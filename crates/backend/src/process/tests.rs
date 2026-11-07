@@ -216,3 +216,26 @@ fn spawning_a_missing_program_is_an_error() {
     };
     assert!(RpcProcess::spawn(&launcher, &SpawnOptions::default()).is_err());
 }
+
+#[test]
+fn taken_events_keep_flowing_and_the_process_stays_usable() {
+    let dir = tempfile::tempdir().unwrap();
+    let launcher = script_launcher(
+        dir.path(),
+        r#"process.stdout.write('{"type":"agent_start"}\n'); process.stdin.resume(); process.stdin.on('end', () => process.exit(0));"#,
+    );
+    let mut process = RpcProcess::spawn(&launcher, &SpawnOptions::default()).unwrap();
+    let events = process.take_events();
+    assert_eq!(
+        events.recv_timeout(TIMEOUT).unwrap(),
+        ProcessEvent::Output(Decoded::Event(RpcEvent::AgentStart))
+    );
+    // The handle left behind is a closed stream, not a second consumer.
+    assert!(process.events().recv_timeout(TIMEOUT).is_err());
+    process.send(&RpcCommand::Abort).unwrap();
+    assert!(matches!(
+        process.shutdown(TIMEOUT).unwrap(),
+        Shutdown::Graceful(_)
+    ));
+    assert_eq!(events.recv_timeout(TIMEOUT).unwrap(), ProcessEvent::Closed);
+}

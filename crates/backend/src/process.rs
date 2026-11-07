@@ -107,6 +107,12 @@ impl RpcProcess {
         &self.events
     }
 
+    /// Hands the output stream to another owner (a UI subscription, say).
+    /// What stays behind is a closed stream, so there is never a second consumer.
+    pub fn take_events(&mut self) -> Receiver<ProcessEvent> {
+        std::mem::replace(&mut self.events, mpsc::channel().1)
+    }
+
     /// Writes one command line to the child's stdin.
     pub fn send(&mut self, command: &RpcCommand) -> io::Result<()> {
         let stdin = self
