@@ -4,14 +4,18 @@
 //! (e.g. `--isolated --model claude-bridge/claude-sonnet-5-5`).
 //!
 //! Layout: `app` (state and wiring), `view/` (one file per component),
-//! `message`, `subscription`, `backend` (startup), plus the small pure helpers
-//! `thread_cache`, `sessions` and `cache_path`.
+//! `message`, `subscription`, `backend` (startup), `refresh_flow` (which session
+//! refresh runs when) and its pure halves `refresh_queue` and `save_throttle`,
+//! plus the small pure helpers `thread_cache`, `sessions` and `cache_path`.
 
 mod app;
 mod backend;
 mod cache_path;
 mod clock;
 mod message;
+mod refresh_flow;
+mod refresh_queue;
+mod save_throttle;
 mod session_refresh;
 mod sessions;
 mod subscription;
@@ -19,6 +23,7 @@ mod text;
 mod thread_cache;
 mod time_ago;
 mod view;
+mod watch_source;
 mod windowing;
 
 use iced::{window, Theme};
