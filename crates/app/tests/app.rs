@@ -471,3 +471,45 @@ mod helpers {
         assert!(opened.chat.helpers.tasks.is_empty());
     }
 }
+
+mod helper_selection {
+    use super::*;
+
+    fn with_helper() -> AppState {
+        let lines = r#"{"schema":"gentle-agents.activity/v1","summary":{"running":1},"tasks":[{"summary":{"id":"t1","status":"running","createdAt":"2026-09-22T10:00:00.000Z"}}]}"#;
+        let raw = serde_json::json!({
+            "type": "extension_ui_request", "id": "w", "method": "setWidget",
+            "widgetKey": "gentle-agents", "widgetLines": [lines]
+        });
+        update(AppState::default(), event(&raw.to_string())).0
+    }
+
+    #[test]
+    fn selecting_a_known_helper_remembers_it() {
+        let (state, commands) = update(with_helper(), intent(Intent::SelectHelper("t1".into())));
+        assert_eq!(state.selected_helper.as_deref(), Some("t1"));
+        assert!(commands.is_empty());
+    }
+
+    #[test]
+    fn selecting_an_unknown_helper_does_nothing() {
+        let (state, _) = update(with_helper(), intent(Intent::SelectHelper("ghost".into())));
+        assert_eq!(state.selected_helper, None);
+    }
+
+    #[test]
+    fn closing_goes_back_to_the_list() {
+        let (state, _) = update(with_helper(), intent(Intent::SelectHelper("t1".into())));
+        let (state, _) = update(state, intent(Intent::CloseHelper));
+        assert_eq!(state.selected_helper, None);
+    }
+
+    #[test]
+    fn a_new_chat_and_opening_a_session_drop_the_selection() {
+        let (selected, _) = update(with_helper(), intent(Intent::SelectHelper("t1".into())));
+        let (fresh, _) = update(selected.clone(), intent(Intent::NewChat));
+        assert_eq!(fresh.selected_helper, None);
+        let (opened, _) = update(selected, intent(Intent::OpenSession("p".into())));
+        assert_eq!(opened.selected_helper, None);
+    }
+}

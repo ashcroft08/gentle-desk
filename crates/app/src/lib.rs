@@ -42,6 +42,8 @@ pub struct AppState {
     pub notices: Vec<Notice>,
     pub sessions: Vec<SessionItem>,
     pub current_session: Option<String>,
+    /// The helper whose thread is open in the panel, if any.
+    pub selected_helper: Option<String>,
     next_notice_id: u64,
 }
 
@@ -62,6 +64,10 @@ pub enum Intent {
     RefreshSessions,
     /// Switch to a saved session and show its history.
     OpenSession(String),
+    /// Open the thread of the helper with this id.
+    SelectHelper(String),
+    /// Back from a helper's thread to the helpers list.
+    CloseHelper,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -236,6 +242,17 @@ fn apply_intent(mut state: AppState, intent: Intent) -> (AppState, Vec<Command>)
             )
         }
         Intent::RefreshSessions => (state, vec![Command::RefreshSessions]),
+        Intent::SelectHelper(id) => {
+            // Only a task the panel knows about can be opened.
+            if state.chat.helpers.tasks.iter().any(|task| task.id == id) {
+                state.selected_helper = Some(id);
+            }
+            (state, Vec::new())
+        }
+        Intent::CloseHelper => {
+            state.selected_helper = None;
+            (state, Vec::new())
+        }
         Intent::OpenSession(path) => {
             let mut commands = Vec::new();
             if state.chat.working {
@@ -245,6 +262,7 @@ fn apply_intent(mut state: AppState, intent: Intent) -> (AppState, Vec<Command>)
                 session_path: path.clone(),
             }));
             state.chat = ChatState::default();
+            state.selected_helper = None;
             state.current_session = Some(path);
             (state, commands)
         }
