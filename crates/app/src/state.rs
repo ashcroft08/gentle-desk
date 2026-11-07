@@ -44,7 +44,8 @@ pub struct Notice {
 pub struct AppState {
     pub chat: ChatState,
     pub notices: Vec<Notice>,
-    /// Set through `Input::SessionsLoaded`, which keeps the search data in step.
+    /// Set through `Input::SessionsLoaded` or `Input::SessionsPrepared`, which
+    /// keep the search data in step.
     pub sessions: Vec<SessionItem>,
     /// What the user typed in the sidebar's search box.
     pub session_query: String,

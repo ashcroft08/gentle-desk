@@ -2,6 +2,7 @@
 
 use gentle_core::rpc::{RpcCommand, RpcEvent, UiAnswer};
 
+use crate::session_prepare::PreparedSessions;
 use crate::state::SessionItem;
 
 /// What the user asked for; the UI only ever emits these.
@@ -36,8 +37,12 @@ pub enum Input {
     /// An RPC event with the wall-clock time (epoch ms) it arrived at. The shell
     /// supplies it so `update` stays pure; only helper bookkeeping uses it.
     RpcAt(RpcEvent, u64),
-    /// The shell finished listing sessions.
+    /// The shell finished listing sessions. Same behaviour as
+    /// `SessionsPrepared(prepare_sessions(items))`, folding included.
     SessionsLoaded(Vec<SessionItem>),
+    /// The shell listed the sessions and built their search data off the UI
+    /// thread, so `update` does not fold anything.
+    SessionsPrepared(PreparedSessions),
 }
 
 /// A side effect for the shell to run.
