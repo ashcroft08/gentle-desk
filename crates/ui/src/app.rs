@@ -10,7 +10,7 @@ use gentle_app::{update, AppState, Command, Input, Intent};
 use gentle_backend::process::{ProcessEvent, RpcProcess};
 use gentle_core::chat::Dialog;
 use gentle_core::rpc::Decoded;
-use iced::widget::{column, row};
+use iced::widget::{column, row, scrollable};
 use iced::{clipboard, Element, Subscription, Task};
 
 use crate::backend;
@@ -35,6 +35,8 @@ pub struct App {
     cache_path: Option<PathBuf>,
     /// A refresh is running on its worker thread; another one waits for it.
     refreshing: bool,
+    /// How far the chat list is scrolled, in pixels (window geometry, not app state).
+    sidebar_offset: f32,
     /// A failure that ends the session (launcher missing, child died).
     fatal: Option<String>,
 }
@@ -52,6 +54,7 @@ impl App {
             index: started.index.map(|index| Arc::new(Mutex::new(index))),
             cache_path: started.cache_path,
             refreshing: false,
+            sidebar_offset: 0.0,
             fatal: started.fatal,
         };
         let loaded = app.dispatch(Input::Intent(Intent::RefreshSessions));
@@ -120,7 +123,20 @@ impl App {
             Message::Header(header::Event::NewChat) => self.intent(Intent::NewChat),
             Message::Sidebar(sidebar::Event::Open(path)) => self.intent(Intent::OpenSession(path)),
             Message::Sidebar(sidebar::Event::QueryChanged(query)) => {
-                self.intent(Intent::SetSessionQuery(query))
+                // A new search starts from the top of its (shorter or longer) list.
+                self.sidebar_offset = 0.0;
+                let to_top = iced::widget::operation::scroll_to(
+                    sidebar::SCROLL_ID,
+                    scrollable::AbsoluteOffset {
+                        x: None,
+                        y: Some(0.0),
+                    },
+                );
+                Task::batch([self.intent(Intent::SetSessionQuery(query)), to_top])
+            }
+            Message::Sidebar(sidebar::Event::Scrolled(offset)) => {
+                self.sidebar_offset = offset;
+                Task::none()
             }
             Message::Thread(thread::Event::Copy(id)) => self.intent(Intent::CopyMessage(id)),
             Message::Thread(thread::Event::LinkClicked(uri)) => {
@@ -219,6 +235,7 @@ impl App {
             query: &self.app.session_query,
             current: self.app.current_session.as_deref(),
             now_ms: clock::now_ms(),
+            offset: self.sidebar_offset,
         });
         let mut layout = row![sessions.map(Message::Sidebar), page];
         // The open helper's thread replaces the list; a task that vanished falls back to it.
