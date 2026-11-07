@@ -7,7 +7,7 @@ fn the_cache_file_sits_under_the_local_app_data_directory() {
         path,
         PathBuf::from("/home/ana/.local/share")
             .join("gentle-desk")
-            .join("session-index-v1.json")
+            .join("session-index.json")
     );
 }
 

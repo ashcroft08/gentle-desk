@@ -88,3 +88,12 @@ fn save_creates_the_missing_directories() {
     save(&path, &snapshot).unwrap();
     assert_eq!(load(&path), Some(snapshot));
 }
+
+#[test]
+fn a_version_one_file_with_unbounded_titles_is_ignored() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("session-index.json");
+    let old = serde_json::json!({ "version": 1, "snapshot": { "sessions_dir": "x", "files": [] } });
+    std::fs::write(&path, old.to_string()).unwrap();
+    assert!(load(&path).is_none());
+}

@@ -13,8 +13,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::session_snapshot::IndexSnapshot;
 
-/// Bumped whenever the snapshot shape changes; an older file is ignored.
-pub const CACHE_VERSION: u32 = 1;
+/// Bumped whenever the snapshot shape or what it holds changes; any other
+/// version is ignored, never migrated. 2: titles are bounded (`MAX_TITLE_CHARS`),
+/// so a version-1 file that still holds whole first messages must not be reused.
+pub const CACHE_VERSION: u32 = 2;
 
 #[derive(Serialize)]
 struct DocumentRef<'a> {
