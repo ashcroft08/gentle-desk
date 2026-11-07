@@ -47,6 +47,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "gentle-term"
+version = "0.1.0"
+dependencies = [
+ "gentle-backend",
+ "gentle-core",
+ "serde_json",
+]
+
+[[package]]
 name = "getrandom"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"

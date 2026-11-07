@@ -8,6 +8,8 @@ Personal project, early stage. Progress and decisions live in [`odd/tasks/`](odd
 
 ```
 crates/gentle-core   UI-free core: RPC protocol, codec, chat state (pure, testable)
+crates/backend       Launcher resolution (npm .cmd shims) and the rpc child process (no orphans)
+crates/term          gentle-term: terminal client, prompt -> streamed reply
 ```
 
 Planned layers, with dependencies in one direction only:

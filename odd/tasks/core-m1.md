@@ -16,8 +16,10 @@ Continues core-m0. M1 = a `backend` crate that launches the real `gentle-shell -
 
 - [x] T1 (S1, S2, S6) `backend` crate: launcher resolution (GENTLE_SHELL_BIN, PATH lookup, .cmd shim -> node + real .mjs, cmd /c fallback), tested — inline — RED not observed (impl and tests written together); 10 tests, clippy/fmt clean — commit: see git log (feat/core-m1)
 - [x] T2 (S1, S3) `backend` process: spawn, stdout bytes -> LineSplitter -> channel, stdin commands, stderr drained, graceful shutdown with no orphans — inline — RED not observed (impl first); 18 backend tests drive real node children; mutation check: without the taskkill /T step the orphan test hangs/fails (grandchild must be spawned detached, libuv otherwise kills it via a job object); clippy/fmt clean — commit: see git log (feat/core-m1)
-- [ ] T3 (S4, S5) terminal binary + visible model errors in the chat state — inline — commit: pending
+- [x] T3 (S4, S5) terminal binary + visible model errors in the chat state — inline — RED observed for the reducer error flag (3 of 4 new tests failed first); renderer written with its tests, then verified against the real gentle-shell: streaming OK, REPL OK, Fable 5.1 credits error shown as "model error" with exit 1, no leftover node processes; main.rs (arg parsing, loop) has no unit tests — commit: see git log (feat/core-m1)
 
 ## Log
 
 - L1: Request (summary of the user's M1 brief): see S1-S7 above, quoted from it. Bugs of the reference app not to repeat: sidebar loaded once, "New chat" no-op by reference equality, `.cmd` spawn without shell, `listAll()` parsing every session file.
+- L2: Real error shape captured from gentle-shell 4.6.0 (Fable 5.1 without credits): an ordinary-looking assistant `message_end` with `stopReason:"error"` and `errorMessage`, plus an extension `notify` (warning) about the rate limit. Reducer now flags it (`ChatMessage.error`); the terminal prints it on stderr as a failure. Open: notices (`notify`) are not in `ChatState` yet — the UI will need them there; `agent_end` with `willRetry:true` ends the turn only on `agent_settled`/final `agent_end`.
+- L3: S3 read as "never leave orphans" (the literal text says "matar huérfanos"); shutdown = close stdin, grace period, then `taskkill /T /F`. Pending of M1 per S7: UI spike, helpers, session index (not started).
