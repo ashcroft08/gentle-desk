@@ -1,0 +1,174 @@
+//! The application: owns the state, runs `gentle-app` commands, wires the
+//! components together. Drawing lives in `view/`, process startup in
+//! `backend`, subscriptions in `subscription`.
+
+use std::time::Duration;
+
+use gentle_app::{update, AppState, Command, Input, Intent};
+use gentle_backend::process::{ProcessEvent, RpcProcess};
+use gentle_backend::session_index::SessionIndex;
+use gentle_core::rpc::Decoded;
+use iced::widget::{column, row};
+use iced::{clipboard, Element, Subscription, Task};
+
+use crate::message::Message;
+use crate::subscription::{self, EventSource};
+use crate::thread_cache::ThreadCache;
+use crate::view::{banner, composer, dialog, header, notices, sidebar, thread};
+use crate::{backend, sessions};
+
+pub struct App {
+    app: AppState,
+    cache: ThreadCache,
+    input: String,
+    dialog_text: String,
+    process: Option<RpcProcess>,
+    events: EventSource,
+    index: Option<SessionIndex>,
+    /// A failure that ends the session (launcher missing, child died).
+    fatal: Option<String>,
+}
+
+impl App {
+    pub fn boot() -> (Self, Task<Message>) {
+        let started = backend::start();
+        let mut app = Self {
+            app: AppState::default(),
+            cache: ThreadCache::default(),
+            input: String::new(),
+            dialog_text: String::new(),
+            process: started.process,
+            events: started.events,
+            index: started.index,
+            fatal: started.fatal,
+        };
+        let loaded = app.dispatch(Input::Intent(Intent::RefreshSessions));
+        let focus = iced::widget::operation::focus(composer::ID);
+        (app, Task::batch([loaded, focus]))
+    }
+
+    /// Feeds an input to the app layer and runs the commands it returns.
+    fn dispatch(&mut self, input: Input) -> Task<Message> {
+        let (state, commands) = update(std::mem::take(&mut self.app), input);
+        self.app = state;
+        self.cache.sync(&self.app.chat);
+        let mut tasks = Vec::new();
+        for command in commands {
+            match command {
+                Command::Send(rpc) => {
+                    let sent = match &mut self.process {
+                        Some(process) => process.send(&rpc).map_err(|e| e.to_string()),
+                        None => Err("gentle-shell is not running".into()),
+                    };
+                    if let Err(error) = sent {
+                        self.fatal = Some(format!("cannot reach gentle-shell: {error}"));
+                    }
+                }
+                Command::CopyToClipboard(text) => tasks.push(clipboard::write(text)),
+                Command::RefreshSessions => tasks.push(self.refresh_sessions()),
+            }
+        }
+        Task::batch(tasks)
+    }
+
+    /// Re-reads the session index (a `stat` per unchanged file) and publishes the list.
+    fn refresh_sessions(&mut self) -> Task<Message> {
+        let Some(index) = &mut self.index else {
+            return Task::none();
+        };
+        if let Err(error) = index.refresh() {
+            eprintln!("cannot read sessions: {error}");
+            return Task::none();
+        }
+        let items = index.entries().iter().map(sessions::to_item).collect();
+        self.dispatch(Input::SessionsLoaded(items))
+    }
+
+    fn intent(&mut self, intent: Intent) -> Task<Message> {
+        self.dispatch(Input::Intent(intent))
+    }
+
+    pub fn update(&mut self, message: Message) -> Task<Message> {
+        match message {
+            Message::Process(event) => self.on_process(event),
+            Message::Header(header::Event::NewChat) => self.intent(Intent::NewChat),
+            Message::Sidebar(sidebar::Event::Open(path)) => self.intent(Intent::OpenSession(path)),
+            Message::Thread(thread::Event::Copy(id)) => self.intent(Intent::CopyMessage(id)),
+            Message::Thread(thread::Event::LinkClicked(uri)) => {
+                eprintln!("link clicked: {uri}");
+                Task::none()
+            }
+            Message::Notices(notices::Event::Dismiss(id)) => self.intent(Intent::DismissNotice(id)),
+            Message::Dialog(dialog::Event::Answer { id, answer }) => {
+                self.dialog_text.clear();
+                self.intent(Intent::AnswerDialog { id, answer })
+            }
+            Message::Dialog(dialog::Event::TextChanged(value)) => {
+                self.dialog_text = value;
+                Task::none()
+            }
+            Message::Composer(composer::Event::Changed(value)) => {
+                self.input = value;
+                Task::none()
+            }
+            Message::Composer(composer::Event::Send) => self.send_prompt(),
+            Message::Composer(composer::Event::Stop) => self.intent(Intent::Abort),
+            Message::Tick => self.intent(Intent::RefreshSessions),
+            Message::CloseRequested => {
+                if let Some(process) = self.process.take() {
+                    let _ = process.shutdown(Duration::from_secs(3));
+                }
+                iced::exit()
+            }
+        }
+    }
+
+    fn on_process(&mut self, event: ProcessEvent) -> Task<Message> {
+        match event {
+            ProcessEvent::Output(Decoded::Event(event)) => self.dispatch(Input::Rpc(event)),
+            ProcessEvent::Output(Decoded::Unknown(_)) => Task::none(),
+            ProcessEvent::Stderr(line) => {
+                eprintln!("[gentle-shell] {line}");
+                Task::none()
+            }
+            ProcessEvent::Closed => {
+                self.fatal
+                    .get_or_insert_with(|| "gentle-shell exited".into());
+                Task::none()
+            }
+        }
+    }
+
+    fn send_prompt(&mut self) -> Task<Message> {
+        let prompt = std::mem::take(&mut self.input);
+        if prompt.trim().is_empty() || self.app.chat.working {
+            self.input = prompt; // keep what the user typed
+            return Task::none();
+        }
+        self.intent(Intent::SendPrompt(prompt))
+    }
+
+    pub fn subscription(&self) -> Subscription<Message> {
+        subscription::subscription(&self.events)
+    }
+
+    pub fn view(&self) -> Element<'_, Message> {
+        let chat = &self.app.chat;
+        let mut page = column![
+            header::view().map(Message::Header),
+            notices::view(&self.app.notices).map(Message::Notices),
+            thread::view(&chat.messages, &self.cache).map(Message::Thread),
+        ];
+        if let Some(error) = &self.fatal {
+            page = page.push(banner::view(error));
+        }
+        if let Some(pending) = chat.pending_dialogs.first() {
+            page = page.push(dialog::view(pending, &self.dialog_text).map(Message::Dialog));
+        }
+        let can_send = !self.input.trim().is_empty() && self.fatal.is_none();
+        let page =
+            page.push(composer::view(&self.input, chat.working, can_send).map(Message::Composer));
+        let sessions = sidebar::view(&self.app.sessions, self.app.current_session.as_deref());
+        row![sessions.map(Message::Sidebar), page].into()
+    }
+}
