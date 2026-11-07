@@ -1,5 +1,6 @@
 //! Everything that can happen to the app: process output, component events, ticks.
 
+use gentle_app::SessionItem;
 use gentle_backend::process::ProcessEvent;
 
 use crate::view::{composer, dialog, header, helper_thread, helpers, notices, sidebar, thread};
@@ -17,5 +18,7 @@ pub enum Message {
     HelperThread(helper_thread::Event),
     /// The periodic session-list refresh.
     Tick,
+    /// The worker thread finished re-reading the session index.
+    SessionsRefreshed(Result<Vec<SessionItem>, String>),
     CloseRequested,
 }

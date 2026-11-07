@@ -2,24 +2,25 @@
 //! components together. Drawing lives in `view/`, process startup in
 //! `backend`, subscriptions in `subscription`.
 
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use gentle_app::{update, AppState, Command, Input, Intent};
 use gentle_backend::process::{ProcessEvent, RpcProcess};
-use gentle_backend::session_index::SessionIndex;
 use gentle_core::chat::Dialog;
 use gentle_core::rpc::Decoded;
 use iced::widget::{column, row};
 use iced::{clipboard, Element, Subscription, Task};
 
+use crate::backend;
 use crate::clock;
 use crate::message::Message;
+use crate::session_refresh::{self, SharedIndex};
 use crate::subscription::{self, EventSource};
 use crate::thread_cache::ThreadCache;
 use crate::view::{
     banner, composer, dialog, header, helper_thread, helpers, notices, sidebar, thread,
 };
-use crate::{backend, sessions};
 
 pub struct App {
     app: AppState,
@@ -28,7 +29,9 @@ pub struct App {
     dialog_text: String,
     process: Option<RpcProcess>,
     events: EventSource,
-    index: Option<SessionIndex>,
+    index: Option<SharedIndex>,
+    /// A refresh is running on its worker thread; another one waits for it.
+    refreshing: bool,
     /// A failure that ends the session (launcher missing, child died).
     fatal: Option<String>,
 }
@@ -43,7 +46,8 @@ impl App {
             dialog_text: String::new(),
             process: started.process,
             events: started.events,
-            index: started.index,
+            index: started.index.map(|index| Arc::new(Mutex::new(index))),
+            refreshing: false,
             fatal: started.fatal,
         };
         let loaded = app.dispatch(Input::Intent(Intent::RefreshSessions));
@@ -86,17 +90,20 @@ impl App {
         Task::batch(tasks)
     }
 
-    /// Re-reads the session index (a `stat` per unchanged file) and publishes the list.
+    /// Starts a refresh of the session index on a worker thread; the list
+    /// arrives later as `Message::SessionsRefreshed`. One at a time.
     fn refresh_sessions(&mut self) -> Task<Message> {
-        let Some(index) = &mut self.index else {
+        let Some(index) = &self.index else {
             return Task::none();
         };
-        if let Err(error) = index.refresh() {
-            eprintln!("cannot read sessions: {error}");
+        if self.refreshing {
             return Task::none();
         }
-        let items = index.entries().iter().map(sessions::to_item).collect();
-        self.dispatch(Input::SessionsLoaded(items))
+        self.refreshing = true;
+        Task::perform(
+            session_refresh::refresh(Arc::clone(index)),
+            Message::SessionsRefreshed,
+        )
     }
 
     fn intent(&mut self, intent: Intent) -> Task<Message> {
@@ -133,6 +140,16 @@ impl App {
             Message::Helpers(helpers::Event::Select(id)) => self.intent(Intent::SelectHelper(id)),
             Message::HelperThread(helper_thread::Event::Back) => self.intent(Intent::CloseHelper),
             Message::Tick => self.intent(Intent::RefreshSessions),
+            Message::SessionsRefreshed(result) => {
+                self.refreshing = false;
+                match result {
+                    Ok(items) => self.dispatch(Input::SessionsLoaded(items)),
+                    Err(error) => {
+                        eprintln!("{error}");
+                        Task::none()
+                    }
+                }
+            }
             Message::CloseRequested => {
                 if let Some(process) = self.process.take() {
                     let _ = process.shutdown(Duration::from_secs(3));
