@@ -1,4 +1,5 @@
-//! What the app listens to: the child's output, the refresh timer, window close.
+//! What the app listens to: the child's output, the watcher's batches, the
+//! refresh timer, window close.
 
 use std::hash::{Hash, Hasher};
 use std::sync::mpsc::Receiver;
@@ -9,6 +10,7 @@ use gentle_backend::process::ProcessEvent;
 use iced::{stream, window, Subscription};
 
 use crate::message::Message;
+use crate::watch_source::{self, WatchSource};
 
 /// The output stream of the child, handed to the subscription once.
 #[derive(Clone, Default)]
@@ -27,11 +29,19 @@ impl Hash for EventSource {
     }
 }
 
-pub fn subscription(source: &EventSource) -> Subscription<Message> {
+/// Everything the window listens to. `delay` is the next full pass and comes
+/// from the app state: iced rebuilds the timer when the duration changes.
+pub fn subscription(
+    source: &EventSource,
+    watch: &WatchSource,
+    delay: Duration,
+) -> Subscription<Message> {
     Subscription::batch([
         child_output(source.clone()),
-        // Sessions change outside this window too (other terminals, other apps).
-        iced::time::every(Duration::from_secs(5)).map(|_| Message::Tick),
+        watch_source::watch_source(watch.clone()),
+        // Watcher batches cover what changed; a slow pass also reconciles what
+        // a watcher can miss, and is the only update without one.
+        iced::time::every(delay).map(|_| Message::Tick),
         window::close_requests().map(|_| Message::CloseRequested),
     ])
 }

@@ -1,8 +1,8 @@
 //! The application: owns the state, runs `gentle-app` commands, wires the
 //! components together. Drawing lives in `view/`, process startup in
-//! `backend`, subscriptions in `subscription`.
+//! `backend`, subscriptions in `subscription`, and the session refresh flow
+//! (which pass runs when) in `refresh_flow`.
 
-use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -16,7 +16,8 @@ use iced::{clipboard, Element, Subscription, Task};
 use crate::backend;
 use crate::clock;
 use crate::message::Message;
-use crate::session_refresh::{self, SharedIndex};
+use crate::refresh_flow::Flow;
+use crate::session_refresh::Shared;
 use crate::subscription::{self, EventSource};
 use crate::thread_cache::ThreadCache;
 use crate::view::{
@@ -30,11 +31,8 @@ pub struct App {
     dialog_text: String,
     process: Option<RpcProcess>,
     events: EventSource,
-    index: Option<SharedIndex>,
-    /// Where the index cache is kept; `None` means this run persists nothing.
-    cache_path: Option<PathBuf>,
-    /// A refresh is running on its worker thread; another one waits for it.
-    refreshing: bool,
+    /// The session index, the watcher and the passes they run.
+    flow: Flow,
     /// How far the chat list is scrolled, in pixels (window geometry, not app state).
     sidebar_offset: f32,
     /// A failure that ends the session (launcher missing, child died).
@@ -44,6 +42,9 @@ pub struct App {
 impl App {
     pub fn boot() -> (Self, Task<Message>) {
         let started = backend::start();
+        let shared = started
+            .index
+            .map(|index| Shared::new(Arc::new(Mutex::new(index)), started.cache_path.clone()));
         let mut app = Self {
             app: AppState::default(),
             cache: ThreadCache::default(),
@@ -51,15 +52,21 @@ impl App {
             dialog_text: String::new(),
             process: started.process,
             events: started.events,
-            index: started.index.map(|index| Arc::new(Mutex::new(index))),
-            cache_path: started.cache_path,
-            refreshing: false,
+            flow: Flow::new(
+                shared,
+                started.sessions_dir,
+                started.watcher,
+                started.watch,
+                started.watch_error,
+            ),
             sidebar_offset: 0.0,
             fatal: started.fatal,
         };
-        let loaded = app.dispatch(Input::Intent(Intent::RefreshSessions));
+        // The window opens empty: the first full pass fills it, whatever the
+        // watcher does afterwards.
+        let first_list = app.flow.on_tick();
         let focus = iced::widget::operation::focus(composer::ID);
-        (app, Task::batch([loaded, focus]))
+        (app, Task::batch([first_list, focus]))
     }
 
     /// Feeds an input to the app layer and runs the commands it returns.
@@ -91,26 +98,10 @@ impl App {
                     }
                 }
                 Command::CopyToClipboard(text) => tasks.push(clipboard::write(text)),
-                Command::RefreshSessions => tasks.push(self.refresh_sessions()),
+                Command::RefreshSessions => tasks.push(self.flow.on_refresh_command()),
             }
         }
         Task::batch(tasks)
-    }
-
-    /// Starts a refresh of the session index on a worker thread; the list
-    /// arrives later as `Message::SessionsRefreshed`. One at a time.
-    fn refresh_sessions(&mut self) -> Task<Message> {
-        let Some(index) = &self.index else {
-            return Task::none();
-        };
-        if self.refreshing {
-            return Task::none();
-        }
-        self.refreshing = true;
-        Task::perform(
-            session_refresh::refresh(Arc::clone(index), self.cache_path.clone()),
-            Message::SessionsRefreshed,
-        )
     }
 
     fn intent(&mut self, intent: Intent) -> Task<Message> {
@@ -162,18 +153,21 @@ impl App {
             Message::Composer(composer::Event::Stop) => self.intent(Intent::Abort),
             Message::Helpers(helpers::Event::Select(id)) => self.intent(Intent::SelectHelper(id)),
             Message::HelperThread(helper_thread::Event::Back) => self.intent(Intent::CloseHelper),
-            Message::Tick => self.intent(Intent::RefreshSessions),
+            Message::Tick => self.flow.on_tick(),
+            Message::SessionsChanged(batch) => self.flow.on_batch(batch),
+            Message::WatcherLost => self.flow.on_watcher_lost(),
             Message::SessionsRefreshed(result) => {
-                self.refreshing = false;
-                match result {
-                    Ok(items) => self.dispatch(Input::SessionsLoaded(items)),
-                    Err(error) => {
-                        eprintln!("{error}");
-                        Task::none()
-                    }
-                }
+                let Some(prepared) = self.flow.settle(result) else {
+                    // A failed pass only logs; the next request tries again.
+                    return self.flow.pump();
+                };
+                let shown = self.dispatch(Input::SessionsPrepared(prepared));
+                Task::batch([shown, self.flow.pump()])
             }
             Message::CloseRequested => {
+                // The cache is the next run's head start: write what the
+                // throttle held back before the window goes away.
+                self.flow.flush();
                 if let Some(process) = self.process.take() {
                     let _ = process.shutdown(Duration::from_secs(3));
                 }
@@ -210,7 +204,7 @@ impl App {
     }
 
     pub fn subscription(&self) -> Subscription<Message> {
-        subscription::subscription(&self.events)
+        subscription::subscription(&self.events, self.flow.watch(), self.flow.tick_delay())
     }
 
     pub fn view(&self) -> Element<'_, Message> {
