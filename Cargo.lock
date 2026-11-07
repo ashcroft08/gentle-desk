@@ -1036,6 +1036,7 @@ name = "gentle-backend"
 version = "0.1.0"
 dependencies = [
  "gentle-core",
+ "serde",
  "serde_json",
  "tempfile",
 ]
@@ -1044,6 +1045,7 @@ dependencies = [
 name = "gentle-core"
 version = "0.1.0"
 dependencies = [
+ "serde",
  "serde_json",
 ]
 

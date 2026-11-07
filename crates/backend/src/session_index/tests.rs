@@ -1,6 +1,7 @@
 use super::*;
-use std::fs::OpenOptions;
+use std::fs::{File, OpenOptions};
 use std::io::Write;
+use std::path::Path;
 use std::time::Duration;
 
 fn header(id: &str, timestamp: &str) -> String {
@@ -289,4 +290,170 @@ fn a_session_without_messages_is_ordered_by_creation_time() {
         .map(|e| e.summary.id.clone())
         .collect();
     assert_eq!(ids, ["late", "early"]);
+}
+
+/// A second index over the same home, warmed from `index`'s snapshot: the
+/// state a persisted cache brings back on the next run.
+fn restored(index: &SessionIndex) -> SessionIndex {
+    let mut fresh = SessionIndex::new(index.sessions_dir.clone());
+    fresh.restore(index.snapshot());
+    fresh
+}
+
+#[test]
+fn a_snapshot_round_trip_keeps_every_entry_and_the_order() {
+    let home = Home::new();
+    home.write(
+        "--C--a--",
+        "old",
+        &[
+            header("old", "2026-01-01T00:00:00.000Z"),
+            user("viejo", "2026-01-01T00:01:00.000Z"),
+        ],
+    );
+    home.write(
+        "--C--b--",
+        "new",
+        &[header("new", "2026-02-01T00:00:00.000Z")],
+    );
+    let mut index = home.index();
+    index.refresh().unwrap();
+
+    let fresh = restored(&index);
+    assert_eq!(fresh.entries(), index.entries());
+    let ids: Vec<_> = fresh
+        .entries()
+        .iter()
+        .map(|e| e.summary.id.clone())
+        .collect();
+    assert_eq!(ids, ["new", "old"]);
+}
+
+#[test]
+fn a_restored_index_reads_nothing_when_the_home_is_unchanged() {
+    let home = Home::new();
+    home.write(
+        "--C--a--",
+        "s",
+        &[
+            header("s", "2026-01-01T00:00:00.000Z"),
+            user("hola", "2026-01-01T00:01:00.000Z"),
+        ],
+    );
+    let mut index = home.index();
+    index.refresh().unwrap();
+
+    let mut fresh = restored(&index);
+    let stats = fresh.refresh().unwrap();
+    assert_eq!(
+        stats,
+        RefreshStats {
+            files: 1,
+            ..RefreshStats::default()
+        }
+    );
+    assert_eq!(fresh.entries(), index.entries());
+}
+
+#[test]
+fn a_restored_index_reads_only_the_appended_bytes() {
+    let home = Home::new();
+    let path = home.write(
+        "--C--a--",
+        "s",
+        &[
+            header("s", "2026-01-01T00:00:00.000Z"),
+            user("hola", "2026-01-01T00:01:00.000Z"),
+        ],
+    );
+    let mut index = home.index();
+    index.refresh().unwrap();
+
+    let extra = format!("{}\n", user("segundo", "2026-01-01T00:02:00.000Z"));
+    append(&path, &extra);
+    let mut fresh = restored(&index);
+    let stats = fresh.refresh().unwrap();
+    assert_eq!((stats.rescanned, stats.appended), (0, 1));
+    assert_eq!(stats.bytes_read, extra.len() as u64);
+    let entry = &fresh.entries()[0];
+    assert_eq!(entry.summary.message_count, 2);
+    assert_eq!(entry.summary.first_message.as_deref(), Some("hola"));
+}
+
+#[test]
+fn a_restored_index_forgets_a_deleted_file() {
+    let home = Home::new();
+    let path = home.write("--C--a--", "s", &[header("s", "2026-01-01T00:00:00.000Z")]);
+    let mut index = home.index();
+    index.refresh().unwrap();
+
+    fs::remove_file(path).unwrap();
+    let mut fresh = restored(&index);
+    let stats = fresh.refresh().unwrap();
+    assert_eq!(stats.removed, 1);
+    assert!(fresh.entries().is_empty());
+}
+
+#[test]
+fn a_restored_file_rewritten_with_the_same_size_is_rescanned() {
+    let home = Home::new();
+    let lines = |text: &str| {
+        vec![
+            header("s", "2026-01-01T00:00:00.000Z"),
+            user(text, "2026-01-01T00:01:00.000Z"),
+        ]
+    };
+    let path = home.write("--C--a--", "s", &lines("aaaa"));
+    let mut index = home.index();
+    index.refresh().unwrap();
+
+    home.write("--C--a--", "s", &lines("bbbb"));
+    bump_mtime(&path, 5);
+    let mut fresh = restored(&index);
+    let stats = fresh.refresh().unwrap();
+    assert_eq!((stats.rescanned, stats.appended), (1, 0));
+    assert_eq!(
+        fresh.entries()[0].summary.first_message.as_deref(),
+        Some("bbbb")
+    );
+}
+
+#[test]
+fn a_snapshot_for_another_sessions_directory_is_ignored() {
+    let home = Home::new();
+    home.write("--C--a--", "s", &[header("s", "2026-01-01T00:00:00.000Z")]);
+    let mut index = home.index();
+    index.refresh().unwrap();
+
+    // The same files under a second home: the snapshot names the first one.
+    let other = Home::new();
+    other.write("--C--a--", "s", &[header("s", "2026-01-01T00:00:00.000Z")]);
+    let mut elsewhere = SessionIndex::new(other.sessions());
+    elsewhere.restore(index.snapshot());
+    let stats = elsewhere.refresh().unwrap();
+    // Ignored: the files are read again instead of being taken from the cache.
+    assert_eq!((stats.files, stats.rescanned), (1, 1));
+    assert_eq!(elsewhere.entries().len(), 1);
+}
+
+/// A cache that claims bytes it never parsed would silently drop the rest of a
+/// file, so such an entry is dropped and the file is scanned again.
+#[test]
+fn a_snapshot_entry_past_the_end_of_its_file_is_dropped() {
+    let home = Home::new();
+    let path = home.write("--C--a--", "s", &[header("s", "2026-01-01T00:00:00.000Z")]);
+    let mut index = home.index();
+    index.refresh().unwrap();
+    let mut snapshot = index.snapshot();
+    snapshot.files[0].parsed_len = usize::MAX as u64;
+
+    append(
+        &path,
+        &format!("{}\n", user("hola", "2026-01-01T00:01:00.000Z")),
+    );
+    let mut fresh = SessionIndex::new(home.sessions());
+    fresh.restore(snapshot);
+    let stats = fresh.refresh().unwrap();
+    assert_eq!(stats.rescanned, 1);
+    assert_eq!(fresh.entries()[0].summary.message_count, 1);
 }
