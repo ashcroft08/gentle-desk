@@ -8,6 +8,8 @@ pub mod launcher;
 pub mod process;
 pub mod session_cache;
 pub mod session_index;
+pub mod session_schedule;
 pub mod session_snapshot;
+pub mod session_watch;
 
 pub use session_snapshot::{FileSnapshot, IndexSnapshot};

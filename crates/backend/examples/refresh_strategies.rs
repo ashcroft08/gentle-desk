@@ -9,7 +9,8 @@
 //!
 //! A: the shipped 5 s polling, timed on a warm index (the baseline).
 //! B: cost-bounded polling, `max(5 s, K x last pass)` with K = 20, from the
-//!    measured pass times (`schedule.rs`, unit-tested).
+//!    measured pass times, scheduled by the shipped, unit-tested
+//!    `gentle_backend::session_schedule`.
 //! C: a file-system watcher (`notify`): setup, idle cost, event latency, and
 //!    whether a burst of creations loses or repeats events (`watcher.rs`).
 //!
@@ -26,8 +27,6 @@ mod probes;
 mod proc;
 #[path = "refresh_strategies/report.rs"]
 mod report;
-#[path = "refresh_strategies/schedule.rs"]
-mod schedule;
 #[path = "refresh_strategies/watcher.rs"]
 mod watcher;
 

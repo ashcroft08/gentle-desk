@@ -10,10 +10,10 @@ use std::path::Path;
 use std::time::{Duration, Instant};
 
 use gentle_backend::session_index::SessionIndex;
+use gentle_backend::session_schedule::next_delay;
 
 use crate::probes;
 use crate::report::{self, Spread};
-use crate::schedule::next_delay;
 
 /// The cadence the app ships today (`crates/ui/src/subscription.rs`).
 const BASE_INTERVAL: Duration = Duration::from_secs(5);
