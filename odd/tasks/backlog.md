@@ -7,8 +7,11 @@ Ordered by (1) shipped-but-unverified first, (2) risk of user-visible problems, 
 3. **DONE (refresh off the UI thread + persisted cache)** — **Session list performance, as one batch**: refresh off the UI thread, then persist the index cache across runs (the second depends on the first's shape).
 4. **DONE (no optimization needed; see perf-check-m11.md)** — **Long-thread performance check** (measure first; optimize only if it hurts).
 5. **Rename / delete sessions** (needs two decisions: how pi stores a name, and a confirmation step before deleting a file).
-6. **Housekeeping** (search/filter chats in the sidebar moves to the front of this item, see perf-check-m11.md): tests for `gentle-term` argument parsing, markdown in helper thread items, bump the `actions/checkout` major version, project filter in the sidebar.
+6. **Housekeeping** (chat search is DONE, see session-search-m12.md): tests for `gentle-term` argument parsing, markdown in helper thread items, bump the `actions/checkout` major version, project filter in the sidebar.
 
 ## Log
 
 - L1: "ordena lo que toca hacer y dale" — order above; starting with 1.
+7. **Virtualized sidebar** (step 2 of session-list-design.md): fixed-height rows, windowed from `scrollable::on_scroll`; prototype first.
+8. **Data-level window for the thread** (step 3): last N messages + "load earlier", markdown parsed only for the window.
+9. **`SessionStore` / SQLite** (step 4): only if the user wants to search inside message text or a home passes ~100 000 chats.

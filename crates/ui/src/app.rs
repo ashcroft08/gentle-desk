@@ -119,6 +119,9 @@ impl App {
             Message::Process(event) => self.on_process(event),
             Message::Header(header::Event::NewChat) => self.intent(Intent::NewChat),
             Message::Sidebar(sidebar::Event::Open(path)) => self.intent(Intent::OpenSession(path)),
+            Message::Sidebar(sidebar::Event::QueryChanged(query)) => {
+                self.intent(Intent::SetSessionQuery(query))
+            }
             Message::Thread(thread::Event::Copy(id)) => self.intent(Intent::CopyMessage(id)),
             Message::Thread(thread::Event::LinkClicked(uri)) => {
                 eprintln!("link clicked: {uri}");
@@ -210,11 +213,13 @@ impl App {
         let can_send = !self.input.trim().is_empty() && self.fatal.is_none();
         let page =
             page.push(composer::view(&self.input, chat.working, can_send).map(Message::Composer));
-        let sessions = sidebar::view(
-            &self.app.sessions,
-            self.app.current_session.as_deref(),
-            clock::now_ms(),
-        );
+        let sessions = sidebar::view(sidebar::Props {
+            visible: self.app.visible_sessions(),
+            total: self.app.sessions.len(),
+            query: &self.app.session_query,
+            current: self.app.current_session.as_deref(),
+            now_ms: clock::now_ms(),
+        });
         let mut layout = row![sessions.map(Message::Sidebar), page];
         // The open helper's thread replaces the list; a task that vanished falls back to it.
         let open = self
