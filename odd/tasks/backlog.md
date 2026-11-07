@@ -15,5 +15,5 @@ Ordered by (1) shipped-but-unverified first, (2) risk of user-visible problems, 
 7. **DONE (virtual-sidebar-m13.md)** — **Virtualized sidebar** (step 2 of session-list-design.md): fixed-height rows, windowed from `scrollable::on_scroll`; prototype first.
 8. **Data-level window for the thread** (step 3): last N messages + "load earlier", markdown parsed only for the window.
 9. **`SessionStore` / SQLite** (step 4): only if the user wants to search inside message text or a home passes ~100 000 chats.
-10. **Refresh strategy that does not scale with the number of files** (found in virtual-sidebar-m13.md): at 50 000 chats the 5 s polling costs ~30 % of a core. File-system watcher or cost-bounded polling; decide with measurements.
+10. **MEASURED (refresh-strategy-m15.md, decision pending)** — **Refresh strategy that does not scale with the number of files** (found in virtual-sidebar-m13.md): at 50 000 chats the 5 s polling costs ~30 % of a core. File-system watcher or cost-bounded polling; decide with measurements.
 11. **DONE (bounded-title-m14.md)** — **Bounded session title in the summary and the cache** (found in virtual-sidebar-m13.md): the whole first message is kept in memory and persisted (65 MB cache at 50 000 chats).
