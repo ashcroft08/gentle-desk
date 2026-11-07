@@ -7,6 +7,7 @@ use std::time::Duration;
 use gentle_app::{update, AppState, Command, Input, Intent};
 use gentle_backend::process::{ProcessEvent, RpcProcess};
 use gentle_backend::session_index::SessionIndex;
+use gentle_core::chat::Dialog;
 use gentle_core::rpc::Decoded;
 use iced::widget::{column, row};
 use iced::{clipboard, Element, Subscription, Task};
@@ -52,10 +53,21 @@ impl App {
 
     /// Feeds an input to the app layer and runs the commands it returns.
     fn dispatch(&mut self, input: Input) -> Task<Message> {
+        let dialog_before = self.app.chat.pending_dialogs.first().cloned();
         let (state, commands) = update(std::mem::take(&mut self.app), input);
         self.app = state;
         self.cache.sync(&self.app.chat);
         let mut tasks = Vec::new();
+        // A new text dialog takes the keyboard so the user can type at once.
+        let dialog_now = self.app.chat.pending_dialogs.first();
+        if dialog_now != dialog_before.as_ref()
+            && matches!(
+                dialog_now,
+                Some(Dialog::Input { .. } | Dialog::Editor { .. })
+            )
+        {
+            tasks.push(iced::widget::operation::focus(dialog::INPUT_ID));
+        }
         for command in commands {
             match command {
                 Command::Send(rpc) => {
@@ -104,7 +116,9 @@ impl App {
             Message::Notices(notices::Event::Dismiss(id)) => self.intent(Intent::DismissNotice(id)),
             Message::Dialog(dialog::Event::Answer { id, answer }) => {
                 self.dialog_text.clear();
-                self.intent(Intent::AnswerDialog { id, answer })
+                // The keyboard goes back to the prompt box once the dialog is gone.
+                let answered = self.intent(Intent::AnswerDialog { id, answer });
+                Task::batch([answered, iced::widget::operation::focus(composer::ID)])
             }
             Message::Dialog(dialog::Event::TextChanged(value)) => {
                 self.dialog_text = value;

@@ -5,6 +5,9 @@ use gentle_core::rpc::UiAnswer;
 use iced::widget::{button, column, container, row, text, text_input};
 use iced::{Element, Length};
 
+/// Id of the text box of an input/editor dialog, focused when the dialog appears.
+pub const INPUT_ID: &str = "dialog-input";
+
 #[derive(Debug, Clone)]
 pub enum Event {
     Answer {
@@ -80,6 +83,7 @@ fn text_dialog<'a>(
     column![
         text(title).size(16),
         text_input(placeholder, &value)
+            .id(INPUT_ID)
             .on_input(Event::TextChanged)
             .on_submit(submit(value.clone())),
         row![

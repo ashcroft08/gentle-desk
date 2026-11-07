@@ -2,7 +2,7 @@
 
 Ordered by (1) shipped-but-unverified first, (2) risk of user-visible problems, (3) dependencies, (4) new features, (5) housekeeping. Each batch = one branch + one pull request, checked by CI before `main`.
 
-1. **GUI checks of shipped-but-unverified paths** (feat/gui-checks, `gui-checks-m7.md`): model-error box, extension dialogs (confirm/select/input/editor), Stop button; fix what breaks. Uses a stand-in gentle-shell, no model cost.
+1. **DONE** — **GUI checks of shipped-but-unverified paths** (feat/gui-checks, `gui-checks-m7.md`): model-error box, extension dialogs (confirm/select/input/editor), Stop button; fix what breaks. Uses a stand-in gentle-shell, no model cost.
 2. **Visual polish that blocks readability**: helper card colours/contrast, `done` colour, timestamps in the sidebar.
 3. **Session list performance, as one batch**: refresh off the UI thread, then persist the index cache across runs (the second depends on the first's shape).
 4. **Long-thread performance check** (measure first; optimize only if it hurts).
