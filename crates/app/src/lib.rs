@@ -112,6 +112,14 @@ fn apply_event(state: AppState, event: &RpcEvent) -> (AppState, Vec<Command>) {
 }
 
 fn push_notice(state: &mut AppState, level: NoticeLevel, text: String) {
+    // Extensions repeat their notices (every session switch re-announces itself).
+    if state
+        .notices
+        .iter()
+        .any(|notice| notice.level == level && notice.text == text)
+    {
+        return;
+    }
     state.notices.push(Notice {
         id: state.next_notice_id,
         level,

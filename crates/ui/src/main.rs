@@ -3,6 +3,7 @@
 //! `gentle-backend`. Command line arguments are forwarded to `gentle-shell`
 //! (e.g. `--isolated --model claude-bridge/claude-sonnet-5-5`).
 
+mod sessions;
 mod thread;
 
 use std::hash::{Hash, Hasher};
@@ -11,8 +12,10 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use gentle_app::{update, AppState, Command, Input, Intent, Notice, NoticeLevel};
+use gentle_backend::home::{agent_dir, with_home_flag, HomeEnv};
 use gentle_backend::launcher::{self, LauncherEnv};
 use gentle_backend::process::{ProcessEvent, RpcProcess, SpawnOptions};
+use gentle_backend::session_index::SessionIndex;
 use gentle_core::chat::{ChatMessage, ChatRole, Dialog};
 use gentle_core::rpc::{Decoded, UiAnswer};
 use iced::widget::{button, column, container, markdown, row, scrollable, text, text_input, Space};
@@ -66,6 +69,8 @@ struct App {
     dialog_text: String,
     process: Option<RpcProcess>,
     events: EventSource,
+    /// `None` when the pi home cannot be resolved: the sidebar stays empty.
+    index: Option<SessionIndex>,
     /// A failure that ends the session (launcher missing, child died).
     fatal: Option<String>,
 }
@@ -73,11 +78,14 @@ struct App {
 impl App {
     fn boot() -> (Self, Task<Message>) {
         let events = EventSource(Arc::default());
+        let home_env = HomeEnv::from_process();
+        let args = with_home_flag(std::env::args_os().skip(1).collect(), &home_env);
+        let index = agent_dir(&args, &home_env).map(|dir| SessionIndex::new(dir.join("sessions")));
         let started = launcher::resolve(&LauncherEnv::from_process())
             .map_err(|e| e.to_string())
             .and_then(|launcher| {
                 let options = SpawnOptions {
-                    args: std::env::args_os().skip(1).collect(),
+                    args,
                     // pi's rpc mode only serves extension UI requests with an interactive host.
                     env: vec![("GENTLE_SHELL_INTERACTIVE_HOST".into(), "1".into())],
                     cwd: None,
@@ -92,16 +100,21 @@ impl App {
             }
             Err(error) => (None, Some(error)),
         };
-        let app = Self {
+        let mut app = Self {
             app: AppState::default(),
             cache: ThreadCache::default(),
             input: String::new(),
             dialog_text: String::new(),
             process,
             events,
+            index,
             fatal,
         };
-        (app, iced::widget::operation::focus(COMPOSER))
+        let loaded = app.dispatch(Input::Intent(Intent::RefreshSessions));
+        (
+            app,
+            Task::batch([loaded, iced::widget::operation::focus(COMPOSER)]),
+        )
     }
 
     /// Feeds an input to the app layer and runs the commands it returns.
@@ -109,20 +122,36 @@ impl App {
         let (state, commands) = update(std::mem::take(&mut self.app), input);
         self.app = state;
         self.cache.sync(&self.app.chat);
-        let tasks = commands.into_iter().map(|command| match command {
-            Command::Send(rpc) => {
-                let sent = match &mut self.process {
-                    Some(process) => process.send(&rpc).map_err(|e| e.to_string()),
-                    None => Err("gentle-shell is not running".into()),
-                };
-                if let Err(error) = sent {
-                    self.fatal = Some(format!("cannot reach gentle-shell: {error}"));
+        let mut tasks = Vec::new();
+        for command in commands {
+            match command {
+                Command::Send(rpc) => {
+                    let sent = match &mut self.process {
+                        Some(process) => process.send(&rpc).map_err(|e| e.to_string()),
+                        None => Err("gentle-shell is not running".into()),
+                    };
+                    if let Err(error) = sent {
+                        self.fatal = Some(format!("cannot reach gentle-shell: {error}"));
+                    }
                 }
-                Task::none()
+                Command::CopyToClipboard(text) => tasks.push(clipboard::write(text)),
+                Command::RefreshSessions => tasks.push(self.refresh_sessions()),
             }
-            Command::CopyToClipboard(text) => clipboard::write(text),
-        });
+        }
         Task::batch(tasks)
+    }
+
+    /// Re-reads the session index (a `stat` per unchanged file) and publishes the list.
+    fn refresh_sessions(&mut self) -> Task<Message> {
+        let Some(index) = &mut self.index else {
+            return Task::none();
+        };
+        if let Err(error) = index.refresh() {
+            eprintln!("cannot read sessions: {error}");
+            return Task::none();
+        }
+        let items = index.entries().iter().map(sessions::to_item).collect();
+        self.dispatch(Input::SessionsLoaded(items))
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
@@ -194,6 +223,9 @@ impl App {
         });
         Subscription::batch([
             events,
+            // Sessions change outside this window too (other terminals, other apps).
+            iced::time::every(Duration::from_secs(5))
+                .map(|_| Message::Intent(Intent::RefreshSessions)),
             window::close_requests().map(|_| Message::CloseRequested),
         ])
     }
@@ -232,7 +264,44 @@ impl App {
         if let Some(dialog) = self.app.chat.pending_dialogs.first() {
             page = page.push(self.dialog_view(dialog));
         }
-        page.push(self.composer()).into()
+        let main = page.push(self.composer());
+        row![self.sidebar(), main].into()
+    }
+
+    fn sidebar(&self) -> Element<'_, Message> {
+        let current = self.app.current_session.as_deref();
+        let rows = self.app.sessions.iter().map(|session| {
+            let style: fn(&Theme, button::Status) -> button::Style =
+                if current == Some(session.path.as_str()) {
+                    button::primary
+                } else {
+                    button::text
+                };
+            let project = session.cwd.rsplit(['\\', '/']).next().unwrap_or("");
+            button(
+                column![
+                    text(&session.title).size(14),
+                    text(format!("{} msgs · {project}", session.message_count)).size(11),
+                ]
+                .spacing(2),
+            )
+            .width(Length::Fill)
+            .style(style)
+            .on_press(Message::Intent(Intent::OpenSession(session.path.clone())))
+            .into()
+        });
+        let list: Element<'_, Message> = if self.app.sessions.is_empty() {
+            text("No saved chats yet").size(13).into()
+        } else {
+            scrollable(column(rows).spacing(2))
+                .height(Length::Fill)
+                .into()
+        };
+        container(column![text("Chats").size(16), list].spacing(8).padding(12))
+            .width(260)
+            .height(Length::Fill)
+            .style(container::bordered_box)
+            .into()
     }
 
     fn message_view<'a>(&'a self, index: usize, message: &'a ChatMessage) -> Element<'a, Message> {

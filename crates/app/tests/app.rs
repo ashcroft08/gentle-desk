@@ -170,21 +170,39 @@ mod notices {
         assert!(state.notices.is_empty());
     }
 
+    fn notify(text: &str) -> Input {
+        event(&format!(
+            r#"{{"type":"extension_ui_request","id":"n","method":"notify","message":"{text}","notifyType":"warning"}}"#
+        ))
+    }
+
+    #[test]
+    fn an_identical_notice_already_on_screen_is_not_repeated() {
+        let (state, _) = run(AppState::default(), vec![event(NOTIFY), event(NOTIFY)]);
+        assert_eq!(state.notices.len(), 1);
+        // Once dismissed it may come back: it is news again.
+        let id = state.notices[0].id;
+        let (state, _) = update(state, intent(Intent::DismissNotice(id)));
+        assert!(state.notices.is_empty());
+        let (state, _) = update(state, event(NOTIFY));
+        assert_eq!(state.notices.len(), 1);
+    }
+
     #[test]
     fn dismissing_removes_only_that_notice_and_ids_are_never_reused() {
-        let (state, _) = run(AppState::default(), vec![event(NOTIFY), event(NOTIFY)]);
+        let (state, _) = run(AppState::default(), vec![notify("a"), notify("b")]);
         let (first, second) = (state.notices[0].id, state.notices[1].id);
         assert_ne!(first, second);
         let (state, _) = update(state, intent(Intent::DismissNotice(first)));
         assert_eq!(state.notices.len(), 1);
         assert_eq!(state.notices[0].id, second);
-        let (state, _) = update(state, event(NOTIFY));
+        let (state, _) = update(state, notify("c"));
         assert!(state.notices.iter().all(|n| n.id != first));
     }
 
     #[test]
     fn only_the_latest_fifty_notices_are_kept() {
-        let inputs = (0..60).map(|_| event(NOTIFY)).collect();
+        let inputs = (0..60).map(|n| notify(&format!("n{n}"))).collect();
         let (state, _) = run(AppState::default(), inputs);
         assert_eq!(state.notices.len(), 50);
         assert_eq!(state.notices.last().unwrap().id, 59);
