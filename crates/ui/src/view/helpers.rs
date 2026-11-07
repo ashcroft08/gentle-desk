@@ -49,7 +49,11 @@ fn card(task: &HelperTask) -> Element<'_, Event> {
         body = body.push(text(step).size(11));
     }
     if let Some(error) = &task.error {
-        body = body.push(text(error).size(11).style(status_style(HelperStatus::Failed)));
+        body = body.push(
+            text(error)
+                .size(11)
+                .style(status_style(HelperStatus::Failed)),
+        );
     }
     // A transparent button inside the same card the thread view uses, so the
     // card keeps the theme's own background and the status colours stay readable.
