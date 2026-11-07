@@ -5,3 +5,4 @@
 
 pub mod launcher;
 pub mod process;
+pub mod session_index;

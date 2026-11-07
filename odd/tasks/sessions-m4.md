@@ -13,7 +13,7 @@ List pi's saved sessions without re-reading every file, keep the list fresh, and
 ## Tasks
 
 - [x] T1 (S3, S4) core: pure `SessionScanner` (line-by-line accumulator) + ISO timestamp parsing — RED: first run 2 of 12 failed, both due to a wrong hand-computed epoch constant in my test (checked the implementation against node Date.parse, fixed the constant); 12 tests, clippy/fmt clean — commit: see git log (feat/sessions-m4)
-- [ ] T2 (S1, S2, S4) backend: `SessionIndex` with per-file cache (size + mtime, parse only appended bytes, rescan on rewrite, drop deleted) — commit: pending
+- [x] T2 (S1, S2, S4) backend: `SessionIndex` with per-file cache (size + mtime, parse only appended bytes, rescan on rewrite, drop deleted) — RED not observed (implementation written first); instead 3 mutants killed (no cache reuse, append from byte 0, keep deleted files); 10 tests; on the 14 real sessions the listing is identical to pi's own SessionManager.listAll() (modified, message count, cwd, title): first refresh 1.8 MB in 37 ms, second 0 bytes in under 1 ms; `examples/list_sessions.rs` is the manual check — commit: see git log (feat/sessions-m4)
 - [ ] T3 (S2, S3) app: sessions list state, refresh input, OpenSession intent (switch_session + get_messages history) — commit: pending
 - [ ] T4 (S2) ui: sidebar with the list, refreshed on start, after each turn and on New chat; click opens — commit: pending
 
