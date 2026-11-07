@@ -10,7 +10,7 @@ pub fn cache_file(local_app_data: Option<OsString>) -> Option<PathBuf> {
     Some(
         PathBuf::from(root)
             .join("gentle-desk")
-            .join("session-index-v1.json"),
+            .join("session-index.json"),
     )
 }
 
