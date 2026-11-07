@@ -11,7 +11,6 @@ fn run(lines: &[&str]) -> Vec<Out> {
         let Decoded::Event(event) = decode_line(line) else {
             panic!("not an event: {line}")
         };
-        out.extend(notice(&event));
         state = reduce_chat(state, &event);
         out.extend(renderer.render(&state));
     }
@@ -73,18 +72,5 @@ fn a_second_reply_streams_from_its_own_start() {
             Out::Text("dos".into()),
             Out::EndOfReply
         ]
-    );
-}
-
-#[test]
-fn only_notify_requests_become_notices() {
-    let notify = r#"{"type":"extension_ui_request","id":"1","method":"notify","message":"rate limit reached","notifyType":"warning"}"#;
-    let status = r#"{"type":"extension_ui_request","id":"2","method":"setStatus","statusKey":"x","statusText":"y"}"#;
-    assert_eq!(
-        run(&[notify, status]),
-        vec![Out::Notice {
-            level: "warning".into(),
-            text: "rate limit reached".into()
-        }]
     );
 }

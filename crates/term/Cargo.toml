@@ -8,4 +8,4 @@ description = "Terminal client for gentle-shell: prompt in, streamed reply out. 
 [dependencies]
 gentle-core = { path = "../gentle-core" }
 gentle-backend = { path = "../backend" }
-serde_json = "1"
+gentle-app = { path = "../app" }

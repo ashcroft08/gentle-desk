@@ -16,8 +16,10 @@ Middle layer between `ui` and `backend` (core-m0 S4): pure and testable, no I/O,
 - [x] T1 (S1, S2, S5) `gentle-app`: AppState, Intent/Input/Command, `update`; SendPrompt, Abort, NewChat — RED observed (stub: 12 of 20 failed); 20 tests green, clippy/fmt clean — commit: see git log (feat/app-m2)
 - [x] T2 (S3) notices from `notify` events (level, id, cap, dismiss) — RED observed (stub: 12 of 20 failed); 20 tests green, clippy/fmt clean — commit: see git log (feat/app-m2)
 - [x] T3 (S4) CopyMessage intent + dialog answers removing pending dialogs — RED observed (stub: 12 of 20 failed); 20 tests green, clippy/fmt clean — commit: see git log (feat/app-m2)
-- [ ] T4 Wire `gentle-term` to `update` instead of its own loop logic (proves the layer end to end) — commit: pending
+- [x] T4 Wire `gentle-term` to `update` instead of its own loop logic (proves the layer end to end) — refactor, behaviour unchanged: 99 tests green (render tests lost the notice case, now covered by app tests); verified against the real gentle-shell: REPL OK, Fable credits error visible with exit 1, no leftover node — commit: see git log (feat/app-m2)
 
 ## Log
 
 - L1: "de las opciones que me diste vamos con la 1, el boton de copiar para no complicarnos. continua"
+- L2: The terminal no longer keeps its own notice/dialog bookkeeping: `dispatch` runs `update` and executes `Command`s. Pending dialogs are now removed by `AnswerDialog` (the core reducer never removes them). Rules chosen: prompts are ignored while the agent works; NewChat while working sends Abort then NewSession and always sends NewSession; at most 50 notices.
+- L3: Still open: `iced` UI crate (thread, markdown, Copy button wired to `Command::CopyToClipboard`), long-thread perf check, helpers (`setWidget` gentle-agents.activity/v1), incremental session index, tests for `gentle-term` main (arg parsing).

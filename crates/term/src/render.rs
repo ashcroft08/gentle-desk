@@ -5,8 +5,6 @@
 //! message was already printed and emitting just the new tail.
 
 use gentle_core::chat::{ChatRole, ChatState};
-use gentle_core::rpc::{RpcEvent, UiRequest};
-use serde_json::Value;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Out {
@@ -73,26 +71,6 @@ impl Renderer {
     fn finished(&self, id: &str) -> bool {
         self.closed.iter().any(|closed| closed == id)
     }
-}
-
-/// An extension `notify` worth showing; every other fire-and-forget request
-/// (status bars, widgets, titles) is chrome the terminal has no place for.
-pub fn notice(event: &RpcEvent) -> Option<Out> {
-    let RpcEvent::UiRequest(UiRequest::FireAndForget { method, raw, .. }) = event else {
-        return None;
-    };
-    if method != "notify" {
-        return None;
-    }
-    let text = raw.get("message").and_then(Value::as_str)?;
-    let level = raw
-        .get("notifyType")
-        .and_then(Value::as_str)
-        .unwrap_or("info");
-    Some(Out::Notice {
-        level: level.to_owned(),
-        text: text.to_owned(),
-    })
 }
 
 #[cfg(test)]

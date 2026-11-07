@@ -57,9 +57,9 @@ dependencies = [
 name = "gentle-term"
 version = "0.1.0"
 dependencies = [
+ "gentle-app",
  "gentle-backend",
  "gentle-core",
- "serde_json",
 ]
 
 [[package]]
