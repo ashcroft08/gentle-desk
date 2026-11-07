@@ -32,8 +32,12 @@ pub(crate) fn apply_intent(mut state: AppState, intent: Intent) -> (AppState, Ve
                 commands.push(Command::Send(RpcCommand::Abort));
             }
             commands.push(Command::Send(RpcCommand::NewSession));
+            // The session list and the search box belong to the sidebar, not to the chat.
             let fresh = AppState {
                 sessions: state.sessions,
+                session_query: state.session_query,
+                search_keys: state.search_keys,
+                visible: state.visible,
                 ..AppState::default()
             };
             (fresh, commands)
@@ -65,6 +69,10 @@ pub(crate) fn apply_intent(mut state: AppState, intent: Intent) -> (AppState, Ve
             )
         }
         Intent::RefreshSessions => (state, vec![Command::RefreshSessions]),
+        Intent::SetSessionQuery(query) => {
+            state.set_query(query);
+            (state, Vec::new())
+        }
         Intent::SelectHelper(id) => {
             // Only a task the panel knows about can be opened.
             if state.chat.helpers.tasks.iter().any(|task| task.id == id) {

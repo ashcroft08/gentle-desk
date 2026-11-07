@@ -21,6 +21,8 @@ pub enum Intent {
     RefreshSessions,
     /// Switch to a saved session and show its history.
     OpenSession(String),
+    /// The user typed in the sidebar's search box.
+    SetSessionQuery(String),
     /// Open the thread of the helper with this id.
     SelectHelper(String),
     /// Back from a helper's thread to the helpers list.
