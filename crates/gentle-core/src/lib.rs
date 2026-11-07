@@ -7,3 +7,4 @@
 
 pub mod chat;
 pub mod rpc;
+pub mod session;
