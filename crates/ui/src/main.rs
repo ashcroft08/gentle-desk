@@ -5,10 +5,11 @@
 //!
 //! Layout: `app` (state and wiring), `view/` (one file per component),
 //! `message`, `subscription`, `backend` (startup), plus the small pure helpers
-//! `thread_cache` and `sessions`.
+//! `thread_cache`, `sessions` and `cache_path`.
 
 mod app;
 mod backend;
+mod cache_path;
 mod clock;
 mod message;
 mod session_refresh;

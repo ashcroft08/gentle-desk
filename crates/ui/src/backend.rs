@@ -1,10 +1,14 @@
 //! Starting the `gentle-shell` child and the session index for one run.
 
+use std::path::PathBuf;
+
 use gentle_backend::home::{agent_dir, with_home_flag, HomeEnv};
 use gentle_backend::launcher::{self, LauncherEnv};
 use gentle_backend::process::{RpcProcess, SpawnOptions};
+use gentle_backend::session_cache;
 use gentle_backend::session_index::SessionIndex;
 
+use crate::cache_path;
 use crate::subscription::EventSource;
 
 /// What `start` brought up. A failure to launch is data, not a panic: the UI
@@ -14,6 +18,8 @@ pub struct Started {
     pub events: EventSource,
     /// `None` when the pi home cannot be resolved: the sidebar stays empty.
     pub index: Option<SessionIndex>,
+    /// Where the index cache is read and written, when the run has one.
+    pub cache_path: Option<PathBuf>,
     pub fatal: Option<String>,
 }
 
@@ -23,7 +29,16 @@ pub fn start() -> Started {
     let events = EventSource::default();
     let home_env = HomeEnv::from_process();
     let args = with_home_flag(std::env::args_os().skip(1).collect(), &home_env);
-    let index = agent_dir(&args, &home_env).map(|dir| SessionIndex::new(dir.join("sessions")));
+    let cache_path = cache_path::cache_file(std::env::var_os("LOCALAPPDATA"));
+    let index = agent_dir(&args, &home_env).map(|dir| {
+        let mut index = SessionIndex::new(dir.join("sessions"));
+        // A cache that is missing, stale, corrupt or from another home is
+        // ignored and the first refresh does the full scan.
+        if let Some(snapshot) = cache_path.as_deref().and_then(session_cache::load) {
+            index.restore(snapshot);
+        }
+        index
+    });
     let spawned = launcher::resolve(&LauncherEnv::from_process())
         .map_err(|e| e.to_string())
         .and_then(|launcher| {
@@ -47,6 +62,7 @@ pub fn start() -> Started {
         process,
         events,
         index,
+        cache_path,
         fatal,
     }
 }
