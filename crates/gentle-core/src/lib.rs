@@ -6,5 +6,7 @@
 //! `gentle-shell --mode rpc`.
 
 pub mod chat;
+pub mod helpers;
 pub mod rpc;
 pub mod session;
+pub mod time;
