@@ -10,5 +10,5 @@ mod reducer;
 mod state;
 
 pub use history::messages_from_history;
-pub use reducer::reduce_chat;
+pub use reducer::{reduce_chat, reduce_chat_at};
 pub use state::{ChatMessage, ChatRole, ChatState, Dialog};

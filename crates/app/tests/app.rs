@@ -410,3 +410,64 @@ mod sessions {
         assert!(state.chat.messages.is_empty());
     }
 }
+
+mod helpers {
+    use super::*;
+    use gentle_core::helpers::HelperStatus;
+
+    fn widget(summary: &str, tasks: &str) -> Input {
+        let lines = format!(
+            r#"{{"schema":"gentle-agents.activity/v1","summary":{summary},"tasks":{tasks}}}"#
+        );
+        let raw = serde_json::json!({
+            "type": "extension_ui_request", "id": "w", "method": "setWidget",
+            "widgetKey": "gentle-agents", "widgetLines": [lines]
+        });
+        event(&raw.to_string())
+    }
+
+    const RUNNING: &str =
+        r#"[{"summary":{"id":"t1","status":"running","createdAt":"2026-09-22T10:00:00.000Z"}}]"#;
+    const COUNTS_1: &str = r#"{"running":1,"queued":0,"waiting":0,"finished":0}"#;
+    const COUNTS_DONE: &str = r#"{"running":0,"queued":0,"waiting":0,"finished":1}"#;
+
+    #[test]
+    fn helper_frames_reach_the_chat_state() {
+        let (state, commands) = update(AppState::default(), widget(COUNTS_1, RUNNING));
+        assert_eq!(state.chat.helpers.summary.running, 1);
+        assert_eq!(state.chat.helpers.tasks[0].id, "t1");
+        assert!(commands.is_empty());
+    }
+
+    #[test]
+    fn the_arrival_time_stamps_a_task_that_gentle_agents_stops_reporting() {
+        let (state, _) = update(AppState::default(), widget(COUNTS_1, RUNNING));
+        let Input::Rpc(dropped) = widget(COUNTS_DONE, "[]") else {
+            panic!("rpc input")
+        };
+        let (state, _) = update(state, Input::RpcAt(dropped, 1_790_074_800_000));
+        let task = &state.chat.helpers.tasks[0];
+        assert_eq!(
+            (task.status, task.ended_at_ms),
+            (HelperStatus::Done, Some(1_790_074_800_000))
+        );
+    }
+
+    #[test]
+    fn rpc_at_behaves_like_rpc_for_everything_else() {
+        let Input::Rpc(start) = event(START) else {
+            panic!("rpc input")
+        };
+        let (state, _) = update(AppState::default(), Input::RpcAt(start, 5));
+        assert!(state.chat.working);
+    }
+
+    #[test]
+    fn a_new_chat_and_opening_a_session_forget_the_helpers() {
+        let (state, _) = update(AppState::default(), widget(COUNTS_1, RUNNING));
+        let (fresh, _) = update(state.clone(), intent(Intent::NewChat));
+        assert!(fresh.chat.helpers.tasks.is_empty());
+        let (opened, _) = update(state, intent(Intent::OpenSession("p".into())));
+        assert!(opened.chat.helpers.tasks.is_empty());
+    }
+}

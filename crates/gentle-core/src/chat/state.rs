@@ -4,6 +4,8 @@
 //! `msg-<index>` scheme. The `ui` layer renders this and the `app` layer feeds
 //! it lines read from `gentle-shell --mode rpc`.
 
+use crate::helpers::HelpersActivity;
+
 /// Who wrote a chat message.
 ///
 /// Only the two roles a chat thread displays are modeled: the reducer opens
@@ -62,7 +64,7 @@ pub enum Dialog {
 /// Everything a chat window shows for one open session.
 ///
 /// `Default` is the initial state of a freshly opened chat.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct ChatState {
     pub messages: Vec<ChatMessage>,
     /// Driven by `agent_start` / `agent_end` / `agent_settled`.
@@ -73,4 +75,6 @@ pub struct ChatState {
     pub activity: u64,
     /// Last `extension_error` the child reported.
     pub last_error: Option<String>,
+    /// Delegated helpers of this chat, from the `gentle-agents` widget.
+    pub helpers: HelpersActivity,
 }

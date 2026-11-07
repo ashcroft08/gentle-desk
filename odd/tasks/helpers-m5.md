@@ -12,7 +12,7 @@ Show the delegated helpers (subagents) of the open chat: counts and a task list,
 ## Tasks
 
 - [x] T1 (S1, S2, S3) core `helpers`: types + `parse_helpers_activity`, tests ported from the reference — RED observed (12 of 14 failed against a stub); 14 tests incl. the real fixture decoded in T2; timestamps are epoch ms (ISO or number accepted, non-ISO strings dropped; overflowing number literals make the whole frame unusable, unlike JS which drops the field); `parse_iso_ms` moved to `time.rs` (re-exported from `session`) — commit: see git log (feat/helpers-m5)
-- [ ] T2 (S2, S3) core: merge/retention/order + reducer folds `setWidget` into `ChatState.helpers` — commit: pending
+- [x] T2 (S2, S3) core: merge/retention/order + reducer folds `setWidget` into `ChatState.helpers` — RED observed (10 of 14 failed against a stub in core; 1 of 34 in app); core `helpers/{types,parse,merge,widget}.rs`, `reduce_chat_at(state, event, now_ms)` (the clock is supplied by the caller to stay pure; `reduce_chat` = no clock), app `Input::RpcAt(event, now_ms)`; `ChatState` lost `Eq` (it now holds JSON values); the recorded gentle-agents fixture folds as in the reference — commit: see git log (feat/helpers-m5)
 - [ ] T3 (S3, S4) ui: `view/helpers.rs` panel, verified with a real delegation — commit: pending
 
 ## Log

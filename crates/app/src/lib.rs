@@ -6,7 +6,7 @@
 //! clipboard or knows a GUI framework; the shell around it runs the commands.
 
 use gentle_core::chat::{
-    messages_from_history, reduce_chat, ChatMessage, ChatRole, ChatState, Dialog,
+    messages_from_history, reduce_chat_at, ChatMessage, ChatRole, ChatState, Dialog,
 };
 use gentle_core::rpc::{RpcCommand, RpcEvent, RpcResponse, UiAnswer, UiRequest};
 
@@ -68,6 +68,9 @@ pub enum Intent {
 pub enum Input {
     Intent(Intent),
     Rpc(RpcEvent),
+    /// An RPC event with the wall-clock time (epoch ms) it arrived at. The shell
+    /// supplies it so `update` stays pure; only helper bookkeeping uses it.
+    RpcAt(RpcEvent, u64),
     /// The shell finished listing sessions.
     SessionsLoaded(Vec<SessionItem>),
 }
@@ -86,17 +89,18 @@ const MAX_NOTICES: usize = 50;
 
 pub fn update(state: AppState, input: Input) -> (AppState, Vec<Command>) {
     match input {
-        Input::Rpc(event) => apply_event(state, &event),
+        Input::Rpc(event) => apply_event(state, &event, None),
+        Input::RpcAt(event, now_ms) => apply_event(state, &event, Some(now_ms)),
         Input::SessionsLoaded(sessions) => (AppState { sessions, ..state }, Vec::new()),
         Input::Intent(intent) => apply_intent(state, intent),
     }
 }
 
-fn apply_event(state: AppState, event: &RpcEvent) -> (AppState, Vec<Command>) {
+fn apply_event(state: AppState, event: &RpcEvent, now_ms: Option<u64>) -> (AppState, Vec<Command>) {
     let notice = notice_from(event);
     let mut commands = Vec::new();
     let mut state = AppState {
-        chat: reduce_chat(state.chat, event),
+        chat: reduce_chat_at(state.chat, event, now_ms),
         ..state
     };
     if let Some((level, text)) = notice {

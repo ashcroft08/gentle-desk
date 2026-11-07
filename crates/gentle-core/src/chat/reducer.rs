@@ -3,6 +3,7 @@
 use serde_json::Value;
 
 use super::state::{ChatMessage, ChatRole, ChatState, Dialog};
+use crate::helpers::fold_widget;
 use crate::rpc::{AssistantMessageEvent, RpcEvent, RpcMessage, UiRequest};
 
 /// Folds one decoded RPC event into chat state.
@@ -11,6 +12,12 @@ use crate::rpc::{AssistantMessageEvent, RpcEvent, RpcMessage, UiRequest};
 /// the state by value so the caller decides where the new state lives, and
 /// events the chat view does not use return the state untouched.
 pub fn reduce_chat(state: ChatState, event: &RpcEvent) -> ChatState {
+    reduce_chat_at(state, event, None)
+}
+
+/// [`reduce_chat`] with the wall-clock time (epoch ms) the event arrived at,
+/// which the caller supplies so this stays pure. Only helper bookkeeping uses it.
+pub fn reduce_chat_at(state: ChatState, event: &RpcEvent, now_ms: Option<u64>) -> ChatState {
     match event {
         RpcEvent::AgentStart => ChatState {
             working: true,
@@ -29,7 +36,7 @@ pub fn reduce_chat(state: ChatState, event: &RpcEvent) -> ChatState {
             activity: state.activity + 1,
             ..state
         },
-        RpcEvent::UiRequest(request) => apply_extension_ui_request(state, request),
+        RpcEvent::UiRequest(request) => apply_extension_ui_request(state, request, now_ms),
         RpcEvent::ExtensionError { error, .. } => ChatState {
             last_error: Some(error.clone()),
             ..state
@@ -151,7 +158,11 @@ fn extract_text(message: &RpcMessage) -> Option<String> {
     Some(text)
 }
 
-fn apply_extension_ui_request(state: ChatState, request: &UiRequest) -> ChatState {
+fn apply_extension_ui_request(
+    state: ChatState,
+    request: &UiRequest,
+    now_ms: Option<u64>,
+) -> ChatState {
     let dialog = match request {
         UiRequest::Select {
             id, title, options, ..
@@ -186,7 +197,17 @@ fn apply_extension_ui_request(state: ChatState, request: &UiRequest) -> ChatStat
         },
         // notify, setStatus, setTitle, set_editor_text: fire-and-forget, no
         // dialog is waiting for an answer.
-        UiRequest::FireAndForget { .. } => return state,
+        // Widgets, status bars, titles: no dialog is waiting. Only gentle-agents'
+        // `setWidget` carries state (the helpers), the rest is chrome.
+        UiRequest::FireAndForget { method, raw, .. } => {
+            if method != "setWidget" {
+                return state;
+            }
+            return ChatState {
+                helpers: fold_widget(state.helpers, raw, now_ms),
+                ..state
+            };
+        }
     };
     let mut pending_dialogs = state.pending_dialogs;
     pending_dialogs.push(dialog);
