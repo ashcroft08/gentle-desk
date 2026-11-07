@@ -1,0 +1,9 @@
+# Throwaway UI spikes: their own workspace so the heavy GUI dependency trees
+# never slow down (or leak into) the main workspace.
+[workspace]
+resolver = "2"
+members = ["common", "iced", "slint"]
+
+[workspace.package]
+edition = "2021"
+license = "MIT"

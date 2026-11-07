@@ -1,0 +1,42 @@
+import { ScrollView } from "std-widgets.slint";
+
+export struct Msg { user: bool, plain: string, styled: styled-text }
+
+export component App inherits Window {
+    title: "Spike Slint";
+    preferred-width: 900px;
+    preferred-height: 700px;
+    background: #1e1e1e;
+
+    in property <[Msg]> messages;
+
+    ScrollView {
+        // Anchored to the bottom while the content is taller than the window.
+        content-y: min(0px, self.height - self.content-height);
+
+        VerticalLayout {
+            padding: 20px;
+            spacing: 16px;
+            alignment: start;
+
+            for m in root.messages: Rectangle {
+                background: m.user ? #3a3a3a : transparent;
+                border-radius: 4px;
+
+                VerticalLayout {
+                    padding: m.user ? 10px : 0px;
+                    if m.user: Text {
+                        text: m.plain;
+                        color: #e6e6e6;
+                        wrap: word-wrap;
+                    }
+                    if !m.user: StyledText {
+                        text: m.styled;
+                        default-color: #e6e6e6;
+                        link-color: #7aa2f7;
+                    }
+                }
+            }
+        }
+    }
+}
