@@ -2,6 +2,7 @@
 //! components together. Drawing lives in `view/`, process startup in
 //! `backend`, subscriptions in `subscription`.
 
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -30,6 +31,8 @@ pub struct App {
     process: Option<RpcProcess>,
     events: EventSource,
     index: Option<SharedIndex>,
+    /// Where the index cache is kept; `None` means this run persists nothing.
+    cache_path: Option<PathBuf>,
     /// A refresh is running on its worker thread; another one waits for it.
     refreshing: bool,
     /// A failure that ends the session (launcher missing, child died).
@@ -47,6 +50,7 @@ impl App {
             process: started.process,
             events: started.events,
             index: started.index.map(|index| Arc::new(Mutex::new(index))),
+            cache_path: started.cache_path,
             refreshing: false,
             fatal: started.fatal,
         };
@@ -101,7 +105,7 @@ impl App {
         }
         self.refreshing = true;
         Task::perform(
-            session_refresh::refresh(Arc::clone(index)),
+            session_refresh::refresh(Arc::clone(index), self.cache_path.clone()),
             Message::SessionsRefreshed,
         )
     }
