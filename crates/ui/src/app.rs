@@ -11,10 +11,11 @@ use gentle_core::rpc::Decoded;
 use iced::widget::{column, row};
 use iced::{clipboard, Element, Subscription, Task};
 
+use crate::clock;
 use crate::message::Message;
 use crate::subscription::{self, EventSource};
 use crate::thread_cache::ThreadCache;
-use crate::view::{banner, composer, dialog, header, notices, sidebar, thread};
+use crate::view::{banner, composer, dialog, header, helpers, notices, sidebar, thread};
 use crate::{backend, sessions};
 
 pub struct App {
@@ -125,7 +126,9 @@ impl App {
 
     fn on_process(&mut self, event: ProcessEvent) -> Task<Message> {
         match event {
-            ProcessEvent::Output(Decoded::Event(event)) => self.dispatch(Input::Rpc(event)),
+            ProcessEvent::Output(Decoded::Event(event)) => {
+                self.dispatch(Input::RpcAt(event, clock::now_ms()))
+            }
             ProcessEvent::Output(Decoded::Unknown(_)) => Task::none(),
             ProcessEvent::Stderr(line) => {
                 eprintln!("[gentle-shell] {line}");
@@ -169,6 +172,10 @@ impl App {
         let page =
             page.push(composer::view(&self.input, chat.working, can_send).map(Message::Composer));
         let sessions = sidebar::view(&self.app.sessions, self.app.current_session.as_deref());
-        row![sessions.map(Message::Sidebar), page].into()
+        let mut layout = row![sessions.map(Message::Sidebar), page];
+        if helpers::is_visible(&chat.helpers) {
+            layout = layout.push(helpers::view(&chat.helpers));
+        }
+        layout.into()
     }
 }

@@ -9,6 +9,7 @@
 
 mod app;
 mod backend;
+mod clock;
 mod message;
 mod sessions;
 mod subscription;
@@ -27,7 +28,7 @@ fn main() -> iced::Result {
         .window(window::Settings {
             // The process must be shut down before exiting: see `Message::CloseRequested`.
             exit_on_close_request: false,
-            size: iced::Size::new(900.0, 520.0),
+            size: iced::Size::new(1100.0, 560.0),
             position: window::Position::Centered,
             ..window::Settings::default()
         })

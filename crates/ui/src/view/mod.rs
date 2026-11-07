@@ -9,6 +9,7 @@ pub mod banner;
 pub mod composer;
 pub mod dialog;
 pub mod header;
+pub mod helpers;
 pub mod notices;
 pub mod sidebar;
 pub mod thread;
