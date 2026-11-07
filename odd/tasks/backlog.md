@@ -5,9 +5,9 @@ Ordered by (1) shipped-but-unverified first, (2) risk of user-visible problems, 
 1. **DONE** — **GUI checks of shipped-but-unverified paths** (feat/gui-checks, `gui-checks-m7.md`): model-error box, extension dialogs (confirm/select/input/editor), Stop button; fix what breaks. Uses a stand-in gentle-shell, no model cost.
 2. **DONE** — **Visual polish that blocks readability**: helper card colours/contrast, `done` colour, timestamps in the sidebar.
 3. **DONE (refresh off the UI thread + persisted cache)** — **Session list performance, as one batch**: refresh off the UI thread, then persist the index cache across runs (the second depends on the first's shape).
-4. **Long-thread performance check** (measure first; optimize only if it hurts).
+4. **DONE (no optimization needed; see perf-check-m11.md)** — **Long-thread performance check** (measure first; optimize only if it hurts).
 5. **Rename / delete sessions** (needs two decisions: how pi stores a name, and a confirmation step before deleting a file).
-6. **Housekeeping**: tests for `gentle-term` argument parsing, markdown in helper thread items, bump the `actions/checkout` major version, project filter in the sidebar.
+6. **Housekeeping** (search/filter chats in the sidebar moves to the front of this item, see perf-check-m11.md): tests for `gentle-term` argument parsing, markdown in helper thread items, bump the `actions/checkout` major version, project filter in the sidebar.
 
 ## Log
 

@@ -15,6 +15,7 @@
 // writes nothing but stdout.
 
 import * as readline from 'node:readline';
+import { floodMessage } from './flood-text.mjs';
 import { helpersFrame } from './helpers-frame.mjs';
 
 /** Lines like the fixtures: one JSON object per line, LF-terminated. */
@@ -88,6 +89,23 @@ function echoTurn(message) {
   textDelta(0, text);
   textEnd(0, text);
   messageEnd(text);
+  agentEnd();
+}
+
+/** How many assistant messages the `flood` prompt produces in one turn. */
+const FLOOD_MESSAGES = 300;
+
+/** One long turn: many markdown messages, to stress long threads. */
+function floodTurn() {
+  agentStart();
+  for (let i = 0; i < FLOOD_MESSAGES; i++) {
+    const text = floodMessage(i);
+    messageStart();
+    textStart(0);
+    textDelta(0, text);
+    textEnd(0, text);
+    messageEnd(text);
+  }
   agentEnd();
 }
 
@@ -213,6 +231,8 @@ function turn(message) {
       return slowTurn();
     case 'helpers':
       return helpersTurn();
+    case 'flood':
+      return floodTurn();
     default:
       return echoTurn(message);
   }
