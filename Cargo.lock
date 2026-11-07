@@ -1065,6 +1065,7 @@ dependencies = [
  "gentle-core",
  "iced",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]

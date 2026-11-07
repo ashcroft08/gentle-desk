@@ -11,6 +11,7 @@ mod app;
 mod backend;
 mod clock;
 mod message;
+mod session_refresh;
 mod sessions;
 mod subscription;
 mod thread_cache;
