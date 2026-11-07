@@ -14,6 +14,7 @@ mod message;
 mod sessions;
 mod subscription;
 mod thread_cache;
+mod time_ago;
 mod view;
 
 use iced::{window, Theme};
