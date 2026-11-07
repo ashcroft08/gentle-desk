@@ -11,20 +11,28 @@
 //! [`SessionIndex::restore`] brings it back, so a later run can start warm. The
 //! restored state is never trusted on its own: [`SessionIndex::refresh`] still
 //! reuses an entry only when its size and mtime match the file exactly.
+//!
+//! [`SessionIndex::refresh_paths`] applies the same per-file rules to the paths
+//! a file watcher reports, so keeping up with a busy home costs one `stat` per
+//! reported path instead of a pass over every session.
 
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use gentle_core::session::{SessionScanner, SessionSummary};
+use gentle_core::session::SessionSummary;
 
 use crate::session_snapshot::{join_mtime, split_mtime, FileSnapshot, IndexSnapshot};
 
 mod disk;
+mod paths;
+mod store;
 
-use disk::{read_new_lines, session_files};
+use disk::session_files;
+use paths::session_key;
+use store::{Cached, Update};
 
 /// One row of the session list.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -38,7 +46,8 @@ pub struct SessionEntry {
 /// What a [`SessionIndex::refresh`] did, so callers (and tests) can see its cost.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct RefreshStats {
-    /// Session files found on disk.
+    /// Session files found on disk: for [`SessionIndex::refresh_paths`], the
+    /// valid session paths it was handed.
     pub files: usize,
     /// Bytes read from disk during this refresh.
     pub bytes_read: u64,
@@ -48,14 +57,6 @@ pub struct RefreshStats {
     pub appended: usize,
     /// Cached files that no longer exist.
     pub removed: usize,
-}
-
-struct Cached {
-    size: u64,
-    mtime: SystemTime,
-    /// Bytes already folded into `scanner`: up to the last complete line.
-    parsed_len: u64,
-    scanner: SessionScanner,
 }
 
 pub struct SessionIndex {
@@ -82,59 +83,70 @@ impl SessionIndex {
         let before = self.cache.len();
         self.cache.retain(|path, _| alive.contains(path));
         stats.removed = before - self.cache.len();
-
         for path in &found {
-            let Ok(meta) = fs::metadata(path) else {
-                continue;
-            };
-            let (size, mtime) = (meta.len(), meta.modified().unwrap_or(UNIX_EPOCH));
-            let start = match self.cache.get(path) {
-                Some(c) if c.size == size && c.mtime == mtime => continue,
-                // Grown: only the appended bytes need parsing.
-                Some(c) if size > c.size => Some(c.parsed_len),
-                // Shrunk, or same size with a different mtime: rewritten.
-                _ => None,
-            };
-            let outcome = match start {
-                Some(offset) => {
-                    stats.appended += 1;
-                    let cached = self.cache.get_mut(path).expect("checked above");
-                    read_new_lines(path, offset, &mut cached.scanner)
-                        .map(|(parsed, read)| (parsed, read, None))
-                }
-                None => {
-                    stats.rescanned += 1;
-                    let mut scanner = SessionScanner::new();
-                    read_new_lines(path, 0, &mut scanner)
-                        .map(|(parsed, read)| (parsed, read, Some(scanner)))
-                }
-            };
-            let Ok((parsed_len, read, fresh)) = outcome else {
-                self.cache.remove(path); // unreadable now: retry on the next refresh
-                continue;
-            };
-            stats.bytes_read += read;
-            match fresh {
-                Some(scanner) => {
-                    self.cache.insert(
-                        path.clone(),
-                        Cached {
-                            size,
-                            mtime,
-                            parsed_len,
-                            scanner,
-                        },
-                    );
-                }
-                None => {
-                    let cached = self.cache.get_mut(path).expect("checked above");
-                    cached.size = size;
-                    cached.mtime = mtime;
-                    cached.parsed_len = parsed_len;
-                }
-            }
+            self.update_file(path).count(&mut stats);
         }
         Ok(stats)
+    }
+
+    /// Brings the cache in line with just `paths`, as a file watcher reports
+    /// them, without enumerating the sessions directory: one `stat` per
+    /// reported path instead of a pass over every session in the home.
+    ///
+    /// The rules per file are exactly the ones [`refresh`](Self::refresh)
+    /// applies, and both share one implementation: an unchanged file is not
+    /// read, a grown one only from its previous end, a rewritten or shrunk one
+    /// from the start, a new one from the start, and a file that is gone is
+    /// dropped from the cache (`removed`). An unreadable file is dropped too,
+    /// so the next pass retries it.
+    ///
+    /// A path that is not a session file location is ignored: not counted, not
+    /// logged, never an error. Only `<sessions_dir>/<project>/<name>.jsonl`
+    /// counts, and the comparison accepts the spellings a watcher reports on
+    /// Windows (verbatim `\\?\` prefix, different case, `/` separators).
+    /// Duplicate paths are processed once.
+    ///
+    /// [`RefreshStats::files`] is the number of valid session paths considered
+    /// here, after ignoring and de-duplicating, not the number of sessions the
+    /// index holds. It cannot fail: nothing is enumerated.
+    pub fn refresh_paths(&mut self, paths: &[PathBuf]) -> RefreshStats {
+        let mut stats = RefreshStats::default();
+        let mut seen = HashSet::new();
+        for path in paths {
+            let Some((key, folded)) = session_key(&self.sessions_dir, path) else {
+                continue;
+            };
+            if !seen.insert(folded) {
+                continue;
+            }
+            // A directory is not a session file, whatever it is called.
+            if fs::metadata(&key).is_ok_and(|meta| meta.is_dir()) {
+                continue;
+            }
+            stats.files += 1;
+            let cached = self.cache.contains_key(&key);
+            match self.update_file(&key) {
+                Update::Missing => {
+                    self.cache.remove(&key);
+                    if cached {
+                        stats.removed += 1;
+                    }
+                }
+                update => update.count(&mut stats),
+            }
+        }
+        stats
+    }
+
+    /// Folds one file into the cache: the one implementation `refresh` and
+    /// `refresh_paths` share, so both answer with the same rules.
+    fn update_file(&mut self, path: &Path) -> Update {
+        let mut entry = self.cache.remove(path);
+        let update = store::update(&mut entry, path);
+        if let Some(cached) = entry {
+            self.cache.insert(path.to_path_buf(), cached);
+        }
+        update
     }
 
     /// The cache as data, so a later run can skip the cold read.
@@ -223,6 +235,15 @@ fn millis(time: SystemTime) -> u64 {
     time.duration_since(UNIX_EPOCH)
         .map_or(0, |d| d.as_millis() as u64)
 }
+
+#[cfg(test)]
+mod refresh_paths_scope_tests;
+
+#[cfg(test)]
+mod refresh_paths_tests;
+
+#[cfg(test)]
+mod test_home;
 
 #[cfg(test)]
 mod tests;
