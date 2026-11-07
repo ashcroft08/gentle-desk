@@ -7,12 +7,14 @@
 //!
 //! One file per responsibility: `state` (what the UI renders), `input` (what
 //! goes in and out of `update`), `intents` (user actions), `events` (RPC
-//! events), `notices` (extension notices).
+//! events), `notices` (extension notices), `session_query` (which chats the
+//! sidebar shows).
 
 mod events;
 mod input;
 mod intents;
 mod notices;
+mod session_query;
 mod state;
 
 pub use input::{Command, Input, Intent};
@@ -22,7 +24,11 @@ pub fn update(state: AppState, input: Input) -> (AppState, Vec<Command>) {
     match input {
         Input::Rpc(event) => events::apply_event(state, &event, None),
         Input::RpcAt(event, now_ms) => events::apply_event(state, &event, Some(now_ms)),
-        Input::SessionsLoaded(sessions) => (AppState { sessions, ..state }, Vec::new()),
+        Input::SessionsLoaded(sessions) => {
+            let mut state = state;
+            state.set_sessions(sessions);
+            (state, Vec::new())
+        }
         Input::Intent(intent) => intents::apply_intent(state, intent),
     }
 }
