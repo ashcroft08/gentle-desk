@@ -6,15 +6,25 @@
 //! the size and mtime it was built from, so [`SessionIndex::refresh`] costs one
 //! `stat` per unchanged file, reads only the appended bytes of a grown file,
 //! rescans a rewritten one and forgets deleted ones.
+//!
+//! [`SessionIndex::snapshot`] turns that cache into data and
+//! [`SessionIndex::restore`] brings it back, so a later run can start warm. The
+//! restored state is never trusted on its own: [`SessionIndex::refresh`] still
+//! reuses an entry only when its size and mtime match the file exactly.
 
 use std::collections::{HashMap, HashSet};
-use std::fs::{self, File};
-use std::io::{self, Read, Seek, SeekFrom};
-use std::path::{Path, PathBuf};
+use std::fs;
+use std::io;
+use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use gentle_core::rpc::LineSplitter;
 use gentle_core::session::{SessionScanner, SessionSummary};
+
+use crate::session_snapshot::{join_mtime, split_mtime, FileSnapshot, IndexSnapshot};
+
+mod disk;
+
+use disk::{read_new_lines, session_files};
 
 /// One row of the session list.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -127,6 +137,61 @@ impl SessionIndex {
         Ok(stats)
     }
 
+    /// The cache as data, so a later run can skip the cold read.
+    pub fn snapshot(&self) -> IndexSnapshot {
+        let mut files: Vec<FileSnapshot> = self
+            .cache
+            .iter()
+            .map(|(path, cached)| {
+                let (mtime_secs, mtime_nanos) = split_mtime(cached.mtime);
+                FileSnapshot {
+                    path: path.clone(),
+                    size: cached.size,
+                    mtime_secs,
+                    mtime_nanos,
+                    parsed_len: cached.parsed_len,
+                    scanner: cached.scanner.clone(),
+                }
+            })
+            .collect();
+        files.sort_by(|a, b| a.path.cmp(&b.path));
+        IndexSnapshot {
+            sessions_dir: self.sessions_dir.clone(),
+            files,
+        }
+    }
+
+    /// Replaces the cache with `snapshot`, unless it was built for another
+    /// sessions directory. The next [`refresh`](Self::refresh) then behaves as
+    /// after an in-memory warm-up: unchanged files are not read at all.
+    ///
+    /// Every entry still has to earn its place: [`refresh`](Self::refresh)
+    /// compares its size and mtime with the file and rescans on any difference,
+    /// so a stale, other-home or corrupt cache only costs time, never accuracy.
+    pub fn restore(&mut self, snapshot: IndexSnapshot) {
+        if snapshot.sessions_dir != self.sessions_dir {
+            return;
+        }
+        self.cache = snapshot
+            .files
+            .into_iter()
+            // A parsed length past the end of the file cannot describe a cache
+            // that is in sync, so the file gets a full scan instead.
+            .filter(|file| file.parsed_len <= file.size)
+            .map(|file| {
+                (
+                    file.path,
+                    Cached {
+                        size: file.size,
+                        mtime: join_mtime(file.mtime_secs, file.mtime_nanos),
+                        parsed_len: file.parsed_len,
+                        scanner: file.scanner,
+                    },
+                )
+            })
+            .collect();
+    }
+
     /// The valid sessions, most recently active first.
     pub fn entries(&self) -> Vec<SessionEntry> {
         let mut entries: Vec<SessionEntry> = self
@@ -157,56 +222,6 @@ impl SessionIndex {
 fn millis(time: SystemTime) -> u64 {
     time.duration_since(UNIX_EPOCH)
         .map_or(0, |d| d.as_millis() as u64)
-}
-
-/// `<dir>/*/*.jsonl`: pi keeps one subdirectory per project cwd.
-fn session_files(dir: &Path) -> io::Result<Vec<PathBuf>> {
-    let projects = match fs::read_dir(dir) {
-        Ok(projects) => projects,
-        Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
-        Err(e) => return Err(e),
-    };
-    let mut files = Vec::new();
-    for project in projects.flatten() {
-        if !project.file_type().is_ok_and(|t| t.is_dir()) {
-            continue;
-        }
-        let Ok(inside) = fs::read_dir(project.path()) else {
-            continue;
-        };
-        files.extend(
-            inside
-                .flatten()
-                .map(|entry| entry.path())
-                .filter(|path| path.extension().is_some_and(|ext| ext == "jsonl")),
-        );
-    }
-    files.sort();
-    Ok(files)
-}
-
-/// Feeds every complete line from byte `offset` on into `scanner`. Returns the
-/// new parsed length (just past the last `\n`) and the bytes read. A trailing
-/// partial line (a write in progress) stays unparsed for the next refresh.
-fn read_new_lines(
-    path: &Path,
-    offset: u64,
-    scanner: &mut SessionScanner,
-) -> io::Result<(u64, u64)> {
-    let mut file = File::open(path)?;
-    file.seek(SeekFrom::Start(offset))?;
-    let mut data = Vec::new();
-    file.read_to_end(&mut data)?;
-    let read = data.len() as u64;
-    let Some(last_newline) = data.iter().rposition(|&b| b == b'\n') else {
-        return Ok((offset, read));
-    };
-    let complete = &data[..=last_newline];
-    let mut splitter = LineSplitter::new();
-    for line in splitter.push(complete) {
-        scanner.push_line(&line);
-    }
-    Ok((offset + complete.len() as u64, read))
 }
 
 #[cfg(test)]
