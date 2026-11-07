@@ -1,3 +1,4 @@
-//! Terminal client internals: output rendering and the session driver.
+//! Terminal client internals: argument parsing and output rendering.
 
+pub mod args;
 pub mod render;
