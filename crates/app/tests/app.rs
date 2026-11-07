@@ -264,3 +264,131 @@ mod copy_and_dialogs {
         assert!(state.notices.is_empty());
     }
 }
+
+mod sessions {
+    use super::*;
+    use gentle_app::SessionItem;
+
+    fn item(path: &str, title: &str) -> SessionItem {
+        SessionItem {
+            path: path.into(),
+            title: title.into(),
+            cwd: String::new(),
+            modified_ms: 1,
+            message_count: 2,
+        }
+    }
+
+    const SWITCH_OK: &str = r#"{"type":"response","command":"switch_session","success":true,"data":{"cancelled":false}}"#;
+    const HISTORY: &str = r#"{"type":"response","command":"get_messages","success":true,"data":{"messages":[{"role":"system","content":""},{"role":"user","content":[{"type":"text","text":"hola"}]},{"role":"assistant","content":[{"type":"text","text":"**ey**"}]}]}}"#;
+
+    #[test]
+    fn refresh_asks_the_shell_to_reload_the_list() {
+        let (_, commands) = update(AppState::default(), intent(Intent::RefreshSessions));
+        assert_eq!(commands, vec![Command::RefreshSessions]);
+    }
+
+    #[test]
+    fn a_loaded_list_replaces_the_previous_one() {
+        let (state, _) = update(
+            AppState::default(),
+            Input::SessionsLoaded(vec![item("a", "A")]),
+        );
+        let (state, commands) = update(
+            state,
+            Input::SessionsLoaded(vec![item("b", "B"), item("c", "C")]),
+        );
+        assert_eq!(
+            state
+                .sessions
+                .iter()
+                .map(|s| s.path.as_str())
+                .collect::<Vec<_>>(),
+            ["b", "c"]
+        );
+        assert!(commands.is_empty());
+    }
+
+    #[test]
+    fn a_settled_turn_refreshes_the_list() {
+        let (_, commands) = update(AppState::default(), event(SETTLED));
+        assert_eq!(commands, vec![Command::RefreshSessions]);
+    }
+
+    #[test]
+    fn opening_a_session_clears_the_thread_and_switches() {
+        let (state, commands) = update(
+            after_one_reply(),
+            intent(Intent::OpenSession("C:/s/a.jsonl".into())),
+        );
+        assert!(state.chat.messages.is_empty());
+        assert_eq!(state.current_session.as_deref(), Some("C:/s/a.jsonl"));
+        assert_eq!(
+            commands,
+            vec![Command::Send(RpcCommand::SwitchSession {
+                session_path: "C:/s/a.jsonl".into()
+            })]
+        );
+    }
+
+    #[test]
+    fn opening_a_session_while_working_aborts_first() {
+        let (state, _) = update(AppState::default(), event(START));
+        let (state, commands) = update(state, intent(Intent::OpenSession("p".into())));
+        assert!(!state.chat.working);
+        assert_eq!(commands[0], Command::Send(RpcCommand::Abort));
+        assert_eq!(commands.len(), 2);
+    }
+
+    #[test]
+    fn a_successful_switch_asks_for_the_history() {
+        let (_, commands) = update(AppState::default(), event(SWITCH_OK));
+        assert_eq!(
+            commands,
+            vec![Command::Send(RpcCommand::GetMessages { id: None })]
+        );
+    }
+
+    #[test]
+    fn the_history_response_fills_the_thread() {
+        let (state, _) = update(AppState::default(), event(HISTORY));
+        let texts: Vec<_> = state
+            .chat
+            .messages
+            .iter()
+            .map(|m| (m.role, m.text.as_str()))
+            .collect();
+        assert_eq!(
+            texts,
+            [(ChatRole::User, "hola"), (ChatRole::Assistant, "**ey**")]
+        );
+    }
+
+    #[test]
+    fn a_failed_switch_is_an_error_notice_and_forgets_the_current_session() {
+        let (state, _) = update(AppState::default(), intent(Intent::OpenSession("p".into())));
+        let failed = r#"{"type":"response","command":"switch_session","success":false,"error":"EISDIR: nope"}"#;
+        let (state, commands) = update(state, event(failed));
+        assert_eq!(state.current_session, None);
+        assert_eq!(state.notices.len(), 1);
+        assert_eq!(state.notices[0].level, NoticeLevel::Error);
+        assert!(
+            state.notices[0].text.contains("switch_session")
+                && state.notices[0].text.contains("EISDIR")
+        );
+        assert!(commands.is_empty());
+    }
+
+    #[test]
+    fn new_chat_keeps_the_session_list_but_forgets_the_current_one() {
+        let (state, _) = update(
+            AppState::default(),
+            Input::SessionsLoaded(vec![item("a", "A")]),
+        );
+        let (state, _) = update(state, intent(Intent::OpenSession("a".into())));
+        let (state, _) = update(state, intent(Intent::NewChat));
+        assert_eq!(state.sessions.len(), 1);
+        assert_eq!(state.current_session, None);
+        assert!(state.chat.messages.is_empty());
+    }
+}

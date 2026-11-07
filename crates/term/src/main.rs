@@ -72,7 +72,8 @@ impl Session {
                     .process
                     .send(&rpc)
                     .map_err(|e| format!("cannot reach gentle-shell: {e}"))?,
-                Command::CopyToClipboard(_) => {} // no clipboard in a terminal
+                // No clipboard and no session list in a terminal.
+                Command::CopyToClipboard(_) | Command::RefreshSessions => {}
             }
         }
         self.print();
