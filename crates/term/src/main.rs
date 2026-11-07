@@ -20,6 +20,7 @@ use gentle_backend::launcher::{self, LauncherEnv};
 use gentle_backend::process::{ProcessEvent, RpcProcess, SpawnOptions};
 use gentle_core::chat::Dialog;
 use gentle_core::rpc::{Decoded, RpcEvent, UiAnswer};
+use gentle_term::args::split_args;
 use gentle_term::render::{Out, Renderer};
 
 fn main() -> ExitCode {
@@ -32,24 +33,6 @@ fn main() -> ExitCode {
             ExitCode::FAILURE
         }
     }
-}
-
-/// Flags forwarded to gentle-shell, and the prompt words after them.
-fn split_args(args: Vec<String>) -> (Vec<String>, String) {
-    let mut forwarded = Vec::new();
-    let mut words = Vec::new();
-    let mut iter = args.into_iter();
-    while let Some(arg) = iter.next() {
-        match arg.as_str() {
-            "--isolated" => forwarded.push(arg),
-            "--provider" | "--model" => {
-                forwarded.push(arg);
-                forwarded.extend(iter.next());
-            }
-            _ => words.push(arg),
-        }
-    }
-    (forwarded, words.join(" "))
 }
 
 /// The session: app state, what was already printed, and the child.
