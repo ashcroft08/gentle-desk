@@ -15,9 +15,11 @@ mod message;
 mod session_refresh;
 mod sessions;
 mod subscription;
+mod text;
 mod thread_cache;
 mod time_ago;
 mod view;
+mod windowing;
 
 use iced::{window, Theme};
 
