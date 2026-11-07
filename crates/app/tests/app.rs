@@ -1,0 +1,266 @@
+//! Behaviour of the app layer through its public interface only.
+
+use gentle_app::{update, AppState, Command, Input, Intent, NoticeLevel};
+use gentle_core::chat::{ChatRole, Dialog};
+use gentle_core::rpc::{decode_line, Decoded, RpcCommand, UiAnswer};
+
+fn event(line: &str) -> Input {
+    match decode_line(line) {
+        Decoded::Event(event) => Input::Rpc(event),
+        Decoded::Unknown(raw) => panic!("not an event: {raw}"),
+    }
+}
+
+fn intent(intent: Intent) -> Input {
+    Input::Intent(intent)
+}
+
+fn run(state: AppState, inputs: Vec<Input>) -> (AppState, Vec<Command>) {
+    inputs
+        .into_iter()
+        .fold((state, vec![]), |(state, mut all), input| {
+            let (next, commands) = update(state, input);
+            all.extend(commands);
+            (next, all)
+        })
+}
+
+const START: &str = r#"{"type":"agent_start"}"#;
+const SETTLED: &str = r#"{"type":"agent_settled"}"#;
+const REPLY_START: &str = r#"{"type":"message_start","message":{"role":"assistant","content":[]}}"#;
+const REPLY_END: &str = r#"{"type":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"**hola**"}]}}"#;
+
+fn after_one_reply() -> AppState {
+    let (state, _) = run(
+        AppState::default(),
+        vec![
+            intent(Intent::SendPrompt("hi".into())),
+            event(START),
+            event(REPLY_START),
+            event(REPLY_END),
+            event(SETTLED),
+        ],
+    );
+    state
+}
+
+mod prompts {
+    use super::*;
+
+    #[test]
+    fn sending_a_prompt_appends_the_user_message_and_sends_the_command() {
+        let (state, commands) = update(
+            AppState::default(),
+            intent(Intent::SendPrompt("hola".into())),
+        );
+        assert_eq!(state.chat.messages.len(), 1);
+        assert_eq!(state.chat.messages[0].role, ChatRole::User);
+        assert_eq!(state.chat.messages[0].text, "hola");
+        assert_eq!(state.chat.messages[0].id, "msg-0");
+        assert_eq!(
+            commands,
+            vec![Command::Send(RpcCommand::Prompt {
+                message: "hola".into()
+            })]
+        );
+    }
+
+    #[test]
+    fn a_blank_prompt_does_nothing() {
+        let (state, commands) = update(
+            AppState::default(),
+            intent(Intent::SendPrompt("  \n".into())),
+        );
+        assert_eq!(state, AppState::default());
+        assert!(commands.is_empty());
+    }
+
+    #[test]
+    fn a_prompt_while_the_agent_works_is_ignored() {
+        let (state, _) = update(AppState::default(), event(START));
+        let (after, commands) = update(state.clone(), intent(Intent::SendPrompt("otra".into())));
+        assert_eq!(after, state);
+        assert!(commands.is_empty());
+    }
+
+    #[test]
+    fn ids_stay_contiguous_across_user_and_assistant_messages() {
+        let state = after_one_reply();
+        let ids: Vec<_> = state.chat.messages.iter().map(|m| m.id.as_str()).collect();
+        assert_eq!(ids, ["msg-0", "msg-1"]);
+        let (state, _) = update(state, intent(Intent::SendPrompt("dos".into())));
+        assert_eq!(state.chat.messages[2].id, "msg-2");
+    }
+
+    #[test]
+    fn rpc_events_still_fold_into_the_chat() {
+        let state = after_one_reply();
+        assert_eq!(state.chat.messages[1].text, "**hola**");
+        assert!(!state.chat.working);
+    }
+
+    #[test]
+    fn abort_sends_the_abort_command() {
+        let (_, commands) = update(AppState::default(), intent(Intent::Abort));
+        assert_eq!(commands, vec![Command::Send(RpcCommand::Abort)]);
+    }
+}
+
+mod new_chat {
+    use super::*;
+
+    #[test]
+    fn new_chat_clears_the_thread_and_asks_for_a_new_session() {
+        let (state, commands) = update(after_one_reply(), intent(Intent::NewChat));
+        assert_eq!(state, AppState::default());
+        assert_eq!(commands, vec![Command::Send(RpcCommand::NewSession)]);
+    }
+
+    /// The reference app's "New chat" did nothing when the state was already
+    /// "new" (reference equality); every request must reach the backend.
+    #[test]
+    fn new_chat_on_an_empty_chat_still_sends_the_command_each_time() {
+        let (state, first) = update(AppState::default(), intent(Intent::NewChat));
+        let (_, second) = update(state, intent(Intent::NewChat));
+        assert_eq!(first, vec![Command::Send(RpcCommand::NewSession)]);
+        assert_eq!(second, first);
+    }
+
+    #[test]
+    fn new_chat_while_working_aborts_first() {
+        let (state, _) = update(AppState::default(), event(START));
+        let (state, commands) = update(state, intent(Intent::NewChat));
+        assert!(!state.chat.working);
+        assert_eq!(
+            commands,
+            vec![
+                Command::Send(RpcCommand::Abort),
+                Command::Send(RpcCommand::NewSession)
+            ]
+        );
+    }
+}
+
+mod notices {
+    use super::*;
+
+    const NOTIFY: &str = r#"{"type":"extension_ui_request","id":"1","method":"notify","message":"rate limit reached","notifyType":"warning"}"#;
+
+    #[test]
+    fn a_notify_becomes_a_notice_with_level_and_id() {
+        let (state, commands) = update(AppState::default(), event(NOTIFY));
+        assert_eq!(state.notices.len(), 1);
+        assert_eq!(state.notices[0].level, NoticeLevel::Warning);
+        assert_eq!(state.notices[0].text, "rate limit reached");
+        assert!(commands.is_empty());
+    }
+
+    #[test]
+    fn missing_or_unknown_levels_are_info() {
+        let bare = r#"{"type":"extension_ui_request","id":"2","method":"notify","message":"hi"}"#;
+        let odd = r#"{"type":"extension_ui_request","id":"3","method":"notify","message":"yo","notifyType":"weird"}"#;
+        let (state, _) = run(AppState::default(), vec![event(bare), event(odd)]);
+        assert!(state.notices.iter().all(|n| n.level == NoticeLevel::Info));
+    }
+
+    #[test]
+    fn other_fire_and_forget_requests_are_not_notices() {
+        let status = r#"{"type":"extension_ui_request","id":"4","method":"setStatus","statusKey":"x","statusText":"y"}"#;
+        let (state, _) = update(AppState::default(), event(status));
+        assert!(state.notices.is_empty());
+    }
+
+    #[test]
+    fn dismissing_removes_only_that_notice_and_ids_are_never_reused() {
+        let (state, _) = run(AppState::default(), vec![event(NOTIFY), event(NOTIFY)]);
+        let (first, second) = (state.notices[0].id, state.notices[1].id);
+        assert_ne!(first, second);
+        let (state, _) = update(state, intent(Intent::DismissNotice(first)));
+        assert_eq!(state.notices.len(), 1);
+        assert_eq!(state.notices[0].id, second);
+        let (state, _) = update(state, event(NOTIFY));
+        assert!(state.notices.iter().all(|n| n.id != first));
+    }
+
+    #[test]
+    fn only_the_latest_fifty_notices_are_kept() {
+        let inputs = (0..60).map(|_| event(NOTIFY)).collect();
+        let (state, _) = run(AppState::default(), inputs);
+        assert_eq!(state.notices.len(), 50);
+        assert_eq!(state.notices.last().unwrap().id, 59);
+    }
+
+    #[test]
+    fn new_chat_clears_notices() {
+        let (state, _) = update(AppState::default(), event(NOTIFY));
+        let (state, _) = update(state, intent(Intent::NewChat));
+        assert!(state.notices.is_empty());
+    }
+}
+
+mod copy_and_dialogs {
+    use super::*;
+
+    #[test]
+    fn copying_a_message_yields_its_raw_markdown() {
+        let (_, commands) = update(
+            after_one_reply(),
+            intent(Intent::CopyMessage("msg-1".into())),
+        );
+        assert_eq!(commands, vec![Command::CopyToClipboard("**hola**".into())]);
+    }
+
+    #[test]
+    fn copying_an_unknown_message_does_nothing() {
+        let (_, commands) = update(
+            after_one_reply(),
+            intent(Intent::CopyMessage("msg-9".into())),
+        );
+        assert!(commands.is_empty());
+    }
+
+    const CONFIRM: &str = r#"{"type":"extension_ui_request","id":"d1","method":"confirm","title":"Sure?","message":"really"}"#;
+
+    #[test]
+    fn answering_a_dialog_sends_the_response_and_removes_it() {
+        let (state, _) = update(AppState::default(), event(CONFIRM));
+        assert!(matches!(
+            state.chat.pending_dialogs[0],
+            Dialog::Confirm { .. }
+        ));
+        let (state, commands) = update(
+            state,
+            intent(Intent::AnswerDialog {
+                id: "d1".into(),
+                answer: UiAnswer::Confirmed(true),
+            }),
+        );
+        assert!(state.chat.pending_dialogs.is_empty());
+        assert_eq!(
+            commands,
+            vec![Command::Send(RpcCommand::UiResponse {
+                id: "d1".into(),
+                answer: UiAnswer::Confirmed(true)
+            })]
+        );
+    }
+
+    #[test]
+    fn answering_an_unknown_dialog_does_nothing() {
+        let (state, commands) = update(
+            AppState::default(),
+            intent(Intent::AnswerDialog {
+                id: "ghost".into(),
+                answer: UiAnswer::Cancelled,
+            }),
+        );
+        assert_eq!(state, AppState::default());
+        assert!(commands.is_empty());
+    }
+
+    #[test]
+    fn unrelated_events_do_not_touch_notices() {
+        let (state, _) = update(AppState::default(), event(START));
+        assert!(state.notices.is_empty());
+    }
+}
