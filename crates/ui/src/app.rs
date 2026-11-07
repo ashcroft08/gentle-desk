@@ -189,7 +189,11 @@ impl App {
         let can_send = !self.input.trim().is_empty() && self.fatal.is_none();
         let page =
             page.push(composer::view(&self.input, chat.working, can_send).map(Message::Composer));
-        let sessions = sidebar::view(&self.app.sessions, self.app.current_session.as_deref());
+        let sessions = sidebar::view(
+            &self.app.sessions,
+            self.app.current_session.as_deref(),
+            clock::now_ms(),
+        );
         let mut layout = row![sessions.map(Message::Sidebar), page];
         // The open helper's thread replaces the list; a task that vanished falls back to it.
         let open = self

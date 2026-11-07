@@ -49,23 +49,37 @@ fn card(task: &HelperTask) -> Element<'_, Event> {
         body = body.push(text(step).size(11));
     }
     if let Some(error) = &task.error {
-        body = body.push(text(error).size(11).style(text::danger));
+        body = body.push(text(error).size(11).style(status_style(HelperStatus::Failed)));
     }
-    button(body)
-        .width(Length::Fill)
-        .padding(8)
-        .style(button::secondary)
-        .on_press(Event::Select(task.id.clone()))
-        .into()
+    // A transparent button inside the same card the thread view uses, so the
+    // card keeps the theme's own background and the status colours stay readable.
+    container(
+        button(body)
+            .width(Length::Fill)
+            .padding(0)
+            .style(button::text)
+            .on_press(Event::Select(task.id.clone())),
+    )
+    .padding(8)
+    .width(Length::Fill)
+    .style(container::rounded_box)
+    .into()
 }
 
 /// The colour a status is drawn in; shared with the thread view.
 pub fn status_style(status: HelperStatus) -> fn(&Theme) -> text::Style {
     match status {
-        HelperStatus::Running => text::primary,
-        HelperStatus::Waiting | HelperStatus::Queued => text::secondary,
-        HelperStatus::Done => text::success,
-        HelperStatus::Failed | HelperStatus::Cancelled => text::danger,
+        HelperStatus::Running => |_| colored(0x7a, 0xa2, 0xf7),
+        HelperStatus::Waiting | HelperStatus::Queued => |_| colored(0xc0, 0xc5, 0xd0),
+        HelperStatus::Done => |_| colored(0x7e, 0xdc, 0x9a),
+        HelperStatus::Failed | HelperStatus::Cancelled => |_| colored(0xff, 0x7b, 0x7b),
+    }
+}
+
+/// Fixed light tones: the theme's own success/primary colours are too dark on its dark cards.
+fn colored(r: u8, g: u8, b: u8) -> text::Style {
+    text::Style {
+        color: Some(iced::Color::from_rgb8(r, g, b)),
     }
 }
 

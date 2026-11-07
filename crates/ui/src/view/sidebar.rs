@@ -4,13 +4,20 @@ use gentle_app::SessionItem;
 use iced::widget::{button, column, container, scrollable, text};
 use iced::{Element, Length, Theme};
 
+use crate::time_ago::time_ago;
+
 #[derive(Debug, Clone)]
 pub enum Event {
     /// The user picked the session stored at this path.
     Open(String),
 }
 
-pub fn view<'a>(sessions: &'a [SessionItem], current: Option<&'a str>) -> Element<'a, Event> {
+/// `now_ms` is the wall clock (epoch ms), passed in so this stays a pure drawing of its inputs.
+pub fn view<'a>(
+    sessions: &'a [SessionItem],
+    current: Option<&'a str>,
+    now_ms: u64,
+) -> Element<'a, Event> {
     let rows = sessions.iter().map(|session| {
         let style: fn(&Theme, button::Status) -> button::Style =
             if current == Some(session.path.as_str()) {
@@ -22,7 +29,12 @@ pub fn view<'a>(sessions: &'a [SessionItem], current: Option<&'a str>) -> Elemen
         button(
             column![
                 text(&session.title).size(14),
-                text(format!("{} msgs · {project}", session.message_count)).size(11),
+                text(format!(
+                    "{} · {} msgs · {project}",
+                    time_ago(now_ms, session.modified_ms),
+                    session.message_count
+                ))
+                .size(11),
             ]
             .spacing(2),
         )

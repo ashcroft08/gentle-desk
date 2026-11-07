@@ -15,6 +15,7 @@
 // writes nothing but stdout.
 
 import * as readline from 'node:readline';
+import { helpersFrame } from './helpers-frame.mjs';
 
 /** Lines like the fixtures: one JSON object per line, LF-terminated. */
 function send(event) {
@@ -88,6 +89,18 @@ function echoTurn(message) {
   textEnd(0, text);
   messageEnd(text);
   agentEnd();
+}
+
+/** Publishes the helpers widget, then answers like an echo. */
+function helpersTurn() {
+  send({
+    type: 'extension_ui_request',
+    id: 'helpers-widget',
+    method: 'setWidget',
+    widgetKey: 'gentle-agents',
+    widgetLines: [JSON.stringify(helpersFrame())],
+  });
+  return echoTurn('helpers');
 }
 
 /** A provider failure: the message carries an error, then a notice arrives. */
@@ -198,6 +211,8 @@ function turn(message) {
       return dialogTurn();
     case 'slow':
       return slowTurn();
+    case 'helpers':
+      return helpersTurn();
     default:
       return echoTurn(message);
   }

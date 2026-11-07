@@ -29,6 +29,7 @@ What a turn does depends on the prompt text:
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | `error`    | assistant message ending with `stopReason: "error"` (`quota exceeded (fake)`), then a `notify` warning; the turn settles normally |
 | `dialog`   | a `confirm` (`d1`), a `select` (`d2`, options `a`/`b`) and an `input` (`d3`), one at a time; the reply echoes the raw responses    |
+| `helpers` | publishes a helpers widget with one helper per state (running, waiting, queued, done, failed), then echoes |
 | `slow`     | a `text_delta` of `tick ` every 100 ms until `{"type":"abort"}`; the message then ends with `ABORTED`                             |
 | anything   | `echo: <prompt>`                                                                                                                |
 
