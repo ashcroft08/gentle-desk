@@ -52,6 +52,7 @@ fn assistant(id: &str, text: &str, streaming: bool) -> ChatMessage {
         role: ChatRole::Assistant,
         text: text.to_owned(),
         streaming,
+        error: None,
     }
 }
 
@@ -61,6 +62,7 @@ fn user(id: &str, text: &str) -> ChatMessage {
         role: ChatRole::User,
         text: text.to_owned(),
         streaming: false,
+        error: None,
     }
 }
 
@@ -681,5 +683,65 @@ mod fixtures {
         assert!(!state.working);
         assert!(state.messages.is_empty());
         assert!(state.pending_dialogs.is_empty());
+    }
+}
+
+mod model_errors {
+    use super::*;
+
+    /// The shape pi emits when the provider fails: an assistant message whose
+    /// content is the provider's text, flagged by `stopReason: "error"`.
+    fn failed_end(content: Value) -> RpcEvent {
+        RpcEvent::MessageEnd(RpcMessage {
+            role: assistant_role(),
+            raw: json!({
+                "role": "assistant",
+                "content": content,
+                "stopReason": "error",
+                "errorMessage": "Claude quota exceeded — rate limit"
+            }),
+        })
+    }
+
+    #[test]
+    fn a_failed_assistant_message_is_flagged_with_the_error_message() {
+        let state = reducer_run(vec![
+            assistant_start(),
+            failed_end(json!([{"type": "text", "text": "Fable 5.1 requires usage credits."}])),
+        ]);
+        let mut expected = assistant("msg-0", "Fable 5.1 requires usage credits.", false);
+        expected.error = Some("Claude quota exceeded — rate limit".to_owned());
+        assert_eq!(state.messages, vec![expected]);
+    }
+
+    #[test]
+    fn a_failed_message_with_no_text_is_kept_not_dropped() {
+        let state = reducer_run(vec![assistant_start(), failed_end(json!([]))]);
+        let mut expected = assistant("msg-0", "", false);
+        expected.error = Some("Claude quota exceeded — rate limit".to_owned());
+        assert_eq!(state.messages, vec![expected]);
+    }
+
+    #[test]
+    fn a_normal_stop_reason_is_not_an_error() {
+        let end = RpcEvent::MessageEnd(RpcMessage {
+            role: assistant_role(),
+            raw: json!({"role": "assistant", "content": [{"type": "text", "text": "hi"}], "stopReason": "stop"}),
+        });
+        let state = reducer_run(vec![assistant_start(), end]);
+        assert_eq!(state.messages, vec![assistant("msg-0", "hi", false)]);
+    }
+
+    #[test]
+    fn an_error_without_a_message_still_flags_the_message() {
+        let end = RpcEvent::MessageEnd(RpcMessage {
+            role: assistant_role(),
+            raw: json!({"role": "assistant", "content": [], "stopReason": "error"}),
+        });
+        let state = reducer_run(vec![assistant_start(), end]);
+        assert_eq!(
+            state.messages[0].error.as_deref(),
+            Some("unknown model error")
+        );
     }
 }

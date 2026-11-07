@@ -51,6 +51,7 @@ fn open_assistant_message(state: ChatState, message: &RpcMessage) -> ChatState {
         role: ChatRole::Assistant,
         text: String::new(),
         streaming: true,
+        error: None,
     });
     ChatState { messages, ..state }
 }
@@ -101,6 +102,14 @@ fn close_assistant_message(state: ChatState, message: &RpcMessage) -> ChatState 
         last.text = authoritative;
     }
 
+    // A provider failure arrives as an ordinary-looking assistant message;
+    // flag it (and keep it even when empty) so the UI can show it as a failure.
+    if let Some(error) = model_error(message) {
+        last.error = Some(error);
+        last.streaming = false;
+        return ChatState { messages, ..state };
+    }
+
     // A message that only ever carried thinking/toolCall parts has nothing to
     // show, so drop it instead of leaving an empty bubble in the thread.
     // Dropping the last element shrinks `messages.len()` back, which is what
@@ -113,6 +122,15 @@ fn close_assistant_message(state: ChatState, message: &RpcMessage) -> ChatState 
 
     last.streaming = false;
     ChatState { messages, ..state }
+}
+
+/// The provider's error text when this message ended with `stopReason: "error"`.
+fn model_error(message: &RpcMessage) -> Option<String> {
+    if message.raw.get("stopReason").and_then(Value::as_str) != Some("error") {
+        return None;
+    }
+    let text = message.raw.get("errorMessage").and_then(Value::as_str);
+    Some(text.unwrap_or("unknown model error").to_owned())
 }
 
 /// The concatenated `{"type":"text"}` blocks of `content`, or `None` when

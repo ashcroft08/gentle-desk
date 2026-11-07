@@ -26,6 +26,9 @@ pub struct ChatMessage {
     pub text: String,
     /// True between `message_start` and `message_end`.
     pub streaming: bool,
+    /// Set when the provider failed this turn (`stopReason: "error"`): the
+    /// text is then the provider's own and must be shown as a failure.
+    pub error: Option<String>,
 }
 
 /// A blocking extension dialog waiting for an answer.
