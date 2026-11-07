@@ -39,3 +39,8 @@ iced. LLM replies are full of headings, fenced code and quotes; Slint would need
 - L1: "dale con el siguiente paso" (UI spike per the M1 brief).
 - L2: Reducer does not emit user messages (only assistant); the app layer must append them — the spikes do it in `spike_common::push_user`. To be settled when the `app` crate is built.
 - L3: Screenshots confirmed both windows render; the first iced capture was blank only because the debug window was still starting.
+
+## Decision
+
+- L4: "elijo iced" — framework chosen: iced 0.14 (MIT). Slint dropped.
+- L5: Selection check, from the iced_widget 0.14.2 sources (not tried by hand in a window): `text`, `rich_text` and the `markdown` widget have no text selection; only `text_editor` and `text_input` do. So rendered assistant messages cannot be selected or copied by dragging. Options: (a) a per-message "Copy" button that copies the raw markdown (cheap, chosen as the starting point), (b) a read-only `text_editor` for selectable plain text (loses markdown styling), (c) wait for upstream support. To revisit if (a) feels insufficient.
