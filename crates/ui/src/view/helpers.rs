@@ -1,16 +1,21 @@
 //! The helpers (delegated subagents) panel: counters and one card per task.
 
 use gentle_core::helpers::{HelperStatus, HelperTask, HelpersActivity, HelpersSummary};
-use iced::widget::{column, container, scrollable, text};
+use iced::widget::{button, column, container, scrollable, text};
 use iced::{Element, Length, Theme};
+
+#[derive(Debug, Clone)]
+pub enum Event {
+    /// The user opened the thread of the task with this id.
+    Select(String),
+}
 
 /// Whether there is anything to show; the panel stays out of the way otherwise.
 pub fn is_visible(helpers: &HelpersActivity) -> bool {
     !helpers.tasks.is_empty()
 }
 
-/// Draws the panel. It emits no events, so it fits any parent message type.
-pub fn view<'a, M: 'a>(helpers: &'a HelpersActivity) -> Element<'a, M> {
+pub fn view(helpers: &HelpersActivity) -> Element<'_, Event> {
     let cards = helpers.tasks.iter().map(card);
     container(
         column![
@@ -21,22 +26,18 @@ pub fn view<'a, M: 'a>(helpers: &'a HelpersActivity) -> Element<'a, M> {
         .spacing(8)
         .padding(12),
     )
-    .width(300)
+    .width(340)
     .height(Length::Fill)
     .style(container::bordered_box)
     .into()
 }
 
-fn card<'a, M: 'a>(task: &'a HelperTask) -> Element<'a, M> {
-    let status_style: fn(&Theme) -> text::Style = match task.status {
-        HelperStatus::Running => text::primary,
-        HelperStatus::Waiting | HelperStatus::Queued => text::secondary,
-        HelperStatus::Done => text::success,
-        HelperStatus::Failed | HelperStatus::Cancelled => text::danger,
-    };
+fn card(task: &HelperTask) -> Element<'_, Event> {
     let mut body = column![
         text(task_title(task)).size(14),
-        text(status_label(task.status)).size(12).style(status_style),
+        text(status_label(task.status))
+            .size(12)
+            .style(status_style(task.status)),
         text(format!(
             "{} · {} turns · {} tool calls",
             task.agent, task.turns, task.tool_calls
@@ -50,11 +51,22 @@ fn card<'a, M: 'a>(task: &'a HelperTask) -> Element<'a, M> {
     if let Some(error) = &task.error {
         body = body.push(text(error).size(11).style(text::danger));
     }
-    container(body)
-        .padding(8)
+    button(body)
         .width(Length::Fill)
-        .style(container::rounded_box)
+        .padding(8)
+        .style(button::secondary)
+        .on_press(Event::Select(task.id.clone()))
         .into()
+}
+
+/// The colour a status is drawn in; shared with the thread view.
+pub fn status_style(status: HelperStatus) -> fn(&Theme) -> text::Style {
+    match status {
+        HelperStatus::Running => text::primary,
+        HelperStatus::Waiting | HelperStatus::Queued => text::secondary,
+        HelperStatus::Done => text::success,
+        HelperStatus::Failed | HelperStatus::Cancelled => text::danger,
+    }
 }
 
 /// "1 running · 0 queued · 0 waiting · 2 finished"
@@ -65,7 +77,7 @@ fn summary_line(summary: &HelpersSummary) -> String {
     )
 }
 
-fn status_label(status: HelperStatus) -> &'static str {
+pub fn status_label(status: HelperStatus) -> &'static str {
     match status {
         HelperStatus::Queued => "queued",
         HelperStatus::Running => "running",
@@ -77,7 +89,7 @@ fn status_label(status: HelperStatus) -> &'static str {
 }
 
 /// The label if there is one, else the first line of the prompt, else the agent, else the id.
-fn task_title(task: &HelperTask) -> String {
+pub fn task_title(task: &HelperTask) -> String {
     let first_line = |text: &str| {
         text.lines()
             .map(str::trim)

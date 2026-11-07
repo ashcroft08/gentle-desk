@@ -15,7 +15,9 @@ use crate::clock;
 use crate::message::Message;
 use crate::subscription::{self, EventSource};
 use crate::thread_cache::ThreadCache;
-use crate::view::{banner, composer, dialog, header, helpers, notices, sidebar, thread};
+use crate::view::{
+    banner, composer, dialog, header, helper_thread, helpers, notices, sidebar, thread,
+};
 use crate::{backend, sessions};
 
 pub struct App {
@@ -114,6 +116,8 @@ impl App {
             }
             Message::Composer(composer::Event::Send) => self.send_prompt(),
             Message::Composer(composer::Event::Stop) => self.intent(Intent::Abort),
+            Message::Helpers(helpers::Event::Select(id)) => self.intent(Intent::SelectHelper(id)),
+            Message::HelperThread(helper_thread::Event::Back) => self.intent(Intent::CloseHelper),
             Message::Tick => self.intent(Intent::RefreshSessions),
             Message::CloseRequested => {
                 if let Some(process) = self.process.take() {
@@ -173,8 +177,16 @@ impl App {
             page.push(composer::view(&self.input, chat.working, can_send).map(Message::Composer));
         let sessions = sidebar::view(&self.app.sessions, self.app.current_session.as_deref());
         let mut layout = row![sessions.map(Message::Sidebar), page];
-        if helpers::is_visible(&chat.helpers) {
-            layout = layout.push(helpers::view(&chat.helpers));
+        // The open helper's thread replaces the list; a task that vanished falls back to it.
+        let open = self
+            .app
+            .selected_helper
+            .as_ref()
+            .and_then(|id| chat.helpers.tasks.iter().find(|task| &task.id == id));
+        if let Some(task) = open {
+            layout = layout.push(helper_thread::view(task).map(Message::HelperThread));
+        } else if helpers::is_visible(&chat.helpers) {
+            layout = layout.push(helpers::view(&chat.helpers).map(Message::Helpers));
         }
         layout.into()
     }
