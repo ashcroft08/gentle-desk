@@ -191,3 +191,18 @@ fn a_missing_gentle_shell_bin_fails_before_spawning_anything() {
     );
     assert_eq!(finished.stdout, "");
 }
+
+#[test]
+fn a_flood_turn_streams_all_three_hundred_messages_in_order() {
+    let finished = run_term(&fake_shell(), &["flood"]);
+
+    assert_eq!(finished.code(), Some(0), "stderr: {}", finished.stderr);
+    let headings: Vec<&str> = finished
+        .stdout
+        .lines()
+        .filter(|line| line.starts_with("## flood message "))
+        .collect();
+    assert_eq!(headings.len(), 300, "stdout: {}", finished.stdout);
+    assert_eq!(headings[0], "## flood message 0");
+    assert_eq!(headings[299], "## flood message 299");
+}
