@@ -1028,6 +1028,7 @@ name = "gentle-app"
 version = "0.1.0"
 dependencies = [
  "gentle-core",
+ "serde_json",
 ]
 
 [[package]]
