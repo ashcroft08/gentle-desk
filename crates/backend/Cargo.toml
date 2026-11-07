@@ -1,0 +1,12 @@
+[package]
+name = "gentle-backend"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Process layer of gentle-desk: launcher resolution and the gentle-shell RPC child process."
+
+[dependencies]
+gentle-core = { path = "../gentle-core" }
+
+[dev-dependencies]
+tempfile = "3"
