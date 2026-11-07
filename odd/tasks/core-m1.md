@@ -15,7 +15,7 @@ Continues core-m0. M1 = a `backend` crate that launches the real `gentle-shell -
 ## Tasks
 
 - [x] T1 (S1, S2, S6) `backend` crate: launcher resolution (GENTLE_SHELL_BIN, PATH lookup, .cmd shim -> node + real .mjs, cmd /c fallback), tested — inline — RED not observed (impl and tests written together); 10 tests, clippy/fmt clean — commit: see git log (feat/core-m1)
-- [ ] T2 (S1, S3) `backend` process: spawn, stdout bytes -> LineSplitter -> channel, stdin commands, stderr drained, graceful shutdown with no orphans — inline — commit: pending
+- [x] T2 (S1, S3) `backend` process: spawn, stdout bytes -> LineSplitter -> channel, stdin commands, stderr drained, graceful shutdown with no orphans — inline — RED not observed (impl first); 18 backend tests drive real node children; mutation check: without the taskkill /T step the orphan test hangs/fails (grandchild must be spawned detached, libuv otherwise kills it via a job object); clippy/fmt clean — commit: see git log (feat/core-m1)
 - [ ] T3 (S4, S5) terminal binary + visible model errors in the chat state — inline — commit: pending
 
 ## Log

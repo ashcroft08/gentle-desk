@@ -10,3 +10,4 @@ gentle-core = { path = "../gentle-core" }
 
 [dev-dependencies]
 tempfile = "3"
+serde_json = "1"

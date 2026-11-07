@@ -35,6 +35,7 @@ name = "gentle-backend"
 version = "0.1.0"
 dependencies = [
  "gentle-core",
+ "serde_json",
  "tempfile",
 ]
 
