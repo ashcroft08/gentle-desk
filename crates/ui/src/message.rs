@@ -2,7 +2,7 @@
 
 use gentle_backend::process::ProcessEvent;
 
-use crate::view::{composer, dialog, header, notices, sidebar, thread};
+use crate::view::{composer, dialog, header, helper_thread, helpers, notices, sidebar, thread};
 
 #[derive(Debug, Clone)]
 pub enum Message {
@@ -13,6 +13,8 @@ pub enum Message {
     Notices(notices::Event),
     Dialog(dialog::Event),
     Composer(composer::Event),
+    Helpers(helpers::Event),
+    HelperThread(helper_thread::Event),
     /// The periodic session-list refresh.
     Tick,
     CloseRequested,
