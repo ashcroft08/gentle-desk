@@ -13,6 +13,11 @@ use serde::{Deserialize, Serialize};
 
 pub use crate::time::parse_iso_ms;
 
+/// Most characters kept of a session name or first message: enough to search by
+/// and to fill a list row, small enough that thousands of chats stay cheap in
+/// memory and in the persisted cache.
+pub const MAX_TITLE_CHARS: usize = 200;
+
 /// What a session list shows for one file.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SessionSummary {
@@ -73,7 +78,7 @@ impl SessionScanner {
                 summary.name = str_field(&entry, "name")
                     .map(str::trim)
                     .filter(|name| !name.is_empty())
-                    .map(str::to_owned);
+                    .map(bounded);
             }
             Some("message") => fold_message(summary, &entry),
             _ => {}
@@ -110,9 +115,14 @@ fn fold_message(summary: &mut SessionSummary, entry: &serde_json::Map<String, se
     if role == Some("user") && summary.first_message.is_none() {
         let text = message_text(&message["content"]);
         if !text.is_empty() {
-            summary.first_message = Some(text);
+            summary.first_message = Some(bounded(&text));
         }
     }
+}
+
+/// At most [`MAX_TITLE_CHARS`] characters, cut on a character boundary.
+fn bounded(text: &str) -> String {
+    text.chars().take(MAX_TITLE_CHARS).collect()
 }
 
 /// A string content as is; a block list as its `text` blocks joined by a space.

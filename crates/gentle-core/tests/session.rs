@@ -206,3 +206,52 @@ fn malformed_timestamps_are_none() {
         assert_eq!(parse_iso_ms(bad), None, "{bad}");
     }
 }
+
+mod bounded_titles {
+    use super::*;
+    use gentle_core::session::MAX_TITLE_CHARS;
+
+    #[test]
+    fn a_huge_first_message_is_kept_only_up_to_the_limit() {
+        let huge = "a".repeat(MAX_TITLE_CHARS * 50);
+        let user = message("user", &format!("\"{huge}\""), "2026-11-07T02:37:00.000Z");
+        let first = scan(&[HEADER, &user]).unwrap().first_message.unwrap();
+        assert_eq!(first.chars().count(), MAX_TITLE_CHARS);
+        assert!(huge.starts_with(&first));
+    }
+
+    #[test]
+    fn a_message_at_the_limit_is_kept_whole() {
+        let exact = "b".repeat(MAX_TITLE_CHARS);
+        let user = message("user", &format!("\"{exact}\""), "2026-11-07T02:37:00.000Z");
+        assert_eq!(scan(&[HEADER, &user]).unwrap().first_message, Some(exact));
+    }
+
+    #[test]
+    fn the_cut_never_splits_a_multibyte_character() {
+        let text = "ñ€😀".repeat(MAX_TITLE_CHARS);
+        let user = message("user", &format!("\"{text}\""), "2026-11-07T02:37:00.000Z");
+        let first = scan(&[HEADER, &user]).unwrap().first_message.unwrap();
+        assert_eq!(first.chars().count(), MAX_TITLE_CHARS);
+        assert!(text.starts_with(&first));
+    }
+
+    #[test]
+    fn a_huge_session_name_is_bounded_too() {
+        let name = "n".repeat(MAX_TITLE_CHARS * 10);
+        let info = format!(
+            r#"{{"type":"session_info","id":"1","timestamp":"2026-11-07T02:40:00.000Z","name":"{name}"}}"#
+        );
+        let kept = scan(&[HEADER, &info]).unwrap().name.unwrap();
+        assert_eq!(kept.chars().count(), MAX_TITLE_CHARS);
+    }
+
+    #[test]
+    fn the_message_count_and_activity_are_unaffected_by_the_bound() {
+        let huge = "c".repeat(MAX_TITLE_CHARS * 5);
+        let user = message("user", &format!("\"{huge}\""), "2026-11-07T02:37:00.000Z");
+        let summary = scan(&[HEADER, &user]).unwrap();
+        assert_eq!(summary.message_count, 1);
+        assert!(summary.last_activity_ms.is_some());
+    }
+}
