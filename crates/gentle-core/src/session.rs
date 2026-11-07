@@ -5,11 +5,16 @@
 //! [`SessionSummary`], so a caller that already scanned a file can feed only
 //! the bytes appended since (the incremental index in `gentle-backend` does).
 //! Pure: no file system, no clock.
+//!
+//! A summary and a scanner both serialize, so a caller may persist its state
+//! and resume scanning where it stopped after a restart.
+
+use serde::{Deserialize, Serialize};
 
 pub use crate::time::parse_iso_ms;
 
 /// What a session list shows for one file.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SessionSummary {
     pub id: String,
     pub cwd: String,
@@ -26,7 +31,7 @@ pub struct SessionSummary {
 }
 
 /// Incremental line-by-line builder of a [`SessionSummary`].
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SessionScanner {
     summary: Option<SessionSummary>,
     /// The first parsable entry was not a `session` header: not a session file.

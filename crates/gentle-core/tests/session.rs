@@ -154,6 +154,45 @@ fn iso_timestamps_parse_to_epoch_milliseconds() {
     );
 }
 
+/// A persisted index stores the scanner itself, so its state must survive
+/// JSON and resume reading where it stopped.
+#[test]
+fn a_scanner_resumes_after_a_json_round_trip() {
+    let user = message("user", r#""hola""#, "2026-11-07T02:37:00.000Z");
+    let mut cut = SessionScanner::new();
+    cut.push_line(HEADER);
+    let json = serde_json::to_string(&cut).unwrap();
+    let mut resumed: SessionScanner = serde_json::from_str(&json).unwrap();
+    resumed.push_line(&user);
+    assert_eq!(resumed.summary(), scan(&[HEADER, &user]));
+    assert_eq!(
+        resumed.summary().unwrap().first_message.as_deref(),
+        Some("hola")
+    );
+}
+
+#[test]
+fn a_rejected_scanner_is_still_rejected_after_a_json_round_trip() {
+    let user = message("user", r#""hola""#, "2026-11-07T02:37:00.000Z");
+    let mut scanner = SessionScanner::new();
+    scanner.push_line(&user);
+    let json = serde_json::to_string(&scanner).unwrap();
+    let mut resumed: SessionScanner = serde_json::from_str(&json).unwrap();
+    resumed.push_line(HEADER);
+    assert_eq!(resumed.summary(), None);
+}
+
+#[test]
+fn a_summary_survives_a_json_round_trip() {
+    let user = message("user", r#""hola""#, "2026-11-07T02:37:00.000Z");
+    let summary = scan(&[HEADER, &user]).unwrap();
+    let json = serde_json::to_string(&summary).unwrap();
+    assert_eq!(
+        serde_json::from_str::<SessionSummary>(&json).unwrap(),
+        summary
+    );
+}
+
 #[test]
 fn malformed_timestamps_are_none() {
     for bad in [
