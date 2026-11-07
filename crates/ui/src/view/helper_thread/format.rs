@@ -2,6 +2,8 @@
 
 use serde_json::Value;
 
+use crate::text::truncate;
+
 /// How a tool call of a helper stands.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ToolStatus {
@@ -24,16 +26,6 @@ pub fn tool_status(running: Option<bool>, is_error: Option<bool>) -> ToolStatus 
     } else {
         ToolStatus::Ok
     }
-}
-
-/// At most `max` characters, with an ellipsis when something was cut.
-pub fn truncate(text: &str, max: usize) -> String {
-    if text.chars().count() <= max {
-        return text.to_owned();
-    }
-    let mut cut: String = text.chars().take(max).collect();
-    cut.push('…');
-    cut
 }
 
 /// A tool call's arguments on one line, e.g. `path=rpc.md, recursive=true`.

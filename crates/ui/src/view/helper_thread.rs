@@ -7,7 +7,8 @@ use iced::widget::{button, column, container, row, scrollable, text};
 use iced::{Element, Font, Length};
 
 use super::helpers::{status_label, status_style, task_title};
-use format::{args_line, output_preview, tool_status, truncate, ToolStatus};
+use crate::text::truncate;
+use format::{args_line, output_preview, tool_status, ToolStatus};
 
 /// Longest prompt echoed at the top, in characters.
 const PROMPT_CHARS: usize = 300;

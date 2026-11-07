@@ -16,14 +16,6 @@ fn a_finished_tool_is_failed_only_when_flagged() {
 }
 
 #[test]
-fn truncate_keeps_short_text_and_cuts_long_text_on_a_character_boundary() {
-    assert_eq!(truncate("hola", 4), "hola");
-    assert_eq!(truncate("hola mundo", 4), "hola…");
-    let long = "ñ".repeat(10);
-    assert_eq!(truncate(&long, 3), "ñññ…");
-}
-
-#[test]
 fn string_arguments_are_shown_unquoted_as_key_value_pairs() {
     assert_eq!(args_line(&json!({"path": "rpc.md"})), "path=rpc.md");
     assert_eq!(
