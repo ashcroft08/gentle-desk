@@ -5,4 +5,5 @@
 //! state this crate produces and the `backend` layer feeds it lines read from
 //! `gentle-shell --mode rpc`.
 
+pub mod chat;
 pub mod rpc;
