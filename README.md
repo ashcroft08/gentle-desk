@@ -34,3 +34,7 @@ One responsibility per file; no file that collects everything. Rules of thumb:
 - UI (`crates/ui/src/view/`): one file per visual component, each a pure `view(...)` over plain data plus its own `Event` enum. A component never touches app state or another component; `app.rs` maps events to intents. New UI is a new file there.
 - Logic that can be pure goes in `gentle-core` or `gentle-app` (testable without a window or a process); I/O stays in `gentle-backend`.
 - Tests sit next to the code (`foo/tests.rs` or `tests/`), and a refactor keeps them green unchanged.
+
+## License
+
+MIT, see [LICENSE](LICENSE). Material derived from the reference app is credited in [NOTICE.md](NOTICE.md).
