@@ -49,7 +49,11 @@ fn send(chat: &ChatId) -> ChatCommand {
 }
 
 fn tagged(key: ChatKey, event: ProcessEvent) -> TaggedEvent {
-    TaggedEvent { key, event }
+    TaggedEvent {
+        key,
+        event,
+        expected: false,
+    }
 }
 
 #[test]
@@ -215,7 +219,32 @@ fn stderr_and_closed_are_kept_for_the_shell_to_show() {
     );
     assert_eq!(
         runtime.convert(tagged(key, ProcessEvent::Closed), 1),
-        Some(Converted::Closed { chat })
+        Some(Converted::Closed {
+            chat,
+            expected: false
+        })
+    );
+}
+
+#[test]
+fn a_close_the_host_asked_for_is_marked_expected() {
+    let (runtime, _spawner) = runtime();
+    let chat = ChatId::of_session("s.jsonl");
+
+    // The host stamps an expected stop on the event; the shell must keep it, or
+    // a reaped chat would look like a death worth a notice (S3).
+    let stopped = TaggedEvent {
+        key: ChatKey::Saved("s.jsonl".into()),
+        event: ProcessEvent::Closed,
+        expected: true,
+    };
+
+    assert_eq!(
+        runtime.convert(stopped, 1),
+        Some(Converted::Closed {
+            chat,
+            expected: true
+        })
     );
 }
 

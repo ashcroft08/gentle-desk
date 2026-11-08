@@ -2,7 +2,7 @@
 
 use gentle_core::chat::{ChatMessage, ChatRole, ChatState};
 
-use crate::chats::Chats;
+use crate::chats::{ChatId, Chats};
 use crate::list_status::ListStatus;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -35,12 +35,23 @@ impl SessionItem {
     }
 }
 
-/// A transient message from an extension (`notify`), shown outside the thread.
+/// The one thing the user can do about a notice, when the notice is about
+/// something the app can fix by itself (S3).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum NoticeAction {
+    /// Start that chat's child again and reopen the chat.
+    RestartChat(ChatId),
+}
+
+/// A transient message from an extension (`notify`), or the report of a chat's
+/// death, shown outside the thread.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Notice {
     pub id: u64,
     pub level: NoticeLevel,
     pub text: String,
+    /// The action that fixes what the notice reports, if there is one.
+    pub action: Option<NoticeAction>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]

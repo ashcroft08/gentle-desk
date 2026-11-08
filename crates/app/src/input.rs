@@ -34,6 +34,10 @@ pub enum Intent {
     OpenChat(ChatId),
     /// A chat that did not exist before, with an id of its own.
     OpenNewChat,
+    /// Start that chat's child again and reopen the chat, after its child died
+    /// (S3). This is the action of the death notice; it works on any chat, not
+    /// only the foreground one.
+    RestartChat(ChatId),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -84,6 +88,14 @@ pub enum Input {
     ChatRekeyed {
         from: ChatId,
         to: ChatId,
+    },
+    /// One chat's child is gone. `expected` is true when the host stopped it on
+    /// purpose (idle reap, cap victim, close, shutdown): the chat is just idle
+    /// and reopens silently. An unexpected close of any chat, foreground or
+    /// background, ends that chat and leaves one notice naming it (S3).
+    ChatClosed {
+        chat: ChatId,
+        expected: bool,
     },
 }
 

@@ -22,12 +22,15 @@ pub struct Chats {
     foreground: Option<ChatId>,
 }
 
-/// One chat: its state, whether a finished turn is still unread, and the
-/// activity the sidebar shows for it.
+/// One chat: its state, whether a finished turn is still unread, whether its
+/// child is gone, and the activity the sidebar shows for it.
 #[derive(Debug, Clone, Default, PartialEq)]
 struct Entry {
     state: ChatState,
     unread: bool,
+    /// The chat's child exited and was not restarted (S3). Cleared by opening or
+    /// restarting the chat, which is what asks the host for a fresh child.
+    ended: bool,
     activity: ChatActivity,
 }
 
@@ -38,7 +41,7 @@ impl Entry {
         if foreground {
             self.unread = false;
         }
-        self.activity = activity_of(&self.state, self.unread, foreground);
+        self.activity = activity_of(&self.state, self.unread, foreground, self.ended);
     }
 }
 
@@ -71,6 +74,22 @@ impl Chats {
         self.entries.get(chat).map(|entry| entry.activity)
     }
 
+    /// Whether that chat's child is gone, so its composer cannot reach
+    /// anything until it is restarted (S3).
+    pub fn is_ended(&self, chat: &ChatId) -> bool {
+        self.entries.get(chat).is_some_and(|entry| entry.ended)
+    }
+
+    /// Every chat whose child is gone, in id order: the chats a Restart can
+    /// bring back.
+    pub fn ended(&self) -> Vec<ChatId> {
+        self.entries
+            .iter()
+            .filter(|(_, entry)| entry.ended)
+            .map(|(chat, _)| chat.clone())
+            .collect()
+    }
+
     /// How many chats are running a model call right now, so the shell can
     /// consult the host's working cap before starting another one.
     pub fn working_count(&self) -> usize {
@@ -89,8 +108,9 @@ impl Chats {
     }
 
     /// Makes `chat` the foreground one and clears its finished-unread mark,
-    /// creating it empty if this is the first it is heard of. No other chat
-    /// changes.
+    /// creating it empty if this is the first it is heard of. Opening a chat also
+    /// clears a death: the caller asks the host for its child, which starts a
+    /// fresh one through `--session` (S3). No other chat changes.
     pub fn open(&mut self, chat: ChatId) -> &mut ChatState {
         let previous = self.foreground.replace(chat.clone());
         let left = previous.filter(|previous| previous != &chat);
@@ -98,8 +118,29 @@ impl Chats {
             entry.refresh(false);
         }
         let entry = self.entries.entry(chat).or_default();
+        entry.ended = false;
         entry.refresh(true);
         &mut entry.state
+    }
+
+    /// Records that `chat`'s child died: it runs nothing until it is restarted.
+    /// The chat keeps its thread, its place and its foreground mark.
+    pub(crate) fn ended_now(&mut self, chat: &ChatId) {
+        let foreground = self.foreground.as_ref() == Some(chat);
+        let entry = self.entries.entry(chat.clone()).or_default();
+        entry.ended = true;
+        entry.refresh(foreground);
+    }
+
+    /// Records that `chat` has a child again: an expected stop, or a restart the
+    /// host honoured. The chat is idle and its thread is untouched.
+    pub(crate) fn clear_ended(&mut self, chat: &ChatId) {
+        let foreground = self.foreground.as_ref() == Some(chat);
+        let Some(entry) = self.entries.get_mut(chat) else {
+            return;
+        };
+        entry.ended = false;
+        entry.refresh(foreground);
     }
 
     /// Moves a chat from the id it had to the one it just learned, for a new chat

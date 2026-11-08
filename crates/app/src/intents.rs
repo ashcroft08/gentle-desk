@@ -114,7 +114,7 @@ fn single_chat(mut state: AppState, intent: Intent) -> (AppState, Vec<Command>) 
             (state, Vec::new())
         }
         // Handled by the per-chat pass above, which this one runs after.
-        Intent::OpenChat(_) | Intent::OpenNewChat => (state, Vec::new()),
+        Intent::OpenChat(_) | Intent::OpenNewChat | Intent::RestartChat(_) => (state, Vec::new()),
     }
 }
 

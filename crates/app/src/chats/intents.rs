@@ -7,6 +7,7 @@
 use gentle_core::rpc::{RpcCommand, UiAnswer};
 
 use super::ChatId;
+use crate::chats::push_death_notice;
 use crate::input::{ChatCommand, Command, Effects, Intent};
 use crate::intents::dialog_id;
 use crate::state::{push_user_message, AppState};
@@ -18,6 +19,7 @@ pub(crate) fn apply(state: &mut AppState, intent: &Intent) -> Option<Effects> {
     match intent {
         Intent::OpenChat(chat) => Some(for_chat(open(state, chat.clone()))),
         Intent::OpenNewChat => Some(for_chat(open(state, ChatId::fresh()))),
+        Intent::RestartChat(chat) => Some(for_chat(open(state, chat.clone()))),
         Intent::SendPrompt(text) => send_prompt(state, text).map(for_chat),
         Intent::Abort => send_to_foreground(state, RpcCommand::Abort).map(for_chat),
         Intent::CopyMessage(id) => copy_message(state, id).map(for_shell),
@@ -45,6 +47,8 @@ fn for_shell(commands: Vec<Command>) -> Effects {
 /// Makes `chat` the foreground one and asks the host for its child. A chat that
 /// already has a live child is only focused by the host, so this never sends
 /// `switch_session` or `new_session`: the session travels on the command line.
+/// It is also the whole of a restart: opening a chat clears the death mark, and
+/// the host starts a fresh child for it through `--session` (S3).
 fn open(state: &mut AppState, chat: ChatId) -> Vec<ChatCommand> {
     state.chats.open(chat.clone());
     vec![ChatCommand::OpenProcess { chat }]
@@ -63,9 +67,17 @@ fn send_to_foreground(state: &AppState, rpc: RpcCommand) -> Option<Vec<ChatComma
 /// Sends the prompt to the foreground chat, one turn at a time, as the
 /// single-chat path does. Answers `None` with no foreground chat, so the
 /// single-chat path keeps the prompt.
+///
+/// A chat whose child died receives nothing: there is no process to write to, so
+/// the prompt is not even appended to its thread and the user gets the Restart
+/// notice instead (S3).
 fn send_prompt(state: &mut AppState, text: &str) -> Option<Vec<ChatCommand>> {
     let chat = state.chats.foreground()?.clone();
     if text.trim().is_empty() {
+        return Some(Vec::new());
+    }
+    if state.chats.is_ended(&chat) {
+        push_death_notice(state, &chat);
         return Some(Vec::new());
     }
     let chat_state = state.chats.chat_mut(&chat);

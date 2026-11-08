@@ -9,10 +9,11 @@ use gentle_core::rpc::RpcCommand;
 /// A child started for a stored chat has the session on its command line but
 /// not its history in the window, so it sends that history; a new chat has no
 /// session file yet, so it asks for its state and learns the path from the
-/// reply. A chat whose child was already up has its thread already, and a start
-/// that was discarded has no child at all: neither asks for anything. Neither
-/// request replaces the child's session: nothing here is a `switch_session` or a
-/// `new_session` (S1).
+/// reply. A chat whose child was already up has its thread already, one whose
+/// child is still starting is served by the start already on its way, and a start
+/// that was discarded has no child at all: none of them asks for anything.
+/// Neither request replaces the child's session: nothing here is a
+/// `switch_session` or a `new_session` (S1).
 pub fn request_after_open(chat: &ChatId, how: Opened) -> Option<ChatCommand> {
     if how != Opened::Started {
         return None;

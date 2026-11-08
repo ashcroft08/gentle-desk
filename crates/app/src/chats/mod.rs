@@ -23,7 +23,7 @@ pub use activity::ChatActivity;
 pub use id::ChatId;
 pub use store::Chats;
 
-pub(crate) use inputs::{failed, rekeyed};
+pub(crate) use inputs::{closed, failed, push_death_notice, rekeyed};
 pub(crate) use intents::apply as apply_intent;
 
 use gentle_core::rpc::RpcEvent;

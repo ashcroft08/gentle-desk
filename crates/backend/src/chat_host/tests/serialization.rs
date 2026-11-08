@@ -22,8 +22,9 @@ fn concurrent_opens_of_one_chat_start_exactly_one_child() {
     };
     spawner.wait_for_spawns(1);
 
-    // A second click while the first child is still starting: no second child.
-    assert_eq!(host.open(saved("a")).unwrap(), Opened::Existing);
+    // A second click while the first child is still starting: no second child,
+    // and the answer says "already coming up" instead of pretending it is live.
+    assert_eq!(host.open(saved("a")).unwrap(), Opened::Starting);
     gate.release();
     assert_eq!(first.join().unwrap().unwrap(), Opened::Started);
 

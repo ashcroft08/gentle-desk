@@ -58,6 +58,7 @@ impl State {
         generation: u64,
         child: Box<dyn Child>,
         alive: Arc<AtomicBool>,
+        stopped: Arc<AtomicBool>,
         tag: Tag,
     ) -> Result<(), Box<dyn Child>> {
         let Some(slot) = self.slots.get_mut(key) else {
@@ -66,7 +67,12 @@ impl State {
         if slot.generation != generation || !slot.is_spawning() {
             return Err(child);
         }
-        slot.status = Status::Live { child, alive, tag };
+        slot.status = Status::Live {
+            child,
+            alive,
+            stopped,
+            tag,
+        };
         Ok(())
     }
 
@@ -141,7 +147,12 @@ impl Slot {
 
     pub(super) fn into_child(self) -> Option<Box<dyn Child>> {
         match self.status {
-            Status::Live { child, .. } => Some(child),
+            Status::Live { child, stopped, .. } => {
+                // From here on, this child's closure is one the host asked for:
+                // the forwarder reads this flag for the `Closed` it stamps.
+                stopped.store(true, Ordering::SeqCst);
+                Some(child)
+            }
             Status::Spawning => None,
         }
     }
@@ -171,6 +182,9 @@ pub(super) enum Status {
     Live {
         child: Box<dyn Child>,
         alive: Arc<AtomicBool>,
+        /// Set when the host takes the child out to stop it, before the stop
+        /// begins, so the `Closed` that follows is reported as expected.
+        stopped: Arc<AtomicBool>,
         /// The key stamped on every event this child sends. A cell, not a copy,
         /// so a rekey changes what the forwarder already running reads.
         tag: Tag,

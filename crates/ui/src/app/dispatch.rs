@@ -5,27 +5,21 @@ use gentle_app::{update_chats, Command, Effects, Input};
 use gentle_core::chat::Dialog;
 use iced::{clipboard, Task};
 
-use super::App;
+use super::{visible, App};
 use crate::message::Message;
 use crate::view::dialog;
 
 impl App {
     /// Feeds an input to the app layer and runs the effects it returns.
     pub(super) fn dispatch(&mut self, input: Input) -> Task<Message> {
-        let dialog_before = Self::visible_chat(&self.app)
-            .pending_dialogs
-            .first()
-            .cloned();
+        let dialog_before = visible::chat(&self.app).pending_dialogs.first().cloned();
         let (state, effects) = update_chats(std::mem::take(&mut self.app), input);
         self.app = state;
-        let chat = Self::visible_chat(&self.app);
+        let chat = visible::chat(&self.app);
         self.cache.sync(chat);
         let mut tasks = Vec::new();
         // A new text dialog takes the keyboard so the user can type at once.
-        let dialog_now = Self::visible_chat(&self.app)
-            .pending_dialogs
-            .first()
-            .cloned();
+        let dialog_now = visible::chat(&self.app).pending_dialogs.first().cloned();
         if dialog_now != dialog_before
             && matches!(
                 dialog_now,

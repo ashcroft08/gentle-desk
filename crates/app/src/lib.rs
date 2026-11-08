@@ -31,7 +31,7 @@ pub use chats::{ChatActivity, ChatId, Chats};
 pub use input::{ChatCommand, Command, Effects, Input, Intent};
 pub use list_status::ListStatus;
 pub use session_prepare::{prepare_sessions, PreparedSessions};
-pub use state::{AppState, Notice, NoticeLevel, SessionItem};
+pub use state::{AppState, Notice, NoticeAction, NoticeLevel, SessionItem};
 
 /// [`update`] with both halves of the answer.
 ///
@@ -61,6 +61,9 @@ fn fold(state: AppState, input: Input) -> (AppState, Effects) {
             (chats::failed(state, &chat, &message), Effects::default())
         }
         Input::ChatRekeyed { from, to } => (chats::rekeyed(state, &from, to), Effects::default()),
+        Input::ChatClosed { chat, expected } => {
+            (chats::closed(state, &chat, expected), Effects::default())
+        }
         Input::SessionsPrepared(prepared) => {
             let mut state = state;
             state.set_prepared(prepared);

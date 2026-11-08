@@ -36,8 +36,15 @@ impl ChatHost {
             }
             if let Some(slot) = state.slots.get_mut(&key) {
                 slot.mark(None, now);
+                let starting = slot.is_spawning();
                 state.foreground = Some(key);
-                return Ok(Opened::Existing);
+                // A child still starting is not a live one: a caller that would
+                // write to it has to know the difference (S2, R3-existing-false-promise).
+                return Ok(if starting {
+                    Opened::Starting
+                } else {
+                    Opened::Existing
+                });
             }
             // Idle background children go first: nothing is lost by stopping a
             // child the user has not touched for a long time.
@@ -93,6 +100,7 @@ impl ChatHost {
         };
 
         let alive = Arc::new(AtomicBool::new(true));
+        let stopped = Arc::new(AtomicBool::new(false));
         let tag: Tag = Arc::new(Mutex::new(key.clone()));
         let forwarded = {
             let mut state = self.state();
@@ -101,6 +109,7 @@ impl ChatHost {
                 generation,
                 child,
                 Arc::clone(&alive),
+                Arc::clone(&stopped),
                 Arc::clone(&tag),
             ) {
                 drop(state);
@@ -116,7 +125,7 @@ impl ChatHost {
                 .map(|child| child.take_events())
         };
         if let Some(events) = forwarded {
-            self.forward(tag, alive, events);
+            self.forward(tag, alive, stopped, events);
         }
         Ok(Opened::Started)
     }

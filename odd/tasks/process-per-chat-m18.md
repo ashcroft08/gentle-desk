@@ -20,7 +20,7 @@ that are working alive in the background, and offers a Restart on death.
 
 - [ ] T1 (S1, S2, S5, S7) backend/app: manager lifecycle `session -> child` — one pure transition in `crates/app` for "start child for session S", "make S foreground" and "reap idle children under the caps", and the I/O in `crates/backend` (spawn with `--session` or without for a new chat, per-session spawn serialization, discard a stale start result, idle reap, stop every child on close). Route: gentle-ai-worker; commit:
 - [ ] T2 (S1) ui: wire open/new chat to the manager as "make foreground" and remove the `switch_session` / `new_session` paths (`crates/app/src/intents.rs:32-34` and `:91-93`, the `switch_session` exchange at `crates/app/src/events.rs:33-41`), including their tests. Route: gentle-ai-worker; commit:
-- [ ] T3 (S3) ui: per-chat death notice with a Restart action that relaunches that chat's child and reopens it, replacing the terminal `"gentle-shell exited"` / `"cannot reach gentle-shell: …"` state (`crates/ui/src/app/process_update.rs:24-27`, `crates/ui/src/app.rs:66-68,155,161`). Route: gentle-ai-worker; commit:
+- [x] T3 (S3) ui: per-chat death notice with a Restart action that relaunches that chat's child and reopens it, replacing the terminal `"gentle-shell exited"` / `"cannot reach gentle-shell: …"` state (`crates/ui/src/app/process_update.rs:24-27`, `crates/ui/src/app.rs:66-68,155,161`). Route: gentle-ai-worker; commit:
 - [ ] T4 (S4) ui: per-chat state in the sidebar (working / finished-unread / needs-attention) and queued extension dialogs from background chats; returning to a chat shows its full reply. Route: gentle-ai-worker; commit:
 - [ ] T5 (S1-S7) parent verifies: real window with `tools/fake-gentle-shell` via `GENTLE_SHELL_BIN` (never the real model), including a stand-in that works for N seconds and one that dies after a session switch; background chats finishing and being read, dialog queueing, idle reap and caps; latency measured with the real gentle-shell using only `get_state`-style no-model calls; `cargo fmt --check` and `cargo clippy` clean; commit and PR. Route: parent; commit:
 
@@ -105,8 +105,69 @@ about what that code does and why it may matter, and the task that should addres
   are gone, so the remaining latency (a frozen caller during shutdowns) is the
   async-command work of T1/T5, not of this fix.
 
-## Window check (T5, real window)
+### Follow-ups as addressed by T3
 
+- R3-existing-false-promise — **now closed**. `ChatHost::open` on a chat whose
+  child is still starting answers the new `Opened::Starting` instead of
+  `Existing`, so a second click during a slow start no longer claims a live
+  child. `chat_host::tests::serialization::concurrent_opens_of_one_chat_start_exactly_one_child`
+  now pins `Opened::Starting` for that second click and still proves exactly one
+  child (the assertion that changed; the count assertions did not), and
+  `reopening_a_chat_only_makes_it_foreground_again` keeps pinning `Existing` for
+  a chat whose child is up. The shell asks the child for nothing after a
+  `Starting` answer, because the start already on its way is the one that will
+  answer (`chat_runtime::tests::open_chat`).
+- R4-003 — **fixed**. `ChatHost::forward` no longer discards the thread's
+  `Result`: when the forwarder cannot be started, the child is marked gone and one
+  unexpected `Closed` is published at once, so the chat gets the death notice and
+  its Restart instead of looking live and silent forever. Not pinned by a test: a
+  thread that cannot be started cannot be simulated without injecting a thread
+  factory into the host, which would test the injection instead of the failure.
+  The rest of the close path is pinned by `chat_host::tests::closes`.
+
+### What T3 changed (S3, plus the S2 distinction above)
+
+- App layer, pure and UI-free: a chat that loses its child is marked *ended* next
+  to its activity (`Chats::is_ended`, `Chats::ended`, `ChatActivity::Ended`).
+  `Input::ChatClosed { chat, expected }` is the only way in. `expected` is true
+  when the host stopped the child itself, and then the chat is just `Idle`, keeps
+  its thread and reopens silently. An unexpected close of **any** chat, foreground
+  or background, ends that chat and leaves **one** error notice naming it, with
+  `NoticeAction::RestartChat` as the notice's action (notices grew an optional
+  action; extension notices still carry none). `Intent::RestartChat(chat)` clears
+  the mark, makes the chat foreground and answers `ChatCommand::OpenProcess`, which
+  reopens it through `--session`, so the history comes back through the existing
+  open follow-up. Opening a chat clears the same mark, so clicking a dead chat in
+  the sidebar is already a restart.
+- Decision — **a prompt to an ended chat is a notice, not an implicit restart.**
+  Restarting under the prompt would need the prompt queued until the child is up,
+  and a send to a spawning chat is refused by the host; the simpler, honest
+  behaviour is to keep the text in the composer, send nothing and re-show the same
+  notice with its Restart button. Chosen explicitly, not by omission.
+- Decision � **the death mark is cleared when the reopen is asked for, not when the
+  child is confirmed up.** There is no input for "this chat's child is up" yet, so
+  a restart whose spawn fails (a session whose cwd is gone, design note 7) reports
+  itself through the existing `ChatFailed` error notice and the chat is no longer
+  marked dead; clicking it again tries once more. The alternative � staying disabled
+  after a failed spawn � would need that extra input and a second notice shape.
+- Host side: `TaggedEvent.expected` is true only for a `Closed` of a child the
+  host took out itself (idle reap, cap victim, `close`, `shutdown`). The slot holds
+  a stop flag that is set before the stop begins and is read by the forwarder when
+  it stamps the event, so the UI can tell a stop from a death.
+- UI: a chat's death is no longer `self.fatal`. `fatal` stays for the one failure
+  that ends everything (the launcher cannot be resolved): the banner is gone for
+  child deaths, the notice carries the `Restart` button (component event mapped in
+  `app`), and the composer stays usable for every other chat. For the ended chat
+  it is disabled, and the notice beside it says why. New handling lives in
+  `crates/ui/src/app/chat_closed.rs`, `send_prompt.rs`, `visible.rs` and
+  `frame.rs`.
+- Tests: `crates/app/tests/chat_death.rs` (seven cases: one notice per death with
+  its action, a background death touching nothing else, an expected stop silent,
+  restart, the refused prompt, reopening a dead chat) and
+  `crates/backend/src/chat_host/tests/closes.rs` (a death is not expected; reap,
+  cap victim, close and shutdown are).
+
+## Window check (T5, real window)
 Release build of `aaf073e` (`cargo build --release -p gentle-ui`), Windows 11,
 window 1393x747 (125 % DPI), the stand-in gentle-shell
 (`GENTLE_SHELL_BIN=tools/fake-gentle-shell/fake.mjs`, no model, no network), a

@@ -143,25 +143,51 @@ impl ChatHost {
     }
 
     /// Forwards one child's event stream onto the host's channel, tagging every
-    /// event with its chat, and clears the child's alive flag when it goes.
-    pub(super) fn forward(&self, tag: Tag, alive: Arc<AtomicBool>, events: Receiver<ProcessEvent>) {
+    /// event with its chat and saying whether its closure is one the host asked
+    /// for, and clears the child's alive flag when it goes.
+    ///
+    /// A forwarder that cannot be started is not left silent: the child is
+    /// marked gone and one unexpected `Closed` is published at once, so the shell
+    /// offers a Restart instead of waiting forever for a chat that will never
+    /// answer (R4-003).
+    pub(super) fn forward(
+        &self,
+        tag: Tag,
+        alive: Arc<AtomicBool>,
+        stopped: Arc<AtomicBool>,
+        events: Receiver<ProcessEvent>,
+    ) {
         let sender = self.events_tx.clone();
-        thread::Builder::new()
+        let initial_key = tag.lock().unwrap_or_else(|p| p.into_inner()).clone();
+        let watched = Arc::clone(&alive);
+        let spawned = thread::Builder::new()
             .name("chat-host-events".to_owned())
             .spawn(move || {
                 while let Ok(event) = events.recv() {
-                    if event == ProcessEvent::Closed {
-                        alive.store(false, Ordering::SeqCst);
+                    let closed = event == ProcessEvent::Closed;
+                    if closed {
+                        watched.store(false, Ordering::SeqCst);
                     }
                     let key = tag.lock().unwrap_or_else(|p| p.into_inner()).clone();
-                    let tagged = TaggedEvent { key, event };
+                    let tagged = TaggedEvent {
+                        key,
+                        event,
+                        expected: closed && stopped.load(Ordering::SeqCst),
+                    };
                     if sender.send(tagged).is_err() {
                         break; // the host is gone
                     }
                 }
-                alive.store(false, Ordering::SeqCst);
-            })
-            .ok();
+                watched.store(false, Ordering::SeqCst);
+            });
+        if spawned.is_err() {
+            alive.store(false, Ordering::SeqCst);
+            let _ = self.events_tx.send(TaggedEvent {
+                key: initial_key,
+                event: ProcessEvent::Closed,
+                expected: false,
+            });
+        }
     }
 }
 

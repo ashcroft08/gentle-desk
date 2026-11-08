@@ -1,31 +1,33 @@
 //! The application: owns the state, runs `gentle-app` commands, wires the
-//! components together. Drawing lives in `view/`, process startup in
-//! `app/boot`, subscriptions in `subscription`, the session refresh flow (which
+//! components together.
+//!
+//! Drawing lives in `view/` and the frame in `app/frame`; process startup in
+//! `app/boot`; subscriptions in `subscription`; the session refresh flow (which
 //! pass runs when) in `refresh_flow`, and the messages of both in
-//! `app/sessions_update`, `app/chat_update` and `app/chat_command`.
+//! `app/sessions_update`, `app/chat_update`, `app/chat_closed`, `app/chat_command`
+//! and `app/send_prompt`.
 
 use std::sync::Arc;
 
 use gentle_app::{AppState, ChatId, Input, Intent};
-use gentle_core::chat::ChatState;
-use iced::widget::{column, row, scrollable};
-use iced::{Element, Subscription, Task};
+use iced::{Subscription, Task};
 
 use crate::chat_runtime::ChatRuntime;
-use crate::clock;
 use crate::message::Message;
 use crate::refresh_flow::Flow;
 use crate::subscription::{self, EventSource};
 use crate::thread_cache::ThreadCache;
-use crate::view::{
-    banner, composer, dialog, header, helper_thread, helpers, notices, sidebar, thread,
-};
+use crate::view::{composer, dialog, header, helper_thread, helpers, notices, sidebar, thread};
 
 mod boot;
+mod chat_closed;
 mod chat_command;
 mod chat_update;
 mod dispatch;
+mod frame;
+mod send_prompt;
 mod sessions_update;
+mod visible;
 
 pub struct App {
     app: AppState,
@@ -40,7 +42,9 @@ pub struct App {
     flow: Flow,
     /// How far the chat list is scrolled, in pixels (window geometry, not app state).
     sidebar_offset: f32,
-    /// A failure that ends the session (launcher missing, the foreground child died).
+    /// A failure that ends the whole session: gentle-shell could not be resolved
+    /// at all. A chat's child dying is a per-chat notice with a Restart (S3), not
+    /// this.
     fatal: Option<String>,
 }
 
@@ -62,7 +66,7 @@ impl App {
                 self.sidebar_offset = 0.0;
                 let to_top = iced::widget::operation::scroll_to(
                     sidebar::SCROLL_ID,
-                    scrollable::AbsoluteOffset {
+                    iced::widget::scrollable::AbsoluteOffset {
                         x: None,
                         y: Some(0.0),
                     },
@@ -79,6 +83,11 @@ impl App {
                 Task::none()
             }
             Message::Notices(notices::Event::Dismiss(id)) => self.intent(Intent::DismissNotice(id)),
+            // The death notice's one action: start that chat's child again and
+            // reopen it, so no chat ends up dead until the app restarts (S3).
+            Message::Notices(notices::Event::Restart(chat)) => {
+                self.intent(Intent::RestartChat(chat))
+            }
             Message::Dialog(dialog::Event::Answer { id, answer }) => {
                 self.dialog_text.clear();
                 // The keyboard goes back to the prompt box once the dialog is gone.
@@ -107,77 +116,7 @@ impl App {
         }
     }
 
-    fn send_prompt(&mut self) -> Task<Message> {
-        let prompt = std::mem::take(&mut self.input);
-        // One turn at a time, and only into a chat that has a child: before the
-        // first chat is open there is nowhere for the prompt to go.
-        let ready = self.app.chats.foreground().is_some() && !Self::visible_chat(&self.app).working;
-        if prompt.trim().is_empty() || !ready {
-            self.input = prompt; // keep what the user typed
-            return Task::none();
-        }
-        self.intent(Intent::SendPrompt(prompt))
-    }
-
     pub fn subscription(&self) -> Subscription<Message> {
         subscription::subscription(&self.events, self.flow.watch(), self.flow.tick_delay())
-    }
-
-    pub fn view(&self) -> Element<'_, Message> {
-        let chat = Self::visible_chat(&self.app);
-        let mut page = column![
-            header::view().map(Message::Header),
-            notices::view(&self.app.notices).map(Message::Notices),
-            thread::view(&chat.messages, &self.cache).map(Message::Thread),
-        ];
-        if let Some(error) = &self.fatal {
-            page = page.push(banner::view(error));
-        }
-        if let Some(pending) = chat.pending_dialogs.first() {
-            page = page.push(dialog::view(pending, &self.dialog_text).map(Message::Dialog));
-        }
-        let can_send = !self.input.trim().is_empty() && self.fatal.is_none();
-        let page =
-            page.push(composer::view(&self.input, chat.working, can_send).map(Message::Composer));
-        let sessions = sidebar::view(sidebar::Props {
-            visible: self.app.visible_sessions(),
-            total: self.app.sessions.len(),
-            query: &self.app.session_query,
-            list_status: self.app.list_status,
-            current: self.current_session(),
-            now_ms: clock::now_ms(),
-            offset: self.sidebar_offset,
-        });
-        let mut layout = row![sessions.map(Message::Sidebar), page];
-        // The open helper's thread replaces the list; a task that vanished falls back to it.
-        let open = self
-            .app
-            .selected_helper
-            .as_ref()
-            .and_then(|id| chat.helpers.tasks.iter().find(|task| &task.id == id));
-        if let Some(task) = open {
-            layout = layout.push(helper_thread::view(task).map(Message::HelperThread));
-        } else if helpers::is_visible(&chat.helpers) {
-            layout = layout.push(helpers::view(&chat.helpers).map(Message::Helpers));
-        }
-        layout.into()
-    }
-
-    /// The chat the window shows: the foreground one of the per-chat shell, or
-    /// the empty single thread before the first chat is opened.
-    fn visible_chat(app: &AppState) -> &ChatState {
-        app.chats
-            .foreground()
-            .and_then(|chat| app.chats.state(chat))
-            .unwrap_or(&app.chat)
-    }
-
-    /// The session file the sidebar marks as open.
-    fn current_session(&self) -> Option<&str> {
-        self.app
-            .chats
-            .foreground()
-            .and_then(|chat| chat.session_path())
-            .or(self.app.current_session.as_deref())
     }
 }

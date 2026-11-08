@@ -140,10 +140,12 @@ fn every_childs_events_arrive_on_one_channel_tagged_with_its_chat() {
             TaggedEvent {
                 key: saved("a"),
                 event: ProcessEvent::Output(Decoded::Event(RpcEvent::AgentStart)),
+                expected: false,
             },
             TaggedEvent {
                 key: saved("b"),
                 event: ProcessEvent::Stderr("boom".into()),
+                expected: false,
             },
         ]
     );
@@ -162,6 +164,7 @@ fn a_child_that_closed_is_no_longer_live_and_reopening_restarts_it() {
         TaggedEvent {
             key: saved("a"),
             event: ProcessEvent::Closed,
+            expected: false,
         }
     );
     assert!(!host.is_alive(&saved("a")));
@@ -213,6 +216,7 @@ fn a_failed_spawn_is_reported_and_leaves_no_slot_behind() {
 }
 
 mod caps;
+mod closes;
 mod isolation;
 mod real;
 mod rekey;

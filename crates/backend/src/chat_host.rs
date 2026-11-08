@@ -76,6 +76,11 @@ impl fmt::Display for ChatKey {
 pub struct TaggedEvent {
     pub key: ChatKey,
     pub event: ProcessEvent,
+    /// True when the host stopped this child itself — the idle reap, a cap
+    /// victim, a close, or the shutdown of every child — instead of the child
+    /// ending on its own. Only meaningful on [`ProcessEvent::Closed`]; it is how
+    /// the shell tells a stop the user asked for from a death worth a notice.
+    pub expected: bool,
 }
 
 /// What [`ChatHost::open`] did.
@@ -83,6 +88,10 @@ pub struct TaggedEvent {
 pub enum Opened {
     /// The chat already had a live child: it only became the foreground one.
     Existing,
+    /// The chat's child is still starting, so there is nothing to write to yet.
+    /// The open changed nothing beyond the foreground mark: the one child on its
+    /// way is the one this chat will have.
+    Starting,
     /// A child was started for the chat.
     Started,
     /// The chat was closed while its child was starting, so the started child

@@ -2,12 +2,26 @@
 
 use gentle_core::rpc::{RpcEvent, UiRequest};
 
-use crate::state::{AppState, Notice, NoticeLevel};
+use crate::state::{AppState, Notice, NoticeAction, NoticeLevel};
 
 /// Most notices kept; older ones are dropped first.
 const MAX_NOTICES: usize = 50;
 
 pub(crate) fn push_notice(state: &mut AppState, level: NoticeLevel, text: String) {
+    push(state, level, text, None);
+}
+
+/// A notice that carries the one action which fixes what it reports (S3).
+pub(crate) fn push_action_notice(
+    state: &mut AppState,
+    level: NoticeLevel,
+    text: String,
+    action: NoticeAction,
+) {
+    push(state, level, text, Some(action));
+}
+
+fn push(state: &mut AppState, level: NoticeLevel, text: String, action: Option<NoticeAction>) {
     // Extensions repeat their notices (every session switch re-announces itself).
     if state
         .notices
@@ -20,6 +34,7 @@ pub(crate) fn push_notice(state: &mut AppState, level: NoticeLevel, text: String
         id: state.next_notice_id,
         level,
         text,
+        action,
     });
     state.next_notice_id += 1;
     let excess = state.notices.len().saturating_sub(MAX_NOTICES);

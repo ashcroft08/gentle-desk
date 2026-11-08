@@ -17,7 +17,7 @@ impl App {
                 eprintln!("[{}] {line}", chat.label());
                 Task::none()
             }
-            Converted::Closed { chat } => self.on_chat_closed(chat),
+            Converted::Closed { chat, expected } => self.on_chat_closed(chat, expected),
         }
     }
 
@@ -74,19 +74,6 @@ impl App {
             return;
         };
         runtime.set_working(chat, state.working);
-    }
-
-    /// The child of the foreground chat is the one the session ends with, as it
-    /// always did. A background child that exited only logs until the per-chat
-    /// death notice with its Restart action exists (T3).
-    fn on_chat_closed(&mut self, chat: ChatId) -> Task<Message> {
-        if self.app.chats.foreground() == Some(&chat) {
-            self.fatal
-                .get_or_insert_with(|| "gentle-shell exited".into());
-        } else {
-            eprintln!("[{}] child exited", chat.label());
-        }
-        Task::none()
     }
 }
 

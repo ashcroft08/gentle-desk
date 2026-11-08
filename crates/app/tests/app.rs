@@ -152,6 +152,10 @@ mod notices {
         assert_eq!(state.notices.len(), 1);
         assert_eq!(state.notices[0].level, NoticeLevel::Warning);
         assert_eq!(state.notices[0].text, "rate limit reached");
+        assert_eq!(
+            state.notices[0].action, None,
+            "an extension notice asks for nothing: only a chat's death carries a Restart (S3)"
+        );
         assert!(commands.is_empty());
     }
 
