@@ -32,8 +32,15 @@ impl App {
     /// came up, or the notice of one that could not be reached.
     pub(super) fn on_chat_outcome(&mut self, outcome: Outcome) -> Task<Message> {
         match outcome {
-            Outcome::Opened { chat, how } => self.on_opened(chat, how),
+            Outcome::Opened { chat, how } => {
+                // The child is up, freshly started or already live (`Existing`):
+                // the same confirmation ends the chat's opening phase either way.
+                let opened = self.dispatch(Input::ChatOpened { chat: chat.clone() });
+                let rest = self.on_opened(chat, how);
+                Task::batch([opened, rest])
+            }
             Outcome::OpenFailed { chat, message } | Outcome::SendFailed { chat, message } => {
+                // A failed open ends the opening phase too: `ChatFailed` clears it.
                 self.dispatch(Input::ChatFailed { chat, message })
             }
             Outcome::Sent => Task::none(),

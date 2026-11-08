@@ -20,6 +20,12 @@ fn open(state: AppState, chat: &ChatId) -> (AppState, Effects) {
     step(state, Input::Intent(Intent::OpenChat(chat.clone())))
 }
 
+/// What the real UI sends the moment the host answers an open: the opening
+/// phase is over and the chat can take a prompt again.
+fn opened(state: AppState, chat: &ChatId) -> (AppState, Effects) {
+    step(state, Input::ChatOpened { chat: chat.clone() })
+}
+
 #[test]
 fn opening_a_chat_asks_the_host_for_it_and_never_for_a_session_switch() {
     let (state, effects) = open(AppState::default(), &chat("a"));
@@ -87,7 +93,9 @@ fn a_new_chat_gets_an_id_of_its_own_and_becomes_the_foreground_one() {
 #[test]
 fn a_prompt_goes_to_the_foreground_chat_only() {
     let (state, _) = open(AppState::default(), &chat("a"));
+    let (state, _) = opened(state, &chat("a"));
     let (state, _) = open(state, &chat("b"));
+    let (state, _) = opened(state, &chat("b"));
 
     let (state, effects) = step(state, Input::Intent(Intent::SendPrompt("hola".into())));
 
@@ -192,6 +200,7 @@ fn stopping_sends_an_abort_to_the_foreground_chat_and_nothing_else() {
 #[test]
 fn copying_a_message_copies_it_from_the_foreground_chat() {
     let (state, _) = open(AppState::default(), &chat("a"));
+    let (state, _) = opened(state, &chat("a"));
     let (state, _) = step(state, Input::Intent(Intent::SendPrompt("hola".into())));
 
     let (_, effects) = step(state, Input::Intent(Intent::CopyMessage("msg-0".into())));

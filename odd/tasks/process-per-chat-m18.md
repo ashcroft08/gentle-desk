@@ -280,6 +280,59 @@ behaviour T3 already chose).
   reminder persisted) and a codemode duplicate-tool warning. Neither blocked
   anything; both are worth remembering when the app parses child stderr.
 
+## What the opening state and the exit reason changed
+
+Implements T3 (S3) plus the two small fixes T5a's measurement asked for, user decision
+"Motivo del fallo + abriendo…": the app keeps a record of why a child died and shows a state while
+a child is starting. Test-first: RED observed as compile failures for the new inputs
+(`ChatActivity::Opening`, `Input::ChatStderr`), then implementation, then every existing test held
+or was updated only where the new behaviour forced it.
+
+- **The death notice says why (S3, T5a trial C).** The app keeps, per chat, a bounded ring of the
+  last 3 non-empty stderr lines that chat's child printed (`Input::ChatStderr { chat, line }`,
+  folded in `crates/app/src/chats/inputs.rs`; the ring is a field of the chat's entry in
+  `crates/app/src/chats/store.rs`, capped at 3 lines and 200 characters per line, never unbounded).
+  The UI forwards every child stderr line to it in addition to the `eprintln` it already did
+  (`crates/ui/src/app/chat_update.rs`). On an unexpected `Input::ChatClosed` the death notice reads
+  `<label>: the child that runs this chat exited (<lines joined with " · ">). Restart to keep talking.`
+  and keeps the old text when the ring is empty. One row per chat death still holds (dedup by
+  level+text unchanged: the same stderr twice is still one row), `drop_restart_notice` removes it on
+  restart, and a fresh child starts with a clean ring (the old child's complaint is not the new
+  child's reason). A stored-cwd failure therefore arrives exactly as T5a asked: the S3 notice plus
+  "Stored session working directory does not exist: C:/dev/proj5" as its detail, the other chats and
+  the window untouched, Retry possible by clicking the chat or taking the Restart.
+- **An opening state.** New `ChatActivity::Opening`, ordered Ended > NeedsAttention > Working >
+  Queued > Opening > FinishedUnread > Idle (chosen: Opening is "between a click and a live child",
+  so it yields to every state that implies an answerable process and beats only a finished-unread
+  mark and idle). It is set exactly when `Intent::OpenChat` / `OpenNewChat` / `RestartChat` emits
+  `ChatCommand::OpenProcess` (`crates/app/src/chats/intents.rs`), and cleared by
+  `Input::ChatOpened { chat }`, which the UI sends on every `Outcome::Opened` — a fresh start or an
+  `Existing` focus-only open clears at once — and by `Input::ChatFailed` (the `OpenFailed` path),
+  and also on `Input::ChatClosed`, so it can never stick. A chat that is Opening refuses SendPrompt
+  exactly like a working or queued one: the prompt is kept in the composer and nothing is appended
+  to the thread. The thread area shows a plain line "Opening chat…" above the messages while the
+  foreground chat is Opening (`crates/ui/src/app/frame.rs`), and the sidebar badge is `◌` in the
+  muted colour — different from Queued's `…`, unit-tested to fit `TITLE_ROOM`
+  (`crates/ui/src/view/sidebar/badge.rs`).
+- Decision recorded with the change: while a chat is Opening the composer shows a disabled
+  **Send**, not the Stop a busy chat shows — the refusal is exactly the queued/working one, but a
+  Stop would abort against a child that is not up yet and produce a `ChatFailed` noise notice.
+- Tests: new `crates/app/tests/chat_opening.rs` (10 tests: set on open, cleared by ChatOpened and
+  by ChatFailed, the existing-focus reopen clearing at once, the refused prompt, a death while
+  opening showing Ended with its Restart, a host stop while opening returning to Idle, working
+  outranking Opening, the new chat's rekey carrying the phase) and `crates/app/tests/chat_stderr.rs`
+  (9 tests: the reason in the notice, the old text without stderr, blank lines are no reason, the
+  3-line/200-character ring, the expected stop silent, no leaking between chats, the clean ring of
+  a fresh child, same-reason dedup).
+- Existing tests updated only where the new behaviour forces it: the helpers of
+  `crates/app/tests/chats.rs`, `session_activity.rs`, `chat_working_cap.rs` and the composer test in
+  `crates/ui/src/app/visible.rs` now fold `Input::ChatOpened` after an open intent (what the real UI
+  sends the moment the host answers); the two restart/reopen assertions of `chat_death.rs` now read
+  `Opening` right after the intent and `Idle` after the confirmation; `chat_intents.rs` gains the
+  same confirmation before the prompt-acceptance paths; and `chat_failures.rs` compares the thread
+  rather than the whole entry after a failed command, because `ChatFailed` now clears the transient
+  opening mark. Every other existing test is untouched and green.
+
 ## Log
 
 - L7 (S7, T4 working cap, user decision "Ponerlo en cola"): the app enforces the working
@@ -306,6 +359,13 @@ behaviour T3 already chose).
   cwd that no longer exists fails fast and cleanly: exit code 1 at 354 ms, no stdout, an explicit
   'Stored session working directory does not exist' stderr — the app should route it to the S3
   notice instead of a crash."
+- L9 (T3 + T5a follow-up, user decision "Motivo del fallo + abriendo…"): the death notice now says
+  why (bounded 3×200 stderr ring per chat, `Input::ChatStderr`, joined with " · ") and a chat whose
+  child is starting shows `ChatActivity::Opening` (badge `◌`, muted; thread line "Opening chat…";
+  composer disabled with the prompt kept) until the host's answer arrives as `Input::ChatOpened`
+  or `Input::ChatFailed`. Verification: `cargo test --workspace` (all suites ok),
+  `cargo fmt --all --check` clean, `cargo clippy --workspace --all-targets -- -D warnings` clean,
+  `cargo build --release -p gentle-ui` ok; real window not driven (out of scope for this worker).
 ### Reproduction evidence (kept here as text, not as a path)
 
 Real window, gentle-shell 4.6.0 and 4.7.0, twice; observed lines:

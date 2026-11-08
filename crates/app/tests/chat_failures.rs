@@ -22,7 +22,9 @@ fn with_a_new_chat() -> (AppState, ChatId) {
 #[test]
 fn a_command_that_could_not_reach_its_child_is_an_error_notice() {
     let (state, open) = with_a_new_chat();
-    let before = state.chats.state(&open).cloned();
+    // Only the thread is claimed to be unchanged: the transient opening mark
+    // of the failed open is cleared by `ChatFailed`, so the phase never sticks.
+    let before = state.chats.state(&open).expect("chat").messages.clone();
 
     let (state, effects) = update_chats(
         state,
@@ -46,9 +48,9 @@ fn a_command_that_could_not_reach_its_child_is_an_error_notice() {
         notice.text
     );
     assert_eq!(
-        state.chats.state(&open),
-        before.as_ref(),
-        "a failed command leaves the chat as it was"
+        state.chats.state(&open).expect("chat").messages,
+        before,
+        "a failed command leaves the chat's thread as it was"
     );
 }
 

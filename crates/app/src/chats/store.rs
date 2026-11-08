@@ -26,19 +26,34 @@ pub struct Chats {
 }
 
 /// One chat: its state, whether a finished turn is still unread, whether its
-/// child is gone, whether a prompt of its own is waiting for a slot (S7), and
-/// the activity the sidebar shows for it.
+/// child is gone, whether one is being started for it, whether a prompt of its
+/// own is waiting for a slot (S7), the last lines its child printed on stderr,
+/// and the activity the sidebar shows for it.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub(crate) struct Entry {
     pub(crate) state: ChatState,
     pub(crate) unread: bool,
+    /// The chat's child is getting one now: set when the chat is asked for and
+    /// cleared when the child is up (or the start failed). Cleared the same way
+    /// when the chat's child goes away, so it can never stick.
+    pub(crate) opening: bool,
     /// The chat's child exited and was not restarted (S3). Cleared by opening or
     /// restarting the chat, which is what asks the host for a fresh child.
     pub(crate) ended: bool,
     /// The chat holds a prompt of its own waiting for a working slot (S7).
     pub(crate) queued: bool,
+    /// The last [`STDERR_RING_LINES`] non-empty lines the chat's child printed
+    /// on stderr, oldest first, each cut at [`STDERR_LINE_CHARS`], so a death
+    /// notice can say why the child died. Bounded; a fresh child starts with a
+    /// clean ring.
+    pub(crate) stderr: Vec<String>,
     pub(crate) activity: ChatActivity,
 }
+
+/// How many stderr lines the ring of one chat keeps.
+const STDERR_RING_LINES: usize = 3;
+/// How many characters of one stderr line the ring keeps.
+const STDERR_LINE_CHARS: usize = 200;
 
 impl Entry {
     /// Re-derives the activity, clearing a finished turn the user is now
@@ -53,7 +68,33 @@ impl Entry {
             foreground,
             self.ended,
             self.queued,
+            self.opening,
         );
+    }
+}
+
+/// The bounded stderr ring of each chat, so a death notice can say why the
+/// child died (S3).
+impl Chats {
+    /// Keeps one non-empty stderr line of that chat's child, oldest last, cut
+    /// at [`STDERR_LINE_CHARS`], and keeps at most the last [`STDERR_RING_LINES`]
+    /// of them. It never grows unbounded.
+    pub(crate) fn record_stderr(&mut self, chat: &ChatId, line: &str) {
+        let line = line.trim();
+        if line.is_empty() {
+            return;
+        }
+        let entry = self.entries.entry(chat.clone()).or_default();
+        entry
+            .stderr
+            .push(line.chars().take(STDERR_LINE_CHARS).collect());
+        let excess = entry.stderr.len().saturating_sub(STDERR_RING_LINES);
+        entry.stderr.drain(..excess);
+    }
+
+    /// The lines that chat's child left on stderr, oldest first.
+    pub(crate) fn stderr_of(&self, chat: &ChatId) -> &[String] {
+        self.entries.get(chat).map_or(&[], |entry| &entry.stderr)
     }
 }
 

@@ -41,6 +41,13 @@ impl Chats {
         self.entries.get(chat).is_some_and(|entry| entry.ended)
     }
 
+    /// Whether a child is being started for that chat right now: it cannot take
+    /// a prompt yet (composer disabled, prompt kept), like a working or queued
+    /// chat.
+    pub fn is_opening(&self, chat: &ChatId) -> bool {
+        self.entries.get(chat).is_some_and(|entry| entry.opening)
+    }
+
     /// Every chat whose child is gone, in id order: the chats a Restart can
     /// bring back.
     pub fn ended(&self) -> Vec<ChatId> {

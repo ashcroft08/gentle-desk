@@ -4,7 +4,7 @@
 //! keeps. Nothing here decides anything: a click leaves as a component event and
 //! comes back through `App::update`.
 
-use iced::widget::{column, row};
+use iced::widget::{column, row, text};
 use iced::Element;
 
 use super::{visible, App};
@@ -17,11 +17,17 @@ use crate::view::{
 impl App {
     pub fn view(&self) -> Element<'_, Message> {
         let chat = visible::chat(&self.app);
+        // A chat whose child is being started has no history on screen yet and
+        // cannot be talked to; the line says so without a spinner or a banner.
+        let opening = visible::opening(&self.app).then(|| text("Opening chat…"));
         let mut page = column![
             header::view().map(Message::Header),
             notices::view(&self.app.notices).map(Message::Notices),
-            thread::view(&chat.messages, &self.cache).map(Message::Thread),
         ];
+        if let Some(line) = opening {
+            page = page.push(line);
+        }
+        page = page.push(thread::view(&chat.messages, &self.cache).map(Message::Thread));
         // Only a failure that ends everything (no launcher) is a banner now: a
         // child that died is a per-chat notice with its Restart (S3).
         if let Some(error) = &self.fatal {

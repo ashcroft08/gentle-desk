@@ -101,6 +101,21 @@ pub enum Input {
         chat: ChatId,
         expected: bool,
     },
+    /// One non-empty line the chat's child printed on stderr. The app keeps the
+    /// last few per chat in a bounded ring, so a death notice (S3) can say why
+    /// the child died instead of only saying it died. Never a notice by itself,
+    /// and never unbounded: at most three lines, each cut at 200 characters.
+    ChatStderr {
+        chat: ChatId,
+        line: String,
+    },
+    /// The chat's child is up, freshly started or already live (the UI sends the
+    /// same confirmation for either): the [`ChatActivity::Opening`] phase of
+    /// that chat is over. Its start failing goes through
+    /// [`Input::ChatFailed`] instead, which ends the phase the same way.
+    ChatOpened {
+        chat: ChatId,
+    },
 }
 
 /// A side effect for the shell to run.

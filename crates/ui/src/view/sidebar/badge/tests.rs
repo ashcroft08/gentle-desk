@@ -60,11 +60,32 @@ fn a_chat_queued_for_a_slot_shows_a_muted_ellipsis() {
     assert!(!badge.bold_title, "a queued title asks for no emphasis");
 }
 
+/// A chat whose child is coming up gets the same quiet family as a queued one
+/// — the phase invites waiting, it does not report a failure — but with a mark
+/// of its own, so the empty circle reads as "coming up", not as a prompt on
+/// its way.
+#[test]
+fn a_chat_coming_up_shows_a_muted_circle_beside_a_queued_ellipsis() {
+    let badge = Badge::on(Opening).expect("an opening chat shows something");
+
+    assert_eq!(badge.mark, "◌");
+    assert_eq!(badge.role, ColourRole::Muted);
+    assert!(!badge.bold_title);
+    assert_ne!(badge.mark, "…", "opening is not the queued ellipsis");
+}
+
 /// Every badge fits in the room the title gives up for it, whatever the chat
 /// is doing: the row keeps its height and its single line.
 #[test]
 fn every_mark_fits_in_the_title_room_it_costs() {
-    for activity in [Working, FinishedUnread, Queued, NeedsAttention, Ended] {
+    for activity in [
+        Working,
+        FinishedUnread,
+        Queued,
+        Opening,
+        NeedsAttention,
+        Ended,
+    ] {
         let badge = Badge::on(activity).expect("every non-idle chat draws a badge");
         assert!(
             badge.mark.chars().count() <= Badge::TITLE_ROOM,

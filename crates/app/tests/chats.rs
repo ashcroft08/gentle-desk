@@ -29,6 +29,12 @@ fn open(chat: &ChatId) -> Input {
     Input::Intent(Intent::OpenChat(chat.clone()))
 }
 
+/// What the real UI sends the moment the host answers an open, so the
+/// opening phase is over from the next step on.
+fn confirmed(chat: &ChatId) -> Input {
+    Input::ChatOpened { chat: chat.clone() }
+}
+
 fn dialog(id: &str, title: &str) -> RpcEvent {
     RpcEvent::UiRequest(UiRequest::Confirm {
         id: id.into(),
@@ -72,7 +78,9 @@ fn a_background_chat_that_finishes_is_finished_unread() {
         AppState::default(),
         vec![
             open(&chat("a")),
+            confirmed(&chat("a")),
             open(&chat("b")),
+            confirmed(&chat("b")),
             event(&chat("a"), RpcEvent::AgentStart),
             event(&chat("a"), RpcEvent::AgentSettled),
         ],
@@ -89,7 +97,8 @@ fn a_background_chat_that_finishes_is_finished_unread() {
     );
     // A finished turn may have written a session file: the list is refreshed
     // exactly as on the single-chat path.
-    assert_eq!(effects[3].commands, vec![Command::RefreshSessions]);
+    // The AgentSettled step: the confirmed opens before it ask for nothing.
+    assert_eq!(effects[5].commands, vec![Command::RefreshSessions]);
 }
 
 #[test]
@@ -98,6 +107,7 @@ fn the_foreground_chat_never_shows_finished_unread() {
         AppState::default(),
         vec![
             open(&chat("a")),
+            confirmed(&chat("a")),
             event(&chat("a"), RpcEvent::AgentStart),
             event(&chat("a"), RpcEvent::AgentSettled),
         ],
@@ -112,9 +122,11 @@ fn opening_a_chat_clears_its_finished_unread() {
         AppState::default(),
         vec![
             open(&chat("a")),
+            confirmed(&chat("a")),
             open(&chat("b")),
             event(&chat("a"), RpcEvent::AgentSettled),
             open(&chat("a")),
+            confirmed(&chat("a")),
         ],
     );
 

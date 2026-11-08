@@ -63,6 +63,15 @@ impl Badge {
                 role: ColourRole::Muted,
                 bold_title: false,
             },
+            ChatActivity::Opening => Self {
+                // An empty circle: the chat's child is coming up from the click
+                // of it. Progress, not failure, so it draws in the muted
+                // colour; not the queued ellipsis, which is a prompt waiting
+                // for its turn, not a child on its way.
+                mark: "◌",
+                role: ColourRole::Muted,
+                bold_title: false,
+            },
             ChatActivity::NeedsAttention => Self {
                 mark: "!",
                 role: ColourRole::Warning,

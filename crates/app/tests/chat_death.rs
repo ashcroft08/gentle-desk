@@ -16,6 +16,12 @@ fn open(state: AppState, chat: &ChatId) -> (AppState, Effects) {
     update_chats(state, Input::Intent(Intent::OpenChat(chat.clone())))
 }
 
+/// What the real UI sends the moment the host answers an open, fresh start or
+/// already-live child alike: the opening phase is over.
+fn opened(state: AppState, chat: &ChatId) -> AppState {
+    update_chats(state, Input::ChatOpened { chat: chat.clone() }).0
+}
+
 fn closed(state: AppState, chat: &ChatId, expected: bool) -> (AppState, Effects) {
     update_chats(
         state,
@@ -64,7 +70,9 @@ fn an_unexpected_death_ends_that_chat_with_one_error_notice_that_restarts_it() {
 #[test]
 fn a_background_death_ends_only_its_own_chat() {
     let (state, _) = open(AppState::default(), &chat("a"));
+    let state = opened(state, &chat("a"));
     let (state, _) = open(state, &chat("b"));
+    let state = opened(state, &chat("b"));
 
     let (state, _) = closed(state, &chat("a"), false);
 
@@ -135,13 +143,22 @@ fn restart_clears_the_end_and_asks_the_host_for_the_child_again() {
         "the child is started again through --session"
     );
     assert_eq!(state.chats.ended(), Vec::new());
-    assert_eq!(state.chats.activity(&chat("a")), Some(ChatActivity::Idle));
+    assert_eq!(
+        state.chats.activity(&chat("a")),
+        Some(ChatActivity::Opening),
+        "the fresh child is not up yet: the chat says it is coming up"
+    );
     assert_eq!(state.chats.foreground(), Some(&chat("a")));
+
+    let state = opened(state, &chat("a"));
+
+    assert_eq!(state.chats.activity(&chat("a")), Some(ChatActivity::Idle));
 }
 
 #[test]
 fn a_prompt_to_an_ended_chat_is_a_notice_and_reaches_no_child() {
     let (state, _) = open(AppState::default(), &chat("a"));
+    let state = opened(state, &chat("a"));
     let (state, _) = prompt(state, "hola");
     let (state, _) = closed(state, &chat("a"), false);
 
@@ -172,5 +189,13 @@ fn opening_an_ended_chat_starts_a_fresh_child_and_clears_the_end() {
         vec![ChatCommand::OpenProcess { chat: chat("a") }]
     );
     assert_eq!(state.chats.ended(), Vec::new());
+    assert_eq!(
+        state.chats.activity(&chat("a")),
+        Some(ChatActivity::Opening),
+        "the fresh child is coming up"
+    );
+
+    let state = opened(state, &chat("a"));
+
     assert_eq!(state.chats.activity(&chat("a")), Some(ChatActivity::Idle));
 }
