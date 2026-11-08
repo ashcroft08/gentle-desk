@@ -1,8 +1,10 @@
 //! The data the UI renders.
 
+use std::collections::BTreeMap;
+
 use gentle_core::chat::{ChatMessage, ChatRole, ChatState};
 
-use crate::chats::{ChatId, Chats};
+use crate::chats::{ChatActivity, ChatId, Chats};
 use crate::list_status::ListStatus;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -80,6 +82,37 @@ pub struct AppState {
     pub selected_helper: Option<String>,
     /// Ids are never reused, so a dismissed notice cannot be confused with a new one.
     pub(crate) next_notice_id: u64,
+}
+
+impl AppState {
+    /// The activity a sidebar row shows for the chat of the session stored at
+    /// `path` (S4). The rows ask one path at a time — the ones being drawn —
+    /// and a chat the app has never heard of is idle, so every path in the
+    /// list has an answer without the app tracking every session file.
+    pub fn activity_of_session(&self, path: &str) -> ChatActivity {
+        self.chats
+            .activity(&ChatId::of_session(path))
+            .unwrap_or_default()
+    }
+
+    /// The activities of the rows' badges, as one plain snapshot keyed by the
+    /// path of the session they belong to: only the chats that are not idle.
+    /// Rows do not find themselves in it the moment they are idle, so it stays
+    /// small however many sessions the list lists, and the sidebar reads no
+    /// further than the activities.
+    pub fn activity_by_path(&self) -> BTreeMap<String, ChatActivity> {
+        self.chats
+            .ids()
+            .iter()
+            .filter_map(|chat| {
+                let activity = self
+                    .chats
+                    .activity(chat)
+                    .filter(|a| *a != ChatActivity::Idle)?;
+                Some((chat.session_path()?.to_owned(), activity))
+            })
+            .collect()
+    }
 }
 
 /// Appends what the user typed as their side of the thread.

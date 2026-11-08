@@ -41,6 +41,9 @@ impl App {
             current: visible::current_session(&self.app),
             now_ms: clock::now_ms(),
             offset: self.sidebar_offset,
+            // The plain activity snapshot the rows' badges draw from (S4): one
+            // entry per chat that is not idle, not the whole app state.
+            activities: self.app.activity_by_path(),
         });
         let mut layout = row![sessions.map(Message::Sidebar), page];
         // The open helper's thread replaces the list; a task that vanished falls back to it.
