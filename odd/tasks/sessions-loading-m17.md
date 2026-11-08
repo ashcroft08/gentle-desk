@@ -8,7 +8,7 @@ Implements backlog item 12 (finding 1 of refresh-watcher-m16.md): on a big home 
 - S2: The refresh worker emits partial `Progress { sessions, done, total }` messages at most once every ~500 ms (time-based throttle, not per N files) and a final `Refreshed`; the UI consumes them with `Task::stream`. Only the first full pass emits partials; later passes stay silent.
 - S3: At startup, before the first pass ends, the UI publishes a prepared list from the restored cache's `entries()`; the final pass reconciles it (new chats appear, deleted ones go).
 - S4: `AppState` gains `list_status: Loading{done,total} | Ready`; `Input::SessionsProgress` replaces the list and updates counters; the final `SessionsPrepared` sets `Ready`.
-- S5: While Loading the sidebar never says "No saved chats yet" (nor "Chats (0 of 0)" as final): it shows "Reading chats… done / total"; "No saved chats yet" only in Ready with total 0. The text comes from a pure function so it can be unit-tested.
+- S5: While Loading the sidebar never says "No saved chats yet" (nor "Chats (0 of 0)" as final): it shows "Reading chats… done / total"; its header is exactly "Chats · reading…" with no counters unless a query is being searched, which keeps "Chats ({shown} of {total}) · reading…"; "No saved chats yet" only in Ready with total 0. The text comes from a pure function so it can be unit-tested.
 - S6: One responsibility per file: progress flow in its own file (session_refresh/progress.rs), message handling out of app.rs (249 lines) into a module; no file past ~200 lines.
 
 ## Tasks
@@ -73,3 +73,4 @@ equal), so no jumping was observed.
 - L2: user decisions "1A, 2A" = time-based throttle ~500 ms, and include cache seeding in this batch.
 - L3: user wants workspaces (folders as groups + independent chats) as a later item after this one; whether it goes before backlog 8 is the user's decision.
 - L4: Window check passed (A-D plus later-pass); findings carried over: warm pass of 50 000 files still takes ~10 s here so the seeded list stays under "· reading…" that long; the header shows "Chats (N of N) · reading…" while loading which can look settled; literal "Reading chats…" body text only shows while the list is empty.
+- L5: user asked for header 'Chats · reading…' while loading without a query

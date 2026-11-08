@@ -37,14 +37,15 @@ pub fn texts(status: ListStatus, total: usize, shown: usize, query: &str) -> Tex
     };
     match status {
         ListStatus::Loading { done, total: files } => Texts {
-            // Unfiltered too: with rows on screen the header is the only place
-            // the counters can be seen. A pass that has found no file yet would
-            // otherwise read as a settled "Chats (0 of 0)"; the note is the
-            // difference.
-            title: if total == 0 {
-                format!("Chats · {READING}")
-            } else {
+            // The counters are only worth drawing next to a search, where they
+            // say how much of the query's answer is in yet; unfiltered they
+            // would be two equal numbers that read like a settled total, so the
+            // header is just the note. A pass that has found no file yet stays
+            // plain either way, so "(0 of 0)" is never drawn.
+            title: if filtering && total > 0 {
                 format!("Chats ({shown} of {total}) · {READING}")
+            } else {
+                format!("Chats · {READING}")
             },
             stand_in: if shown > 0 {
                 None

@@ -21,12 +21,22 @@ fn loading_with_nothing_read_yet_offers_reading_not_an_empty_list() {
 }
 
 /// Partial rows are the truth so far: they stay, and the header carries the
-/// note that the list is still coming.
+/// note that the list is still coming. With no search the counters would be
+/// two equal numbers that read like a settled total, so they stay off it.
 #[test]
 fn loading_with_partial_rows_keeps_the_rows_and_notes_it_in_the_header() {
     let texts = loading(200, 50_000, 200, "");
     assert_eq!(texts.stand_in, None, "partial rows must still be drawn");
-    assert_eq!(texts.title, "Chats (200 of 50000) · reading…");
+    assert_eq!(texts.title, "Chats · reading…");
+}
+
+/// A search while the pass runs is the one case where the counters earn their
+/// place: they count what the query matches out of what has been read so far.
+#[test]
+fn loading_with_a_query_still_counts_what_matches() {
+    let texts = loading(200, 50_000, 120, "auth");
+    assert_eq!(texts.stand_in, None, "matching rows must still be drawn");
+    assert_eq!(texts.title, "Chats (120 of 50000) · reading…");
 }
 
 /// The counters are the pass's own numbers, `done / total`, written as-is.
@@ -100,6 +110,12 @@ fn a_running_pass_never_looks_settled() {
             "header looks final: {}",
             texts.title
         );
+        if query.trim().is_empty() {
+            assert_eq!(
+                texts.title, "Chats · reading…",
+                "an unfiltered pass must not print two equal counters"
+            );
+        }
         assert_ne!(
             texts.stand_in.as_deref(),
             Some("No saved chats yet"),
