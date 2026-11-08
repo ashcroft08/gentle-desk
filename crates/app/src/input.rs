@@ -2,6 +2,7 @@
 
 use gentle_core::rpc::{RpcCommand, RpcEvent, UiAnswer};
 
+use crate::chats::ChatId;
 use crate::session_prepare::PreparedSessions;
 use crate::state::SessionItem;
 
@@ -28,6 +29,11 @@ pub enum Intent {
     SelectHelper(String),
     /// Back from a helper's thread to the helpers list.
     CloseHelper,
+    /// Make a chat the foreground one. Its child is started if it has none, and
+    /// no other chat is stopped.
+    OpenChat(ChatId),
+    /// A chat that did not exist before, with an id of its own.
+    OpenNewChat,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -51,6 +57,13 @@ pub enum Input {
         done: usize,
         total: usize,
     },
+    /// One decoded event of one chat's child, tagged with the chat it came from.
+    /// A chat the app has not heard of yet is created empty. The same event of
+    /// another chat is another input, and the two never touch each other.
+    ChatEvent {
+        chat: ChatId,
+        event: RpcEvent,
+    },
 }
 
 /// A side effect for the shell to run.
@@ -60,4 +73,27 @@ pub enum Command {
     CopyToClipboard(String),
     /// Refresh the session index and report back with `Input::SessionsLoaded`.
     RefreshSessions,
+}
+
+/// Everything one [`Input`] asks the shell to do.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Effects {
+    /// The effects of the single chat the one-child shell ran.
+    pub commands: Vec<Command>,
+    /// The effects on one chat's child, for a shell that runs one per chat.
+    pub chat_commands: Vec<ChatCommand>,
+}
+
+/// A side effect on one chat's child.
+///
+/// Separate from [`Command`] because that one belongs to the single child the
+/// one-child shell ran. A shell that owns one child per chat runs these through
+/// [`update_chats`](crate::update_chats); the single child keeps taking
+/// [`Command::Send`], so nothing of the old shell changes.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ChatCommand {
+    /// Start that chat's child, or focus it when it is already up.
+    OpenProcess { chat: ChatId },
+    /// Route one RPC command to that chat's child and no other.
+    Send { chat: ChatId, rpc: RpcCommand },
 }

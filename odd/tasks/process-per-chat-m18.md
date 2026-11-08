@@ -73,6 +73,38 @@ about what that code does and why it may matter, and the task that should addres
 - R4-001 (CRITICAL) — `crates/backend/src/chat_host/host/routing.rs:16-30`: recorded as **refuted by
   the provider refuter**; no action.
 
+### Follow-ups as addressed by T2 (backend + app half, step 1 of 2)
+
+- R3-send-holds-lock — **fixed**. `Child` now hands out a writer of its own
+  (`chat_host::Writer`, `RpcWriter` for the real process) and `ChatHost::send`
+  takes it under the lock, releases the lock, then writes. The regression test is
+  `chat_host::tests::isolation::a_blocked_write_of_one_chat_stalls_no_other_chat`:
+  while one chat's write is parked in its pipe, `open`, `close`, `set_working`,
+  `working_count`, `foreground`, `live_keys` and a send to another chat all have to
+  answer within 5 s (each runs on its own thread so a held lock fails the test
+  instead of hanging it).
+- R3-existing-false-promise — **half fixed, deliberately**. The dead-child reading
+  is now pinned by
+  `chat_host::tests::startup::a_chat_whose_child_died_starts_a_fresh_child_instead_of_answering_existing`
+  (an exited child's slot is dropped, the chat is started anew, `Started` and not
+  `Existing`). The `Spawning` reading is left as it is on purpose: a second click
+  during a slow start must still not start a second child (S2), and
+  `chat_host::tests::serialization::concurrent_opens_of_one_chat_start_exactly_one_child`
+  pins `Opened::Existing` for exactly that case. A distinct `Opened::Starting`
+  answer is a UI-visible distinction ("already coming up" vs "live") and belongs
+  to T3/T4, together with the death notice that reads it; changing it now would
+  rewrite the S2 test for a caller that does not exist yet.
+- R4-002 — **real defect, fixed**. `open` now starts the clicked chat's child
+  *before* it stops the children the reap or the cap took out, so the chat the user
+  just clicked is no longer `Spawning` for the length of up to `DEFAULT_GRACE` (2 s)
+  per victim. Pinned by
+  `chat_host::tests::startup::the_clicked_chat_starts_before_the_reaped_victim_is_stopped`,
+  which asserts the order of the fake spawner's journal (`spawn c` before
+  `shutdown a`). The live cap is exceeded by one process for the length of a
+  shutdown, which is the cheaper trade; the caller still blocks until the victims
+  are gone, so the remaining latency (a frozen caller during shutdowns) is the
+  async-command work of T1/T5, not of this fix.
+
 ## Log
 
 - L1: "la 3 explicame mejor, hace algo parecido a gentle-shell-desktop?"

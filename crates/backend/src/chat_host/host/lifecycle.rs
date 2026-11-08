@@ -68,9 +68,16 @@ impl ChatHost {
             state.foreground = Some(key.clone());
         }
         // Starting and stopping a child take seconds: never under the lock.
+        //
+        // And the clicked chat's child starts before the children that were
+        // taken out are stopped: each of those graceful shutdowns can take the
+        // whole grace period, and the chat the user just clicked must not sit
+        // `Spawning` behind them (R4-002). The cap is exceeded by one process for
+        // as long as a shutdown takes, which is the cheaper trade.
+        let started = self.spawner.spawn(&key);
         self.stop_all(stops);
 
-        let child = match self.spawner.spawn(&key) {
+        let child = match started {
             Ok(child) => child,
             Err(error) => {
                 let ours = self.state().drop_reservation(&key, generation);

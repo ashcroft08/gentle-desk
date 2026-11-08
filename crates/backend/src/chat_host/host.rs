@@ -6,11 +6,14 @@
 //! working, and [`state`] is the map itself with its generation bookkeeping.
 //!
 //! One mutex guards the map, the foreground chat and the spawn generations, and
-//! it is never held while a child starts or stops: both can take seconds, and a
-//! held lock there would stall every other chat. So an open reserves its slot,
-//! releases the lock to start the child, and re-checks its generation when the
-//! start returns; a [`ChatHost::close`] in between makes the generation stale and
-//! the child that arrives is stopped instead of adopted (S2).
+//! it is never held while a child starts or stops, nor while a command is
+//! written: all three can take seconds, and a held lock there would stall every
+//! other chat. So an open reserves its slot, releases the lock to start the
+//! child, and re-checks its generation when the start returns; a
+//! [`ChatHost::close`] in between makes the generation stale and the child that
+//! arrives is stopped instead of adopted (S2). A send takes the child's writer
+//! under the lock and writes only after releasing it, so a child that stops
+//! reading its pipe stalls its own chat and nothing else.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};

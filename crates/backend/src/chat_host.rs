@@ -36,7 +36,7 @@ mod host;
 pub mod policy;
 pub mod spawner;
 
-pub use child::Child;
+pub use child::{Child, Writer};
 pub use host::{ChatHost, SendError};
 pub use policy::{Admission, ChatView, Clock, Limits, ManualClock, SystemClock, TooManyLive};
 pub use spawner::{ProcessSpawner, Spawner};
