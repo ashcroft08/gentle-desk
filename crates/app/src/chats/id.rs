@@ -22,7 +22,14 @@ impl ChatId {
     /// The chat of a stored session. The path is the identity: opening the same
     /// session twice is opening the same chat.
     pub fn of_session(path: &str) -> Self {
-        Self(format!("session:{path}"))
+        Self(format!("{SESSION_PREFIX}{path}"))
+    }
+
+    /// The session file of a stored chat, or `None` for a chat that has none
+    /// yet. The UI reads the path back through this, so it never parses the
+    /// scheme itself.
+    pub fn session_path(&self) -> Option<&str> {
+        self.0.strip_prefix(SESSION_PREFIX)
     }
 
     /// The id as text, the way the UI holds it.
@@ -32,6 +39,8 @@ impl ChatId {
 }
 
 static NEXT: AtomicU64 = AtomicU64::new(1);
+
+const SESSION_PREFIX: &str = "session:";
 
 impl fmt::Display for ChatId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

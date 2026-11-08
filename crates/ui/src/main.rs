@@ -11,6 +11,9 @@
 mod app;
 mod backend;
 mod cache_path;
+// Wired by the chat host dispatch (m18 T2 step 2b); until then only its tests use it.
+#[allow(dead_code)]
+mod chat_keys;
 mod clock;
 mod message;
 mod refresh_flow;
