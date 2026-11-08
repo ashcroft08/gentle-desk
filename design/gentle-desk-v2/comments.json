@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "comments": [
+    {
+      "id": "uq1ll33r",
+      "file": "01a-tree-chat.html",
+      "selector": "#theme",
+      "excerpt": "system dark Gentle Gentleman-Cute Gentleman-Sexy light",
+      "comment": "corrije porque el listado aparece blanco y no usa los colores del tema seleccionado",
+      "createdAt": "2026-11-08T23:26:00.674Z",
+      "status": "resolved",
+      "sentAt": null,
+      "resolvedAt": "2026-11-08T23:28:26.089Z"
+    },
+    {
+      "id": "12uzdg2r",
+      "file": "01a-tree-chat.html",
+      "selector": "#theme",
+      "excerpt": "system dark Gentle Gentleman-Cute Gentleman-Sexy light",
+      "comment": "corrije porque el listado aparece blanco y no usa los colores del tema seleccionado",
+      "createdAt": "2026-11-08T23:26:04.399Z",
+      "status": "open",
+      "sentAt": "2026-11-08T23:26:04.415Z",
+      "resolvedAt": null
+    }
+  ]
+}
