@@ -105,6 +105,55 @@ about what that code does and why it may matter, and the task that should addres
   are gone, so the remaining latency (a frozen caller during shutdowns) is the
   async-command work of T1/T5, not of this fix.
 
+## Window check (T5, real window)
+
+Release build of `aaf073e` (`cargo build --release -p gentle-ui`), Windows 11,
+window 1393x747 (125 % DPI), the stand-in gentle-shell
+(`GENTLE_SHELL_BIN=tools/fake-gentle-shell/fake.mjs`, no model, no network), a
+synthetic home of 20 chats (`node tools/perf/gen-home.mjs`) and a throw-away
+`LOCALAPPDATA`, both in a `mktemp -d` outside the repo. Every screenshot is the
+app window only (window rect, never the desktop); clicks are fractions of the
+client rect, and typing happens only while the exact app window is the verified
+foreground window. The home, the screenshots and the driver scripts were deleted
+afterwards. All checks pass.
+
+Stand-in extension (only `tools/fake-gentle-shell/**`, old behaviour kept as the
+default): the `stream N` prompt streams `tick ` every 100 ms for N seconds and
+then ends the message with the whole text, so a chat can be left while it works
+and still finish on its own; `get_state` reports the `--session` path, or opens
+and reports `<--home>/sessions/--fake--/<stamp>_<pid>.jsonl` when the child has
+no session yet (the new chat needs that to become a stored chat);
+`FAKE_SHELL_LOG` appends one line per lifecycle step and per received command,
+which is what proves F. `error`, `dialog`, `slow`, `helpers`, `flood`, the echo
+default and the `{}` reply to every other command are unchanged.
+
+| check | observed |
+|---|---|
+| A two chats, two children | opening "chat 0" then "chat 12" left exactly two stand-in children: pid 23172 with `--session …/--C--proj0--/2026-01-01T00-00-00-000Z_0.jsonl` and pid 26736 with `…_12.jsonl`. Chat 0's child (23172) stayed alive the whole run (age 28 s when chat 12 opened, still `pid=23172` at the end) and received no `abort`; only chat 12's row was highlighted after the second click |
+| B a working chat finishes in the background | prompt `stream 6` in chat 0: 2 s later ~20 `tick` tokens were on screen and the composer showed **Stop** (working). Chat 12 was opened at t+7 s while the stream ran; no `abort` reached pid 23172 and no new child was spawned. Back on chat 0 at t+24 s the window showed the complete reply — three wrapped lines of `tick` (6 s at 100 ms) plus its `Copy` action — and the composer was back to **Send** (the turn had settled while it was in the background) |
+| C new chat becomes the stored chat | "New chat" spawned pid 14324 with `--home <home>` and **no** `--session`; it received one `get_state`, whose `sessionFile` reply turned the chat into the stored one: the sidebar gained "(no messages) · now · 0 msgs · tmp.L5Z9AMROvC", highlighted as the open chat, and the home gained `sessions/--fake--/…_14324.jsonl`. Clicking that same row again started no child (3 children before, 3 after, zero `start` lines in the log after the click) and pid 14324 was unchanged |
+| D a child killed while it is a background chat | killed pid 26736 (chat 12) with `Stop-Process -Force` while the foreground chat was the new one: the app logged `[…_12.jsonl] child exited` on stderr and nothing else; no banner, no notice, the window kept answering (a click on chat 0 was drawn at once and showed its complete reply intact). Opening the killed chat spawned a fresh child for the same `--session` (pid 33488); the window then showed an **empty thread** for it (the stand-in answers `get_messages` with `{}`, so there is no stored history to draw), no error, and a prompt sent there answered `echo: hola` |
+| E close leaves nothing behind | `WM_CLOSE` on the window; at **2.0 s** (the first sample) 0 `gentle-desk` processes and 0 stand-in `node` processes remained, well inside the 5 s bound. The log has 3 `exit` lines for the 3 children that were alive (stdin EOF, exit 0); the killed one has none, as expected |
+| F no session switch was ever sent | every command the whole run delivered to every child: 3 `get_messages`, 1 `get_state`, 2 `prompt`, and **0 `switch_session`, 0 `new_session`**. The 4 child argv lines carry `--home …` and `--session …` only for stored chats; the new chat's argv has no `--session` |
+
+Odds and ends:
+
+- Stored history is not rendered in this run: `get_messages` is answered `{}` by
+  the stand-in and `messages_from_history` reads `{"messages": [...]}`, so an
+  opened stored chat shows an empty thread and only a live reply is visible.
+  The check says nothing about history drawing, only about which chat is open.
+- The generated session headers keep `cwd: C:/dev/projN`, which does not exist.
+  The stand-in never looks at it; real pi would refuse such a session, so this
+  run does not cover design note 7 (a stored chat whose cwd is gone).
+- Start-up latency per open (design note 1) was not measured: it needs the real
+  gentle-shell, which this check is not allowed to run.
+- `stream N` ends with the complete text, unlike `slow`, which ends with
+  `ABORTED`; `slow` itself was left alone.
+- The per-chat death notice (S3/T3) does not exist yet: a killed background chat
+  shows nothing in the window until it is opened, and opening it silently starts
+  a fresh child. D only asserts what this batch promises — the window stays
+  responsive and the other chats are untouched — not the T3 notice.
+
 ## Log
 
 - L1: "la 3 explicame mejor, hace algo parecido a gentle-shell-desktop?"

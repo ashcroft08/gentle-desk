@@ -32,6 +32,7 @@ What a turn does depends on the prompt text:
 | `flood`    | one turn with 300 markdown assistant messages (heading, list, code block), to stress long threads |
 | `helpers` | publishes a helpers widget with one helper per state (running, waiting, queued, done, failed), then echoes |
 | `slow`     | a `text_delta` of `tick ` every 100 ms until `{"type":"abort"}`; the message then ends with `ABORTED`                             |
+| `stream N` | the same `tick ` deltas for N seconds (0.2 to 60), then the message ends with the whole streamed text: a working chat that finishes on its own |
 | anything   | `echo: <prompt>`                                                                                                                |
 
 Every turn starts by acknowledging the prompt with
@@ -39,6 +40,20 @@ Every turn starts by acknowledging the prompt with
 
 `slow` self-terminates after 30 s with the same `ABORTED` message, so a client
 that forgets to abort cannot keep the process alive.
+
+## Sessions and logging
+
+`get_state` models the one field a client needs after starting a child: a child
+started with `--session <path>` reports that path, and a child started without
+one opens `<--home>/sessions/--fake--/<stamp>_<pid>.jsonl` (a one-line session
+header) and reports that, the way pi answers for a brand-new chat. Without
+`--home` there is nothing to open and the reply carries no `sessionFile`.
+
+`FAKE_SHELL_LOG=<file>` appends one JSON line per step: `start` (with `argv`),
+`command` (with its `type`, plus `message` for a prompt), `session_file`, and
+`exit`. It is the way to prove that a command (e.g. `switch_session`) was
+*never* received: the log is written before the command is handled, so any
+command that arrived is in it.
 
 ## Tests
 
