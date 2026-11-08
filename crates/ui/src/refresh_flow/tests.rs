@@ -99,7 +99,7 @@ fn a_batch_of_paths_asks_for_a_targeted_pass_and_a_rescan_for_a_full_one() {
 }
 
 #[test]
-fn without_a_watcher_the_list_polls_and_with_one_it_only_reconciles() {
+fn without_a_watcher_the_list_polls_every_few_seconds() {
     let (_dir, sessions) = home();
     let mut flow = flow_without_watcher(sessions);
     assert!(!flow.is_watching());
@@ -136,7 +136,7 @@ fn the_safety_net_waits_for_the_last_full_pass() {
 /// The case the flow exists for: with a watcher, a settled turn is already
 /// covered (the watcher reports the appended file), so it asks for nothing.
 #[test]
-fn a_running_watcher_covers_a_settled_turn_and_slows_the_safety_net_down() {
+fn a_settled_turn_still_asks_for_a_pass_with_a_watcher_and_the_safety_net_slows_down() {
     let (_dir, sessions) = home();
     let (watcher, batches) = backend::try_start_watcher(&sessions).expect("a watcher");
     let shared = Shared::new(
@@ -148,8 +148,10 @@ fn a_running_watcher_covers_a_settled_turn_and_slows_the_safety_net_down() {
     let mut flow = Flow::new(Some(shared), Some(sessions), Some(watcher), watch, None);
 
     assert!(flow.is_watching());
-    assert_eq!(flow.on_refresh_command().units(), 0);
-    // Nothing was requested, so there is no pass to settle.
+    // A settled turn is the user's own write: the watcher's notice of it can come
+    // seconds late (measured on Windows), so the turn end asks for a pass itself.
+    assert_eq!(flow.on_refresh_command().units(), 1);
+    // The timer is still the slow safety net while a watcher runs.
     assert_eq!(flow.tick_delay(), session_schedule::RECONCILE_BASE);
 }
 

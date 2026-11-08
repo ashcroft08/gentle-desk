@@ -10,12 +10,18 @@
 //! are pure and tested on their own (`debounce/tests.rs`, `classify/tests.rs`).
 //! Nothing here reads the index; the caller decides what a batch means.
 //!
-//! Known limit (measured on Windows/NTFS): a write made through a handle that
-//! stays open and is never flushed or closed is not reported for at least 15 s;
-//! once the writer closes or syncs, the event arrives in about 265 ms. pi appends
-//! with `appendFileSync` (open, write, close), so it is reported promptly. Any
-//! other writer that keeps the file open is only noticed by the slow
-//! reconciliation pass.
+//! Known limits (measured on Windows/NTFS):
+//!
+//! - A write through a handle that stays open and is never flushed or closed is
+//!   not reported for at least 15 s.
+//! - Even after the writer closes the file, the notice of an append can arrive
+//!   seconds late: about 3 s on a developer machine and over 10 s on the GitHub
+//!   runner, where the append test failed 12 of 12 times. The delay is before
+//!   this code: the thread reports an event the moment it receives it.
+//!
+//! So a caller must not wait on this watcher for its own writes. The app asks
+//! for a full pass when a turn settles, and a slow reconciliation pass covers
+//! any other writer.
 
 use std::fs;
 use std::path::{Path, PathBuf};
