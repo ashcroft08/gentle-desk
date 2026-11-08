@@ -186,6 +186,7 @@ fn badge_colour(role: badge::ColourRole) -> fn(&Theme) -> text::Style {
     match role {
         ColourRole::Accent => text::primary,
         ColourRole::Success => text::success,
+        ColourRole::Muted => text::secondary,
         ColourRole::Warning => text::warning,
         ColourRole::Error => text::danger,
     }

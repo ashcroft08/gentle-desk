@@ -61,7 +61,9 @@ about what that code does and why it may matter, and the task that should addres
 - R3-working-cap-race â€” `crates/backend/src/chat_host/host/routing.rs:53-55`: `may_start_work`
   evaluates `policy::working_full` under one lock acquisition and `set_working` takes the lock again
   later, so the pair is check-then-act and two chats starting together can both see room and both
-  exceed `max_working`. Task: T4.
+  exceed `max_working`. Resolved by S7 (T4): the cap is enforced in the `gentle-app` reducer, in one
+  step with the working mark, so no two prompts can take the same slot; `may_start_work` stays
+  informational (design note 5).
 - R4-002 â€” `crates/backend/src/chat_host/host/lifecycle.rs:70-71`: `self.stop_all(stops)` runs every
   reaped victim's graceful shutdown (up to `DEFAULT_GRACE`, 2 s each) synchronously before
   `spawner.spawn` is called, so the chat just clicked stays `Spawning` for the length of those
@@ -144,12 +146,12 @@ about what that code does and why it may matter, and the task that should addres
   and a send to a spawning chat is refused by the host; the simpler, honest
   behaviour is to keep the text in the composer, send nothing and re-show the same
   notice with its Restart button. Chosen explicitly, not by omission.
-- Decision — **the death mark is cleared when the reopen is asked for, not when the
+- Decision ï¿½ **the death mark is cleared when the reopen is asked for, not when the
   child is confirmed up.** There is no input for "this chat's child is up" yet, so
   a restart whose spawn fails (a session whose cwd is gone, design note 7) reports
   itself through the existing `ChatFailed` error notice and the chat is no longer
-  marked dead; clicking it again tries once more. The alternative — staying disabled
-  after a failed spawn — would need that extra input and a second notice shape.
+  marked dead; clicking it again tries once more. The alternative ï¿½ staying disabled
+  after a failed spawn ï¿½ would need that extra input and a second notice shape.
 - Host side: `TaggedEvent.expected` is true only for a `Closed` of a child the
   host took out itself (idle reap, cap victim, `close`, `shutdown`). The slot holds
   a stop flag that is set before the stop begins and is read by the forwarder when
@@ -216,6 +218,16 @@ Odds and ends:
   responsive and the other chats are untouched â€” not the T3 notice.
 
 ## Log
+
+- L7 (S7, T4 working cap, user decision "Ponerlo en cola"): the app enforces the working
+  cap now. `Input::SetWorkingCap` passes the host's `Limits::max_working` at boot (`0` means
+  no cap), and a prompt to an idle foreground chat with no slot free is **queued**, never lost
+  and never refused: its user message is appended as today, the chat is marked Queued in the
+  sidebar, and the prompt goes out FIFO, one per freed slot, the moment a chat stops working
+  (`agent_end` / `agent_settled`) or its child goes away (expected stop or death), still under
+  the cap. The released prompt marks its chat Working in the same reducer step, so a slot is
+  never handed out twice. An Abort on a Queued chat cancels its prompt, and a chat that dies
+  (S3) drops its queued prompt with no further notice. Tests: `crates/app/tests/chat_working_cap.rs`.
 
 - L1: "la 3 explicame mejor, hace algo parecido a gentle-shell-desktop?"
 - L2: "si dale con eso, es lo mejor por ahora o tienes algo mejor y robusto?"

@@ -12,36 +12,50 @@ use gentle_core::chat::{messages_from_history, reduce_chat_at, ChatState, Dialog
 use gentle_core::rpc::RpcEvent;
 
 use super::activity::{activity_of, ChatActivity};
-use super::ChatId;
-use crate::input::Command;
+use super::{queue, ChatId};
+use crate::input::{ChatCommand, Command};
 
 /// Every chat the app has heard of, and the one the user is looking at.
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Chats {
-    entries: BTreeMap<ChatId, Entry>,
-    foreground: Option<ChatId>,
+    pub(crate) entries: BTreeMap<ChatId, Entry>,
+    pub(crate) foreground: Option<ChatId>,
+    /// Prompts waiting for a working slot, oldest first, across every chat (S7).
+    /// Its state and methods live in `queue`, together with the cap.
+    pub(crate) queue: Vec<(ChatId, String)>,
+    /// The working cap; `0` means no cap is enforced (S7).
+    pub(crate) max_working: usize,
 }
 
 /// One chat: its state, whether a finished turn is still unread, whether its
-/// child is gone, and the activity the sidebar shows for it.
+/// child is gone, whether a prompt of its own is waiting for a slot (S7), and
+/// the activity the sidebar shows for it.
 #[derive(Debug, Clone, Default, PartialEq)]
-struct Entry {
-    state: ChatState,
+pub(crate) struct Entry {
+    pub(crate) state: ChatState,
     unread: bool,
     /// The chat's child exited and was not restarted (S3). Cleared by opening or
     /// restarting the chat, which is what asks the host for a fresh child.
     ended: bool,
+    /// The chat holds a prompt of its own waiting for a working slot (S7).
+    pub(crate) queued: bool,
     activity: ChatActivity,
 }
 
 impl Entry {
     /// Re-derives the activity, clearing a finished turn the user is now
     /// looking at.
-    fn refresh(&mut self, foreground: bool) {
+    pub(crate) fn refresh(&mut self, foreground: bool) {
         if foreground {
             self.unread = false;
         }
-        self.activity = activity_of(&self.state, self.unread, foreground, self.ended);
+        self.activity = activity_of(
+            &self.state,
+            self.unread,
+            foreground,
+            self.ended,
+            self.queued,
+        );
     }
 }
 
@@ -97,6 +111,13 @@ impl Chats {
             .values()
             .filter(|entry| entry.state.working)
             .count()
+    }
+
+    /// Whether that chat is running a model call right now.
+    pub(crate) fn is_working(&self, chat: &ChatId) -> bool {
+        self.entries
+            .get(chat)
+            .is_some_and(|entry| entry.state.working)
     }
 
     /// The dialogs waiting for an answer in one chat, oldest first. A background
@@ -157,7 +178,8 @@ impl Chats {
             self.foreground = Some(to.clone());
         }
         entry.refresh(self.foreground.as_ref() == Some(&to));
-        self.entries.insert(to, entry);
+        self.entries.insert(to.clone(), entry);
+        queue::rekeyed(self, from, to);
     }
 
     /// One chat's state, created empty if this is the first it is heard of.
@@ -166,14 +188,19 @@ impl Chats {
     }
 
     /// Folds one event into one chat and answers the commands it asks for.
-    /// Nothing of any other chat is read or written.
+    /// Nothing of any other chat is read or written — except the queue (S7):
+    /// a turn that just ended frees a slot, and filling it is one more step of
+    /// the same fold, with the check and the mark side by side.
     pub(crate) fn apply(
         &mut self,
         chat: &ChatId,
         event: &RpcEvent,
         now_ms: Option<u64>,
-    ) -> Vec<Command> {
+    ) -> (Vec<Command>, Vec<ChatCommand>) {
         let foreground = self.foreground.as_ref() == Some(chat);
+        // Read before the reduce: only a turn that was really running freed a
+        // slot; end events of an idle chat free nothing.
+        let was_working = self.is_working(chat);
         let entry = self.entries.entry(chat.clone()).or_default();
         entry.state = reduce_chat_at(std::mem::take(&mut entry.state), event, now_ms);
         // A turn that ends while the user is elsewhere leaves a reply to read.
@@ -182,17 +209,26 @@ impl Chats {
             entry.unread = true;
         }
         entry.refresh(foreground);
-        match event {
+        // The turn that just ended freed a slot: the oldest queued prompt goes
+        // out, if any waited.
+        let released = if ended && was_working {
+            queue::release(self)
+        } else {
+            Vec::new()
+        };
+        let commands = match event {
             // A finished turn may have created or extended a session file.
             RpcEvent::AgentSettled => vec![Command::RefreshSessions],
             // A stored chat's history arrives in one reply to `get_messages`.
             RpcEvent::Response(response) => {
                 if let ("get_messages", Ok(data)) = (response.command.as_str(), &response.outcome) {
+                    let entry = self.entries.entry(chat.clone()).or_default();
                     entry.state.messages = messages_from_history(data);
                 }
                 Vec::new()
             }
             _ => Vec::new(),
-        }
+        };
+        (commands, released)
     }
 }

@@ -49,11 +49,22 @@ fn a_chat_whose_child_died_shows_an_error_cross() {
     assert!(!badge.bold_title);
 }
 
+/// A chat whose prompt waits for a slot gets a quiet clock-like mark: the
+/// queued work is on its way, not failed, so it draws in the muted colour.
+#[test]
+fn a_chat_queued_for_a_slot_shows_a_muted_ellipsis() {
+    let badge = Badge::on(Queued).expect("a queued chat shows something");
+
+    assert_eq!(badge.mark, "…");
+    assert_eq!(badge.role, ColourRole::Muted);
+    assert!(!badge.bold_title, "a queued title asks for no emphasis");
+}
+
 /// Every badge fits in the room the title gives up for it, whatever the chat
 /// is doing: the row keeps its height and its single line.
 #[test]
 fn every_mark_fits_in_the_title_room_it_costs() {
-    for activity in [Working, FinishedUnread, NeedsAttention, Ended] {
+    for activity in [Working, FinishedUnread, Queued, NeedsAttention, Ended] {
         let badge = Badge::on(activity).expect("every non-idle chat draws a badge");
         assert!(
             badge.mark.chars().count() <= Badge::TITLE_ROOM,

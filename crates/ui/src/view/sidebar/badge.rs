@@ -15,6 +15,8 @@ pub enum ColourRole {
     Accent,
     /// A finished reply is waiting to be read.
     Success,
+    /// A prompt is queued for its turn, but nothing is failed (S7).
+    Muted,
     /// An extension dialog wants an answer.
     Warning,
     /// The chat's child is gone until it is restarted.
@@ -53,6 +55,13 @@ impl Badge {
                 mark: "●",
                 role: ColourRole::Success,
                 bold_title: true,
+            },
+            ChatActivity::Queued => Self {
+                // A clock-like ellipsis: its turn is on its way, so the mark
+                // stays quiet, in the secondary colour.
+                mark: "…",
+                role: ColourRole::Muted,
+                bold_title: false,
             },
             ChatActivity::NeedsAttention => Self {
                 mark: "!",

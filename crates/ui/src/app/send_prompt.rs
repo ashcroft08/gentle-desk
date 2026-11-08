@@ -14,10 +14,11 @@ impl App {
     pub(super) fn send_prompt(&mut self) -> Task<Message> {
         let prompt = std::mem::take(&mut self.input);
         // One turn at a time, and only into a chat that has a child: before the
-        // first chat is open there is nowhere for the prompt to go.
+        // first chat is open there is nowhere for the prompt to go, and a chat
+        // whose turn is queued (S7) counts as busy, like a working one.
         let has_chat = self.app.chats.foreground().is_some();
-        let working = visible::chat(&self.app).working;
-        if !has_chat || working || !visible::can_send(&self.app, &prompt, self.fatal.is_some()) {
+        let busy = visible::chat_busy(&self.app);
+        if !has_chat || busy || !visible::can_send(&self.app, &prompt, self.fatal.is_some()) {
             self.input = prompt; // keep what the user typed
             return Task::none();
         }

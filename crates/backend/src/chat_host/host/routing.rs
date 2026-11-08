@@ -65,6 +65,12 @@ impl ChatHost {
 
     /// Whether another chat may start a model call, under
     /// [`Limits::max_working`](super::super::Limits::max_working).
+    ///
+    /// Informational only: the `gentle-app` reducer enforces this cap itself
+    /// (S7), where the check and the `set_working` mark happen in one step, so
+    /// the check-then-act race of this pair (R3-working-cap-race) cannot occur.
+    /// A prompt over the cap is queued in the app and neither lost nor refused;
+    /// the host is told nothing new.
     pub fn may_start_work(&self) -> bool {
         !policy::working_full(&self.limits, &self.state().views())
     }

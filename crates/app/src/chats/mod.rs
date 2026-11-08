@@ -17,6 +17,7 @@ mod activity;
 mod id;
 mod inputs;
 mod intents;
+mod queue;
 mod store;
 
 pub use activity::ChatActivity;
@@ -28,8 +29,13 @@ pub(crate) use intents::apply as apply_intent;
 
 use gentle_core::rpc::RpcEvent;
 
-use crate::input::Command;
+use crate::input::Effects;
 use crate::state::AppState;
+
+/// Applies the boot's working cap for every chat at once (S7).
+pub(crate) fn set_working_cap(state: &mut AppState, cap: usize) {
+    queue::set_cap(&mut state.chats, cap);
+}
 
 /// Routes one chat's event to that chat and nothing else.
 pub(crate) fn apply_event(
@@ -37,7 +43,13 @@ pub(crate) fn apply_event(
     chat: ChatId,
     event: &RpcEvent,
     now_ms: Option<u64>,
-) -> (AppState, Vec<Command>) {
-    let commands = state.chats.apply(&chat, event, now_ms);
-    (state, commands)
+) -> (AppState, Effects) {
+    let (commands, chat_commands) = state.chats.apply(&chat, event, now_ms);
+    (
+        state,
+        Effects {
+            commands,
+            chat_commands,
+        },
+    )
 }

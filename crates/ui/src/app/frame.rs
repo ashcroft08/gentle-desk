@@ -31,8 +31,12 @@ impl App {
             page = page.push(dialog::view(pending, &self.dialog_text).map(Message::Dialog));
         }
         let can_send = visible::can_send(&self.app, &self.input, self.fatal.is_some());
-        let page =
-            page.push(composer::view(&self.input, chat.working, can_send).map(Message::Composer));
+        // A queued chat (S7) shows the same Stop as a working one: its button
+        // cancels the queued prompt instead of sending it.
+        let page = page.push(
+            composer::view(&self.input, visible::chat_busy(&self.app), can_send)
+                .map(Message::Composer),
+        );
         let sessions = sidebar::view(sidebar::Props {
             visible: self.app.visible_sessions(),
             total: self.app.sessions.len(),
