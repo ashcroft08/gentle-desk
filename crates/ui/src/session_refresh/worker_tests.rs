@@ -1,67 +1,10 @@
+use super::test_home::*;
 use super::*;
 use iced::futures::executor::block_on;
 use std::fs;
 use std::path::Path;
 
-const HEADER: &str = r#"{"type":"session","version":3,"id":"s1","timestamp":"2026-01-01T00:00:00.000Z","cwd":"C:\\dev\\p"}"#;
-
-fn message(text: &str) -> String {
-    format!(
-        r#"{{"type":"message","id":"m","timestamp":"2026-01-01T00:01:00.000Z","message":{{"role":"user","content":"{text}"}}}}"#
-    )
-}
-
-/// A pi home with a `sessions/` directory and one file per session.
-struct Home {
-    dir: tempfile::TempDir,
-}
-
-impl Home {
-    fn new() -> Self {
-        Self {
-            dir: tempfile::tempdir().unwrap(),
-        }
-    }
-
-    fn sessions(&self) -> PathBuf {
-        self.dir.path().join("sessions")
-    }
-
-    fn project(&self, name: &str) -> PathBuf {
-        let dir = self.sessions().join(name);
-        fs::create_dir_all(&dir).unwrap();
-        dir
-    }
-
-    /// A session file with a header and one user message.
-    fn session(&self, project: &str, name: &str, first: &str) -> PathBuf {
-        let path = self.project(project).join(name);
-        let body = format!("{HEADER}\n{}\n", message(first));
-        fs::write(&path, body).unwrap();
-        path
-    }
-
-    /// Appends `line` and returns the bytes written, as a pass should read them.
-    fn append(&self, path: &Path, line: &str) -> u64 {
-        let text = format!("{line}\n");
-        let mut body = fs::read_to_string(path).unwrap();
-        body.push_str(&text);
-        fs::write(path, body).unwrap();
-        text.len() as u64
-    }
-
-    fn index(&self) -> SessionIndex {
-        SessionIndex::new(self.sessions())
-    }
-
-    fn cache(&self) -> PathBuf {
-        self.dir.path().join("data").join("session-index-v1.json")
-    }
-}
-
-fn index_in(sessions: PathBuf) -> SharedIndex {
-    Arc::new(Mutex::new(SessionIndex::new(sessions)))
-}
+use crate::refresh_queue::Job;
 
 fn item<'a>(refreshed: &'a Refreshed, path: &Path) -> Option<&'a SessionItem> {
     let wanted = path.to_string_lossy();
@@ -70,15 +13,6 @@ fn item<'a>(refreshed: &'a Refreshed, path: &Path) -> Option<&'a SessionItem> {
         .items()
         .iter()
         .find(|item| item.path == wanted)
-}
-
-fn titles(refreshed: &Refreshed) -> Vec<String> {
-    refreshed
-        .sessions
-        .items()
-        .iter()
-        .map(|item| item.title.clone())
-        .collect()
 }
 
 #[test]
@@ -143,13 +77,6 @@ fn a_paths_pass_after_a_restored_index_reads_only_the_appended_bytes() {
     assert_eq!(item(&targeted, &a).unwrap().message_count, 2);
 }
 
-/// The snapshot of the home as it is now, read by one full pass.
-fn warm_snapshot(home: &Home) -> gentle_backend::session_snapshot::IndexSnapshot {
-    let mut index = home.index();
-    index.refresh().unwrap();
-    index.snapshot()
-}
-
 #[test]
 fn the_first_change_writes_the_cache_a_second_change_within_the_interval_does_not_and_flush_does() {
     let home = Home::new();
@@ -200,7 +127,7 @@ fn no_cache_path_writes_nothing() {
     let refreshed = block_on(run(Job::Full, shared.clone())).unwrap();
     assert_eq!(refreshed.sessions.items().len(), 1);
     flush(&shared);
-    assert!(!home.dir.path().join("data").exists());
+    assert!(!home.root().join("data").exists());
 }
 
 #[test]
@@ -208,7 +135,7 @@ fn an_unwritable_cache_location_does_not_fail_the_pass() {
     let home = Home::new();
     home.session("--C--p--", "a.jsonl", "uno");
     // A file where the cache directory should be: the save cannot win.
-    let blocked = home.dir.path().join("data");
+    let blocked = home.root().join("data");
     fs::write(&blocked, "not a directory").unwrap();
     let shared = Shared::new(
         index_in(home.sessions()),

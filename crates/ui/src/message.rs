@@ -4,7 +4,7 @@
 use gentle_backend::process::ProcessEvent;
 use gentle_backend::session_watch::Batch;
 
-use crate::session_refresh::Refreshed;
+use crate::session_refresh::{Progress, Refreshed};
 use crate::view::{composer, dialog, header, helper_thread, helpers, notices, sidebar, thread};
 
 #[derive(Debug, Clone)]
@@ -26,5 +26,7 @@ pub enum Message {
     WatcherLost,
     /// The worker thread finished a refresh pass.
     SessionsRefreshed(Result<Refreshed, String>),
+    /// The first full pass reported how far it got: the list as read so far.
+    SessionsProgress(Progress),
     CloseRequested,
 }

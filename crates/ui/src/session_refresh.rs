@@ -8,31 +8,51 @@
 //!
 //! Two kinds of pass exist: a full one that enumerates the sessions directory,
 //! and a targeted one that only looks at the paths a file watcher reported
-//! (`RefreshQueue` decides which runs when).
+//! (`RefreshQueue` decides which runs when). The first full pass of a run also
+//! reports the list as it goes ([`progress`]), because on a big home it takes
+//! seconds and the sidebar would otherwise show nothing.
 //!
 //! The same thread persists the index afterwards, but never per change: the
 //! cache is one document holding every session (`SaveThrottle`), so it is
 //! written at most every [`save_throttle::MIN_INTERVAL`] and on close.
 
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
+use gentle_app::PreparedSessions;
 #[cfg(test)]
 use gentle_app::SessionItem;
-use gentle_app::{prepare_sessions, PreparedSessions};
 use gentle_backend::session_cache;
 use gentle_backend::session_index::{RefreshStats, SessionIndex};
 
-use crate::refresh_queue::Job;
 use crate::save_throttle::SaveThrottle;
-use crate::sessions;
+
+mod progress;
+mod worker;
+
+pub use progress::{Progress, Update};
+pub use worker::stream;
+
+#[cfg(test)]
+pub(crate) use worker::run;
+
+#[cfg(test)]
+pub(crate) use worker::work;
+
+#[cfg(test)]
+mod stream_tests;
+
+#[cfg(test)]
+mod test_home;
 
 pub type SharedIndex = Arc<Mutex<SessionIndex>>;
 
-/// What the worker threads need: the index, where its cache goes, and how often
-/// that cache may be rewritten. Cheap to clone, so every pass gets its own copy
-/// and the app keeps one for [`flush`].
+/// What the worker threads need: the index, where its cache goes, how often
+/// that cache may be rewritten, and whether the first full pass already ran.
+/// Cheap to clone, so every pass gets its own copy and the app keeps one for
+/// [`flush`].
 #[derive(Clone)]
 pub struct Shared {
     pub index: SharedIndex,
@@ -41,6 +61,8 @@ pub struct Shared {
     throttle: Arc<Mutex<SaveThrottle>>,
     /// The time base of the throttle: the clock inside never leaves this struct.
     started: Instant,
+    /// Whether the run's first full pass still has to report its progress.
+    first_pass: Arc<AtomicBool>,
 }
 
 impl Shared {
@@ -51,12 +73,24 @@ impl Shared {
             cache_path,
             throttle: Arc::new(Mutex::new(SaveThrottle::default())),
             started: Instant::now(),
+            first_pass: Arc::new(AtomicBool::new(true)),
         }
     }
 
     /// Time since this run started, as the throttle's time base.
     fn now(&self) -> Duration {
         self.started.elapsed()
+    }
+
+    /// Whether the run's first full pass still has to report its progress.
+    fn is_first_pass(&self) -> bool {
+        self.first_pass.load(Ordering::Relaxed)
+    }
+
+    /// A full pass ran: later passes stay silent, since the list they would
+    /// report is already complete.
+    fn first_pass_done(&self) {
+        self.first_pass.store(false, Ordering::Relaxed);
     }
 
     /// Marks the cache dirty when the pass changed anything and writes it when
@@ -103,46 +137,6 @@ pub struct Refreshed {
     pub stats: RefreshStats,
 }
 
-/// Runs one pass on a worker thread and returns what the list should show.
-/// `Err` carries a message fit for the log (unreadable directory, thread lost).
-pub async fn run(job: Job, shared: Shared) -> Result<Refreshed, String> {
-    let (done, result) = iced::futures::channel::oneshot::channel();
-    std::thread::spawn(move || {
-        let outcome = work(&job, &shared);
-        let _ = done.send(outcome);
-    });
-    result
-        .await
-        .unwrap_or_else(|_| Err("the session refresh thread ended unexpectedly".to_owned()))
-}
-
-/// The worker thread's half of [`run`]: the index pass, its cache write, and
-/// the prepared list, in that order.
-fn work(job: &Job, shared: &Shared) -> Result<Refreshed, String> {
-    let Ok(mut index) = shared.index.lock() else {
-        return Err("the session index is poisoned".to_owned());
-    };
-    let full = matches!(job, Job::Full);
-    let started = Instant::now();
-    let stats = match job {
-        Job::Full => index
-            .refresh()
-            .map_err(|error| format!("cannot read sessions: {error}"))?,
-        Job::Paths(paths) => index.refresh_paths(paths),
-    };
-    let took = started.elapsed();
-    // The folding is O(N) and pure: it happens here, not in `update`.
-    let sessions = prepare_sessions(index.entries().iter().map(sessions::to_item).collect());
-    drop(index);
-    shared.save_if_due(&stats);
-    Ok(Refreshed {
-        sessions,
-        took,
-        full,
-        stats,
-    })
-}
-
 /// Writes the cache now if it holds something unsaved, for use on close.
 pub fn flush(shared: &Shared) {
     let Some(path) = shared.cache_path.as_deref() else {
@@ -168,14 +162,18 @@ pub fn flush(shared: &Shared) {
 /// Refreshes the index on a worker thread and returns the list to show.
 ///
 /// A full pass with a fresh throttle, so the list is never held back by how
-/// often this run persisted the cache. The shipped path is [`run`] through
+/// often this run persisted the cache. The shipped path is [`stream`] through
 /// `refresh_flow`; this wrapper exists for the module's own tests.
 #[cfg(test)]
 pub async fn refresh(
     index: SharedIndex,
     cache_path: Option<PathBuf>,
 ) -> Result<Vec<SessionItem>, String> {
-    let refreshed = run(Job::Full, Shared::new(index, cache_path)).await?;
+    let refreshed = run(
+        crate::refresh_queue::Job::Full,
+        Shared::new(index, cache_path),
+    )
+    .await?;
     Ok(refreshed.sessions.items().to_vec())
 }
 

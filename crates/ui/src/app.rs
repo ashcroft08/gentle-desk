@@ -1,28 +1,27 @@
 //! The application: owns the state, runs `gentle-app` commands, wires the
 //! components together. Drawing lives in `view/`, process startup in
-//! `backend`, subscriptions in `subscription`, and the session refresh flow
-//! (which pass runs when) in `refresh_flow`.
-
-use std::sync::{Arc, Mutex};
-use std::time::Duration;
+//! `app/boot`, subscriptions in `subscription`, the session refresh flow (which
+//! pass runs when) in `refresh_flow`, and the messages of both in
+//! `app/process_update` and `app/sessions_update`.
 
 use gentle_app::{update, AppState, Command, Input, Intent};
-use gentle_backend::process::{ProcessEvent, RpcProcess};
+use gentle_backend::process::RpcProcess;
 use gentle_core::chat::Dialog;
-use gentle_core::rpc::Decoded;
 use iced::widget::{column, row, scrollable};
 use iced::{clipboard, Element, Subscription, Task};
 
-use crate::backend;
 use crate::clock;
 use crate::message::Message;
 use crate::refresh_flow::Flow;
-use crate::session_refresh::Shared;
 use crate::subscription::{self, EventSource};
 use crate::thread_cache::ThreadCache;
 use crate::view::{
     banner, composer, dialog, header, helper_thread, helpers, notices, sidebar, thread,
 };
+
+mod boot;
+mod process_update;
+mod sessions_update;
 
 pub struct App {
     app: AppState,
@@ -40,35 +39,6 @@ pub struct App {
 }
 
 impl App {
-    pub fn boot() -> (Self, Task<Message>) {
-        let started = backend::start();
-        let shared = started
-            .index
-            .map(|index| Shared::new(Arc::new(Mutex::new(index)), started.cache_path.clone()));
-        let mut app = Self {
-            app: AppState::default(),
-            cache: ThreadCache::default(),
-            input: String::new(),
-            dialog_text: String::new(),
-            process: started.process,
-            events: started.events,
-            flow: Flow::new(
-                shared,
-                started.sessions_dir,
-                started.watcher,
-                started.watch,
-                started.watch_error,
-            ),
-            sidebar_offset: 0.0,
-            fatal: started.fatal,
-        };
-        // The window opens empty: the first full pass fills it, whatever the
-        // watcher does afterwards.
-        let first_list = app.flow.on_tick();
-        let focus = iced::widget::operation::focus(composer::ID);
-        (app, Task::batch([first_list, focus]))
-    }
-
     /// Feeds an input to the app layer and runs the commands it returns.
     fn dispatch(&mut self, input: Input) -> Task<Message> {
         let dialog_before = self.app.chat.pending_dialogs.first().cloned();
@@ -153,44 +123,12 @@ impl App {
             Message::Composer(composer::Event::Stop) => self.intent(Intent::Abort),
             Message::Helpers(helpers::Event::Select(id)) => self.intent(Intent::SelectHelper(id)),
             Message::HelperThread(helper_thread::Event::Back) => self.intent(Intent::CloseHelper),
-            Message::Tick => self.flow.on_tick(),
-            Message::SessionsChanged(batch) => self.flow.on_batch(batch),
-            Message::WatcherLost => self.flow.on_watcher_lost(),
-            Message::SessionsRefreshed(result) => {
-                let Some(prepared) = self.flow.settle(result) else {
-                    // A failed pass only logs; the next request tries again.
-                    return self.flow.pump();
-                };
-                let shown = self.dispatch(Input::SessionsPrepared(prepared));
-                Task::batch([shown, self.flow.pump()])
-            }
-            Message::CloseRequested => {
-                // The cache is the next run's head start: write what the
-                // throttle held back before the window goes away.
-                self.flow.flush();
-                if let Some(process) = self.process.take() {
-                    let _ = process.shutdown(Duration::from_secs(3));
-                }
-                iced::exit()
-            }
-        }
-    }
-
-    fn on_process(&mut self, event: ProcessEvent) -> Task<Message> {
-        match event {
-            ProcessEvent::Output(Decoded::Event(event)) => {
-                self.dispatch(Input::RpcAt(event, clock::now_ms()))
-            }
-            ProcessEvent::Output(Decoded::Unknown(_)) => Task::none(),
-            ProcessEvent::Stderr(line) => {
-                eprintln!("[gentle-shell] {line}");
-                Task::none()
-            }
-            ProcessEvent::Closed => {
-                self.fatal
-                    .get_or_insert_with(|| "gentle-shell exited".into());
-                Task::none()
-            }
+            Message::Tick => self.on_tick(),
+            Message::SessionsChanged(batch) => self.on_sessions_changed(batch),
+            Message::WatcherLost => self.on_watcher_lost(),
+            Message::SessionsRefreshed(result) => self.on_sessions_refreshed(result),
+            Message::SessionsProgress(progress) => self.on_sessions_progress(progress),
+            Message::CloseRequested => self.on_close_requested(),
         }
     }
 

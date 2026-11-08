@@ -3,6 +3,7 @@ use iced::futures::executor::block_on;
 use iced::futures::FutureExt;
 use std::fs;
 
+use crate::sessions;
 use gentle_backend::session_cache;
 
 const HEADER: &str = r#"{"type":"session","version":3,"id":"s1","timestamp":"2026-01-01T00:00:00.000Z","cwd":"C:\\dev\\p"}"#;
