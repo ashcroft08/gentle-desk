@@ -76,13 +76,12 @@ impl Flow {
         session_schedule::full_pass_delay(self.is_watching(), self.last_full_pass)
     }
 
-    /// `Command::RefreshSessions` from the app layer: a settled turn may have
-    /// appended to a session file. A watcher already reports that file, so only
-    /// the polling fallback asks for a pass.
+    /// `Command::RefreshSessions` from the app layer (a settled turn, boot, an
+    /// explicit refresh): always a full pass. A watcher reports the appended file
+    /// too, but its notice can arrive seconds late (measured on Windows/NTFS: 3 s
+    /// on a developer machine, over 10 s on a CI runner), and the user's own chat
+    /// must not wait for it. The pass runs on the worker thread, once per turn.
     pub fn on_refresh_command(&mut self) -> Task<Message> {
-        if self.is_watching() {
-            return Task::none();
-        }
         self.request_full();
         self.pump()
     }

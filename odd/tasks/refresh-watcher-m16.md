@@ -54,6 +54,14 @@ The 2 s figures are upper bounds from screenshots, not measured latencies.
 
 ## CI failure and fix (PR #10)
 
-- The first CI run failed in `session_watch::tests::batches::an_append_to_a_session_file_is_reported` (it had passed 5 of 5 locally). Cause, confirmed with a probe (not committed): on Windows/NTFS a write through a handle that stays open and is never flushed is **not reported for at least 15 s** (0 of 5 runs); closing or `sync_all` gives the event in about 265 ms. The test kept its handle open, and locally it could pass by accident on the late "modify" event of the file creation.
-- pi appends with `appendFileSync` (open, write, close) and writes headers with `openSync`/`closeSync` (checked in its `session-manager.js`), so its changes are reported promptly. A different writer that holds the file open is only noticed by the 60 s reconciliation pass; this is documented in `session_watch.rs`.
-- Fix: the test now closes the handle like pi does and lets the create settle before appending; the limit is documented. 8 consecutive local runs green.
+The CI failed twice in `session_watch::tests::batches::an_append_to_a_session_file_is_reported` (12 of 12 on the runner even alone and single-threaded; it passed locally).
+
+What was ruled out, each with a probe on the runner (temporary `diag/**` branch, to be deleted): the OS reports a closed append immediately in a bare `notify` probe; the real `SessionWatcher` also reported 10 of 10 appends in a probe, in debug and in release, with the project directory created before or after the watcher started. My first explanation (the test kept the file handle open) was only part of it: an unflushed open handle is indeed not reported for 15+ s, but closing it did not fix the CI.
+
+Root cause as far as it can be established: tracing the production thread showed that the raw `Modify` of the append reaches it late (about 3 s on the developer machine, **10 263 ms on the runner, only when the test ended and the directory was deleted**), and the thread classifies and reports it the moment it arrives. The delay is in the OS notice or in `notify`, before our code. Why it shows up in the test and not in the probes is **not explained**.
+
+Decisions (the user chose "Pasada completa al terminar cada turno + test marcado como ignorado"):
+
+1. `Flow::on_refresh_command` now always asks for a full pass (before: nothing while a watcher runs). A settled turn is the user's own write and must not depend on a late notice; the pass runs on the worker thread, once per turn (about 1.2 s at 50 000 chats). The changed test is `a_settled_turn_still_asks_for_a_pass_with_a_watcher_and_the_safety_net_slows_down` (RED observed first).
+2. The append test is `#[ignore]` with the reason in its doc comment; run it by hand with `cargo test -- --ignored an_append_to_a_session_file`.
+3. Consequence to keep in mind: with a watcher, changes by other writers (another terminal, another pi) may appear after seconds, bounded by the 60 s reconciliation pass in the worst case. The window check "a modified chat shows within 2 s" held on the developer machine but is not a guarantee.
