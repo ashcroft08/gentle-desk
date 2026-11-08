@@ -1,7 +1,7 @@
 [workspace]
 resolver = "2"
 exclude = ["spikes"]
-members = ["crates/gentle-core", "crates/backend", "crates/term", "crates/app", "crates/runtime", "crates/ui"]
+members = ["crates/gentle-core", "crates/backend", "crates/term", "crates/app", "crates/runtime", "crates/ui", "apps/desktop/src-tauri"]
 
 [workspace.package]
 edition = "2021"
