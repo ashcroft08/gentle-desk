@@ -215,5 +215,6 @@ fn a_failed_spawn_is_reported_and_leaves_no_slot_behind() {
 mod caps;
 mod isolation;
 mod real;
+mod rekey;
 mod serialization;
 mod startup;

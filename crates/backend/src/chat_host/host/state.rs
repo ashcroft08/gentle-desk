@@ -6,7 +6,7 @@
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use super::super::policy::ChatView;
@@ -58,6 +58,7 @@ impl State {
         generation: u64,
         child: Box<dyn Child>,
         alive: Arc<AtomicBool>,
+        tag: Tag,
     ) -> Result<(), Box<dyn Child>> {
         let Some(slot) = self.slots.get_mut(key) else {
             return Err(child);
@@ -65,7 +66,7 @@ impl State {
         if slot.generation != generation || !slot.is_spawning() {
             return Err(child);
         }
-        slot.status = Status::Live { child, alive };
+        slot.status = Status::Live { child, alive, tag };
         Ok(())
     }
 
@@ -145,6 +146,18 @@ impl Slot {
         }
     }
 
+    /// Points the events of this slot's child at a new key. Only a live slot
+    /// has events to tag; answers whether there was one.
+    pub(super) fn retag(&self, key: ChatKey) -> bool {
+        match &self.status {
+            Status::Live { tag, .. } => {
+                *tag.lock().unwrap_or_else(|p| p.into_inner()) = key;
+                true
+            }
+            Status::Spawning => false,
+        }
+    }
+
     pub(super) fn shut_down(self, grace: Duration) {
         if let Some(child) = self.into_child() {
             let _ = child.shutdown(grace);
@@ -158,5 +171,11 @@ pub(super) enum Status {
     Live {
         child: Box<dyn Child>,
         alive: Arc<AtomicBool>,
+        /// The key stamped on every event this child sends. A cell, not a copy,
+        /// so a rekey changes what the forwarder already running reads.
+        tag: Tag,
     },
 }
+
+/// The chat key a child's events are tagged with, shared with its forwarder.
+pub(in crate::chat_host) type Tag = Arc<Mutex<ChatKey>>;

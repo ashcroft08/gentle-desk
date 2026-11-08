@@ -27,9 +27,10 @@ use super::{ChatKey, TaggedEvent};
 use crate::launcher::LauncherError;
 use crate::process::ProcessEvent;
 
-use state::State;
+use state::{State, Tag};
 
 mod lifecycle;
+mod rekey;
 mod routing;
 mod state;
 
@@ -143,12 +144,7 @@ impl ChatHost {
 
     /// Forwards one child's event stream onto the host's channel, tagging every
     /// event with its chat, and clears the child's alive flag when it goes.
-    pub(super) fn forward(
-        &self,
-        key: ChatKey,
-        alive: Arc<AtomicBool>,
-        events: Receiver<ProcessEvent>,
-    ) {
+    pub(super) fn forward(&self, tag: Tag, alive: Arc<AtomicBool>, events: Receiver<ProcessEvent>) {
         let sender = self.events_tx.clone();
         thread::Builder::new()
             .name("chat-host-events".to_owned())
@@ -157,10 +153,8 @@ impl ChatHost {
                     if event == ProcessEvent::Closed {
                         alive.store(false, Ordering::SeqCst);
                     }
-                    let tagged = TaggedEvent {
-                        key: key.clone(),
-                        event,
-                    };
+                    let key = tag.lock().unwrap_or_else(|p| p.into_inner()).clone();
+                    let tagged = TaggedEvent { key, event };
                     if sender.send(tagged).is_err() {
                         break; // the host is gone
                     }

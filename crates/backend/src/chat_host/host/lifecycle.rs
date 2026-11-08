@@ -7,11 +7,11 @@
 //! against its generation before it is adopted.
 
 use std::sync::atomic::AtomicBool;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use super::super::policy::{self, Admission};
 use super::super::{ChatKey, Child, HostError, Opened};
-use super::state::Slot;
+use super::state::{Slot, Tag};
 use super::ChatHost;
 
 impl ChatHost {
@@ -93,9 +93,16 @@ impl ChatHost {
         };
 
         let alive = Arc::new(AtomicBool::new(true));
+        let tag: Tag = Arc::new(Mutex::new(key.clone()));
         let forwarded = {
             let mut state = self.state();
-            if let Err(child) = state.adopt(&key, generation, child, Arc::clone(&alive)) {
+            if let Err(child) = state.adopt(
+                &key,
+                generation,
+                child,
+                Arc::clone(&alive),
+                Arc::clone(&tag),
+            ) {
                 drop(state);
                 // The chat was closed or reopened while its child started (S2):
                 // discard the start result instead of adopting it.
@@ -109,7 +116,7 @@ impl ChatHost {
                 .map(|child| child.take_events())
         };
         if let Some(events) = forwarded {
-            self.forward(key, alive, events);
+            self.forward(tag, alive, events);
         }
         Ok(Opened::Started)
     }

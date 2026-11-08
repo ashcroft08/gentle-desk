@@ -28,7 +28,7 @@ impl ChatHost {
                 .ok_or_else(|| SendError::NoChild(key.clone()))?;
             let writer = match &slot.status {
                 Status::Spawning => return Err(SendError::Starting(key.clone())),
-                Status::Live { child, alive } => {
+                Status::Live { child, alive, .. } => {
                     if !alive.load(Ordering::SeqCst) {
                         return Err(SendError::NoChild(key.clone()));
                     }
