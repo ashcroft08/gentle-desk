@@ -40,9 +40,11 @@ pub(crate) fn set_working_cap(state: &mut AppState, cap: usize) {
     queue::set_cap(&mut state.chats, cap);
 }
 
-/// Records that the chat's child is up: the opening phase is over, whatever
-/// the host answered (a fresh start or an already-live child) — the UI sends
-/// the same confirmation either way, so the mark never sticks.
+/// Records that the chat's child is up: the opening phase is over. For a
+/// fresh child, the UI sends this only through the 20 s net for a child that
+/// started but never speaks (its first event already clears the fold); an
+/// already-live chat or a discarded start is confirmed at once, because no one
+/// is waiting for the child any more.
 pub(crate) fn opened(mut state: AppState, chat: &ChatId) -> AppState {
     state.chats.clear_opening(chat);
     state

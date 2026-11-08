@@ -190,3 +190,56 @@ fn a_death_noticed_twice_with_the_same_reason_stays_one_row() {
 
     assert_eq!(rows, 1, "dedup by level and text still applies");
 }
+
+#[test]
+fn the_joined_reason_is_capped_and_keeps_the_first_line_when_it_alone_fits() {
+    // Three lines at 200 characters each would make a ~600 character reason:
+    // the notice would be a wall of text. It is capped at 240 characters of
+    // reason, cut at a character boundary and closed with `…`.
+    let state = open(AppState::default(), "a");
+    let first_line = "x".repeat(100);
+    let second_line = "y".repeat(100);
+    let third_line = "z".repeat(50);
+    let state = stderr(state, "a", &first_line);
+    let state = stderr(state, "a", &second_line);
+    let state = stderr(state, "a", &third_line);
+
+    let state = closed(state, "a", false);
+
+    let notice = state.notices.last().expect("a notice");
+    let reason = reason_of(&notice.text).expect("the reason is in the notice");
+    assert_eq!(
+        reason.chars().count(),
+        241,
+        "240 characters plus the ellipsis"
+    );
+    assert!(reason.ends_with('…'), "cut and closed: {reason:?}");
+    assert!(reason.contains(&first_line), "the first line stays intact");
+    assert!(
+        !reason.contains(&third_line),
+        "the tail is gone: {reason:?}"
+    );
+}
+
+#[test]
+fn a_reason_that_fits_is_never_ellipsised() {
+    let state = open(AppState::default(), "a");
+    let line = "w".repeat(200);
+    let state = stderr(state, "a", &line);
+
+    let state = closed(state, "a", false);
+
+    let notice = state.notices.last().expect("a notice");
+    assert_eq!(
+        reason_of(&notice.text).expect("the reason").chars().count(),
+        200,
+        "no cap needed, no ellipsis added"
+    );
+    assert!(!notice.text.contains('…'));
+}
+
+/// The part of the notice between the parentheses: the joined reason.
+fn reason_of(text: &str) -> Option<&str> {
+    let inside = text.find("(")? + 1..text.find(")")?;
+    Some(&text[inside])
+}

@@ -335,6 +335,45 @@ or was updated only where the new behaviour forced it.
 
 ## Log
 
+- L10 (T5a follow-up, user decision, reported defect in the real window): the `Opening chat…`
+  state and the `◌` badge never showed. Cause: `crates/ui/src/app/chat_command.rs` sent
+  `Input::ChatOpened` the moment `ChatHost::open` returned — a fresh child is *created* in
+  milliseconds (T5a), while the real gentle-shell prints its first line after ~2.2 s and answers
+  after a warm median of ~3.0 s, so the chat was cleared to Idle long before its child could say
+  anything and the user saw "nothing happens". Fix, test-first (RED observed): for
+  `Outcome::Opened { how: Started }` the UI no longer confirms at once — the opening phase ends
+  with the chat's **own first decoded event** (`Chats::apply` now clears the mark before folding
+  any event of an Opening chat, `crates/app/src/chats/apply.rs`), because that is the actual proof
+  the child is alive. `Existing` and `Discarded` keep the at-once confirmation (focus-only opens
+  are instant), `ChatFailed` still clears, `ChatClosed` still clears. The follow-up requests of an
+  `Started` open (`get_messages` / `get_state`) are still sent the moment the host answers, as
+  today, written to the pipe before the child answers. Safety net: the UI schedules a 20 s task
+  (`opening_net` in `chat_command.rs`, a background thread sleeping 20 s that delivers
+  `Input::ChatOpened`, same blocking style as the existing `execute` task) so a child that starts
+  but never speaks cannot leave its chat Opening forever; 20 s covers the measured ~3.6 s warm max
+  with a wide margin, and `ChatOpened` stays idempotent (clearing an already-clear chat changes
+  nothing, so a child that already spoke is untouched by the net). Also (same window defect): the
+  joined stderr reason of the death notice is capped at 240 characters, cut at a character
+  boundary and closed with `…` — a first line that fits is kept whole, only the tail is lost
+  (`cap_reason` in `crates/app/src/chats/inputs.rs`). Tests: new `crates/app/tests/
+  chat_opening_ready.rs` (5 tests: stderr while starting is not life; the first own event ends the
+  phase; the 20 s confirmation clears and is idempotent; a prompt refused while Opening and
+  accepted after the first event; a confirmation without a first event never sticks) and two cap
+  tests in `chat_stderr.rs` (a 3-line reason is capped at 240 + `…` with the first line whole; a
+  fitting reason is never ellipsised). No existing test contradicts the new rule; none needed
+  changes (the existing `chat_opening.rs` cases keep passing: they fold `ChatOpened` after an
+  intent, which the UI still does for `Existing`/`Discarded` and for the net). This entry
+  supersedes the one sentence above about the UI sending `ChatOpened` "on every `Outcome::Opened`".
+  S numbers covered: S3 (death notice reason, and the opening state's real-observable behaviour),
+  T5a latency decision context (the opening state must survive the measured ~3 s start).
+  Verification: `cargo test --workspace`: the only failures in-repo are the 6 `gentle-term`
+  `end_to_end` spawn cases — reproduced with `os error 5/2` at `Command::spawn` and the binary
+  `target/debug/gentle-term.exe` disappearing during the run; the byte-identical HEAD commit
+  checked out in a scratch clone passes the whole workspace suite with exit 0, so it is an
+  environment artefact of this checkout (real-time scanner / sandbox), not of the change — every
+  other suite ok. `cargo fmt --all --check` clean, `cargo clippy --workspace --all-targets --
+  -D warnings` clean, `cargo build --release -p gentle-ui` ok; real window not driven (out of
+  scope for this worker).
 - L7 (S7, T4 working cap, user decision "Ponerlo en cola"): the app enforces the working
   cap now. `Input::SetWorkingCap` passes the host's `Limits::max_working` at boot (`0` means
   no cap), and a prompt to an idle foreground chat with no slot free is **queued**, never lost

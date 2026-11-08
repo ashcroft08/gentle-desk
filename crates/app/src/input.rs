@@ -109,10 +109,15 @@ pub enum Input {
         chat: ChatId,
         line: String,
     },
-    /// The chat's child is up, freshly started or already live (the UI sends the
-    /// same confirmation for either): the [`ChatActivity::Opening`] phase of
-    /// that chat is over. Its start failing goes through
-    /// [`Input::ChatFailed`] instead, which ends the phase the same way.
+    /// The chat's child is up, freshly started or already live. The UI confirms
+    /// an already-live chat (`Existing`) or a discarded start the moment the
+    /// host answers; for a fresh child (`Started`) the host's answer only says
+    /// the process was created — milliseconds —, not that the chat is
+    /// answerable (that takes ~seconds), so it sends this input instead only as
+    /// a 20 s safety net for a child that started but never speaks. Otherwise
+    /// [`ChatActivity::Opening`] ends with the chat's own first event. A start
+    /// that fails goes through [`Input::ChatFailed`], which ends the phase the
+    /// same way.
     ChatOpened {
         chat: ChatId,
     },

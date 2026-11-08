@@ -66,9 +66,10 @@ fn for_shell(commands: Vec<Command>) -> Effects {
 /// the host starts a fresh child for it through `--session` (S3).
 ///
 /// Until the host answers, the chat is [`ChatActivity::Opening`]: the click is
-/// seen and nothing can be sent there yet. The UI confirms the child is up (or
-/// its start failed) through `Input::ChatOpened` / `Input::ChatFailed`, so the
-/// state never sticks, not even for an open the host answers `Existing` to.
+/// seen and nothing can be sent there yet. A fresh child's first event (and, as
+/// the net for a child that never speaks, the UI's 20 s confirmation) clears it,
+/// and a failed start through `Input::ChatFailed`; an already-live child is
+/// confirmed at once. So the state never sticks.
 fn open(state: &mut AppState, chat: ChatId) -> Vec<ChatCommand> {
     drop_restart_notice(state, &chat);
     state.chats.open(chat.clone());

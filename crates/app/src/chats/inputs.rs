@@ -69,9 +69,11 @@ pub(crate) fn closed(mut state: AppState, chat: &ChatId, expected: bool) -> (App
 /// deduplicated by text: a chat that dies twice shows one row, and that row still
 /// carries the Restart. The last stderr lines the child left, if any, are the
 /// reason, so the user learns why it died (a stored working directory that is
-/// gone says so, for instance).
+/// gone says so, for instance). The reason is capped at 240 characters so three
+/// lines of stderr do not make a wall of text: the joined reason is cut at a
+/// character boundary and closed with `…`, losing only its tail.
 pub(crate) fn push_death_notice(state: &mut AppState, chat: &ChatId) {
-    let reason = state.chats.stderr_of(chat).join(" · ");
+    let reason = cap_reason(state.chats.stderr_of(chat).join(" · "));
     let text = if reason.is_empty() {
         format!(
             "{}: the child that runs this chat exited. Restart to keep talking.",
@@ -90,6 +92,19 @@ pub(crate) fn push_death_notice(state: &mut AppState, chat: &ChatId) {
         text,
         NoticeAction::RestartChat(chat.clone()),
     );
+}
+
+/// Caps the joined reason at 240 characters (the ellipsis not included). Each
+/// line of the ring is at most 200 characters, so a first line that alone fits
+/// is never cut; a cut inside the joined reason lands after whole characters.
+fn cap_reason(reason: String) -> String {
+    const REASON_CAP: usize = 240;
+    if reason.chars().count() <= REASON_CAP {
+        return reason;
+    }
+    let mut capped: String = reason.chars().take(REASON_CAP).collect();
+    capped.push('…');
+    capped
 }
 
 /// Keeps one stderr line of that chat's child in its bounded ring (S3): the

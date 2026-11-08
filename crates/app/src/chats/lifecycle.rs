@@ -26,8 +26,10 @@ impl Chats {
     }
 
     /// Marks that a child is being started for `chat` right now: the chat asked
-    /// for one and the start takes seconds. Cleared when the child is up
-    /// ([`Input::ChatOpened`](crate::Input::ChatOpened)), its start fails
+    /// for one and the start takes seconds. Cleared when the chat's own first
+    /// event proves its child is alive, when the child is confirmed up (for a
+    /// fresh child only through the 20 s net, see
+    /// [`Input::ChatOpened`](crate::Input::ChatOpened)), its start fails
     /// ([`Input::ChatFailed`](crate::Input::ChatFailed)) or its child goes away.
     pub(crate) fn mark_opening(&mut self, chat: &ChatId) {
         let foreground = self.foreground.as_ref() == Some(chat);
@@ -48,8 +50,10 @@ impl Chats {
     }
 
     /// Records that the opening phase of `chat` is over, whatever ended it: the
-    /// child is up, its start failed, or the child went away while it was being
-    /// started. So the mark never sticks.
+    /// chat spoke (any of its own events — [`Chats::apply`](super::store::Chats)
+    /// calls this before it folds), the child is up, its start failed, or the
+    /// child went away while it was being started. So the mark never sticks.
+    /// Clearing a chat that is not Opening changes nothing.
     pub(crate) fn clear_opening(&mut self, chat: &ChatId) {
         let foreground = self.foreground.as_ref() == Some(chat);
         let Some(entry) = self.entries.get_mut(chat) else {
