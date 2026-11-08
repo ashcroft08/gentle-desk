@@ -38,6 +38,7 @@ pub(crate) fn apply_intent(mut state: AppState, intent: Intent) -> (AppState, Ve
                 session_query: state.session_query,
                 search_keys: state.search_keys,
                 visible: state.visible,
+                list_status: state.list_status,
                 ..AppState::default()
             };
             (fresh, commands)

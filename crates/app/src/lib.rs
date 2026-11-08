@@ -9,17 +9,19 @@
 //! goes in and out of `update`), `intents` (user actions), `events` (RPC
 //! events), `notices` (extension notices), `session_prepare` (building the
 //! search data of a list, away from the UI thread), `session_query` (which
-//! chats the sidebar shows).
+//! chats the sidebar shows), `list_status` (whether that list is complete).
 
 mod events;
 mod input;
 mod intents;
+mod list_status;
 mod notices;
 mod session_prepare;
 mod session_query;
 mod state;
 
 pub use input::{Command, Input, Intent};
+pub use list_status::ListStatus;
 pub use session_prepare::{prepare_sessions, PreparedSessions};
 pub use state::{AppState, Notice, NoticeLevel, SessionItem};
 
@@ -30,6 +32,16 @@ pub fn update(state: AppState, input: Input) -> (AppState, Vec<Command>) {
         Input::SessionsPrepared(prepared) => {
             let mut state = state;
             state.set_prepared(prepared);
+            state.set_ready();
+            (state, Vec::new())
+        }
+        Input::SessionsProgress {
+            prepared,
+            done,
+            total,
+        } => {
+            let mut state = state;
+            state.set_progress(prepared, done, total);
             (state, Vec::new())
         }
         Input::SessionsLoaded(sessions) => {
