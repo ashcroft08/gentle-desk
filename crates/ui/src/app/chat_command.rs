@@ -4,7 +4,6 @@
 //! stops reading, so each command runs in its own task: a slow chat never
 //! freezes the window and never holds up another chat.
 
-use std::sync::mpsc;
 use std::time::Duration;
 
 use gentle_app::{ChatCommand, ChatId, Input};
@@ -91,7 +90,10 @@ impl App {
 /// on a background thread so the window never stalls.
 fn opening_net(chat: ChatId) -> Task<Message> {
     const SILENCE_TOLERATED: Duration = Duration::from_secs(20);
-    let (elapsed, wait) = mpsc::channel::<()>();
+    // An async channel, not a blocking one: awaiting it parks the task, while a
+    // blocking `recv` inside the future would hold an executor thread for the
+    // whole wait and stall the delivery of every child's events with it.
+    let (elapsed, wait) = iced::futures::channel::oneshot::channel::<()>();
     let _ = std::thread::Builder::new()
         .name("chat-opening-wait".into())
         .spawn(move || {
@@ -101,9 +103,7 @@ fn opening_net(chat: ChatId) -> Task<Message> {
     let confirmed = chat;
     Task::perform(
         async move {
-            // Blocking wait, like `execute` blocks on a child: the iced
-            // executor runs it off the UI thread.
-            let _ = wait.recv();
+            let _ = wait.await;
         },
         move |()| Message::Chat(Converted::Input(Input::ChatOpened { chat: confirmed })),
     )
