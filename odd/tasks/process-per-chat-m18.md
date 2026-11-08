@@ -1,0 +1,70 @@
+# process-per-chat-m18: one gentle-shell process per chat, and a recoverable death notice
+
+Implements backlog item 16: gentle-desk keeps one long-lived `gentle-shell --mode rpc` child and
+changes chat inside it (`switch_session` / `new_session`), so a stale extension context from
+gentle-pi's skill-registry timer kills the child and the window dead-ends until the app restarts.
+This batch spawns one child per chat with `--session <path>` instead, keeps the children of chats
+that are working alive in the background, and offers a Restart on death.
+
+## Specs
+
+- S1: A `ChatHost`-style manager keeps a map `session -> live child`: one `gentle-shell --mode rpc --session <path>` per chat, and a new chat is a child spawned without `--session`. Opening a chat makes it the foreground chat; it never stops the other children and never sends `switch_session` or `new_session` to a live child.
+- S2: Spawns are serialized per session (rapid clicks on the same chat never create two children; a stale start result is discarded).
+- S3: If a chat's child dies, the UI shows a recoverable notice with a Restart action, per chat child: Restart relaunches that chat's child and reopens that chat; no dead-end until app restart.
+- S4: A chat that is working keeps running in the background. The sidebar shows a per-chat state: working / finished-unread / needs-attention (a pending extension dialog). Returning to it shows its full reply. Extension dialogs raised by background chats are queued, never lost.
+- S5: Closing the app leaves no orphan process, for every child it spawned (existing guarantee, now multiplied by the number of live children).
+- S6: One responsibility per file; process lifecycle logic pure and testable in `crates/app`, I/O in `crates/backend`; no file past ~200 lines.
+- S7: Idle children are reaped after a configurable idle time, and the number of live children and of simultaneously working chats each has a configurable cap (default proposal: 4 live, 2 working — open decision, see Design notes), because parallel model calls consume the usage limit faster. A reaped chat reopens through `--session`.
+
+## Tasks
+
+- [ ] T1 (S1, S2, S5, S7) backend/app: manager lifecycle `session -> child` — one pure transition in `crates/app` for "start child for session S", "make S foreground" and "reap idle children under the caps", and the I/O in `crates/backend` (spawn with `--session` or without for a new chat, per-session spawn serialization, discard a stale start result, idle reap, stop every child on close). Route: gentle-ai-worker; commit:
+- [ ] T2 (S1) ui: wire open/new chat to the manager as "make foreground" and remove the `switch_session` / `new_session` paths (`crates/app/src/intents.rs:32-34` and `:91-93`, the `switch_session` exchange at `crates/app/src/events.rs:33-41`), including their tests. Route: gentle-ai-worker; commit:
+- [ ] T3 (S3) ui: per-chat death notice with a Restart action that relaunches that chat's child and reopens it, replacing the terminal `"gentle-shell exited"` / `"cannot reach gentle-shell: …"` state (`crates/ui/src/app/process_update.rs:24-27`, `crates/ui/src/app.rs:66-68,155,161`). Route: gentle-ai-worker; commit:
+- [ ] T4 (S4) ui: per-chat state in the sidebar (working / finished-unread / needs-attention) and queued extension dialogs from background chats; returning to a chat shows its full reply. Route: gentle-ai-worker; commit:
+- [ ] T5 (S1-S7) parent verifies: real window with `tools/fake-gentle-shell` via `GENTLE_SHELL_BIN` (never the real model), including a stand-in that works for N seconds and one that dies after a session switch; background chats finishing and being read, dialog queueing, idle reap and caps; latency measured with the real gentle-shell using only `get_state`-style no-model calls; `cargo fmt --check` and `cargo clippy` clean; commit and PR. Route: parent; commit:
+
+## Design notes
+
+Open decisions for the user, each with a recommendation:
+
+1. **Latency of starting a child is measured before anything is optimised.** Spawning a child per chat adds process start-up to the first open of a chat and to reopening a reaped one. T5 measures it with the real gentle-shell using only `get_state`-style calls (no model). Recommendation: measure first and optimise only if the number is felt in the window.
+2. **A warm standby child is a later optimisation.** A pre-spawned child that receives the session could hide the start-up cost. Recommendation: not now; only if the measurement in 1 hurts. It doubles the live processes and the orphan-guard surface, so it deserves its own batch.
+3. **Background chats stay alive (decided, L4/L5).** A chat that is working when another opens keeps working; opening a chat only changes the foreground. Consequence to keep in mind: the user can come back to a finished reply, and a pending extension dialog from a background chat is queued instead of being lost. Nothing in the UI may silently kill a working child.
+4. **Memory and process cost of several live children.** Each child is a Node process running gentle-shell: tens of MB of RSS each plus its own extension load, so N live children cost roughly N times the current footprint. Recommendation: accept it because the alternative (one shared child) is what kills the window, and bound it with the caps of 5.
+5. **Caps on live and working children (open decision).** Parallel model calls consume the usage limit faster: working chats are the expensive axis. Recommendation: default 4 live children and 2 simultaneously working chats, both configurable; over the working cap, queue the start instead of refusing it so no click is lost. Alternatives: no cap on live children (memory grows with the number of chats visited), or a cap of 1 working chat (loses the whole point of background work).
+6. **Idle reap (open decision, S7).** Recommendation: reap a child after a configurable idle time (proposal ~10 min without activity and without a running model call); the chat reopens through `--session`, so the cost of a reap is one start-up. Alternative: reap only under memory pressure, which is harder to observe reliably.
+7. **A chat whose stored cwd no longer exists.** `switch_session` fails in that case today; with `--session <path>` the child may fail to start for the same reason. Recommendation: treat a failed spawn as a spawn error on the death notice (S3) and let the user pick another chat, rather than leaving the window in the fatal state.
+8. **Report the extension bug upstream to gentle-pi.** Separate user decision. It is reproduced (see Log), so the report is unblocked, but it is not part of this batch and the gentle-desk side must not depend on it being fixed.
+
+Recorded uncertainties:
+
+- The link between `switch_session` and the crash is inferred from code reading, not proven by an isolated test: RPC `switch_session` alone did not reproduce it in 3 trials because the skill-registry timer did not fire there. The fix is chosen because it removes the trigger class (session replacement inside a live child), not because the mechanism is fully proven.
+- The reference behaviour is read from gentle-shell-desktop `ChatHost.ts:141-186` and `PiSession.ts:127-133,216-241`: one child per chat, `--session <path>`, no `switch_session`, and on child death an error whose next open/new spawns a fresh child. gentle-desk's S3 goes one step further by offering Restart.
+- Background children multiply the orphan risk: the existing single-child close path does not cover N children, so S5 has to be verified per child in T5, not only for the foreground one.
+
+## Log
+
+- L1: "la 3 explicame mejor, hace algo parecido a gentle-shell-desktop?"
+- L2: "si dale con eso, es lo mejor por ahora o tienes algo mejor y robusto?"
+- L3: parent answer — option 3 (two layers: one child per chat, plus a recoverable death notice) is the best now; warm standby is a later optimisation to be measured first.
+- L4: "con lo de s4 hay algo, si yo como usuario abro otro chat para trabajar algo nuevo alla pero quiero que el chat viejo siga trabajando y regresar a ver su respuesta cuando termine, eso es un proceso organico"
+- L5: parent answer — the stop-on-switch idea is replaced by a process manager that maps session -> child process: opening a chat makes it the foreground and leaves every other child running, so a chat that is working finishes in the background and its reply is there on return. S1, S2, S3, S4 and S5 are rewritten to that model, S7 (idle reap + caps) is added, and the tasks are re-cut accordingly. The upstream report stays a separate user decision.
+
+### Reproduction evidence (kept here as text, not as a path)
+
+Real window, gentle-shell 4.6.0 and 4.7.0, twice; observed lines:
+
+```text
+# changing chat in the window (OpenSession -> RPC switch_session)
+Notify: error: This extension ctx is stale after session replacement or reload
+UnhandledPromiseRejection  (gentle-pi/extensions/skill-registry.ts: timer/poll callback
+                            calls notify with a ctx captured at session_start)
+-> the child process exits
+UI: "gentle-shell exited"
+UI on every further send: "cannot reach gentle-shell: ... (os error 232)"
+```
+
+The same change over RPC `switch_session` alone was tried 3 times and did not reproduce: the
+skill-registry timer did not fire in those runs. Unhandled rejection ends Node, so a single stale
+`notify` is enough; the UI had no recovery path except restarting the app.
