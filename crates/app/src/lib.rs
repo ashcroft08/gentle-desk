@@ -57,6 +57,10 @@ fn fold(state: AppState, input: Input) -> (AppState, Effects) {
             event,
             now_ms,
         } => shared(chats::apply_event(state, chat, &event, Some(now_ms))),
+        Input::ChatFailed { chat, message } => {
+            (chats::failed(state, &chat, &message), Effects::default())
+        }
+        Input::ChatRekeyed { from, to } => (chats::rekeyed(state, &from, to), Effects::default()),
         Input::SessionsPrepared(prepared) => {
             let mut state = state;
             state.set_prepared(prepared);

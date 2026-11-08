@@ -95,7 +95,7 @@ fn assert_gone(pid: u32) {
 #[test]
 fn a_saved_chat_passes_its_session_on_the_command_line() {
     let dir = tempfile::tempdir().unwrap();
-    let mut host = real_host(dir.path());
+    let host = real_host(dir.path());
     let session = dir.path().join("session.jsonl");
 
     let (child, grandchild, argv) = open_and_read(&host, ChatKey::Saved(session.clone()));
@@ -113,7 +113,7 @@ fn a_saved_chat_passes_its_session_on_the_command_line() {
 #[test]
 fn a_new_chat_is_spawned_without_a_session() {
     let dir = tempfile::tempdir().unwrap();
-    let mut host = real_host(dir.path());
+    let host = real_host(dir.path());
 
     let (child, grandchild, argv) = open_and_read(&host, ChatKey::New(1));
 
@@ -126,7 +126,7 @@ fn a_new_chat_is_spawned_without_a_session() {
 #[test]
 fn shutdown_stops_every_child_and_its_descendants() {
     let dir = tempfile::tempdir().unwrap();
-    let mut host = real_host(dir.path());
+    let host = real_host(dir.path());
     let (child_a, grandchild_a, _) = open_and_read(&host, ChatKey::Saved(dir.path().join("a")));
     let (child_b, grandchild_b, _) = open_and_read(&host, ChatKey::Saved(dir.path().join("b")));
 

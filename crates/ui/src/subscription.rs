@@ -1,24 +1,35 @@
-//! What the app listens to: the child's output, the watcher's batches, the
-//! refresh timer, window close.
+//! What the app listens to: every child's tagged events, the watcher's batches,
+//! the refresh timer, window close.
 
 use std::hash::{Hash, Hasher};
 use std::sync::mpsc::Receiver;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use gentle_backend::process::ProcessEvent;
+use gentle_backend::chat_host::TaggedEvent;
 use iced::{stream, window, Subscription};
 
+use crate::chat_runtime::ChatRuntime;
+use crate::clock;
 use crate::message::Message;
 use crate::watch_source::{self, WatchSource};
 
-/// The output stream of the child, handed to the subscription once.
+/// The one stream every child's events arrive on, with the runtime that knows
+/// which chat each event belongs to. Handed to the subscription once.
 #[derive(Clone, Default)]
-pub struct EventSource(Arc<Mutex<Option<Receiver<ProcessEvent>>>>);
+pub struct EventSource(Arc<Mutex<Option<ChatEvents>>>);
+
+/// The receiver and the translator, which must travel together: translating an
+/// event needs the chat registry the runtime holds.
+struct ChatEvents {
+    runtime: Arc<ChatRuntime>,
+    events: Receiver<TaggedEvent>,
+}
 
 impl EventSource {
-    pub fn fill(&self, events: Receiver<ProcessEvent>) {
-        *self.0.lock().unwrap() = Some(events);
+    /// Hands over the tagged stream of every child and the runtime that reads it.
+    pub fn fill(&self, runtime: Arc<ChatRuntime>, events: Receiver<TaggedEvent>) {
+        *self.0.lock().unwrap() = Some(ChatEvents { runtime, events });
     }
 }
 
@@ -48,15 +59,21 @@ pub fn subscription(
 
 fn child_output(source: EventSource) -> Subscription<Message> {
     Subscription::run_with(source, |source| {
-        let receiver = source.0.lock().unwrap().take();
+        let chat_events = source.0.lock().unwrap().take();
         stream::channel(1024, async move |mut output| {
             use iced::futures::{executor::block_on, SinkExt};
-            let Some(receiver) = receiver else { return };
+            let Some(ChatEvents { runtime, events }) = chat_events else {
+                return;
+            };
             // A plain thread blocks on the std channel; `send` applies
             // backpressure instead of dropping events.
             std::thread::spawn(move || {
-                for event in receiver {
-                    if block_on(output.send(Message::Process(event))).is_err() {
+                for tagged in events {
+                    let converted = runtime.convert(tagged, clock::now_ms());
+                    let Some(converted) = converted else {
+                        continue; // a chat nobody knows, or a line we do not model
+                    };
+                    if block_on(output.send(Message::Chat(converted))).is_err() {
                         break;
                     }
                 }

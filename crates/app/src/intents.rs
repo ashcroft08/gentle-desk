@@ -10,14 +10,8 @@ use crate::state::{push_user_message, AppState};
 pub(crate) fn apply_intent(mut state: AppState, intent: Intent) -> (AppState, Effects) {
     // The intents that name a chat act on that chat's child; the rest act on the
     // single thread the one-child shell renders.
-    if let Some(chat_commands) = chats::apply_intent(&mut state, &intent) {
-        return (
-            state,
-            Effects {
-                commands: Vec::new(),
-                chat_commands,
-            },
-        );
+    if let Some(effects) = chats::apply_intent(&mut state, &intent) {
+        return (state, effects);
     }
     let (state, commands) = single_chat(state, intent);
     (
@@ -124,7 +118,7 @@ fn single_chat(mut state: AppState, intent: Intent) -> (AppState, Vec<Command>) 
     }
 }
 
-fn dialog_id(dialog: &Dialog) -> &str {
+pub(crate) fn dialog_id(dialog: &Dialog) -> &str {
     match dialog {
         Dialog::Select { id, .. }
         | Dialog::Confirm { id, .. }

@@ -17,10 +17,16 @@ use gentle_backend::chat_host::{ChatHost, TaggedEvent};
 
 use crate::chat_keys::ChatKeys;
 
-// `Converted` and `Outcome` are re-exported here once the shell consumes them
-// (m18 T2 step 2b-2).
 mod events;
 mod execute;
+mod host;
+mod open;
+mod rekey;
+
+pub use events::Converted;
+pub use execute::Outcome;
+pub use open::request_after_open;
+pub use rekey::session_file_of;
 
 /// The chat host plus the id/key registry that goes with it.
 pub struct ChatRuntime {

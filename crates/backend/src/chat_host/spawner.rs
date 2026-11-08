@@ -19,10 +19,12 @@ pub trait Spawner: Send + Sync {
     fn spawn(&self, key: &ChatKey) -> io::Result<Box<dyn Child>>;
 }
 
-/// Real children: one launcher for every chat, `--mode rpc` plus the session
-/// flag of the chat being started.
+/// Real children: one launcher for every chat, the forwarded arguments of the
+/// shell, `--mode rpc` plus the session flag of the chat being started.
 pub struct ProcessSpawner {
     launcher: Launcher,
+    /// Arguments every child gets before its own (e.g. `--isolated`).
+    args: Vec<OsString>,
     env: Vec<(OsString, OsString)>,
 }
 
@@ -50,18 +52,29 @@ impl ProcessSpawner {
     /// A spawner with an explicit child environment and working directory of
     /// `None` (the process inherits ours).
     pub fn with_env(launcher: Launcher, env: Vec<(OsString, OsString)>) -> Self {
-        Self { launcher, env }
+        Self {
+            launcher,
+            args: Vec::new(),
+            env,
+        }
     }
 
-    /// The options for one chat: `--session <path>` for a saved chat, nothing
-    /// for a new one. Never a session switch: the session is chosen at spawn.
+    /// The arguments every child of this spawner gets, before its own: the ones
+    /// the shell was started with, so `--isolated`, `--model` and friends reach
+    /// every chat.
+    pub fn with_args(mut self, args: Vec<OsString>) -> Self {
+        self.args = args;
+        self
+    }
+
+    /// The options for one chat: the forwarded arguments, then `--session
+    /// <path>` for a saved chat and nothing more for a new one. Never a session
+    /// switch: the session is chosen at spawn.
     pub fn options_for(&self, key: &ChatKey) -> SpawnOptions {
-        let args = match key {
-            ChatKey::Saved(path) => {
-                vec![OsString::from("--session"), path.clone().into_os_string()]
-            }
-            ChatKey::New(_) => Vec::new(),
-        };
+        let mut args = self.args.clone();
+        if let ChatKey::Saved(path) = key {
+            args.extend([OsString::from("--session"), path.clone().into_os_string()]);
+        }
         SpawnOptions {
             args,
             env: self.env.clone(),

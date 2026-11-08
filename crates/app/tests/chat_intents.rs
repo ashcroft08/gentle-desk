@@ -5,7 +5,7 @@ use gentle_app::{
     update, update_chats, AppState, ChatActivity, ChatCommand, ChatId, Command, Effects, Input,
     Intent,
 };
-use gentle_core::rpc::{RpcCommand, RpcEvent};
+use gentle_core::rpc::{RpcCommand, RpcEvent, UiAnswer, UiRequest};
 
 fn chat(name: &str) -> ChatId {
     ChatId::of_session(name)
@@ -164,4 +164,148 @@ fn with_no_foreground_chat_the_single_chat_path_still_answers() {
     );
     assert_eq!(state.chat.messages.len(), 1);
     assert!(state.chats.is_empty());
+}
+
+#[test]
+fn stopping_sends_an_abort_to_the_foreground_chat_and_nothing_else() {
+    let (state, _) = open(AppState::default(), &chat("a"));
+    let (state, _) = step(
+        state,
+        Input::ChatEvent {
+            chat: chat("a"),
+            event: RpcEvent::AgentStart,
+        },
+    );
+
+    let (_, effects) = step(state, Input::Intent(Intent::Abort));
+
+    assert_eq!(
+        effects.chat_commands,
+        vec![ChatCommand::Send {
+            chat: chat("a"),
+            rpc: RpcCommand::Abort,
+        }]
+    );
+    assert_eq!(effects.commands, Vec::new(), "not the single child");
+}
+
+#[test]
+fn copying_a_message_copies_it_from_the_foreground_chat() {
+    let (state, _) = open(AppState::default(), &chat("a"));
+    let (state, _) = step(state, Input::Intent(Intent::SendPrompt("hola".into())));
+
+    let (_, effects) = step(state, Input::Intent(Intent::CopyMessage("msg-0".into())));
+
+    assert_eq!(
+        effects.commands,
+        vec![Command::CopyToClipboard("hola".into())]
+    );
+    assert_eq!(effects.chat_commands, Vec::new());
+}
+
+#[test]
+fn a_dialog_is_answered_in_the_chat_that_raised_it() {
+    let (state, _) = open(AppState::default(), &chat("a"));
+    let (state, _) = step(
+        state,
+        Input::ChatEvent {
+            chat: chat("a"),
+            event: RpcEvent::UiRequest(UiRequest::Confirm {
+                id: "d1".into(),
+                title: "run?".into(),
+                message: "go on?".into(),
+                timeout: None,
+            }),
+        },
+    );
+
+    let (state, effects) = step(
+        state,
+        Input::Intent(Intent::AnswerDialog {
+            id: "d1".into(),
+            answer: UiAnswer::Confirmed(true),
+        }),
+    );
+
+    assert_eq!(
+        effects.chat_commands,
+        vec![ChatCommand::Send {
+            chat: chat("a"),
+            rpc: RpcCommand::UiResponse {
+                id: "d1".into(),
+                answer: UiAnswer::Confirmed(true),
+            },
+        }]
+    );
+    assert!(state.chats.dialogs(&chat("a")).is_empty());
+}
+
+#[test]
+fn another_chats_dialog_is_not_answered_from_the_foreground_chat() {
+    let (state, _) = open(AppState::default(), &chat("a"));
+    let (state, _) = step(
+        state,
+        Input::ChatEvent {
+            chat: chat("a"),
+            event: RpcEvent::UiRequest(UiRequest::Select {
+                id: "d1".into(),
+                title: "pick".into(),
+                options: vec!["one".into()],
+                timeout: None,
+            }),
+        },
+    );
+    let (state, _) = open(state, &chat("b"));
+
+    let (state, effects) = step(
+        state,
+        Input::Intent(Intent::AnswerDialog {
+            id: "d1".into(),
+            answer: UiAnswer::Value("one".into()),
+        }),
+    );
+
+    assert_eq!(effects.chat_commands, Vec::new(), "no child is asked");
+    assert_eq!(state.chats.dialogs(&chat("a")).len(), 1, "still waiting");
+}
+
+#[test]
+fn no_click_produces_a_switch_session_or_a_new_session() {
+    // S1: the session of a chat travels on the command line when its child is
+    // started. Nothing a click can produce replaces a live child's session.
+    let clicks = [
+        Input::Intent(Intent::OpenChat(chat("a"))),
+        Input::Intent(Intent::OpenNewChat),
+        Input::Intent(Intent::SendPrompt("hola".into())),
+        Input::Intent(Intent::Abort),
+    ];
+    let mut state = AppState::default();
+    for click in clicks {
+        let (next, effects) = step(state, click.clone());
+        assert_no_session_replacement(&click, &effects);
+        state = next;
+    }
+}
+
+fn assert_no_session_replacement(input: &Input, effects: &Effects) {
+    for command in &effects.chat_commands {
+        if let ChatCommand::Send { rpc, .. } = command {
+            assert_no_replacement(input, rpc);
+        }
+    }
+    for command in &effects.commands {
+        if let Command::Send(rpc) = command {
+            assert_no_replacement(input, rpc);
+        }
+    }
+}
+
+fn assert_no_replacement(input: &Input, rpc: &RpcCommand) {
+    assert!(
+        !matches!(
+            rpc,
+            RpcCommand::NewSession | RpcCommand::SwitchSession { .. }
+        ),
+        "{input:?} produced {rpc:?}"
+    );
 }

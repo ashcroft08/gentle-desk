@@ -36,6 +36,19 @@ impl ChatId {
     pub fn as_str(&self) -> &str {
         &self.0
     }
+
+    /// A short name for a notice or a log line: the file name of a stored
+    /// chat's session, or the id of a new chat. Never the whole path.
+    pub fn label(&self) -> String {
+        match self.session_path() {
+            Some(path) => path
+                .rsplit([char::from(47u8), char::from(92u8)]) // / and the backslash
+                .next()
+                .unwrap_or(path)
+                .to_owned(),
+            None => self.0.clone(),
+        }
+    }
 }
 
 static NEXT: AtomicU64 = AtomicU64::new(1);

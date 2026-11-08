@@ -72,6 +72,19 @@ pub enum Input {
         event: RpcEvent,
         now_ms: u64,
     },
+    /// A command for one chat's child did not reach it (it could not be started,
+    /// or its stdin was gone). A notice for that chat, never fatal for the whole
+    /// window: the other chats keep their children.
+    ChatFailed {
+        chat: ChatId,
+        message: String,
+    },
+    /// A new chat's child reported the session file it opened: the chat is the
+    /// stored chat from now on.
+    ChatRekeyed {
+        from: ChatId,
+        to: ChatId,
+    },
 }
 
 /// A side effect for the shell to run.
@@ -104,4 +117,13 @@ pub enum ChatCommand {
     OpenProcess { chat: ChatId },
     /// Route one RPC command to that chat's child and no other.
     Send { chat: ChatId, rpc: RpcCommand },
+}
+
+impl ChatCommand {
+    /// The chat this command is for.
+    pub fn chat(&self) -> &ChatId {
+        match self {
+            Self::OpenProcess { chat } | Self::Send { chat, .. } => chat,
+        }
+    }
 }

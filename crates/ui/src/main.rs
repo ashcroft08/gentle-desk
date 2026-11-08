@@ -6,16 +6,14 @@
 //! Layout: `app` (state and wiring), `view/` (one file per component),
 //! `message`, `subscription`, `backend` (startup), `refresh_flow` (which session
 //! refresh runs when) and its pure halves `refresh_queue` and `save_throttle`,
-//! plus the small pure helpers `thread_cache`, `sessions` and `cache_path`.
+//! `chat_runtime` (one child per chat, and the app's commands over it),
+//! `chat_keys` (the two names of one chat) and the small pure helpers
+//! `thread_cache`, `sessions` and `cache_path`.
 
 mod app;
 mod backend;
 mod cache_path;
-// Wired by the chat host dispatch (m18 T2 step 2b); until then only its tests use it.
-#[allow(dead_code)]
 mod chat_keys;
-// Wired by the chat host dispatch (m18 T2 step 2b-2); until then only its tests use it.
-#[allow(dead_code)]
 mod chat_runtime;
 mod clock;
 mod message;

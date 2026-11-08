@@ -2,14 +2,16 @@
 //! components together. Drawing lives in `view/`, process startup in
 //! `app/boot`, subscriptions in `subscription`, the session refresh flow (which
 //! pass runs when) in `refresh_flow`, and the messages of both in
-//! `app/process_update` and `app/sessions_update`.
+//! `app/sessions_update`, `app/chat_update` and `app/chat_command`.
 
-use gentle_app::{update, AppState, Command, Input, Intent};
-use gentle_backend::process::RpcProcess;
-use gentle_core::chat::Dialog;
+use std::sync::Arc;
+
+use gentle_app::{AppState, ChatId, Input, Intent};
+use gentle_core::chat::ChatState;
 use iced::widget::{column, row, scrollable};
-use iced::{clipboard, Element, Subscription, Task};
+use iced::{Element, Subscription, Task};
 
+use crate::chat_runtime::ChatRuntime;
 use crate::clock;
 use crate::message::Message;
 use crate::refresh_flow::Flow;
@@ -20,7 +22,9 @@ use crate::view::{
 };
 
 mod boot;
-mod process_update;
+mod chat_command;
+mod chat_update;
+mod dispatch;
 mod sessions_update;
 
 pub struct App {
@@ -28,61 +32,31 @@ pub struct App {
     cache: ThreadCache,
     input: String,
     dialog_text: String,
-    process: Option<RpcProcess>,
+    /// The chat host: one child per chat, shared with the event subscription and
+    /// with every command. `None` when gentle-shell could not be resolved.
+    chat: Option<Arc<ChatRuntime>>,
     events: EventSource,
     /// The session index, the watcher and the passes they run.
     flow: Flow,
     /// How far the chat list is scrolled, in pixels (window geometry, not app state).
     sidebar_offset: f32,
-    /// A failure that ends the session (launcher missing, child died).
+    /// A failure that ends the session (launcher missing, the foreground child died).
     fatal: Option<String>,
 }
 
 impl App {
-    /// Feeds an input to the app layer and runs the commands it returns.
-    fn dispatch(&mut self, input: Input) -> Task<Message> {
-        let dialog_before = self.app.chat.pending_dialogs.first().cloned();
-        let (state, commands) = update(std::mem::take(&mut self.app), input);
-        self.app = state;
-        self.cache.sync(&self.app.chat);
-        let mut tasks = Vec::new();
-        // A new text dialog takes the keyboard so the user can type at once.
-        let dialog_now = self.app.chat.pending_dialogs.first();
-        if dialog_now != dialog_before.as_ref()
-            && matches!(
-                dialog_now,
-                Some(Dialog::Input { .. } | Dialog::Editor { .. })
-            )
-        {
-            tasks.push(iced::widget::operation::focus(dialog::INPUT_ID));
-        }
-        for command in commands {
-            match command {
-                Command::Send(rpc) => {
-                    let sent = match &mut self.process {
-                        Some(process) => process.send(&rpc).map_err(|e| e.to_string()),
-                        None => Err("gentle-shell is not running".into()),
-                    };
-                    if let Err(error) = sent {
-                        self.fatal = Some(format!("cannot reach gentle-shell: {error}"));
-                    }
-                }
-                Command::CopyToClipboard(text) => tasks.push(clipboard::write(text)),
-                Command::RefreshSessions => tasks.push(self.flow.on_refresh_command()),
-            }
-        }
-        Task::batch(tasks)
-    }
-
     fn intent(&mut self, intent: Intent) -> Task<Message> {
         self.dispatch(Input::Intent(intent))
     }
 
     pub fn update(&mut self, message: Message) -> Task<Message> {
         match message {
-            Message::Process(event) => self.on_process(event),
-            Message::Header(header::Event::NewChat) => self.intent(Intent::NewChat),
-            Message::Sidebar(sidebar::Event::Open(path)) => self.intent(Intent::OpenSession(path)),
+            Message::Chat(converted) => self.on_chat(converted),
+            Message::ChatOutcome(outcome) => self.on_chat_outcome(outcome),
+            Message::Header(header::Event::NewChat) => self.intent(Intent::OpenNewChat),
+            Message::Sidebar(sidebar::Event::Open(path)) => {
+                self.intent(Intent::OpenChat(ChatId::of_session(&path)))
+            }
             Message::Sidebar(sidebar::Event::QueryChanged(query)) => {
                 // A new search starts from the top of its (shorter or longer) list.
                 self.sidebar_offset = 0.0;
@@ -124,6 +98,7 @@ impl App {
             Message::Helpers(helpers::Event::Select(id)) => self.intent(Intent::SelectHelper(id)),
             Message::HelperThread(helper_thread::Event::Back) => self.intent(Intent::CloseHelper),
             Message::Tick => self.on_tick(),
+            Message::ReapDone => Task::none(),
             Message::SessionsChanged(batch) => self.on_sessions_changed(batch),
             Message::WatcherLost => self.on_watcher_lost(),
             Message::SessionsRefreshed(result) => self.on_sessions_refreshed(result),
@@ -134,7 +109,10 @@ impl App {
 
     fn send_prompt(&mut self) -> Task<Message> {
         let prompt = std::mem::take(&mut self.input);
-        if prompt.trim().is_empty() || self.app.chat.working {
+        // One turn at a time, and only into a chat that has a child: before the
+        // first chat is open there is nowhere for the prompt to go.
+        let ready = self.app.chats.foreground().is_some() && !Self::visible_chat(&self.app).working;
+        if prompt.trim().is_empty() || !ready {
             self.input = prompt; // keep what the user typed
             return Task::none();
         }
@@ -146,7 +124,7 @@ impl App {
     }
 
     pub fn view(&self) -> Element<'_, Message> {
-        let chat = &self.app.chat;
+        let chat = Self::visible_chat(&self.app);
         let mut page = column![
             header::view().map(Message::Header),
             notices::view(&self.app.notices).map(Message::Notices),
@@ -166,7 +144,7 @@ impl App {
             total: self.app.sessions.len(),
             query: &self.app.session_query,
             list_status: self.app.list_status,
-            current: self.app.current_session.as_deref(),
+            current: self.current_session(),
             now_ms: clock::now_ms(),
             offset: self.sidebar_offset,
         });
@@ -183,5 +161,23 @@ impl App {
             layout = layout.push(helpers::view(&chat.helpers).map(Message::Helpers));
         }
         layout.into()
+    }
+
+    /// The chat the window shows: the foreground one of the per-chat shell, or
+    /// the empty single thread before the first chat is opened.
+    fn visible_chat(app: &AppState) -> &ChatState {
+        app.chats
+            .foreground()
+            .and_then(|chat| app.chats.state(chat))
+            .unwrap_or(&app.chat)
+    }
+
+    /// The session file the sidebar marks as open.
+    fn current_session(&self) -> Option<&str> {
+        self.app
+            .chats
+            .foreground()
+            .and_then(|chat| chat.session_path())
+            .or(self.app.current_session.as_deref())
     }
 }

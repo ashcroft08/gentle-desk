@@ -8,7 +8,7 @@
 
 use std::collections::BTreeMap;
 
-use gentle_core::chat::{reduce_chat_at, ChatState, Dialog};
+use gentle_core::chat::{messages_from_history, reduce_chat_at, ChatState, Dialog};
 use gentle_core::rpc::RpcEvent;
 
 use super::activity::{activity_of, ChatActivity};
@@ -144,6 +144,13 @@ impl Chats {
         match event {
             // A finished turn may have created or extended a session file.
             RpcEvent::AgentSettled => vec![Command::RefreshSessions],
+            // A stored chat's history arrives in one reply to `get_messages`.
+            RpcEvent::Response(response) => {
+                if let ("get_messages", Ok(data)) = (response.command.as_str(), &response.outcome) {
+                    entry.state.messages = messages_from_history(data);
+                }
+                Vec::new()
+            }
             _ => Vec::new(),
         }
     }

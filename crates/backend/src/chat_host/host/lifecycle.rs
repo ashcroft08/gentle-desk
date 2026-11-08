@@ -154,7 +154,10 @@ impl ChatHost {
     }
 
     /// Stops every child. `Drop` does the same, so no child outlives the host.
-    pub fn shutdown(&mut self) {
+    /// Takes `&self` because the map is behind a mutex: a shell that shares the
+    /// host (the event reader holds one reference too) can still close every
+    /// child before the window exits (S5).
+    pub fn shutdown(&self) {
         let slots: Vec<Slot> = {
             let mut state = self.state();
             state.foreground = None;

@@ -37,6 +37,31 @@ fn a_new_chat_carries_no_session_flag() {
 }
 
 #[test]
+fn forwarded_arguments_come_before_the_session_of_a_saved_chat() {
+    let spawner = spawner().with_args(vec![OsString::from("--isolated")]);
+    let saved = ChatKey::Saved(PathBuf::from("c:/home/sessions/a.jsonl"));
+
+    assert_eq!(
+        spawner.options_for(&saved).args,
+        vec![
+            OsString::from("--isolated"),
+            OsString::from("--session"),
+            OsString::from("c:/home/sessions/a.jsonl"),
+        ]
+    );
+}
+
+#[test]
+fn a_new_chat_still_carries_the_forwarded_arguments() {
+    let spawner = spawner().with_args(vec![OsString::from("--isolated")]);
+
+    assert_eq!(
+        spawner.options_for(&ChatKey::New(1)).args,
+        vec![OsString::from("--isolated")]
+    );
+}
+
+#[test]
 fn every_child_is_told_it_has_an_interactive_host() {
     let options = spawner().options_for(&ChatKey::New(1));
 

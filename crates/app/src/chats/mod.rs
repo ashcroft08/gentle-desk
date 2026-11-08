@@ -15,6 +15,7 @@
 
 mod activity;
 mod id;
+mod inputs;
 mod intents;
 mod store;
 
@@ -22,6 +23,7 @@ pub use activity::ChatActivity;
 pub use id::ChatId;
 pub use store::Chats;
 
+pub(crate) use inputs::{failed, rekeyed};
 pub(crate) use intents::apply as apply_intent;
 
 use gentle_core::rpc::RpcEvent;

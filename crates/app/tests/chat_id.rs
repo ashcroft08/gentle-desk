@@ -29,3 +29,11 @@ fn the_same_session_is_the_same_chat_and_a_fresh_one_never_equals_it() {
     assert_ne!(ChatId::of_session("a"), ChatId::of_session("b"));
     assert_ne!(ChatId::fresh(), ChatId::of_session("new-1"));
 }
+
+#[test]
+fn a_chat_is_labelled_by_its_session_file_or_its_own_id() {
+    assert_eq!(ChatId::of_session("C:/s/a.jsonl").label(), "a.jsonl");
+    assert_eq!(ChatId::of_session("C:/s/b.jsonl").label(), "b.jsonl");
+    assert_eq!(ChatId::of_session("p").label(), "p");
+    assert!(ChatId::fresh().label().starts_with("new-"));
+}

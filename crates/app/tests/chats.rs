@@ -2,7 +2,7 @@
 //! one chat, the activity the sidebar shows follows it, and nothing else moves.
 
 use gentle_app::{update_chats, AppState, ChatActivity, ChatId, Command, Input, Intent};
-use gentle_core::rpc::{RpcEvent, UiRequest};
+use gentle_core::rpc::{decode_line, Decoded, RpcEvent, UiRequest};
 
 fn chat(name: &str) -> ChatId {
     ChatId::of_session(name)
@@ -191,4 +191,44 @@ fn rekey_moves_the_chat_and_the_foreground_follows_it() {
     );
     assert!(state.chats.state(&fresh).is_none(), "the old id is gone");
     assert_eq!(state.chats.len(), 1);
+}
+
+#[test]
+fn the_history_of_a_stored_chat_fills_its_own_thread() {
+    const HISTORY: &str = r#"{"type":"response","command":"get_messages","success":true,"data":{"messages":[{"role":"system","content":""},{"role":"user","content":[{"type":"text","text":"hola"}]},{"role":"assistant","content":[{"type":"text","text":"ey"}]}]}}"#;
+    let Decoded::Event(history) = decode_line(HISTORY) else {
+        panic!("history is an event");
+    };
+
+    let (state, _) = apply(
+        AppState::default(),
+        vec![
+            open(&chat("a")),
+            open(&chat("b")),
+            event(&chat("a"), history),
+        ],
+    );
+
+    let texts: Vec<_> = state
+        .chats
+        .state(&chat("a"))
+        .expect("chat a")
+        .messages
+        .iter()
+        .map(|message| (message.role, message.text.as_str()))
+        .collect();
+    assert_eq!(
+        texts,
+        [
+            (gentle_core::chat::ChatRole::User, "hola"),
+            (gentle_core::chat::ChatRole::Assistant, "ey"),
+        ]
+    );
+    assert!(
+        state
+            .chats
+            .state(&chat("b"))
+            .is_none_or(|b| b.messages.is_empty()),
+        "the history belongs to one chat"
+    );
 }

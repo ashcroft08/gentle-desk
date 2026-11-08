@@ -8,22 +8,29 @@ use gentle_backend::chat_host::{
 use gentle_backend::process::ProcessEvent;
 use gentle_core::rpc::{Decoded, RpcCommand, RpcEvent};
 
-use super::events::Converted;
-use super::execute::Outcome;
-use super::ChatRuntime;
+use super::{ChatRuntime, Converted, Outcome};
 
+mod calls;
 mod fake;
+mod open_chat;
+mod rekey;
 use fake::FakeSpawner;
 
 fn runtime_with(limits: Limits) -> (ChatRuntime, Arc<FakeSpawner>) {
+    let (runtime, spawner, _clock) = runtime_with_clock(limits);
+    (runtime, spawner)
+}
+
+fn runtime_with_clock(limits: Limits) -> (ChatRuntime, Arc<FakeSpawner>, Arc<ManualClock>) {
     let spawner = Arc::new(FakeSpawner::default());
+    let clock = Arc::new(ManualClock::new());
     let host = ChatHost::with_parts(
         limits,
         Arc::clone(&spawner) as Arc<dyn Spawner>,
-        Arc::new(ManualClock::new()),
+        Arc::clone(&clock) as Arc<dyn gentle_backend::chat_host::Clock>,
     );
     let (runtime, _events) = ChatRuntime::new(host);
-    (runtime, spawner)
+    (runtime, spawner, clock)
 }
 
 fn runtime() -> (ChatRuntime, Arc<FakeSpawner>) {
