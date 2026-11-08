@@ -2,6 +2,8 @@
 
 use gentle_core::chat::ChatState;
 
+use crate::list_status::ListStatus;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NoticeLevel {
     Info,
@@ -53,6 +55,9 @@ pub struct AppState {
     pub(crate) search_keys: Vec<String>,
     /// Indices into `sessions` of the chats matching `session_query`.
     pub(crate) visible: Vec<usize>,
+    /// Whether `sessions` is the whole list or a partial read of the first pass.
+    /// The sidebar's empty state depends on it, so it starts `Loading`.
+    pub list_status: ListStatus,
     pub current_session: Option<String>,
     /// The helper whose thread is open in the panel, if any.
     pub selected_helper: Option<String>,

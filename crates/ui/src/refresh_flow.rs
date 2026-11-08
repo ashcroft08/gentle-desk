@@ -15,12 +15,13 @@ use std::time::Duration;
 use gentle_app::PreparedSessions;
 use gentle_backend::session_schedule;
 use gentle_backend::session_watch::{Batch, SessionWatcher};
+use iced::futures::StreamExt;
 use iced::Task;
 
 use crate::backend;
 use crate::message::Message;
 use crate::refresh_queue::RefreshQueue;
-use crate::session_refresh::{self, Refreshed, Shared};
+use crate::session_refresh::{self, Refreshed, Shared, Update};
 use crate::watch_source::WatchSource;
 
 /// The refresh state of a running window.
@@ -140,9 +141,13 @@ impl Flow {
         let Some(job) = self.queue.start_next() else {
             return Task::none();
         };
-        Task::perform(
-            session_refresh::run(job, shared),
-            Message::SessionsRefreshed,
+        // One stream per pass: the first full pass reports partial lists as it
+        // goes, and every pass ends with the item that settles the job.
+        Task::stream(
+            session_refresh::stream(job, shared).map(|update| match update {
+                Update::Progress(progress) => Message::SessionsProgress(progress),
+                Update::Refreshed(result) => Message::SessionsRefreshed(result),
+            }),
         )
     }
 

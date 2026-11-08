@@ -43,6 +43,14 @@ pub enum Input {
     /// The shell listed the sessions and built their search data off the UI
     /// thread, so `update` does not fold anything.
     SessionsPrepared(PreparedSessions),
+    /// The first full pass is still running: the same prepared list as
+    /// `SessionsPrepared`, read so far, plus how far the pass got. Ignored once
+    /// the final list has arrived.
+    SessionsProgress {
+        prepared: PreparedSessions,
+        done: usize,
+        total: usize,
+    },
 }
 
 /// A side effect for the shell to run.

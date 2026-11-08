@@ -15,10 +15,13 @@
 //! [`SessionIndex::refresh_paths`] applies the same per-file rules to the paths
 //! a file watcher reports, so keeping up with a busy home costs one `stat` per
 //! reported path instead of a pass over every session.
+//!
+//! [`SessionIndex::refresh_with_progress`] is that same full pass reporting how
+//! many files it has folded, so a caller can show what the cache already knows
+//! while a big home is still being read.
 
 use std::collections::{HashMap, HashSet};
 use std::fs;
-use std::io;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -28,9 +31,9 @@ use crate::session_snapshot::{join_mtime, split_mtime, FileSnapshot, IndexSnapsh
 
 mod disk;
 mod paths;
+mod progress;
 mod store;
 
-use disk::session_files;
 use paths::session_key;
 use store::{Cached, Update};
 
@@ -71,22 +74,6 @@ impl SessionIndex {
             sessions_dir: sessions_dir.into(),
             cache: HashMap::new(),
         }
-    }
-
-    /// Brings the cache in line with the disk. A missing sessions directory is
-    /// an empty list, not an error; an unreadable single file is skipped.
-    pub fn refresh(&mut self) -> io::Result<RefreshStats> {
-        let mut stats = RefreshStats::default();
-        let found = session_files(&self.sessions_dir)?;
-        stats.files = found.len();
-        let alive: HashSet<&PathBuf> = found.iter().collect();
-        let before = self.cache.len();
-        self.cache.retain(|path, _| alive.contains(path));
-        stats.removed = before - self.cache.len();
-        for path in &found {
-            self.update_file(path).count(&mut stats);
-        }
-        Ok(stats)
     }
 
     /// Brings the cache in line with just `paths`, as a file watcher reports
@@ -235,6 +222,9 @@ fn millis(time: SystemTime) -> u64 {
     time.duration_since(UNIX_EPOCH)
         .map_or(0, |d| d.as_millis() as u64)
 }
+
+#[cfg(test)]
+mod progress_tests;
 
 #[cfg(test)]
 mod refresh_paths_scope_tests;
