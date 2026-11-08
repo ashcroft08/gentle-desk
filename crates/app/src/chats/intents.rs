@@ -10,6 +10,7 @@ use super::ChatId;
 use crate::chats::push_death_notice;
 use crate::input::{ChatCommand, Command, Effects, Intent};
 use crate::intents::dialog_id;
+use crate::notices::drop_restart_notice;
 use crate::state::{push_user_message, AppState};
 
 /// Applies `intent` if it belongs to the per-chat model, answering the effects
@@ -50,6 +51,7 @@ fn for_shell(commands: Vec<Command>) -> Effects {
 /// It is also the whole of a restart: opening a chat clears the death mark, and
 /// the host starts a fresh child for it through `--session` (S3).
 fn open(state: &mut AppState, chat: ChatId) -> Vec<ChatCommand> {
+    drop_restart_notice(state, &chat);
     state.chats.open(chat.clone());
     vec![ChatCommand::OpenProcess { chat }]
 }
