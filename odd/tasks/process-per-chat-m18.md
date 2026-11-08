@@ -217,8 +217,163 @@ Odds and ends:
   a fresh child. D only asserts what this batch promises — the window stays
   responsive and the other chats are untouched — not the T3 notice.
 
+## Latency and stored-cwd measurement (T5a)
+
+Real gentle-shell (global install, `gentle-pi\bin\gentle-shell.mjs`), spawned exactly as
+the app does: `node …gentle-shell.mjs --mode rpc --home <home> [--session <path>]` with
+`GENTLE_SHELL_INTERACTIVE_HOST=1`, cwd = the gentle-desk repo. Scratch home in a
+`mktemp -d` outside the repo, populated with `node tools/perf/gen-home.mjs <dir>/home 6 4`
+(6 sessions); every header's `cwd` was rewritten to `C:/Users/josep/dev/gentle-desk`
+except one session kept at the generator's `C:/dev/proj5` (which does not exist).
+Only no-model calls were sent, read-only: `get_state` right after spawn and
+`get_messages` right after the state reply. Every spawned tree was killed after its
+trial; a final sweep found 0 leftover gentle-shell processes.
+
+Times are milliseconds from `spawn` to the first stdout line / the `get_state` reply /
+the `get_messages` reply. `extension_ui_request` events from extensions arrive at start
+before the replies; they were not answered and did not delay the replies.
+
+| trial | first stdout | `get_state` | `get_messages` |
+|---|---|---|---|
+| A1 stored chat, existing cwd (cold — first spawn of the run) | 3222 | 3824 | 3825 |
+| A2 same session, new process (warm) | 2599 | 3190 | 3190 |
+| A3 same session, new process (warm) | 2889 | 3557 | 3557 |
+| A4 same session, new process (warm) | 2263 | 2883 | 2883 |
+| A5 same session, new process (warm) | 2231 | 2842 | 2842 |
+| B new chat (`--home` without `--session`) | 2068 | 2641 | 2642 |
+
+- Warm median `get_state`: **3036 ms** (A2–A5 sorted: 2842, 2883, 3190, 3557; the two
+  middle values average to 3036). Warm max: **3557 ms**. Cold: 3824 ms.
+- Memory: working set of one child (stored session, existing cwd) **≈ 64 MB**
+  (65152 KB) a few seconds after spawn; the child's tree carried **1 extra node
+  process** beside the gentle-shell process itself. After a hard kill,
+  **0 node processes** of the tree remained (checked twice).
+
+**Verdict (design note 1/2):** a warm median of ~3.0 s (max ~3.6 s) is above the
+guideline of ~2 s, so the rule "optimise only if the number is felt in the window"
+triggers: **a warm standby child is justified only if the warm median is above about
+2 s, and it is** — per this run, the standby is justified, still as a later batch of
+its own (design note 2's doubles-the-surface caveat stands).
+
+**Stored cwd missing (trial C, design note 7, session with `cwd: C:/dev/proj5`):**
+the child did **not** start and did **not** hang: it emitted **no stdout at all** and
+exited with **code 1 after 354 ms**. Its stderr ends with:
+
+```text
+Stored session working directory does not exist: C:\dev\proj5
+Session file: <path to the session .jsonl>
+Current working directory: C:\Users\josep\dev\gentle-desk
+```
+
+It is a clean, fast, reported failure — never a crash and never a silent dead-end.
+What the app should do: treat it exactly as S3's spawn-error death — keep the chat
+marked ended, show the recoverable notice with a **Restart** action (already built
+in T3), and surface the shell's stderr line ("Stored session working directory does
+not exist: …") to the user as the notice detail, plus one concrete suggestion: pick
+another chat. The chat's other children and the window must stay untouched; a
+retry stays possible by clicking the chat again (the failed-remains-recoverable
+behaviour T3 already chose).
+
+- The stderr of every spawn also carried two harmless lines: gentle-shell's
+  "already has content and was not set up … run `--home setup`" notice (the
+  scratch home was provisioned with `gentle-shell --home … setup` and this
+  reminder persisted) and a codemode duplicate-tool warning. Neither blocked
+  anything; both are worth remembering when the app parses child stderr.
+
+## What the opening state and the exit reason changed
+
+Implements T3 (S3) plus the two small fixes T5a's measurement asked for, user decision
+"Motivo del fallo + abriendo…": the app keeps a record of why a child died and shows a state while
+a child is starting. Test-first: RED observed as compile failures for the new inputs
+(`ChatActivity::Opening`, `Input::ChatStderr`), then implementation, then every existing test held
+or was updated only where the new behaviour forced it.
+
+- **The death notice says why (S3, T5a trial C).** The app keeps, per chat, a bounded ring of the
+  last 3 non-empty stderr lines that chat's child printed (`Input::ChatStderr { chat, line }`,
+  folded in `crates/app/src/chats/inputs.rs`; the ring is a field of the chat's entry in
+  `crates/app/src/chats/store.rs`, capped at 3 lines and 200 characters per line, never unbounded).
+  The UI forwards every child stderr line to it in addition to the `eprintln` it already did
+  (`crates/ui/src/app/chat_update.rs`). On an unexpected `Input::ChatClosed` the death notice reads
+  `<label>: the child that runs this chat exited (<lines joined with " · ">). Restart to keep talking.`
+  and keeps the old text when the ring is empty. One row per chat death still holds (dedup by
+  level+text unchanged: the same stderr twice is still one row), `drop_restart_notice` removes it on
+  restart, and a fresh child starts with a clean ring (the old child's complaint is not the new
+  child's reason). A stored-cwd failure therefore arrives exactly as T5a asked: the S3 notice plus
+  "Stored session working directory does not exist: C:/dev/proj5" as its detail, the other chats and
+  the window untouched, Retry possible by clicking the chat or taking the Restart.
+- **An opening state.** New `ChatActivity::Opening`, ordered Ended > NeedsAttention > Working >
+  Queued > Opening > FinishedUnread > Idle (chosen: Opening is "between a click and a live child",
+  so it yields to every state that implies an answerable process and beats only a finished-unread
+  mark and idle). It is set exactly when `Intent::OpenChat` / `OpenNewChat` / `RestartChat` emits
+  `ChatCommand::OpenProcess` (`crates/app/src/chats/intents.rs`), and cleared by
+  `Input::ChatOpened { chat }`, which the UI sends on every `Outcome::Opened` — a fresh start or an
+  `Existing` focus-only open clears at once — and by `Input::ChatFailed` (the `OpenFailed` path),
+  and also on `Input::ChatClosed`, so it can never stick. A chat that is Opening refuses SendPrompt
+  exactly like a working or queued one: the prompt is kept in the composer and nothing is appended
+  to the thread. The thread area shows a plain line "Opening chat…" above the messages while the
+  foreground chat is Opening (`crates/ui/src/app/frame.rs`), and the sidebar badge is `◌` in the
+  muted colour — different from Queued's `…`, unit-tested to fit `TITLE_ROOM`
+  (`crates/ui/src/view/sidebar/badge.rs`).
+- Decision recorded with the change: while a chat is Opening the composer shows a disabled
+  **Send**, not the Stop a busy chat shows — the refusal is exactly the queued/working one, but a
+  Stop would abort against a child that is not up yet and produce a `ChatFailed` noise notice.
+- Tests: new `crates/app/tests/chat_opening.rs` (10 tests: set on open, cleared by ChatOpened and
+  by ChatFailed, the existing-focus reopen clearing at once, the refused prompt, a death while
+  opening showing Ended with its Restart, a host stop while opening returning to Idle, working
+  outranking Opening, the new chat's rekey carrying the phase) and `crates/app/tests/chat_stderr.rs`
+  (9 tests: the reason in the notice, the old text without stderr, blank lines are no reason, the
+  3-line/200-character ring, the expected stop silent, no leaking between chats, the clean ring of
+  a fresh child, same-reason dedup).
+- Existing tests updated only where the new behaviour forces it: the helpers of
+  `crates/app/tests/chats.rs`, `session_activity.rs`, `chat_working_cap.rs` and the composer test in
+  `crates/ui/src/app/visible.rs` now fold `Input::ChatOpened` after an open intent (what the real UI
+  sends the moment the host answers); the two restart/reopen assertions of `chat_death.rs` now read
+  `Opening` right after the intent and `Idle` after the confirmation; `chat_intents.rs` gains the
+  same confirmation before the prompt-acceptance paths; and `chat_failures.rs` compares the thread
+  rather than the whole entry after a failed command, because `ChatFailed` now clears the transient
+  opening mark. Every other existing test is untouched and green.
+
 ## Log
 
+- L10 (T5a follow-up, user decision, reported defect in the real window): the `Opening chat…`
+  state and the `◌` badge never showed. Cause: `crates/ui/src/app/chat_command.rs` sent
+  `Input::ChatOpened` the moment `ChatHost::open` returned — a fresh child is *created* in
+  milliseconds (T5a), while the real gentle-shell prints its first line after ~2.2 s and answers
+  after a warm median of ~3.0 s, so the chat was cleared to Idle long before its child could say
+  anything and the user saw "nothing happens". Fix, test-first (RED observed): for
+  `Outcome::Opened { how: Started }` the UI no longer confirms at once — the opening phase ends
+  with the chat's **own first decoded event** (`Chats::apply` now clears the mark before folding
+  any event of an Opening chat, `crates/app/src/chats/apply.rs`), because that is the actual proof
+  the child is alive. `Existing` and `Discarded` keep the at-once confirmation (focus-only opens
+  are instant), `ChatFailed` still clears, `ChatClosed` still clears. The follow-up requests of an
+  `Started` open (`get_messages` / `get_state`) are still sent the moment the host answers, as
+  today, written to the pipe before the child answers. Safety net: the UI schedules a 20 s task
+  (`opening_net` in `chat_command.rs`, a background thread sleeping 20 s that delivers
+  `Input::ChatOpened`, same blocking style as the existing `execute` task) so a child that starts
+  but never speaks cannot leave its chat Opening forever; 20 s covers the measured ~3.6 s warm max
+  with a wide margin, and `ChatOpened` stays idempotent (clearing an already-clear chat changes
+  nothing, so a child that already spoke is untouched by the net). Also (same window defect): the
+  joined stderr reason of the death notice is capped at 240 characters, cut at a character
+  boundary and closed with `…` — a first line that fits is kept whole, only the tail is lost
+  (`cap_reason` in `crates/app/src/chats/inputs.rs`). Tests: new `crates/app/tests/
+  chat_opening_ready.rs` (5 tests: stderr while starting is not life; the first own event ends the
+  phase; the 20 s confirmation clears and is idempotent; a prompt refused while Opening and
+  accepted after the first event; a confirmation without a first event never sticks) and two cap
+  tests in `chat_stderr.rs` (a 3-line reason is capped at 240 + `…` with the first line whole; a
+  fitting reason is never ellipsised). No existing test contradicts the new rule; none needed
+  changes (the existing `chat_opening.rs` cases keep passing: they fold `ChatOpened` after an
+  intent, which the UI still does for `Existing`/`Discarded` and for the net). This entry
+  supersedes the one sentence above about the UI sending `ChatOpened` "on every `Outcome::Opened`".
+  S numbers covered: S3 (death notice reason, and the opening state's real-observable behaviour),
+  T5a latency decision context (the opening state must survive the measured ~3 s start).
+  Verification: `cargo test --workspace`: the only failures in-repo are the 6 `gentle-term`
+  `end_to_end` spawn cases — reproduced with `os error 5/2` at `Command::spawn` and the binary
+  `target/debug/gentle-term.exe` disappearing during the run; the byte-identical HEAD commit
+  checked out in a scratch clone passes the whole workspace suite with exit 0, so it is an
+  environment artefact of this checkout (real-time scanner / sandbox), not of the change — every
+  other suite ok. `cargo fmt --all --check` clean, `cargo clippy --workspace --all-targets --
+  -D warnings` clean, `cargo build --release -p gentle-ui` ok; real window not driven (out of
+  scope for this worker).
 - L7 (S7, T4 working cap, user decision "Ponerlo en cola"): the app enforces the working
   cap now. `Input::SetWorkingCap` passes the host's `Limits::max_working` at boot (`0` means
   no cap), and a prompt to an idle foreground chat with no slot free is **queued**, never lost
@@ -237,7 +392,19 @@ Odds and ends:
 - L6: "native review of T1 approved (lenses resilience+reliability, reviewers ran on
   commandcode/deepseek-v4.1-flash, total cost ~US$0.05); advisory findings recorded as
   follow-ups".
-
+- L8: "T5a latency + stored-cwd measurement done (gentle-shell subprocess, real code, no model):
+  get_state to open a stored chat ~2.8–3.6 s (warm median 3036 ms, cold 3824 ms), new chat
+  2641 ms; warm standby exceeds the ~2 s trigger, so it is justified as a later batch. A stored
+  cwd that no longer exists fails fast and cleanly: exit code 1 at 354 ms, no stdout, an explicit
+  'Stored session working directory does not exist' stderr — the app should route it to the S3
+  notice instead of a crash."
+- L9 (T3 + T5a follow-up, user decision "Motivo del fallo + abriendo…"): the death notice now says
+  why (bounded 3×200 stderr ring per chat, `Input::ChatStderr`, joined with " · ") and a chat whose
+  child is starting shows `ChatActivity::Opening` (badge `◌`, muted; thread line "Opening chat…";
+  composer disabled with the prompt kept) until the host's answer arrives as `Input::ChatOpened`
+  or `Input::ChatFailed`. Verification: `cargo test --workspace` (all suites ok),
+  `cargo fmt --all --check` clean, `cargo clippy --workspace --all-targets -- -D warnings` clean,
+  `cargo build --release -p gentle-ui` ok; real window not driven (out of scope for this worker).
 ### Reproduction evidence (kept here as text, not as a path)
 
 Real window, gentle-shell 4.6.0 and 4.7.0, twice; observed lines:

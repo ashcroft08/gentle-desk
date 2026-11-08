@@ -37,9 +37,18 @@ fn event(path: &str, event: RpcEvent) -> Input {
 }
 
 fn opened(state: AppState, path: &str) -> AppState {
-    update_chats(
+    // The real UI sends `ChatOpened` the moment the host answers an open, so
+    // the opening phase is over from the next step on. The opening phase
+    // itself is `chat_opening.rs`'s job.
+    let (state, _) = update_chats(
         state,
         Input::Intent(Intent::OpenChat(ChatId::of_session(path))),
+    );
+    update_chats(
+        state,
+        Input::ChatOpened {
+            chat: ChatId::of_session(path),
+        },
     )
     .0
 }

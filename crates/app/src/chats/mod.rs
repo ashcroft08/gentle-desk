@@ -27,7 +27,7 @@ pub use activity::ChatActivity;
 pub use id::ChatId;
 pub use store::Chats;
 
-pub(crate) use inputs::{closed, failed, push_death_notice, rekeyed};
+pub(crate) use inputs::{closed, failed, push_death_notice, rekeyed, stderr};
 pub(crate) use intents::apply as apply_intent;
 
 use gentle_core::rpc::RpcEvent;
@@ -38,6 +38,16 @@ use crate::state::AppState;
 /// Applies the boot's working cap for every chat at once (S7).
 pub(crate) fn set_working_cap(state: &mut AppState, cap: usize) {
     queue::set_cap(&mut state.chats, cap);
+}
+
+/// Records that the chat's child is up: the opening phase is over. For a
+/// fresh child, the UI sends this only through the 20 s net for a child that
+/// started but never speaks (its first event already clears the fold); an
+/// already-live chat or a discarded start is confirmed at once, because no one
+/// is waiting for the child any more.
+pub(crate) fn opened(mut state: AppState, chat: &ChatId) -> AppState {
+    state.chats.clear_opening(chat);
+    state
 }
 
 /// Routes one chat's event to that chat and nothing else.

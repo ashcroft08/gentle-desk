@@ -17,7 +17,12 @@ fn chat(name: &str) -> ChatId {
 }
 
 fn open(state: AppState, chat: &ChatId) -> (AppState, Effects) {
-    update_chats(state, Input::Intent(Intent::OpenChat(chat.clone())))
+    // The real UI sends `ChatOpened` the moment the host answers an open
+    // (fresh start or already-live child), and these chats have live children:
+    // asking a prompt to a chat still starting is refused, which is the
+    // job of `chat_opening.rs`, not of the cap tests.
+    let (state, _) = update_chats(state, Input::Intent(Intent::OpenChat(chat.clone())));
+    update_chats(state, Input::ChatOpened { chat: chat.clone() })
 }
 
 fn prompt(state: AppState, text: &str) -> (AppState, Effects) {

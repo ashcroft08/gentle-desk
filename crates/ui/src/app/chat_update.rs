@@ -15,7 +15,9 @@ impl App {
             Converted::Input(input) => self.on_chat_input(input),
             Converted::Stderr { chat, line } => {
                 eprintln!("[{}] {line}", chat.label());
-                Task::none()
+                // The app keeps the last lines per chat (bounded) so a death
+                // notice can say why the child died (S3).
+                self.dispatch(Input::ChatStderr { chat, line })
             }
             Converted::Closed { chat, expected } => self.on_chat_closed(chat, expected),
         }

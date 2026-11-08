@@ -67,6 +67,10 @@ fn fold(state: AppState, input: Input) -> (AppState, Effects) {
         }
         Input::ChatRekeyed { from, to } => (chats::rekeyed(state, &from, to), Effects::default()),
         Input::ChatClosed { chat, expected } => chats::closed(state, &chat, expected),
+        Input::ChatStderr { chat, line } => {
+            (chats::stderr(state, &chat, &line), Effects::default())
+        }
+        Input::ChatOpened { chat } => (chats::opened(state, &chat), Effects::default()),
         Input::SessionsPrepared(prepared) => {
             let mut state = state;
             state.set_prepared(prepared);

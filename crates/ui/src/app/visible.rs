@@ -31,15 +31,24 @@ pub(super) fn queued(app: &AppState) -> bool {
         .is_some_and(|chat| app.chats.is_queued(chat))
 }
 
+/// Whether a child is being started for the chat the window shows: the click
+/// was seen and its start takes seconds.
+pub(super) fn opening(app: &AppState) -> bool {
+    app.chats
+        .foreground()
+        .is_some_and(|chat| app.chats.is_opening(chat))
+}
+
 /// Whether the composer may send that text right now.
 ///
 /// Disabled for a failure that ends everything (gentle-shell could not be
 /// resolved), for a chat whose child died: there is nowhere for the prompt to
-/// go, and the notice beside it carries the Restart, and for a chat that
-/// already has a turn running or queued (S7). Nothing else disables it, so
-/// one death never takes the other chats with it.
+/// go, and the notice beside it carries the Restart, for a chat whose child is
+/// still coming up (the prompt is kept until it can be sent), and for a chat
+/// that already has a turn running or queued (S7). Nothing else disables it,
+/// so one death never takes the other chats with it.
 pub(super) fn can_send(app: &AppState, input: &str, fatal: bool) -> bool {
-    !input.trim().is_empty() && !fatal && !ended(app) && !chat_busy(app)
+    !input.trim().is_empty() && !fatal && !ended(app) && !opening(app) && !chat_busy(app)
 }
 
 /// Whether the chat on screen cannot take a prompt: it works or it queues.
@@ -79,6 +88,15 @@ mod tests {
         let (state, _) = update_chats(
             state,
             Input::Intent(Intent::OpenChat(ChatId::of_session("b"))),
+        );
+        // The real UI confirms the child is up at once for a chat the host
+        // answers Existing to; here chat b's child is already up (a holds the
+        // only working slot).
+        let (state, _) = update_chats(
+            state,
+            Input::ChatOpened {
+                chat: ChatId::of_session("b"),
+            },
         );
         let (state, _) = update_chats(state, Input::Intent(Intent::SendPrompt("hola".into())));
         state

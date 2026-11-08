@@ -9,8 +9,9 @@ use super::{queue, ChatId};
 impl Chats {
     /// Makes `chat` the foreground one and clears its finished-unread mark,
     /// creating it empty if this is the first it is heard of. Opening a chat also
-    /// clears a death: the caller asks the host for its child, which starts a
-    /// fresh one through `--session` (S3). No other chat changes.
+    /// clears a death and the stderr the old child left: the caller asks the host
+    /// for its child, which starts a fresh one through `--session` (S3). No other
+    /// chat changes.
     pub fn open(&mut self, chat: ChatId) -> &mut ChatState {
         let previous = self.foreground.replace(chat.clone());
         let left = previous.filter(|previous| previous != &chat);
@@ -19,16 +20,21 @@ impl Chats {
         }
         let entry = self.entries.entry(chat).or_default();
         entry.ended = false;
+        entry.stderr.clear();
         entry.refresh(true);
         &mut entry.state
     }
 
-    /// Records that `chat`'s child died: it runs nothing until it is restarted.
-    /// The chat keeps its thread, its place and its foreground mark.
-    pub(crate) fn ended_now(&mut self, chat: &ChatId) {
+    /// Marks that a child is being started for `chat` right now: the chat asked
+    /// for one and the start takes seconds. Cleared when the chat's own first
+    /// event proves its child is alive, when the child is confirmed up (for a
+    /// fresh child only through the 20 s net, see
+    /// [`Input::ChatOpened`](crate::Input::ChatOpened)), its start fails
+    /// ([`Input::ChatFailed`](crate::Input::ChatFailed)) or its child goes away.
+    pub(crate) fn mark_opening(&mut self, chat: &ChatId) {
         let foreground = self.foreground.as_ref() == Some(chat);
         let entry = self.entries.entry(chat.clone()).or_default();
-        entry.ended = true;
+        entry.opening = true;
         entry.refresh(foreground);
     }
 
@@ -40,6 +46,29 @@ impl Chats {
             return;
         };
         entry.ended = false;
+        entry.refresh(foreground);
+    }
+
+    /// Records that the opening phase of `chat` is over, whatever ended it: the
+    /// chat spoke (any of its own events — [`Chats::apply`](super::store::Chats)
+    /// calls this before it folds), the child is up, its start failed, or the
+    /// child went away while it was being started. So the mark never sticks.
+    /// Clearing a chat that is not Opening changes nothing.
+    pub(crate) fn clear_opening(&mut self, chat: &ChatId) {
+        let foreground = self.foreground.as_ref() == Some(chat);
+        let Some(entry) = self.entries.get_mut(chat) else {
+            return;
+        };
+        entry.opening = false;
+        entry.refresh(foreground);
+    }
+
+    /// Records that `chat`'s child died: it runs nothing until it is restarted.
+    /// The chat keeps its thread, its place and its foreground mark.
+    pub(crate) fn ended_now(&mut self, chat: &ChatId) {
+        let foreground = self.foreground.as_ref() == Some(chat);
+        let entry = self.entries.entry(chat.clone()).or_default();
+        entry.ended = true;
         entry.refresh(foreground);
     }
 

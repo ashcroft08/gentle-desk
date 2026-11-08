@@ -20,6 +20,11 @@ impl Chats {
         event: &RpcEvent,
         now_ms: Option<u64>,
     ) -> (Vec<Command>, Vec<ChatCommand>) {
+        // The chat's own decoded event is the proof its child is alive: whatever
+        // end of the opening phase awaits (`ChatOpened` at once, the 20 s net,
+        // the first request's reply), any event of this chat means it already
+        // tells the user something. Cleared here so the phase cannot stick.
+        self.clear_opening(chat);
         let foreground = self.foreground.as_ref() == Some(chat);
         // Read before the reduce: only a turn that was really running freed a
         // slot; end events of an idle chat free nothing.

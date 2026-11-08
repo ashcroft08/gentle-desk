@@ -64,9 +64,16 @@ fn for_shell(commands: Vec<Command>) -> Effects {
 /// `switch_session` or `new_session`: the session travels on the command line.
 /// It is also the whole of a restart: opening a chat clears the death mark, and
 /// the host starts a fresh child for it through `--session` (S3).
+///
+/// Until the host answers, the chat is [`ChatActivity::Opening`]: the click is
+/// seen and nothing can be sent there yet. A fresh child's first event (and, as
+/// the net for a child that never speaks, the UI's 20 s confirmation) clears it,
+/// and a failed start through `Input::ChatFailed`; an already-live child is
+/// confirmed at once. So the state never sticks.
 fn open(state: &mut AppState, chat: ChatId) -> Vec<ChatCommand> {
     drop_restart_notice(state, &chat);
     state.chats.open(chat.clone());
+    state.chats.mark_opening(&chat);
     vec![ChatCommand::OpenProcess { chat }]
 }
 
@@ -100,6 +107,11 @@ fn send_prompt(state: &mut AppState, text: &str) -> Option<Vec<ChatCommand>> {
     }
     if state.chats.is_ended(&chat) {
         push_death_notice(state, &chat);
+        return Some(Vec::new());
+    }
+    // A chat whose child is coming up takes no prompt (composer disabled, prompt
+    // kept): there is nothing to write to yet, exactly like working or queued.
+    if state.chats.is_opening(&chat) {
         return Some(Vec::new());
     }
     if state.chats.is_working(&chat) || state.chats.is_queued(&chat) {

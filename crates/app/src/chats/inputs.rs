@@ -1,5 +1,6 @@
 //! Inputs about one chat that are not events from its child: a command that did
-//! not reach it, the session file a new chat learned, and its child going away.
+//! not reach it, the stderr its child printed, the session file a new chat
+//! learned, and its child going away.
 
 use crate::chats::{queue, ChatId};
 use crate::input::Effects;
@@ -8,8 +9,10 @@ use crate::state::{AppState, NoticeAction, NoticeLevel};
 
 /// A per-chat command failed: an error notice naming the chat, and nothing else
 /// changes. The chat keeps its thread and its place, and the other children are
-/// untouched.
+/// untouched. Whether it was a failed start or a failed send, the chat's opening
+/// phase is over, so the opening mark never sticks.
 pub(crate) fn failed(mut state: AppState, chat: &ChatId, message: &str) -> AppState {
+    state.chats.clear_opening(chat);
     push_notice(
         &mut state,
         NoticeLevel::Error,
@@ -37,6 +40,8 @@ pub(crate) fn closed(mut state: AppState, chat: &ChatId, expected: bool) -> (App
     // A working chat whose child goes away frees the slot it held, whatever
     // stopped the child: both an expected stop and a death free it.
     let freed = state.chats.stop_working(chat);
+    // The opening phase was for a child that is now gone, whatever stopped it.
+    state.chats.clear_opening(chat);
     if expected {
         state.chats.clear_ended(chat);
     } else {
@@ -62,15 +67,50 @@ pub(crate) fn closed(mut state: AppState, chat: &ChatId, expected: bool) -> (App
 
 /// The one notice a death leaves. Extensions repeat themselves, so the notice is
 /// deduplicated by text: a chat that dies twice shows one row, and that row still
-/// carries the Restart.
+/// carries the Restart. The last stderr lines the child left, if any, are the
+/// reason, so the user learns why it died (a stored working directory that is
+/// gone says so, for instance). The reason is capped at 240 characters so three
+/// lines of stderr do not make a wall of text: the joined reason is cut at a
+/// character boundary and closed with `…`, losing only its tail.
 pub(crate) fn push_death_notice(state: &mut AppState, chat: &ChatId) {
-    push_action_notice(
-        state,
-        NoticeLevel::Error,
+    let reason = cap_reason(state.chats.stderr_of(chat).join(" · "));
+    let text = if reason.is_empty() {
         format!(
             "{}: the child that runs this chat exited. Restart to keep talking.",
             chat.label()
-        ),
+        )
+    } else {
+        format!(
+            "{}: the child that runs this chat exited ({}). Restart to keep talking.",
+            chat.label(),
+            reason
+        )
+    };
+    push_action_notice(
+        state,
+        NoticeLevel::Error,
+        text,
         NoticeAction::RestartChat(chat.clone()),
     );
+}
+
+/// Caps the joined reason at 240 characters (the ellipsis not included). Each
+/// line of the ring is at most 200 characters, so a first line that alone fits
+/// is never cut; a cut inside the joined reason lands after whole characters.
+fn cap_reason(reason: String) -> String {
+    const REASON_CAP: usize = 240;
+    if reason.chars().count() <= REASON_CAP {
+        return reason;
+    }
+    let mut capped: String = reason.chars().take(REASON_CAP).collect();
+    capped.push('…');
+    capped
+}
+
+/// Keeps one stderr line of that chat's child in its bounded ring (S3): the
+/// reason a death notice reports, if the child ever dies. It is not a notice
+/// while the child is alive.
+pub(crate) fn stderr(mut state: AppState, chat: &ChatId, line: &str) -> AppState {
+    state.chats.record_stderr(chat, line);
+    state
 }
