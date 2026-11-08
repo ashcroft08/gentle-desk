@@ -6,7 +6,7 @@ use super::*;
 use iced::futures::executor::block_on;
 use iced::futures::StreamExt;
 
-use crate::refresh_queue::Job;
+use gentle_runtime::refresh_queue::Job;
 
 /// Every item one pass emits, with a clock the test drives instead of waiting.
 fn items(job: Job, shared: Shared, mut now: impl FnMut() -> Duration) -> Vec<Update> {

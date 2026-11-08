@@ -9,10 +9,10 @@ use std::time::Duration;
 use gentle_backend::chat_host::TaggedEvent;
 use iced::{stream, window, Subscription};
 
-use crate::chat_runtime::ChatRuntime;
-use crate::clock;
 use crate::message::Message;
 use crate::watch_source::{self, WatchSource};
+use gentle_runtime::chat_runtime::ChatRuntime;
+use gentle_runtime::clock;
 
 /// The one stream every child's events arrive on, with the runtime that knows
 /// which chat each event belongs to. Handed to the subscription once.

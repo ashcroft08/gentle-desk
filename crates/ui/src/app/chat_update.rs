@@ -6,8 +6,8 @@ use gentle_core::rpc::RpcEvent;
 use iced::Task;
 
 use super::App;
-use crate::chat_runtime::{session_file_of, Converted};
 use crate::message::Message;
+use gentle_runtime::chat_runtime::{session_file_of, Converted};
 
 impl App {
     pub(super) fn on_chat(&mut self, converted: Converted) -> Task<Message> {

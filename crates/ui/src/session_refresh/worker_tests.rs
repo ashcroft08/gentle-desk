@@ -4,7 +4,7 @@ use iced::futures::executor::block_on;
 use std::fs;
 use std::path::Path;
 
-use crate::refresh_queue::Job;
+use gentle_runtime::refresh_queue::Job;
 
 fn item<'a>(refreshed: &'a Refreshed, path: &Path) -> Option<&'a SessionItem> {
     let wanted = path.to_string_lossy();

@@ -11,8 +11,8 @@ use gentle_backend::chat_host::Opened;
 use iced::Task;
 
 use super::App;
-use crate::chat_runtime::{request_after_open, Converted, Outcome};
 use crate::message::Message;
+use gentle_runtime::chat_runtime::{request_after_open, Converted, Outcome};
 
 impl App {
     /// Runs the commands the app layer answered, one task each.

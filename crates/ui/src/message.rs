@@ -4,9 +4,9 @@
 
 use gentle_backend::session_watch::Batch;
 
-use crate::chat_runtime::{Converted, Outcome};
 use crate::session_refresh::{Progress, Refreshed};
 use crate::view::{composer, dialog, header, helper_thread, helpers, notices, sidebar, thread};
+use gentle_runtime::chat_runtime::{Converted, Outcome};
 
 #[derive(Debug, Clone)]
 pub enum Message {

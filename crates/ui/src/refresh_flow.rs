@@ -20,9 +20,9 @@ use iced::Task;
 
 use crate::backend;
 use crate::message::Message;
-use crate::refresh_queue::RefreshQueue;
 use crate::session_refresh::{self, Refreshed, Shared, Update};
 use crate::watch_source::WatchSource;
+use gentle_runtime::refresh_queue::RefreshQueue;
 
 /// The refresh state of a running window.
 pub struct Flow {

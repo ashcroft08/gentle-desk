@@ -67,7 +67,7 @@ fn a_finished_full_pass_hands_the_list_over_and_remembers_its_duration() {
 
     let shared = flow.shared.clone().expect("a run with an index");
     let refreshed = block_on(session_refresh::run(
-        crate::refresh_queue::Job::Full,
+        gentle_runtime::refresh_queue::Job::Full,
         shared,
     ))
     .unwrap();
@@ -177,7 +177,7 @@ fn a_watcher_is_retried_on_each_full_pass_and_the_restarted_one_asks_for_a_pass(
 
     let full = || {
         let shared = shared.clone();
-        async move { session_refresh::run(crate::refresh_queue::Job::Full, shared).await }
+        async move { session_refresh::run(gentle_runtime::refresh_queue::Job::Full, shared).await }
     };
     assert_eq!(flow.on_tick().units(), 1);
     assert!(flow.settle(block_on(full())).is_some());

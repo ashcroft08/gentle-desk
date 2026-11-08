@@ -12,12 +12,12 @@ use std::sync::Arc;
 use gentle_app::{AppState, ChatId, Input, Intent};
 use iced::{Subscription, Task};
 
-use crate::chat_runtime::ChatRuntime;
 use crate::message::Message;
 use crate::refresh_flow::Flow;
 use crate::subscription::{self, EventSource};
 use crate::thread_cache::ThreadCache;
 use crate::view::{composer, dialog, header, helper_thread, helpers, notices, sidebar, thread};
+use gentle_runtime::chat_runtime::ChatRuntime;
 
 mod boot;
 mod chat_closed;
