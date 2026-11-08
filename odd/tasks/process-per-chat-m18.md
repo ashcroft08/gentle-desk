@@ -217,6 +217,69 @@ Odds and ends:
   a fresh child. D only asserts what this batch promises — the window stays
   responsive and the other chats are untouched — not the T3 notice.
 
+## Latency and stored-cwd measurement (T5a)
+
+Real gentle-shell (global install, `gentle-pi\bin\gentle-shell.mjs`), spawned exactly as
+the app does: `node …gentle-shell.mjs --mode rpc --home <home> [--session <path>]` with
+`GENTLE_SHELL_INTERACTIVE_HOST=1`, cwd = the gentle-desk repo. Scratch home in a
+`mktemp -d` outside the repo, populated with `node tools/perf/gen-home.mjs <dir>/home 6 4`
+(6 sessions); every header's `cwd` was rewritten to `C:/Users/josep/dev/gentle-desk`
+except one session kept at the generator's `C:/dev/proj5` (which does not exist).
+Only no-model calls were sent, read-only: `get_state` right after spawn and
+`get_messages` right after the state reply. Every spawned tree was killed after its
+trial; a final sweep found 0 leftover gentle-shell processes.
+
+Times are milliseconds from `spawn` to the first stdout line / the `get_state` reply /
+the `get_messages` reply. `extension_ui_request` events from extensions arrive at start
+before the replies; they were not answered and did not delay the replies.
+
+| trial | first stdout | `get_state` | `get_messages` |
+|---|---|---|---|
+| A1 stored chat, existing cwd (cold — first spawn of the run) | 3222 | 3824 | 3825 |
+| A2 same session, new process (warm) | 2599 | 3190 | 3190 |
+| A3 same session, new process (warm) | 2889 | 3557 | 3557 |
+| A4 same session, new process (warm) | 2263 | 2883 | 2883 |
+| A5 same session, new process (warm) | 2231 | 2842 | 2842 |
+| B new chat (`--home` without `--session`) | 2068 | 2641 | 2642 |
+
+- Warm median `get_state`: **3036 ms** (A2–A5 sorted: 2842, 2883, 3190, 3557; the two
+  middle values average to 3036). Warm max: **3557 ms**. Cold: 3824 ms.
+- Memory: working set of one child (stored session, existing cwd) **≈ 64 MB**
+  (65152 KB) a few seconds after spawn; the child's tree carried **1 extra node
+  process** beside the gentle-shell process itself. After a hard kill,
+  **0 node processes** of the tree remained (checked twice).
+
+**Verdict (design note 1/2):** a warm median of ~3.0 s (max ~3.6 s) is above the
+guideline of ~2 s, so the rule "optimise only if the number is felt in the window"
+triggers: **a warm standby child is justified only if the warm median is above about
+2 s, and it is** — per this run, the standby is justified, still as a later batch of
+its own (design note 2's doubles-the-surface caveat stands).
+
+**Stored cwd missing (trial C, design note 7, session with `cwd: C:/dev/proj5`):**
+the child did **not** start and did **not** hang: it emitted **no stdout at all** and
+exited with **code 1 after 354 ms**. Its stderr ends with:
+
+```text
+Stored session working directory does not exist: C:\dev\proj5
+Session file: <path to the session .jsonl>
+Current working directory: C:\Users\josep\dev\gentle-desk
+```
+
+It is a clean, fast, reported failure — never a crash and never a silent dead-end.
+What the app should do: treat it exactly as S3's spawn-error death — keep the chat
+marked ended, show the recoverable notice with a **Restart** action (already built
+in T3), and surface the shell's stderr line ("Stored session working directory does
+not exist: …") to the user as the notice detail, plus one concrete suggestion: pick
+another chat. The chat's other children and the window must stay untouched; a
+retry stays possible by clicking the chat again (the failed-remains-recoverable
+behaviour T3 already chose).
+
+- The stderr of every spawn also carried two harmless lines: gentle-shell's
+  "already has content and was not set up … run `--home setup`" notice (the
+  scratch home was provisioned with `gentle-shell --home … setup` and this
+  reminder persisted) and a codemode duplicate-tool warning. Neither blocked
+  anything; both are worth remembering when the app parses child stderr.
+
 ## Log
 
 - L7 (S7, T4 working cap, user decision "Ponerlo en cola"): the app enforces the working
@@ -237,7 +300,12 @@ Odds and ends:
 - L6: "native review of T1 approved (lenses resilience+reliability, reviewers ran on
   commandcode/deepseek-v4.1-flash, total cost ~US$0.05); advisory findings recorded as
   follow-ups".
-
+- L8: "T5a latency + stored-cwd measurement done (gentle-shell subprocess, real code, no model):
+  get_state to open a stored chat ~2.8–3.6 s (warm median 3036 ms, cold 3824 ms), new chat
+  2641 ms; warm standby exceeds the ~2 s trigger, so it is justified as a later batch. A stored
+  cwd that no longer exists fails fast and cleanly: exit code 1 at 354 ms, no stdout, an explicit
+  'Stored session working directory does not exist' stderr — the app should route it to the S3
+  notice instead of a crash."
 ### Reproduction evidence (kept here as text, not as a path)
 
 Real window, gentle-shell 4.6.0 and 4.7.0, twice; observed lines:
