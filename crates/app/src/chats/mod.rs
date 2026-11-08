@@ -34,7 +34,8 @@ pub(crate) fn apply_event(
     mut state: AppState,
     chat: ChatId,
     event: &RpcEvent,
+    now_ms: Option<u64>,
 ) -> (AppState, Vec<Command>) {
-    let commands = state.chats.apply(&chat, event);
+    let commands = state.chats.apply(&chat, event, now_ms);
     (state, commands)
 }

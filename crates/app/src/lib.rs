@@ -51,7 +51,12 @@ fn fold(state: AppState, input: Input) -> (AppState, Effects) {
     match input {
         Input::Rpc(event) => shared(events::apply_event(state, &event, None)),
         Input::RpcAt(event, now_ms) => shared(events::apply_event(state, &event, Some(now_ms))),
-        Input::ChatEvent { chat, event } => shared(chats::apply_event(state, chat, &event)),
+        Input::ChatEvent { chat, event } => shared(chats::apply_event(state, chat, &event, None)),
+        Input::ChatEventAt {
+            chat,
+            event,
+            now_ms,
+        } => shared(chats::apply_event(state, chat, &event, Some(now_ms))),
         Input::SessionsPrepared(prepared) => {
             let mut state = state;
             state.set_prepared(prepared);

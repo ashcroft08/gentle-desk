@@ -64,6 +64,14 @@ pub enum Input {
         chat: ChatId,
         event: RpcEvent,
     },
+    /// [`Input::ChatEvent`] with the wall-clock time (epoch ms) the event
+    /// arrived at, so a helper that stops being reported in a background chat is
+    /// stamped with when it ended. Otherwise identical.
+    ChatEventAt {
+        chat: ChatId,
+        event: RpcEvent,
+        now_ms: u64,
+    },
 }
 
 /// A side effect for the shell to run.

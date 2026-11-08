@@ -8,7 +8,7 @@
 
 use std::collections::BTreeMap;
 
-use gentle_core::chat::{reduce_chat, ChatState, Dialog};
+use gentle_core::chat::{reduce_chat_at, ChatState, Dialog};
 use gentle_core::rpc::RpcEvent;
 
 use super::activity::{activity_of, ChatActivity};
@@ -126,10 +126,15 @@ impl Chats {
 
     /// Folds one event into one chat and answers the commands it asks for.
     /// Nothing of any other chat is read or written.
-    pub(crate) fn apply(&mut self, chat: &ChatId, event: &RpcEvent) -> Vec<Command> {
+    pub(crate) fn apply(
+        &mut self,
+        chat: &ChatId,
+        event: &RpcEvent,
+        now_ms: Option<u64>,
+    ) -> Vec<Command> {
         let foreground = self.foreground.as_ref() == Some(chat);
         let entry = self.entries.entry(chat.clone()).or_default();
-        entry.state = reduce_chat(std::mem::take(&mut entry.state), event);
+        entry.state = reduce_chat_at(std::mem::take(&mut entry.state), event, now_ms);
         // A turn that ends while the user is elsewhere leaves a reply to read.
         let ended = matches!(event, RpcEvent::AgentEnd { .. } | RpcEvent::AgentSettled);
         if ended && !foreground {
