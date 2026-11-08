@@ -9,6 +9,13 @@
 //! Only this module touches the file system and a thread: the rules it applies
 //! are pure and tested on their own (`debounce/tests.rs`, `classify/tests.rs`).
 //! Nothing here reads the index; the caller decides what a batch means.
+//!
+//! Known limit (measured on Windows/NTFS): a write made through a handle that
+//! stays open and is never flushed or closed is not reported for at least 15 s;
+//! once the writer closes or syncs, the event arrives in about 265 ms. pi appends
+//! with `appendFileSync` (open, write, close), so it is reported promptly. Any
+//! other writer that keeps the file open is only noticed by the slow
+//! reconciliation pass.
 
 use std::fs;
 use std::path::{Path, PathBuf};

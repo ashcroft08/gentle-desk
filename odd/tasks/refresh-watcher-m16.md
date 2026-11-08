@@ -51,3 +51,9 @@ The 2 s figures are upper bounds from screenshots, not measured latencies.
 ## Log
 
 - L1: "1. Observador + refresco por archivo + sondeo lento (recomendada)" (user's choice among A keep, B bounded polling, C watcher). Context backstop reached (60 %): work is delegated in units and re-verified by the parent.
+
+## CI failure and fix (PR #10)
+
+- The first CI run failed in `session_watch::tests::batches::an_append_to_a_session_file_is_reported` (it had passed 5 of 5 locally). Cause, confirmed with a probe (not committed): on Windows/NTFS a write through a handle that stays open and is never flushed is **not reported for at least 15 s** (0 of 5 runs); closing or `sync_all` gives the event in about 265 ms. The test kept its handle open, and locally it could pass by accident on the late "modify" event of the file creation.
+- pi appends with `appendFileSync` (open, write, close) and writes headers with `openSync`/`closeSync` (checked in its `session-manager.js`), so its changes are reported promptly. A different writer that holds the file open is only noticed by the 60 s reconciliation pass; this is documented in `session_watch.rs`.
+- Fix: the test now closes the handle like pi does and lets the create settle before appending; the limit is documented. 8 consecutive local runs green.
