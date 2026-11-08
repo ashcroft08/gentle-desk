@@ -43,6 +43,36 @@ Recorded uncertainties:
 - The reference behaviour is read from gentle-shell-desktop `ChatHost.ts:141-186` and `PiSession.ts:127-133,216-241`: one child per chat, `--session <path>`, no `switch_session`, and on child death an error whose next open/new spawns a fresh child. gentle-desk's S3 goes one step further by offering Restart.
 - Background children multiply the orphan risk: the existing single-child close path does not cover N children, so S5 has to be verified per child in T5, not only for the foreground one.
 
+## Follow-ups from the native review of T1
+
+Advisory only: the review at lineage `review-6c50190c40c30c6e` was approved and acknowledged, and
+none of these findings reopens it. Each one cites the code it was written against, one factual line
+about what that code does and why it may matter, and the task that should address it.
+
+- R3-existing-false-promise — `crates/backend/src/chat_host/host/lifecycle.rs:37-41`: a chat that
+  already holds a slot is only marked active and answered `Ok(Opened::Existing)`, even while that
+  slot is still `Status::Spawning`, so a caller that reads `Existing` as "a live child serves this
+  chat" then gets `SendError::Starting` from `send`; it may matter because T2 makes `open` the path
+  of every click, so a second click during a slow start looks like success. Task: T2.
+- R3-send-holds-lock — `crates/backend/src/chat_host/host/routing.rs:14-30`: `send` holds the whole
+  `State` mutex across `child.send(...)`, a blocking stdin pipe write, so a slow or blocked child
+  stalls every other chat's send, reap and open until that write returns — a candidate fix belongs
+  in T2 before the UI sends from many chats. Task: T2.
+- R3-working-cap-race — `crates/backend/src/chat_host/host/routing.rs:53-55`: `may_start_work`
+  evaluates `policy::working_full` under one lock acquisition and `set_working` takes the lock again
+  later, so the pair is check-then-act and two chats starting together can both see room and both
+  exceed `max_working`. Task: T4.
+- R4-002 — `crates/backend/src/chat_host/host/lifecycle.rs:70-71`: `self.stop_all(stops)` runs every
+  reaped victim's graceful shutdown (up to `DEFAULT_GRACE`, 2 s each) synchronously before
+  `spawner.spawn` is called, so the chat just clicked stays `Spawning` for the length of those
+  shutdowns before its own child has even started. Task: T2.
+- R4-003 — `crates/backend/src/chat_host/host.rs:150-167`: `forward` starts the per-chat event
+  thread with `.spawn(..).ok()`, discarding the `Result`, so a thread that cannot be started
+  forwards no event and never clears `alive`, leaving the slot looking live while the chat stays
+  silent forever and no death is noticed. Task: T3.
+- R4-001 (CRITICAL) — `crates/backend/src/chat_host/host/routing.rs:16-30`: recorded as **refuted by
+  the provider refuter**; no action.
+
 ## Log
 
 - L1: "la 3 explicame mejor, hace algo parecido a gentle-shell-desktop?"
@@ -50,6 +80,9 @@ Recorded uncertainties:
 - L3: parent answer — option 3 (two layers: one child per chat, plus a recoverable death notice) is the best now; warm standby is a later optimisation to be measured first.
 - L4: "con lo de s4 hay algo, si yo como usuario abro otro chat para trabajar algo nuevo alla pero quiero que el chat viejo siga trabajando y regresar a ver su respuesta cuando termine, eso es un proceso organico"
 - L5: parent answer — the stop-on-switch idea is replaced by a process manager that maps session -> child process: opening a chat makes it the foreground and leaves every other child running, so a chat that is working finishes in the background and its reply is there on return. S1, S2, S3, S4 and S5 are rewritten to that model, S7 (idle reap + caps) is added, and the tasks are re-cut accordingly. The upstream report stays a separate user decision.
+- L6: "native review of T1 approved (lenses resilience+reliability, reviewers ran on
+  commandcode/deepseek-v4.1-flash, total cost ~US$0.05); advisory findings recorded as
+  follow-ups".
 
 ### Reproduction evidence (kept here as text, not as a path)
 
