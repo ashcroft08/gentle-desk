@@ -1,0 +1,68 @@
+//! The mutations that change a chat's life: open, end, rekey, and the mutable
+//! handle into one chat's state.
+
+use gentle_core::chat::ChatState;
+
+use super::store::Chats;
+use super::{queue, ChatId};
+
+impl Chats {
+    /// Makes `chat` the foreground one and clears its finished-unread mark,
+    /// creating it empty if this is the first it is heard of. Opening a chat also
+    /// clears a death: the caller asks the host for its child, which starts a
+    /// fresh one through `--session` (S3). No other chat changes.
+    pub fn open(&mut self, chat: ChatId) -> &mut ChatState {
+        let previous = self.foreground.replace(chat.clone());
+        let left = previous.filter(|previous| previous != &chat);
+        if let Some(entry) = left.and_then(|left| self.entries.get_mut(&left)) {
+            entry.refresh(false);
+        }
+        let entry = self.entries.entry(chat).or_default();
+        entry.ended = false;
+        entry.refresh(true);
+        &mut entry.state
+    }
+
+    /// Records that `chat`'s child died: it runs nothing until it is restarted.
+    /// The chat keeps its thread, its place and its foreground mark.
+    pub(crate) fn ended_now(&mut self, chat: &ChatId) {
+        let foreground = self.foreground.as_ref() == Some(chat);
+        let entry = self.entries.entry(chat.clone()).or_default();
+        entry.ended = true;
+        entry.refresh(foreground);
+    }
+
+    /// Records that `chat` has a child again: an expected stop, or a restart the
+    /// host honoured. The chat is idle and its thread is untouched.
+    pub(crate) fn clear_ended(&mut self, chat: &ChatId) {
+        let foreground = self.foreground.as_ref() == Some(chat);
+        let Some(entry) = self.entries.get_mut(chat) else {
+            return;
+        };
+        entry.ended = false;
+        entry.refresh(foreground);
+    }
+
+    /// Moves a chat from the id it had to the one it just learned, for a new chat
+    /// that now has a session path. The foreground follows it, and a finished
+    /// turn nobody has read is still waiting afterwards.
+    pub fn rekey(&mut self, from: &ChatId, to: ChatId) {
+        let Some(mut entry) = self.entries.remove(from) else {
+            return;
+        };
+        if let Some(existing) = self.entries.get(&to) {
+            entry.unread |= existing.unread;
+        }
+        if self.foreground.as_ref() == Some(from) {
+            self.foreground = Some(to.clone());
+        }
+        entry.refresh(self.foreground.as_ref() == Some(&to));
+        self.entries.insert(to.clone(), entry);
+        queue::rekeyed(self, from, to);
+    }
+
+    /// One chat's state, created empty if this is the first it is heard of.
+    pub(crate) fn chat_mut(&mut self, chat: &ChatId) -> &mut ChatState {
+        &mut self.entries.entry(chat.clone()).or_default().state
+    }
+}

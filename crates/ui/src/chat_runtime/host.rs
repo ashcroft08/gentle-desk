@@ -16,6 +16,12 @@ impl ChatRuntime {
         key.is_some_and(|key| self.host.set_working(&key, working))
     }
 
+    /// How many chats the host lets run model calls at once; the app enforces
+    /// it with its own queue (S7).
+    pub fn max_working(&self) -> usize {
+        self.host.limits().max_working
+    }
+
     /// Stops the idle background children and answers which chats went. The
     /// shell calls this on its timer.
     pub fn reap_idle(&self) -> Vec<ChatKey> {

@@ -16,6 +16,8 @@ pub enum ChatActivity {
     Working,
     /// A turn ended while the user was on another chat.
     FinishedUnread,
+    /// The chat holds a prompt of its own waiting for a working slot (S7).
+    Queued,
     /// An extension dialog is waiting for an answer.
     NeedsAttention,
     /// The chat's child is gone: nothing runs here until it is restarted (S3).
@@ -23,12 +25,14 @@ pub enum ChatActivity {
 }
 
 /// The activity of one chat, given its state, whether a finished turn is still
-/// unread, whether it is the foreground chat, and whether its child is gone.
+/// unread, whether it is the foreground chat, whether its child is gone, and
+/// whether its own prompt is waiting for a slot (S7).
 ///
 /// A dead child wins over everything: a pending dialog cannot be answered and a
 /// turn cannot finish once there is no process to talk to. A waiting dialog then
 /// wins over the rest: it is the one thing the user has to act on, and it is lost
-/// if a background chat's dialog is not surfaced. A turn that ends elsewhere stays
+/// if a background chat's dialog is not surfaced. Working beats its own queued
+/// prompt: the slot was taken. A turn that ends elsewhere stays
 /// [`ChatActivity::FinishedUnread`] until the chat is opened; the chat the user is
 /// on never shows it.
 pub(crate) fn activity_of(
@@ -36,6 +40,7 @@ pub(crate) fn activity_of(
     unread: bool,
     foreground: bool,
     ended: bool,
+    queued: bool,
 ) -> ChatActivity {
     if ended {
         ChatActivity::Ended
@@ -43,6 +48,8 @@ pub(crate) fn activity_of(
         ChatActivity::NeedsAttention
     } else if state.working {
         ChatActivity::Working
+    } else if queued {
+        ChatActivity::Queued
     } else if !foreground && unread {
         ChatActivity::FinishedUnread
     } else {

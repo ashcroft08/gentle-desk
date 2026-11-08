@@ -6,6 +6,7 @@
 
 use gentle_core::rpc::{RpcCommand, UiAnswer};
 
+use super::queue;
 use super::ChatId;
 use crate::chats::push_death_notice;
 use crate::input::{ChatCommand, Command, Effects, Intent};
@@ -22,7 +23,20 @@ pub(crate) fn apply(state: &mut AppState, intent: &Intent) -> Option<Effects> {
         Intent::OpenNewChat => Some(for_chat(open(state, ChatId::fresh()))),
         Intent::RestartChat(chat) => Some(for_chat(open(state, chat.clone()))),
         Intent::SendPrompt(text) => send_prompt(state, text).map(for_chat),
-        Intent::Abort => send_to_foreground(state, RpcCommand::Abort).map(for_chat),
+        Intent::Abort => {
+            // The Abort of a chat that only waits for a slot cancels its own
+            // queued prompt and sends nothing (S7): no turn was started.
+            let waiting = state
+                .chats
+                .foreground()
+                .filter(|chat| state.chats.is_queued(chat))
+                .cloned();
+            if let Some(chat) = waiting {
+                queue::cancel(&mut state.chats, &chat);
+                return Some(for_chat(Vec::new()));
+            }
+            send_to_foreground(state, RpcCommand::Abort).map(for_chat)
+        }
         Intent::CopyMessage(id) => copy_message(state, id).map(for_shell),
         Intent::AnswerDialog { id, answer } => answer_dialog(state, id, answer).map(for_chat),
         _ => None,
@@ -73,6 +87,12 @@ fn send_to_foreground(state: &AppState, rpc: RpcCommand) -> Option<Vec<ChatComma
 /// A chat whose child died receives nothing: there is no process to write to, so
 /// the prompt is not even appended to its thread and the user gets the Restart
 /// notice instead (S3).
+///
+/// At the working cap (S7) the prompt is queued, never lost and never refused:
+/// the user message is appended as today, the chat is marked Queued, and the
+/// send goes out the moment a slot frees. A chat that already holds a queued
+/// prompt refuses a second one, as a working chat refuses a prompt: one turn
+/// at a time.
 fn send_prompt(state: &mut AppState, text: &str) -> Option<Vec<ChatCommand>> {
     let chat = state.chats.foreground()?.clone();
     if text.trim().is_empty() {
@@ -82,17 +102,20 @@ fn send_prompt(state: &mut AppState, text: &str) -> Option<Vec<ChatCommand>> {
         push_death_notice(state, &chat);
         return Some(Vec::new());
     }
-    let chat_state = state.chats.chat_mut(&chat);
-    if chat_state.working {
+    if state.chats.is_working(&chat) || state.chats.is_queued(&chat) {
         return Some(Vec::new());
     }
-    push_user_message(chat_state, text);
-    Some(vec![ChatCommand::Send {
-        chat,
-        rpc: RpcCommand::Prompt {
-            message: text.to_owned(),
-        },
-    }])
+    push_user_message(state.chats.chat_mut(&chat), text);
+    if queue::has_room(&state.chats) {
+        return Some(vec![ChatCommand::Send {
+            chat,
+            rpc: RpcCommand::Prompt {
+                message: text.to_owned(),
+            },
+        }]);
+    }
+    queue::enqueue(&mut state.chats, chat, text.to_owned());
+    Some(Vec::new())
 }
 
 /// Copies a message of the foreground chat, if it is that chat's message.

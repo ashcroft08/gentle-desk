@@ -1,7 +1,8 @@
 //! Inputs about one chat that are not events from its child: a command that did
 //! not reach it, the session file a new chat learned, and its child going away.
 
-use crate::chats::ChatId;
+use crate::chats::{queue, ChatId};
+use crate::input::Effects;
 use crate::notices::{push_action_notice, push_notice};
 use crate::state::{AppState, NoticeAction, NoticeLevel};
 
@@ -32,14 +33,31 @@ pub(crate) fn rekeyed(mut state: AppState, from: &ChatId, to: ChatId) -> AppStat
 /// foreground or background, ends that chat and leaves one notice naming it,
 /// with the Restart that brings it back (S3). Nothing here is fatal for the
 /// window: every other chat keeps its child.
-pub(crate) fn closed(mut state: AppState, chat: &ChatId, expected: bool) -> AppState {
+pub(crate) fn closed(mut state: AppState, chat: &ChatId, expected: bool) -> (AppState, Effects) {
+    // A working chat whose child goes away frees the slot it held, whatever
+    // stopped the child: both an expected stop and a death free it.
+    let freed = state.chats.stop_working(chat);
     if expected {
         state.chats.clear_ended(chat);
     } else {
         state.chats.ended_now(chat);
+        // Its queued prompt can never be sent: the death notice already
+        // told the user.
+        queue::drop_of(&mut state.chats, chat);
         push_death_notice(&mut state, chat);
     }
-    state
+    let chat_commands = if freed {
+        queue::release(&mut state.chats)
+    } else {
+        Vec::new()
+    };
+    (
+        state,
+        Effects {
+            commands: Vec::new(),
+            chat_commands,
+        },
+    )
 }
 
 /// The one notice a death leaves. Extensions repeat themselves, so the notice is

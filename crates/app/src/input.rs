@@ -89,6 +89,10 @@ pub enum Input {
         from: ChatId,
         to: ChatId,
     },
+    /// The window's working cap (S7), passed at boot from the host's
+    /// `Limits::max_working`. The app enforces it: a prompt over the cap is
+    /// queued, not refused. `0` means no cap is enforced.
+    SetWorkingCap(usize),
     /// One chat's child is gone. `expected` is true when the host stopped it on
     /// purpose (idle reap, cap victim, close, shutdown): the chat is just idle
     /// and reopens silently. An unexpected close of any chat, foreground or

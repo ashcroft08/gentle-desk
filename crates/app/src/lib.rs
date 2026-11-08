@@ -51,19 +51,22 @@ fn fold(state: AppState, input: Input) -> (AppState, Effects) {
     match input {
         Input::Rpc(event) => shared(events::apply_event(state, &event, None)),
         Input::RpcAt(event, now_ms) => shared(events::apply_event(state, &event, Some(now_ms))),
-        Input::ChatEvent { chat, event } => shared(chats::apply_event(state, chat, &event, None)),
+        Input::ChatEvent { chat, event } => chats::apply_event(state, chat, &event, None),
         Input::ChatEventAt {
             chat,
             event,
             now_ms,
-        } => shared(chats::apply_event(state, chat, &event, Some(now_ms))),
+        } => chats::apply_event(state, chat, &event, Some(now_ms)),
+        Input::SetWorkingCap(cap) => {
+            let mut state = state;
+            chats::set_working_cap(&mut state, cap);
+            (state, Effects::default())
+        }
         Input::ChatFailed { chat, message } => {
             (chats::failed(state, &chat, &message), Effects::default())
         }
         Input::ChatRekeyed { from, to } => (chats::rekeyed(state, &from, to), Effects::default()),
-        Input::ChatClosed { chat, expected } => {
-            (chats::closed(state, &chat, expected), Effects::default())
-        }
+        Input::ChatClosed { chat, expected } => chats::closed(state, &chat, expected),
         Input::SessionsPrepared(prepared) => {
             let mut state = state;
             state.set_prepared(prepared);

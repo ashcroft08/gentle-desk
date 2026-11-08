@@ -20,6 +20,9 @@ impl App {
         let shared = started
             .index
             .map(|index| Shared::new(Arc::new(Mutex::new(index)), started.cache_path.clone()));
+        // The app enforces the host's working cap (S7): it knows every chat's
+        // activity, so its check and its mark happen in one reducer step.
+        let cap = started.chat.as_ref().map(|runtime| runtime.max_working());
         let mut app = Self {
             app: AppState::default(),
             cache: ThreadCache::default(),
@@ -37,6 +40,9 @@ impl App {
             sidebar_offset: 0.0,
             fatal: started.fatal,
         };
+        if let Some(cap) = cap {
+            app.app = gentle_app::update_chats(app.app, gentle_app::Input::SetWorkingCap(cap)).0;
+        }
         // The window opens empty: the first full pass fills it, first with what
         // the restored cache already knew and then with its final list.
         let first_list = app.flow.on_tick();
