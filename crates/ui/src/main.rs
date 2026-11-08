@@ -14,6 +14,9 @@ mod cache_path;
 // Wired by the chat host dispatch (m18 T2 step 2b); until then only its tests use it.
 #[allow(dead_code)]
 mod chat_keys;
+// Wired by the chat host dispatch (m18 T2 step 2b-2); until then only its tests use it.
+#[allow(dead_code)]
+mod chat_runtime;
 mod clock;
 mod message;
 mod refresh_flow;
