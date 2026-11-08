@@ -1,4 +1,6 @@
-//! The error bar for a failure that ends the session (launcher missing, child died).
+//! The error bar for a failure that ends the whole session: gentle-shell could
+//! not be resolved. A chat's child dying is a per-chat notice with a Restart, not
+//! this bar (S3).
 
 use iced::widget::{container, text};
 use iced::{Element, Length};

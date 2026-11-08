@@ -1,24 +1,31 @@
-//! Starting the `gentle-shell` child, the session index and the session watcher
-//! for one run.
+//! Starting the chat host (one `gentle-shell` child per chat), the session index
+//! and the session watcher for one run.
 
+use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::Receiver;
+use std::sync::Arc;
 
+use gentle_backend::chat_host::{ChatHost, Clock, Limits, ProcessSpawner, Spawner, SystemClock};
 use gentle_backend::home::{agent_dir, with_home_flag, HomeEnv};
 use gentle_backend::launcher::{self, LauncherEnv};
-use gentle_backend::process::{RpcProcess, SpawnOptions};
 use gentle_backend::session_cache;
 use gentle_backend::session_index::SessionIndex;
 use gentle_backend::session_watch::{Batch, SessionWatcher, WatchError};
 
 use crate::cache_path;
+use crate::chat_runtime::ChatRuntime;
 use crate::subscription::EventSource;
 use crate::watch_source::WatchSource;
 
 /// What `start` brought up. A failure to launch is data, not a panic: the UI
 /// still opens and shows it.
 pub struct Started {
-    pub process: Option<RpcProcess>,
+    /// The chat host with the registry of chat names, shared with the event
+    /// subscription and with every command. `None` when gentle-shell cannot be
+    /// resolved at all, which is the run's fatal banner.
+    pub chat: Option<Arc<ChatRuntime>>,
+    /// The tagged events of every child, filled when the host is up.
     pub events: EventSource,
     /// `None` when the pi home cannot be resolved: the sidebar stays empty.
     pub index: Option<SessionIndex>,
@@ -37,8 +44,8 @@ pub struct Started {
     pub fatal: Option<String>,
 }
 
-/// Command line arguments are forwarded to `gentle-shell`; a home flag is added
-/// when they name none.
+/// Command line arguments are forwarded to every `gentle-shell` child; a home
+/// flag is added when they name none.
 pub fn start() -> Started {
     let events = EventSource::default();
     let home_env = HomeEnv::from_process();
@@ -73,27 +80,17 @@ pub fn start() -> Started {
     if let Some(batches) = batches {
         watch.fill(batches);
     }
-    let spawned = launcher::resolve(&LauncherEnv::from_process())
-        .map_err(|e| e.to_string())
-        .and_then(|launcher| {
-            let options = SpawnOptions {
-                args,
-                // pi's rpc mode only serves extension UI requests with an interactive host.
-                env: vec![("GENTLE_SHELL_INTERACTIVE_HOST".into(), "1".into())],
-                cwd: None,
-            };
-            RpcProcess::spawn(&launcher, &options)
-                .map_err(|e| format!("cannot start {}: {e}", launcher.program.display()))
-        });
-    let (process, fatal) = match spawned {
-        Ok(mut process) => {
-            events.fill(process.take_events());
-            (Some(process), None)
+    let (chat, fatal) = match start_host(args) {
+        Ok(host) => {
+            let (runtime, tagged) = ChatRuntime::new(host);
+            let runtime = Arc::new(runtime);
+            events.fill(Arc::clone(&runtime), tagged);
+            (Some(runtime), None)
         }
         Err(error) => (None, Some(error)),
     };
     Started {
-        process,
+        chat,
         events,
         index,
         cache_path,
@@ -103,6 +100,18 @@ pub fn start() -> Started {
         watch_error,
         fatal,
     }
+}
+
+/// The host itself: real children, the searcher's limits, and the launcher plus
+/// the forwarded arguments of this window.
+fn start_host(args: Vec<OsString>) -> Result<ChatHost, String> {
+    let launcher = launcher::resolve(&LauncherEnv::from_process()).map_err(|e| e.to_string())?;
+    let spawner = ProcessSpawner::new(launcher).with_args(args);
+    Ok(ChatHost::with_parts(
+        Limits::default(),
+        Arc::new(spawner) as Arc<dyn Spawner>,
+        Arc::new(SystemClock) as Arc<dyn Clock>,
+    ))
 }
 
 /// Starts watching `sessions_dir`, for the first time and for every retry after

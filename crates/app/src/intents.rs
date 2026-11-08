@@ -1,25 +1,36 @@
 //! Applying what the user asked for.
 
-use gentle_core::chat::{ChatMessage, ChatRole, ChatState, Dialog};
+use gentle_core::chat::{ChatState, Dialog};
 use gentle_core::rpc::RpcCommand;
 
-use crate::input::{Command, Intent};
-use crate::state::AppState;
+use crate::chats;
+use crate::input::{Command, Effects, Intent};
+use crate::state::{push_user_message, AppState};
 
-pub(crate) fn apply_intent(mut state: AppState, intent: Intent) -> (AppState, Vec<Command>) {
+pub(crate) fn apply_intent(mut state: AppState, intent: Intent) -> (AppState, Effects) {
+    // The intents that name a chat act on that chat's child; the rest act on the
+    // single thread the one-child shell renders.
+    if let Some(effects) = chats::apply_intent(&mut state, &intent) {
+        return (state, effects);
+    }
+    let (state, commands) = single_chat(state, intent);
+    (
+        state,
+        Effects {
+            commands,
+            chat_commands: Vec::new(),
+        },
+    )
+}
+
+fn single_chat(mut state: AppState, intent: Intent) -> (AppState, Vec<Command>) {
     match intent {
         Intent::SendPrompt(text) => {
             // One turn at a time: the UI disables sending while the agent works.
             if text.trim().is_empty() || state.chat.working {
                 return (state, Vec::new());
             }
-            state.chat.messages.push(ChatMessage {
-                id: format!("msg-{}", state.chat.messages.len()),
-                role: ChatRole::User,
-                text: text.clone(),
-                streaming: false,
-                error: None,
-            });
+            push_user_message(&mut state.chat, &text);
             (
                 state,
                 vec![Command::Send(RpcCommand::Prompt { message: text })],
@@ -102,10 +113,12 @@ pub(crate) fn apply_intent(mut state: AppState, intent: Intent) -> (AppState, Ve
             state.notices.retain(|notice| notice.id != id);
             (state, Vec::new())
         }
+        // Handled by the per-chat pass above, which this one runs after.
+        Intent::OpenChat(_) | Intent::OpenNewChat | Intent::RestartChat(_) => (state, Vec::new()),
     }
 }
 
-fn dialog_id(dialog: &Dialog) -> &str {
+pub(crate) fn dialog_id(dialog: &Dialog) -> &str {
     match dialog {
         Dialog::Select { id, .. }
         | Dialog::Confirm { id, .. }

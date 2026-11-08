@@ -9,18 +9,31 @@
 //! Closing never orphans anything: stdin is closed first (pi exits on EOF),
 //! and a child that does not leave within the grace period is killed together
 //! with its descendants. `Drop` does the same.
+//!
+//! Writing is its own handle ([`RpcWriter`]) because a pipe write blocks when the
+//! child stops reading: an owner can hand one out and write with no lock of its
+//! own held across the write.
 
 use std::ffi::OsString;
-use std::io::{self, Read, Write};
+use std::io::{self, Read};
 use std::path::PathBuf;
 use std::process::{Child, ChildStdin, Command, ExitStatus, Stdio};
 use std::sync::mpsc::{self, Receiver};
+use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
-use gentle_core::rpc::{decode_line, encode_command, Decoded, LineSplitter, RpcCommand};
+use gentle_core::rpc::{decode_line, Decoded, LineSplitter, RpcCommand};
 
 use crate::launcher::Launcher;
+
+mod tree;
+mod writer;
+
+pub use writer::RpcWriter;
+
+use tree::{hide_console_window, kill_tree};
+use writer::stdin_closed;
 
 /// How to start the child beyond the resolved launcher.
 #[derive(Debug, Clone, Default)]
@@ -54,7 +67,9 @@ pub enum Shutdown {
 
 pub struct RpcProcess {
     child: Child,
-    stdin: Option<ChildStdin>,
+    /// Shared with every [`RpcWriter`] taken from this process: a write and the
+    /// end-of-file that [`RpcProcess::stop`] sends must not race on the pipe.
+    stdin: Arc<Mutex<Option<ChildStdin>>>,
     events: Receiver<ProcessEvent>,
     readers: Vec<JoinHandle<()>>,
 }
@@ -96,7 +111,7 @@ impl RpcProcess {
 
         Ok(Self {
             child,
-            stdin,
+            stdin: Arc::new(Mutex::new(stdin)),
             events,
             readers: vec![stdout_reader, stderr_reader],
         })
@@ -115,12 +130,16 @@ impl RpcProcess {
 
     /// Writes one command line to the child's stdin.
     pub fn send(&mut self, command: &RpcCommand) -> io::Result<()> {
-        let stdin = self
-            .stdin
-            .as_mut()
-            .ok_or_else(|| io::Error::new(io::ErrorKind::BrokenPipe, "stdin is closed"))?;
-        stdin.write_all(encode_command(command).as_bytes())?;
-        stdin.flush()
+        self.writer().ok_or_else(stdin_closed)?.send(command)
+    }
+
+    /// A handle that writes command lines on its own, or `None` once stdin is
+    /// closed. The caller writes with the handle and not with this struct, so the
+    /// pipe write never happens under a lock it holds for other reasons.
+    pub fn writer(&self) -> Option<RpcWriter> {
+        let stdin = self.stdin.lock().unwrap_or_else(|p| p.into_inner());
+        stdin.as_ref()?;
+        Some(RpcWriter::new(Arc::clone(&self.stdin)))
     }
 
     /// Closes stdin, waits up to `grace` for a clean exit, then kills the
@@ -130,7 +149,9 @@ impl RpcProcess {
     }
 
     fn stop(&mut self, grace: Duration) -> io::Result<Shutdown> {
-        self.stdin = None; // EOF on stdin: pi's cue to exit
+        // EOF on stdin: pi's cue to exit. Taking the slot waits for a write that
+        // is still in flight, so a half-written line is never sent after it.
+        self.stdin.lock().unwrap_or_else(|p| p.into_inner()).take();
         let deadline = Instant::now() + grace;
         let outcome = loop {
             if let Some(status) = self.child.try_wait()? {
@@ -174,32 +195,6 @@ fn pump(mut source: impl Read, mut on_line: impl FnMut(String)) {
         }
     }
     splitter.flush().into_iter().for_each(&mut on_line);
-}
-
-#[cfg(windows)]
-fn hide_console_window(command: &mut Command) {
-    use std::os::windows::process::CommandExt;
-    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-    command.creation_flags(CREATE_NO_WINDOW);
-}
-
-#[cfg(not(windows))]
-fn hide_console_window(_command: &mut Command) {}
-
-/// Kills the child and its descendants. `Child::kill` alone leaves
-/// grandchildren (pi extensions, provider bridges) running on Windows.
-fn kill_tree(child: &mut Child) {
-    #[cfg(windows)]
-    {
-        let mut taskkill = Command::new("taskkill");
-        taskkill
-            .args(["/T", "/F", "/PID", &child.id().to_string()])
-            .stdout(Stdio::null())
-            .stderr(Stdio::null());
-        hide_console_window(&mut taskkill);
-        let _ = taskkill.status();
-    }
-    let _ = child.kill(); // no-op if taskkill already did it
 }
 
 #[cfg(test)]

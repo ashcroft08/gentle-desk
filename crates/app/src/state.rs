@@ -1,7 +1,8 @@
 //! The data the UI renders.
 
-use gentle_core::chat::ChatState;
+use gentle_core::chat::{ChatMessage, ChatRole, ChatState};
 
+use crate::chats::{ChatId, Chats};
 use crate::list_status::ListStatus;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -34,17 +35,33 @@ impl SessionItem {
     }
 }
 
-/// A transient message from an extension (`notify`), shown outside the thread.
+/// The one thing the user can do about a notice, when the notice is about
+/// something the app can fix by itself (S3).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum NoticeAction {
+    /// Start that chat's child again and reopen the chat.
+    RestartChat(ChatId),
+}
+
+/// A transient message from an extension (`notify`), or the report of a chat's
+/// death, shown outside the thread.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Notice {
     pub id: u64,
     pub level: NoticeLevel,
     pub text: String,
+    /// The action that fixes what the notice reports, if there is one.
+    pub action: Option<NoticeAction>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct AppState {
+    /// The single chat the one-child shell renders. Untouched by the per-chat
+    /// model, which keeps its own states in [`AppState::chats`].
     pub chat: ChatState,
+    /// One state per chat, plus the foreground one. Empty in a shell that runs
+    /// one child for every chat it does not have.
+    pub chats: Chats,
     pub notices: Vec<Notice>,
     /// Set through `Input::SessionsLoaded` or `Input::SessionsPrepared`, which
     /// keep the search data in step.
@@ -63,4 +80,19 @@ pub struct AppState {
     pub selected_helper: Option<String>,
     /// Ids are never reused, so a dismissed notice cannot be confused with a new one.
     pub(crate) next_notice_id: u64,
+}
+
+/// Appends what the user typed as their side of the thread.
+///
+/// Ids stay contiguous — `msg-<index>` — the same scheme the reducer uses when it
+/// opens and closes an assistant message, so the whole thread keeps one id space
+/// whichever chat it belongs to.
+pub(crate) fn push_user_message(state: &mut ChatState, text: &str) {
+    state.messages.push(ChatMessage {
+        id: format!("msg-{}", state.messages.len()),
+        role: ChatRole::User,
+        text: text.to_owned(),
+        streaming: false,
+        error: None,
+    });
 }

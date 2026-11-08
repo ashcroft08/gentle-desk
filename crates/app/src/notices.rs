@@ -2,12 +2,37 @@
 
 use gentle_core::rpc::{RpcEvent, UiRequest};
 
-use crate::state::{AppState, Notice, NoticeLevel};
+use crate::chats::ChatId;
+use crate::state::{AppState, Notice, NoticeAction, NoticeLevel};
 
 /// Most notices kept; older ones are dropped first.
 const MAX_NOTICES: usize = 50;
 
 pub(crate) fn push_notice(state: &mut AppState, level: NoticeLevel, text: String) {
+    push(state, level, text, None);
+}
+
+/// A notice that carries the one action which fixes what it reports (S3).
+pub(crate) fn push_action_notice(
+    state: &mut AppState,
+    level: NoticeLevel,
+    text: String,
+    action: NoticeAction,
+) {
+    push(state, level, text, Some(action));
+}
+
+/// Removes the death notice whose Restart was taken: the restart or reopen
+/// that clears the ended mark is the fix that notice waited on, so it goes with
+/// it. Notices with no action, and other chats' notices, stay.
+pub(crate) fn drop_restart_notice(state: &mut AppState, chat: &ChatId) {
+    state.notices.retain(|notice| match &notice.action {
+        Some(NoticeAction::RestartChat(ended)) => ended != chat,
+        _ => true,
+    });
+}
+
+fn push(state: &mut AppState, level: NoticeLevel, text: String, action: Option<NoticeAction>) {
     // Extensions repeat their notices (every session switch re-announces itself).
     if state
         .notices
@@ -20,6 +45,7 @@ pub(crate) fn push_notice(state: &mut AppState, level: NoticeLevel, text: String
         id: state.next_notice_id,
         level,
         text,
+        action,
     });
     state.next_notice_id += 1;
     let excess = state.notices.len().saturating_sub(MAX_NOTICES);

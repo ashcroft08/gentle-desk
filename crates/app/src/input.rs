@@ -2,6 +2,7 @@
 
 use gentle_core::rpc::{RpcCommand, RpcEvent, UiAnswer};
 
+use crate::chats::ChatId;
 use crate::session_prepare::PreparedSessions;
 use crate::state::SessionItem;
 
@@ -28,6 +29,15 @@ pub enum Intent {
     SelectHelper(String),
     /// Back from a helper's thread to the helpers list.
     CloseHelper,
+    /// Make a chat the foreground one. Its child is started if it has none, and
+    /// no other chat is stopped.
+    OpenChat(ChatId),
+    /// A chat that did not exist before, with an id of its own.
+    OpenNewChat,
+    /// Start that chat's child again and reopen the chat, after its child died
+    /// (S3). This is the action of the death notice; it works on any chat, not
+    /// only the foreground one.
+    RestartChat(ChatId),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -51,6 +61,42 @@ pub enum Input {
         done: usize,
         total: usize,
     },
+    /// One decoded event of one chat's child, tagged with the chat it came from.
+    /// A chat the app has not heard of yet is created empty. The same event of
+    /// another chat is another input, and the two never touch each other.
+    ChatEvent {
+        chat: ChatId,
+        event: RpcEvent,
+    },
+    /// [`Input::ChatEvent`] with the wall-clock time (epoch ms) the event
+    /// arrived at, so a helper that stops being reported in a background chat is
+    /// stamped with when it ended. Otherwise identical.
+    ChatEventAt {
+        chat: ChatId,
+        event: RpcEvent,
+        now_ms: u64,
+    },
+    /// A command for one chat's child did not reach it (it could not be started,
+    /// or its stdin was gone). A notice for that chat, never fatal for the whole
+    /// window: the other chats keep their children.
+    ChatFailed {
+        chat: ChatId,
+        message: String,
+    },
+    /// A new chat's child reported the session file it opened: the chat is the
+    /// stored chat from now on.
+    ChatRekeyed {
+        from: ChatId,
+        to: ChatId,
+    },
+    /// One chat's child is gone. `expected` is true when the host stopped it on
+    /// purpose (idle reap, cap victim, close, shutdown): the chat is just idle
+    /// and reopens silently. An unexpected close of any chat, foreground or
+    /// background, ends that chat and leaves one notice naming it (S3).
+    ChatClosed {
+        chat: ChatId,
+        expected: bool,
+    },
 }
 
 /// A side effect for the shell to run.
@@ -60,4 +106,36 @@ pub enum Command {
     CopyToClipboard(String),
     /// Refresh the session index and report back with `Input::SessionsLoaded`.
     RefreshSessions,
+}
+
+/// Everything one [`Input`] asks the shell to do.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Effects {
+    /// The effects of the single chat the one-child shell ran.
+    pub commands: Vec<Command>,
+    /// The effects on one chat's child, for a shell that runs one per chat.
+    pub chat_commands: Vec<ChatCommand>,
+}
+
+/// A side effect on one chat's child.
+///
+/// Separate from [`Command`] because that one belongs to the single child the
+/// one-child shell ran. A shell that owns one child per chat runs these through
+/// [`update_chats`](crate::update_chats); the single child keeps taking
+/// [`Command::Send`], so nothing of the old shell changes.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ChatCommand {
+    /// Start that chat's child, or focus it when it is already up.
+    OpenProcess { chat: ChatId },
+    /// Route one RPC command to that chat's child and no other.
+    Send { chat: ChatId, rpc: RpcCommand },
+}
+
+impl ChatCommand {
+    /// The chat this command is for.
+    pub fn chat(&self) -> &ChatId {
+        match self {
+            Self::OpenProcess { chat } | Self::Send { chat, .. } => chat,
+        }
+    }
 }

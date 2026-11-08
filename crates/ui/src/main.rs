@@ -6,11 +6,15 @@
 //! Layout: `app` (state and wiring), `view/` (one file per component),
 //! `message`, `subscription`, `backend` (startup), `refresh_flow` (which session
 //! refresh runs when) and its pure halves `refresh_queue` and `save_throttle`,
-//! plus the small pure helpers `thread_cache`, `sessions` and `cache_path`.
+//! `chat_runtime` (one child per chat, and the app's commands over it),
+//! `chat_keys` (the two names of one chat) and the small pure helpers
+//! `thread_cache`, `sessions` and `cache_path`.
 
 mod app;
 mod backend;
 mod cache_path;
+mod chat_keys;
+mod chat_runtime;
 mod clock;
 mod message;
 mod refresh_flow;

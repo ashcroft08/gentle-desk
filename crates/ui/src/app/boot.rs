@@ -1,4 +1,4 @@
-//! Process startup: the child, the session index and its cache, the watcher,
+//! Process startup: the chat host, the session index and its cache, the watcher,
 //! and the window's first task.
 
 use std::sync::{Arc, Mutex};
@@ -25,7 +25,7 @@ impl App {
             cache: ThreadCache::default(),
             input: String::new(),
             dialog_text: String::new(),
-            process: started.process,
+            chat: started.chat,
             events: started.events,
             flow: Flow::new(
                 shared,
