@@ -4,13 +4,15 @@
 //! widgets (see `windowing`), so the cost of drawing does not grow with the
 //! number of chats; blank spacers keep the scrollable's full height.
 
-use gentle_app::SessionItem;
+use gentle_app::{ListStatus, SessionItem};
 use iced::widget::{button, column, container, responsive, scrollable, text, text_input, Space};
 use iced::{Element, Length, Theme};
 
 use crate::text::truncate;
 use crate::time_ago::time_ago;
 use crate::windowing::window;
+
+mod status;
 
 /// Id of the scrollable, so the app can send it back to the top.
 pub const SCROLL_ID: &str = "sidebar-scroll";
@@ -38,6 +40,8 @@ pub struct Props<'a> {
     /// How many chats exist, so the header can say "3 of 120".
     pub total: usize,
     pub query: &'a str,
+    /// Whether the list is still coming, and how far the pass got.
+    pub list_status: ListStatus,
     pub current: Option<&'a str>,
     /// The wall clock (epoch ms), passed in so this stays a pure drawing of its inputs.
     pub now_ms: u64,
@@ -50,28 +54,24 @@ pub fn view(props: Props<'_>) -> Element<'_, Event> {
         visible,
         total,
         query,
+        list_status,
         current,
         now_ms,
         offset,
     } = props;
-    let shown = visible.len();
-    let list: Element<'_, Event> = if total == 0 {
-        text("No saved chats yet").size(13).into()
-    } else if shown == 0 {
-        text("No chats match").size(13).into()
-    } else {
+    let texts = status::texts(list_status, total, visible.len(), query);
+    let list: Element<'_, Event> = match texts.stand_in {
+        Some(line) => text(line).size(13).into(),
         // `responsive` hands over the height this pane really has, which also
         // follows a resize of the window.
-        responsive(move |size| rows_in_view(&visible, current, now_ms, offset, size.height)).into()
-    };
-    let title = if query.trim().is_empty() {
-        "Chats".to_owned()
-    } else {
-        format!("Chats ({shown} of {total})")
+        None => {
+            responsive(move |size| rows_in_view(&visible, current, now_ms, offset, size.height))
+                .into()
+        }
     };
     container(
         column![
-            text(title).size(16),
+            text(texts.title).size(16),
             text_input("Search chats…", query)
                 .size(13)
                 .on_input(Event::QueryChanged),

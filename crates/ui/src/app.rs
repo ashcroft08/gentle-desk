@@ -165,6 +165,7 @@ impl App {
             visible: self.app.visible_sessions(),
             total: self.app.sessions.len(),
             query: &self.app.session_query,
+            list_status: self.app.list_status,
             current: self.app.current_session.as_deref(),
             now_ms: clock::now_ms(),
             offset: self.sidebar_offset,
