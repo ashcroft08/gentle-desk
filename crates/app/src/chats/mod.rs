@@ -14,9 +14,12 @@
 //! working while the per-chat shell is wired in its own time.
 
 mod activity;
+mod apply;
 mod id;
 mod inputs;
 mod intents;
+mod lifecycle;
+mod queries;
 mod queue;
 mod store;
 

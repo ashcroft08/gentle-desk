@@ -16,17 +16,6 @@ use crate::input::ChatCommand;
 /// The cap [`Chats::default`] carries before the boot input names the host's.
 pub(crate) const DEFAULT_MAX_WORKING: usize = 2;
 
-impl Default for Chats {
-    fn default() -> Self {
-        Self {
-            entries: Default::default(),
-            foreground: None,
-            queue: Default::default(),
-            max_working: DEFAULT_MAX_WORKING,
-        }
-    }
-}
-
 /// Reads and marks on `Chats` that only the cap knows the meaning of. They live
 /// here, next to the queue, so `store` stays the plain map it was.
 impl Chats {
