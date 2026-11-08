@@ -8,11 +8,11 @@ use iced::widget::{column, row, text};
 use iced::Element;
 
 use super::{visible, App};
-use crate::clock;
 use crate::message::Message;
 use crate::view::{
     banner, composer, dialog, header, helper_thread, helpers, notices, sidebar, thread,
 };
+use gentle_runtime::clock;
 
 impl App {
     pub fn view(&self) -> Element<'_, Message> {

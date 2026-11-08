@@ -1051,6 +1051,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "gentle-runtime"
+version = "0.1.0"
+dependencies = [
+ "gentle-app",
+ "gentle-backend",
+ "gentle-core",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "gentle-term"
 version = "0.1.0"
 dependencies = [
@@ -1066,6 +1077,7 @@ dependencies = [
  "gentle-app",
  "gentle-backend",
  "gentle-core",
+ "gentle-runtime",
  "iced",
  "serde_json",
  "tempfile",

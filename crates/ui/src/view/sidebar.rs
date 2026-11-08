@@ -11,9 +11,9 @@ use iced::widget::{
 use iced::{Element, Font, Length, Theme};
 use std::collections::BTreeMap;
 
-use crate::text::truncate;
-use crate::time_ago::time_ago;
 use crate::windowing::window;
+use gentle_runtime::text::truncate;
+use gentle_runtime::time_ago::time_ago;
 
 mod badge;
 mod status;

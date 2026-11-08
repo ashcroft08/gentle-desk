@@ -1,20 +1,18 @@
 //! Starting the chat host (one `gentle-shell` child per chat), the session index
-//! and the session watcher for one run.
+//! and the session watcher for one run, in the shape the window needs.
+//!
+//! The startup itself is framework-free and lives in
+//! [`gentle_runtime::startup`]; this thin wrapper turns its plain receivers
+//! into the window's event sources.
 
-use std::ffi::OsString;
-use std::path::{Path, PathBuf};
-use std::sync::mpsc::Receiver;
+use std::path::PathBuf;
 use std::sync::Arc;
 
-use gentle_backend::chat_host::{ChatHost, Clock, Limits, ProcessSpawner, Spawner, SystemClock};
-use gentle_backend::home::{agent_dir, with_home_flag, HomeEnv};
-use gentle_backend::launcher::{self, LauncherEnv};
-use gentle_backend::session_cache;
 use gentle_backend::session_index::SessionIndex;
-use gentle_backend::session_watch::{Batch, SessionWatcher, WatchError};
+use gentle_backend::session_watch::SessionWatcher;
+use gentle_runtime::chat_runtime::ChatRuntime;
+use gentle_runtime::startup;
 
-use crate::cache_path;
-use crate::chat_runtime::ChatRuntime;
 use crate::subscription::EventSource;
 use crate::watch_source::WatchSource;
 
@@ -47,77 +45,28 @@ pub struct Started {
 /// Command line arguments are forwarded to every `gentle-shell` child; a home
 /// flag is added when they name none.
 pub fn start() -> Started {
+    let raw = startup::start();
     let events = EventSource::default();
-    let home_env = HomeEnv::from_process();
-    let args = with_home_flag(std::env::args_os().skip(1).collect(), &home_env);
-    let cache_path = cache_path::cache_file(std::env::var_os("LOCALAPPDATA"));
-    let agent = agent_dir(&args, &home_env);
-    let sessions_dir = agent.map(|dir| dir.join("sessions"));
-    let index = sessions_dir.clone().map(|sessions| {
-        let mut index = SessionIndex::new(sessions);
-        // A cache that is missing, stale, corrupt or from another home is
-        // ignored and the first refresh does the full scan.
-        if let Some(snapshot) = cache_path.as_deref().and_then(session_cache::load) {
-            index.restore(snapshot);
-        }
-        index
-    });
-    // A watcher that cannot start is no dead end: the polling fallback covers
-    // the list and every full pass tries again.
+    if let (Some(chat), Some(tagged)) = (&raw.chat, raw.events) {
+        events.fill(chat.clone(), tagged);
+    }
     let mut watch = WatchSource::default();
-    let mut watch_error = None;
-    let (watcher, batches) = match sessions_dir.as_deref() {
-        Some(dir) => match try_start_watcher(dir) {
-            Ok(started) => (Some(started.0), Some(started.1)),
-            Err(error) => {
-                eprintln!("session watcher unavailable: {error}");
-                watch_error = Some(error.to_string());
-                (None, None)
-            }
-        },
-        None => (None, None),
-    };
-    if let Some(batches) = batches {
+    if let Some(batches) = raw.batches {
         watch.fill(batches);
     }
-    let (chat, fatal) = match start_host(args) {
-        Ok(host) => {
-            let (runtime, tagged) = ChatRuntime::new(host);
-            let runtime = Arc::new(runtime);
-            events.fill(Arc::clone(&runtime), tagged);
-            (Some(runtime), None)
-        }
-        Err(error) => (None, Some(error)),
-    };
     Started {
-        chat,
+        chat: raw.chat,
         events,
-        index,
-        cache_path,
-        sessions_dir,
-        watcher,
+        index: raw.index,
+        cache_path: raw.cache_path,
+        sessions_dir: raw.sessions_dir,
+        watcher: raw.watcher,
         watch,
-        watch_error,
-        fatal,
+        watch_error: raw.watch_error,
+        fatal: raw.fatal,
     }
-}
-
-/// The host itself: real children, the searcher's limits, and the launcher plus
-/// the forwarded arguments of this window.
-fn start_host(args: Vec<OsString>) -> Result<ChatHost, String> {
-    let launcher = launcher::resolve(&LauncherEnv::from_process()).map_err(|e| e.to_string())?;
-    let spawner = ProcessSpawner::new(launcher).with_args(args);
-    Ok(ChatHost::with_parts(
-        Limits::default(),
-        Arc::new(spawner) as Arc<dyn Spawner>,
-        Arc::new(SystemClock) as Arc<dyn Clock>,
-    ))
 }
 
 /// Starts watching `sessions_dir`, for the first time and for every retry after
 /// a failure. `Err` is worth logging once, not once per pass: the caller decides.
-pub fn try_start_watcher(
-    sessions_dir: &Path,
-) -> Result<(SessionWatcher, Receiver<Batch>), WatchError> {
-    SessionWatcher::start(sessions_dir)
-}
+pub use gentle_runtime::startup::try_start_watcher;

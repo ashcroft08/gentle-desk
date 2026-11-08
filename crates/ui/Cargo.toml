@@ -13,6 +13,7 @@ path = "src/main.rs"
 gentle-core = { path = "../gentle-core" }
 gentle-app = { path = "../app" }
 gentle-backend = { path = "../backend" }
+gentle-runtime = { path = "../runtime" }
 iced = { version = "0.14", features = ["markdown", "highlighter", "tokio"] }
 serde_json = "1"
 

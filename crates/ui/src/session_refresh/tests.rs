@@ -3,8 +3,8 @@ use iced::futures::executor::block_on;
 use iced::futures::FutureExt;
 use std::fs;
 
-use crate::sessions;
 use gentle_backend::session_cache;
+use gentle_runtime::sessions;
 
 const HEADER: &str = r#"{"type":"session","version":3,"id":"s1","timestamp":"2026-01-01T00:00:00.000Z","cwd":"C:\\dev\\p"}"#;
 const USER: &str = r#"{"type":"message","id":"m","timestamp":"2026-01-01T00:01:00.000Z","message":{"role":"user","content":"hola"}}"#;
