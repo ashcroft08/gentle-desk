@@ -228,6 +228,114 @@ p {
   transform: none;
 }
 
+/* The New workspace menu: the artboard's rules for it (01a, `.menu`), except
+   for the placement, which bits-ui's floating layer owns; the trigger and the
+   items keep the artboard's hover look, and `data-highlighted` is the keyboard
+   form of the same highlight. */
+.menu {
+  min-width: 210px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  padding: 4px;
+  z-index: 15;
+}
+
+.menu [role='menuitem'] {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.menu [role='menuitem']:hover,
+.menu [role='menuitem'][data-highlighted] {
+  background: var(--surface2);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+/* The create-folder dialog: the states board's dialog shape (the `dialog`
+   element's geometry and the `.dlg` card), since bits-ui mounts its own node
+   instead of a native <dialog>. */
+.ovl {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 40;
+}
+
+.dlg {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(440px, calc(100vw - 32px));
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 18px;
+  box-shadow: var(--shadow);
+  z-index: 41;
+}
+
+.dlg .dt {
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.dlg label {
+  display: block;
+  margin: 14px 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.dlg input {
+  width: 100%;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 7px 10px;
+  background: var(--bg);
+  font-size: 13px;
+}
+
+.dlg .acts {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.btn {
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 6px 14px;
+  cursor: pointer;
+}
+
+.btn:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.empty .btn {
+  margin-top: 10px;
+}
+
 /* The tree: one scroll container, flat rows of one fixed height. */
 .tree {
   flex: 1;
