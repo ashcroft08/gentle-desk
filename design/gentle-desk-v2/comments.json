@@ -41,9 +41,9 @@
       "excerpt": "gentle-desk",
       "comment": "que el boton de new chat sea con hover que aparezca al poner el mouse sobre la seccion de la carpeta",
       "createdAt": "2026-11-09T06:18:53.452Z",
-      "status": "open",
+      "status": "resolved",
       "sentAt": "2026-11-09T06:18:53.488Z",
-      "resolvedAt": null
+      "resolvedAt": "2026-11-09T06:22:23.666Z"
     },
     {
       "id": "voxx3gaf",
@@ -54,6 +54,17 @@
       "createdAt": "2026-11-09T06:19:49.588Z",
       "status": "open",
       "sentAt": "2026-11-09T06:19:49.621Z",
+      "resolvedAt": null
+    },
+    {
+      "id": "e3ub0sco",
+      "file": "01a-tree-chat.html",
+      "selector": "body > div > aside > nav > div > div:nth-of-type(1) > button",
+      "excerpt": "New chat in gentle-desk",
+      "comment": "al poner el mouse encima se dibuja un cuadrado como una card como que esta encerrado el icono",
+      "createdAt": "2026-11-09T06:22:07.030Z",
+      "status": "open",
+      "sentAt": "2026-11-09T06:22:07.084Z",
       "resolvedAt": null
     }
   ]
