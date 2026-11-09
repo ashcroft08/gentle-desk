@@ -12,11 +12,24 @@ export const commands = {
 	 */
 	getBadge: (chatId: string) => __TAURI_INVOKE<ChatBadge>("get_badge", { chatId }),
 	/**
-	 *  The one command this slice exposes: fold the intent, push the new slice and
+	 *  One command this slice exposes: fold the intent, push the new slice and
 	 *  run what it asked for. The emitted event is typed through tauri-specta, so
 	 *  the Svelte side gets the same [`ViewState`] for the return and the payload.
 	 */
 	dispatchIntent: (intent: UiIntent) => typedError<ViewState_Serialize, string>(__TAURI_INVOKE("dispatch_intent", { intent })),
+	/**
+	 *  One page of the session list (S3): the rows `[offset, offset + length)` of
+	 *  the list `query` narrows, and how many rows it matches in total. It reads the
+	 *  CURRENT state, so a sidebar that missed a push still gets the truth; the
+	 *  length is capped, so no caller can ask for a whole 50 000-chat list.
+	 */
+	sessionsWindow: (offset: number, length: number, query: string) => __TAURI_INVOKE<SessionsWindow>("sessions_window", { offset, length, query }),
+	/**
+	 *  The first read of a web view: the slice the state holds right now. It emits
+	 *  nothing, so it cannot race the pushes it duplicates; a view that starts after
+	 *  the first pass already settled reads the settled list here.
+	 */
+	getViewState: () => __TAURI_INVOKE<ViewState_Serialize>("get_view_state"),
 };
 
 /** Events */
@@ -82,10 +95,8 @@ export type NoticeView = {
 };
 
 /**
- *  One row of the session list, flattened for display. Only a WINDOW of rows is
- *  pushed ([`ROWS_PUSHED`](crate::sessions::view::ROWS_PUSHED)); the windowed
- *  `offset`/`length`/`query` query of S3 is a later slice (T4), which is why no
- *  total is part of this row or of the push.
+ *  One row of the session list, flattened for display. Rows are served a
+ *  WINDOW at a time ([`SessionsWindow`], S3); the whole list is never pushed.
  */
 export type SessionRowView = {
 	/**
@@ -101,6 +112,20 @@ export type SessionRowView = {
 	 *  (the rule is [`gentle_runtime::time_ago`]).
 	 */
 	modified_ago: string,
+};
+
+/**
+ *  One page of the session list as `sessions_window` answers it (S3): the rows
+ *  `[offset, offset + length)` of the list `query` narrows, and how many rows
+ *  that query matches in total, so the sidebar knows how far it can scroll.
+ * 
+ *  The length is capped ([`MAX_WINDOW`](crate::sessions::window::MAX_WINDOW)),
+ *  so this type never carries the whole list of a 50 000-chat home.
+ */
+export type SessionsWindow = {
+	/**  The filtered count: the rows the query matches, not the page's length. */
+	total: number,
+	rows: SessionRowView[],
 };
 
 /**
@@ -146,10 +171,12 @@ export type UiIntent = { type: "SendPrompt"; data: {
 /**
  *  The state the current views render: the foreground chat (as the app names
  *  it, the id the sidebar passes back) with its thread, the notices, the
- *  per-chat activity the list rows show and the first window of the session
- *  list with how complete it is. The push size is the notices, the chats that
- *  are not idle, the tail of one thread and a bounded window of rows, never the
- *  whole `AppState` (S2).
+ *  per-chat activity the list rows show, and the session list as a status plus
+ *  a revision. The rows themselves are not here: the sidebar asks
+ *  `sessions_window` for the page it draws (S3).
+ * 
+ *  The push size is the notices, the chats that are not idle and the tail of one
+ *  thread, never the whole `AppState` and never the whole list (S2).
  * 
  *  A chat's stderr reason lines are not a slice of their own: the app keeps them
  *  in a bounded ring but exposes them only as the reason of the death notice, so
@@ -160,10 +187,12 @@ export type ViewState = ViewState_Serialize | ViewState_Deserialize;
 /**
  *  The state the current views render: the foreground chat (as the app names
  *  it, the id the sidebar passes back) with its thread, the notices, the
- *  per-chat activity the list rows show and the first window of the session
- *  list with how complete it is. The push size is the notices, the chats that
- *  are not idle, the tail of one thread and a bounded window of rows, never the
- *  whole `AppState` (S2).
+ *  per-chat activity the list rows show, and the session list as a status plus
+ *  a revision. The rows themselves are not here: the sidebar asks
+ *  `sessions_window` for the page it draws (S3).
+ * 
+ *  The push size is the notices, the chats that are not idle and the tail of one
+ *  thread, never the whole `AppState` and never the whole list (S2).
  * 
  *  A chat's stderr reason lines are not a slice of their own: the app keeps them
  *  in a bounded ring but exposes them only as the reason of the death notice, so
@@ -177,11 +206,16 @@ export type ViewState_Deserialize = {
 	 */
 	list_status: ListStatusView,
 	/**
-	 *  The first [`ROWS_PUSHED`](crate::sessions::view::ROWS_PUSHED) rows of the
-	 *  session list, in list order: enough for the sidebar to draw before the
-	 *  windowed query of T4 exists.
+	 *  Bumped every time the folded list or its status changes (wrapping), so
+	 *  the web side knows the page of rows it holds is stale and re-queries
+	 *  `sessions_window`. A push that does not touch the list leaves it alone.
 	 */
-	sessions: SessionRowView[],
+	sessions_revision: number,
+	/**
+	 *  How many sessions the app holds, whatever the search box says: the
+	 *  unfiltered count, next to the filtered total each window answers with.
+	 */
+	total_sessions: number,
 	/**
 	 *  The foreground chat's messages, oldest first. Message text is the model's
 	 *  whole markdown reply, so the slice carries the last
@@ -196,10 +230,12 @@ export type ViewState_Deserialize = {
 /**
  *  The state the current views render: the foreground chat (as the app names
  *  it, the id the sidebar passes back) with its thread, the notices, the
- *  per-chat activity the list rows show and the first window of the session
- *  list with how complete it is. The push size is the notices, the chats that
- *  are not idle, the tail of one thread and a bounded window of rows, never the
- *  whole `AppState` (S2).
+ *  per-chat activity the list rows show, and the session list as a status plus
+ *  a revision. The rows themselves are not here: the sidebar asks
+ *  `sessions_window` for the page it draws (S3).
+ * 
+ *  The push size is the notices, the chats that are not idle and the tail of one
+ *  thread, never the whole `AppState` and never the whole list (S2).
  * 
  *  A chat's stderr reason lines are not a slice of their own: the app keeps them
  *  in a bounded ring but exposes them only as the reason of the death notice, so
@@ -213,11 +249,16 @@ export type ViewState_Serialize = {
 	 */
 	list_status: ListStatusView,
 	/**
-	 *  The first [`ROWS_PUSHED`](crate::sessions::view::ROWS_PUSHED) rows of the
-	 *  session list, in list order: enough for the sidebar to draw before the
-	 *  windowed query of T4 exists.
+	 *  Bumped every time the folded list or its status changes (wrapping), so
+	 *  the web side knows the page of rows it holds is stale and re-queries
+	 *  `sessions_window`. A push that does not touch the list leaves it alone.
 	 */
-	sessions: SessionRowView[],
+	sessions_revision: number,
+	/**
+	 *  How many sessions the app holds, whatever the search box says: the
+	 *  unfiltered count, next to the filtered total each window answers with.
+	 */
+	total_sessions: number,
 	/**
 	 *  The foreground chat's messages, oldest first. Message text is the model's
 	 *  whole markdown reply, so the slice carries the last

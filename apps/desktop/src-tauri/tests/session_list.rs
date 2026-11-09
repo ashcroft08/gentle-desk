@@ -14,7 +14,7 @@ use std::time::Duration;
 
 use gentle_app::{prepare_sessions, AppState, Input, SessionItem};
 use gentle_desk_lib::contract::ListStatusView;
-use gentle_desk_lib::sessions::view;
+use gentle_desk_lib::sessions::window;
 
 #[test]
 fn the_first_pass_pushes_a_reading_list_then_the_whole_one() {
@@ -43,12 +43,15 @@ fn the_first_pass_pushes_a_reading_list_then_the_whole_one() {
         "a partial list never claims to be the whole truth"
     );
     assert_eq!(last.list_status, ListStatusView::Complete);
-    assert_eq!(last.sessions.len(), 3, "one row per session file");
+    assert_eq!(last.total_sessions, 3, "one row per session file");
 
-    let mut names: Vec<&str> = last.sessions.iter().map(|row| file_name(&row.id)).collect();
+    // The rows are not part of the push: they come back as a window (S3).
+    let rows = holder.sessions_window(0, window::MAX_WINDOW, "");
+    assert_eq!(rows.rows.len(), 3);
+    let mut names: Vec<&str> = rows.rows.iter().map(|row| file_name(&row.id)).collect();
     names.sort();
     assert_eq!(names, vec!["a.jsonl", "b.jsonl", "c.jsonl"]);
-    for row in &last.sessions {
+    for row in &rows.rows {
         assert_eq!(
             row.project, "p",
             "the project is the session's last directory"
@@ -59,35 +62,34 @@ fn the_first_pass_pushes_a_reading_list_then_the_whole_one() {
             "every row carries its age text"
         );
     }
-    let titles: Vec<&str> = last.sessions.iter().map(|row| row.title.as_str()).collect();
+    let titles: Vec<&str> = rows.rows.iter().map(|row| row.title.as_str()).collect();
     assert!(titles.contains(&"first chat"), "got {titles:?}");
 
     // The holder is what the last push said: the web side and the state agree.
     let held = holder.view();
     assert_eq!(held.list_status, ListStatusView::Complete);
-    assert_eq!(held.sessions.len(), 3);
+    assert_eq!(held.total_sessions, 3);
 }
 
 #[test]
-fn more_than_fifty_sessions_are_pushed_as_a_window_of_fifty_rows() {
+fn a_big_list_is_pushed_without_rows_and_read_back_by_the_window() {
     let home = Home::new();
     home.many(60);
-    let (service, _, recorder) = service(&home);
+    let (service, holder, recorder) = service(&home);
 
     service.request();
     let pushes = recorder.wait_for_complete();
 
     let last = pushes.last().expect("the list settles");
     assert_eq!(last.list_status, ListStatusView::Complete);
-    assert_eq!(
-        last.sessions.len(),
-        view::ROWS_PUSHED,
-        "the whole list never leaves Rust: the push is a window"
-    );
-    let mut ids: Vec<&str> = last.sessions.iter().map(|row| row.id.as_str()).collect();
+    assert_eq!(last.total_sessions, 60, "the push carries the count only");
+    let rows = holder.sessions_window(0, window::MAX_WINDOW, "");
+    assert_eq!(rows.total, 60);
+    let mut ids: Vec<&str> = rows.rows.iter().map(|row| row.id.as_str()).collect();
+    assert_eq!(ids.len(), 60, "no row is served twice");
     ids.sort();
     ids.dedup();
-    assert_eq!(ids.len(), view::ROWS_PUSHED, "no row is pushed twice");
+    assert_eq!(ids.len(), 60);
 }
 
 #[test]
@@ -139,7 +141,7 @@ fn a_missing_home_keeps_the_list_reading_and_never_claims_it_is_empty() {
         ListStatusView::Loading { done: 0, total: 0 },
         "the reducer's initial state is reading, not an empty list"
     );
-    assert!(view.sessions.is_empty());
+    assert_eq!(view.total_sessions, 0);
 }
 
 #[test]
@@ -157,10 +159,10 @@ fn a_home_with_no_sessions_settles_complete_and_empty_after_reading() {
         "an empty list is never claimed before the pass ends, got {:?}",
         first.list_status
     );
-    assert!(first.sessions.is_empty());
+    assert_eq!(first.total_sessions, 0);
     let last = pushes.last().expect("the pass settles");
     assert_eq!(last.list_status, ListStatusView::Complete);
-    assert!(last.sessions.is_empty());
+    assert_eq!(last.total_sessions, 0);
 }
 
 #[test]
@@ -181,7 +183,7 @@ fn a_row_carries_the_texts_the_runtime_rules_produce() {
     )
     .0;
 
-    let rows = view::rows(&state, 1_000 + 3 * 60 * 60_000);
+    let rows = window::window(&state, "", 0, window::MAX_WINDOW, 1_000 + 3 * 60 * 60_000).rows;
 
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0].id, "/sessions/p/a.jsonl");

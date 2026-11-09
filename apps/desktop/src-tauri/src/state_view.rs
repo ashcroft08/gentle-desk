@@ -3,28 +3,28 @@
 //!
 //! Every field is a slice the state really holds, never the whole `AppState`:
 //! the foreground chat named as the app names it, the tail of its thread, the
-//! notices flattened, the chats that are not idle, and the session list with
-//! how complete it is. The clock is read once per slice, so every age a row
-//! shows is measured at the same moment.
+//! notices flattened, the chats that are not idle, and the session list as a
+//! status, a total and a revision instead of rows - the rows are served one
+//! window at a time (S3).
 
 use gentle_app::AppState;
 use gentle_runtime::badge::{Badge, BadgeMark};
-use gentle_runtime::clock::now_ms;
 
 use crate::contract::{ChatActivityMark, ChatActivityView, NoticeLevel, NoticeView, ViewState};
 use crate::{sessions, view};
 
-/// The slice of `state` as it stands now. The clock is read once, so every age
-/// a row shows is measured at the same moment.
-pub fn view_state(state: &AppState) -> ViewState {
-    let now = now_ms();
+/// The slice of `state` as it stands now, carrying the revision the holder
+/// keeps for the session list: the web side compares it to know when the page
+/// of rows it holds is stale.
+pub fn view_state(state: &AppState, sessions_revision: u32) -> ViewState {
     ViewState {
         foreground_chat: state
             .chats
             .foreground()
             .map(|chat| chat.as_str().to_owned()),
         list_status: sessions::view::status(state),
-        sessions: sessions::view::rows(state, now),
+        sessions_revision,
+        total_sessions: sessions::view::total(state),
         messages: view::messages(state),
         notices: state.notices.iter().map(NoticeView::of).collect(),
         activity: activity_view(state),

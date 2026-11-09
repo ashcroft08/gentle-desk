@@ -18,11 +18,15 @@
 //! bridge, which asks the sessions service for that pass. Both kinds run off the
 //! window's thread.
 
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use gentle_app::{ChatId, Command};
+use gentle_runtime::clock::now_ms;
 
-use crate::contract::{UiIntent, ViewState};
+use crate::contract::{SessionsWindow, UiIntent, ViewState};
+use crate::sessions::revision;
+use crate::sessions::window::window;
 use crate::state_view::view_state;
 
 /// What runs one shared command the reducer asked for. `Command::RefreshSessions`
@@ -38,6 +42,10 @@ pub struct AppStateHolder {
     /// Installed once at startup: before it exists a shared command is simply
     /// dropped, which is what the earlier slices did with all of them.
     commands: Mutex<Option<CommandSink>>,
+    /// Bumped whenever the folded list or its status changes, and carried by
+    /// every slice as `ViewState::sessions_revision`. It wraps: the web side
+    /// compares two revisions for inequality, so a wrap names no old list.
+    sessions_revision: AtomicU32,
 }
 
 impl AppStateHolder {
@@ -79,20 +87,45 @@ impl AppStateHolder {
         view
     }
 
-    /// The slice the web side holds right now, without folding anything.
+    /// The slice the web side holds right now, without folding anything: the
+    /// answer of `get_view_state`, the first read a sidebar makes. Reading never
+    /// emits, so a webview that missed the pushes still gets the whole slice.
     pub fn view(&self) -> ViewState {
-        view_state(&self.state())
+        view_state(&self.state(), self.sessions_revision())
+    }
+
+    /// One window of the session list as the state holds it NOW: the rows
+    /// `[offset, offset + length)` of the list `query` narrows, and the filtered
+    /// total. The state is cloned so the filter runs off the lock and a fold on
+    /// the pump's thread never waits for a page (S3).
+    pub fn sessions_window(&self, offset: u32, length: u32, query: &str) -> SessionsWindow {
+        window(&self.state(), query, offset, length, now_ms())
+    }
+
+    /// The revision of the session list this holder has reached.
+    pub fn sessions_revision(&self) -> u32 {
+        self.sessions_revision.load(Ordering::Relaxed)
     }
 
     fn apply(&self, input: gentle_app::Input) -> (ViewState, Vec<gentle_app::ChatCommand>) {
-        let state = self.state();
-        let (state, effects) = gentle_app::update_chats(state, input);
-        *lock(&self.app) = state.clone();
-        let view = view_state(&state);
-        // After the state lock is released: a refresh request starts a pass
-        // whose thread folds back into this same holder.
-        self.run_shared(effects.commands);
-        (view, effects.chat_commands)
+        // One lock for the fold and the slice it answers: a revision read here
+        // describes exactly the state it is pushed with. The shared commands
+        // run after it is released, because a refresh pass folds back into this
+        // same holder.
+        let (view, chat_commands, commands) = {
+            let mut app = lock(&self.app);
+            let previous = app.clone();
+            let full = revision::folds_the_list(&input);
+            let (state, effects) = gentle_app::update_chats(previous.clone(), input);
+            if revision::list_moved(&previous, &state, full) {
+                self.sessions_revision.fetch_add(1, Ordering::Relaxed);
+            }
+            *app = state;
+            let view = view_state(&app, self.sessions_revision());
+            (view, effects.chat_commands, effects.commands)
+        };
+        self.run_shared(commands);
+        (view, chat_commands)
     }
 
     /// Runs the shared commands of one fold through the sink, if any.

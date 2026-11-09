@@ -28,6 +28,8 @@ pub fn contract_builder() -> Builder<tauri::Wry> {
         .commands(tauri_specta::collect_commands![
             contract::get_badge,
             commands::dispatch_intent,
+            sessions::commands::sessions_window,
+            sessions::commands::get_view_state,
         ])
         .events(tauri_specta::collect_events![contract::StateChanged,])
 }
