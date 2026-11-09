@@ -156,7 +156,7 @@ fn row_of<'a>(
     let badge = badge::Badge::on(activity);
     // A badge costs the title the room of a mark, and no more: the row keeps
     // its height and its one line either way.
-    let room = badge.map(|_| badge::Badge::TITLE_ROOM).unwrap_or(0);
+    let room = badge.map(|_| badge::TITLE_ROOM).unwrap_or(0);
     let title = text(truncate(&session.title, TITLE_CHARS - room))
         .size(14)
         .wrapping(text::Wrapping::None)
@@ -164,7 +164,9 @@ fn row_of<'a>(
     let title: Element<'_, Event> = match badge {
         Some(badge) => row![
             title,
-            text(badge.mark).size(13).style(badge_colour(badge.role))
+            text(badge::glyph(badge.mark))
+                .size(13)
+                .style(badge_colour(badge.role)),
         ]
         .spacing(6)
         .into(),
