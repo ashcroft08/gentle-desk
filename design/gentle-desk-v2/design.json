@@ -1,54 +1,26 @@
 {
-  "title": "gentle-desk v2 - three clean directions for the Tauri client",
-  "brief": "Second design round for the gentle-desk desktop client (gentle-shell GUI). Three structurally different directions, each with ONE quiet main screen (no more than about 12 visible controls, icons with tooltips instead of text buttons, no state demo controls) and the Chat | Helpers swap in the same area, shown in both views. Per-chat states live in one shared board. Same six themes as gentle-shell.",
+  "title": "gentle-desk v2 - direction A, workspaces (the chosen design)",
+  "brief": "Desktop client for gentle-shell. Chosen direction A: a sidebar of workspaces (folders) with their chats, a New session button that opens a chat in the current workspace folder (disabled when no workspace is selected), a new-chat icon on each workspace that appears on hover or focus, and the Chat | Helpers swap in the same area, shown in both views. Per-chat states, notices, rename/delete and the disabled New session state live in one shared board. Same six gentle-shell themes. Directions B and C were discarded by the user.",
   "feature": "odd/tasks/tauri-migration-m19.md",
   "artboards": [
     {
       "file": "00-states-board.html",
       "title": "Shared states board",
-      "tradeoff": "Keeps the six per-chat states, notices, rename and delete out of the main screens so those stay silent; cost: you judge states away from the real layout.",
+      "tradeoff": "Keeps the six per-chat states, notices, rename, delete and the disabled New session state out of the main screens so those stay silent; cost: you judge states away from the real layout.",
       "width": 1440,
       "height": 1500
     },
     {
       "file": "01a-tree-chat.html",
-      "title": "A - Workspaces only (Chat view)",
-      "tradeoff": "Workspaces with their chats, no separate Chats section. Top button is New session (opens a chat in the current workspace folder) and each workspace row shows a new-chat icon on hover or focus. Matches how the terminal works (history per location); open questions: what New session does with no current workspace, and what a workspace menu would hold (not drawn).",
+      "title": "A - Workspaces (Chat view)",
+      "tradeoff": "Workspaces with their chats and nothing else in the sidebar. New session opens a chat in the current workspace; each workspace shows a new-chat icon on hover or focus. Open or closed folder icon shows the state; no chevron. Matches the terminal (history per location). Not drawn: a workspace menu (no options yet).",
       "width": 1440,
       "height": 900
     },
     {
       "file": "01b-tree-helpers.html",
-      "title": "A - Workspaces only (Helpers view)",
-      "tradeoff": "Same direction, Helpers view swapped into the same area as the thread.",
-      "width": 1440,
-      "height": 900
-    },
-    {
-      "file": "02a-activity-chat.html",
-      "title": "B - Activity tabs (Chat view)",
-      "tradeoff": "Sidebar grouped by what needs you (Needs you, Working, Recent) with icon tabs for Workspaces and independent Chats; answers what needs me now without scanning, but old chats take one extra tab switch.",
-      "width": 1440,
-      "height": 900
-    },
-    {
-      "file": "02b-activity-helpers.html",
-      "title": "B - Activity tabs (Helpers view)",
-      "tradeoff": "Same direction, Helpers view.",
-      "width": 1440,
-      "height": 900
-    },
-    {
-      "file": "03a-rail-chat.html",
-      "title": "C - Workspace rail (Chat view)",
-      "tradeoff": "A narrow rail of workspaces plus one focused chat list: the quietest, shows only one workspace at a time; the most controls on screen (13) and hidden workspaces need a click.",
-      "width": 1440,
-      "height": 900
-    },
-    {
-      "file": "03b-rail-helpers.html",
-      "title": "C - Workspace rail (Helpers view)",
-      "tradeoff": "Same direction, Helpers view (15 controls, the densest screen).",
+      "title": "A - Workspaces (Helpers view)",
+      "tradeoff": "Same sidebar as the Chat view, with the Helpers view swapped into the same area as the thread.",
       "width": 1440,
       "height": 900
     }
