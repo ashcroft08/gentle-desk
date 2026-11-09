@@ -1,5 +1,7 @@
 //! Running one per-chat command against the host.
 
+use std::path::PathBuf;
+
 use gentle_app::{ChatCommand, ChatId};
 use gentle_backend::chat_host::Opened;
 use gentle_core::rpc::RpcCommand;
@@ -21,15 +23,25 @@ pub enum Outcome {
 }
 
 impl ChatRuntime {
-    /// Runs one command. Blocking: an open waits for the child to start.
+    /// Runs one command, in the folder of this process.
     pub fn execute(&self, command: ChatCommand) -> Outcome {
+        self.execute_in(command, None)
+    }
+
+    /// Runs one command with the folder a workspace named for the chat it
+    /// opens. The folder only matters for a child that is actually started: an
+    /// open of a chat that is already live keeps the folder it started in, and a
+    /// send goes to a child that already has one. An open in a folder that
+    /// cannot host a child fails the way the host says it does, before anything
+    /// is started.
+    pub fn execute_in(&self, command: ChatCommand, folder: Option<PathBuf>) -> Outcome {
         match command {
-            ChatCommand::OpenProcess { chat } => self.open(chat),
+            ChatCommand::OpenProcess { chat } => self.open(chat, folder),
             ChatCommand::Send { chat, rpc } => self.send(chat, &rpc),
         }
     }
 
-    fn open(&self, chat: ChatId) -> Outcome {
+    fn open(&self, chat: ChatId, folder: Option<PathBuf>) -> Outcome {
         // The registry lock ends before `open`, which waits for the child.
         let key = {
             let mut keys = self.keys();
@@ -41,7 +53,7 @@ impl ChatRuntime {
                 message: "this chat has no process to open".to_owned(),
             };
         };
-        match self.host.open(key) {
+        match self.host.open_in(key, folder) {
             Ok(how) => Outcome::Opened { chat, how },
             Err(error) => Outcome::OpenFailed {
                 chat,

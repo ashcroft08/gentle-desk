@@ -59,6 +59,20 @@ pub enum UiIntent {
     },
     /// The same for a chat that did not exist before.
     OpenNewChat,
+    /// Start a NEW chat in the workspace at `path`: what the header's New
+    /// session button (D2) and a workspace's own new-chat icon (D3) send. The
+    /// web side decides which workspace is the current one and names it; the
+    /// chat started here is the same new chat `OpenNewChat` starts, only in
+    /// that folder, and never the legacy single-child `NewChat`.
+    NewChatInWorkspace {
+        path: String,
+    },
+    /// Fold or unfold the chats of the workspace at `path` in the sidebar (D8):
+    /// the state is remembered in the app config, so it survives the run.
+    SetWorkspaceCollapsed {
+        path: String,
+        collapsed: bool,
+    },
     /// Start the child of a chat that died again and reopen it (S3).
     RestartChat {
         chat_id: String,
@@ -209,9 +223,11 @@ pub struct ViewState {
     pub messages: Vec<MessageView>,
     pub notices: Vec<NoticeView>,
     pub activity: Vec<ChatActivityView>,
-    /// What the user should be told about the app config file, when it could
-    /// not be used at startup: a damaged file is kept aside and the app starts
-    /// with an empty config. `None` when the file was read, or was not there.
+    /// What the user should be told about the app config file: a file that
+    /// could not be used at startup is kept aside and the app starts with an
+    /// empty config, and a file that could not be written leaves the change in
+    /// memory only. `None` when the file was read, or was not there, and nothing
+    /// failed.
     pub config_notice: Option<String>,
 }
 

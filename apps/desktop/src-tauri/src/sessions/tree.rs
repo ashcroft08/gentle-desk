@@ -120,6 +120,13 @@ impl Tree {
     pub fn chat(&self, index: u32) -> Option<&SessionItem> {
         self.chats.get(index as usize)
     }
+
+    /// Whether a workspace of this tree is the folder `key` names
+    /// ([`gentle_runtime::app_config::folder_key`]): the folders the config
+    /// holds and the ones the sessions name, exactly as the sidebar shows them.
+    pub fn knows(&self, key: &str) -> bool {
+        self.headers.iter().any(|header| header.key == key)
+    }
 }
 
 /// The index a list reaches after one more push, as the `u32` a [`Row`] holds.

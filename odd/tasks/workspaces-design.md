@@ -145,3 +145,48 @@ What the tree window of the bridge decided, beyond the specs above:
 - The app config is read once at startup, outside every lock, and the notice of a damaged file reaches
   the web side as the new optional `ViewState.config_notice` field. A run with no config path holds the
   empty config in memory, and this slice never writes a config file.
+
+## W3b decisions
+
+What the bridge's workspace intents decided, beyond the specs above:
+
+- Two intents were added to the contract and nothing else: `NewChatInWorkspace { path }` and
+  `SetWorkspaceCollapsed { path, collapsed }`. The web side decides which workspace is the current
+  one (P5 stays a view-local selection) and names it in the intent.
+- `NewChatInWorkspace` is the intent of BOTH the header's New session button (D2) and a workspace's
+  circle-plus icon (D3), because both mean the same thing: a new chat in one named folder. It folds
+  to the existing `OpenNewChat` path, so the chat is a chat of the per-chat model; the legacy
+  single-child `NewChat` is untouched by this slice.
+- The folder never enters `crates/app` (S2, unchanged reducer and state types). It waits in a
+  pending-folder table keyed by the `ChatId` the reducer allocated: the intent path sets it before
+  the `OpenProcess` command is run, the executor takes it and calls `ChatHost::open_in(key, folder)`
+  (`ChatRuntime::execute_in`). An entry is removed when it is taken, so a folder can never reach a
+  second open, and an open nobody set a folder for inherits the process folder as before.
+- A folder that is not there, or that is a file, never starts a child: the host refuses before
+  anything is reserved, and the refusal travels the path a failed open already takes
+  (`Outcome::OpenFailed`, `Input::ChatFailed`), which ends the opening phase and leaves one error
+  notice naming the reason. No new error surface was invented for it.
+- `SetWorkspaceCollapsed` is not a reducer intent: it edits the app config snapshot
+  (`AppConfig::set_collapsed`) and installs it, which moves `sessions_revision`, so the tree is
+  rebuilt and the folded workspace serves its header only. The collapsed state is the config's
+  because it must survive the run (D8, S9).
+- A workspace that exists only because a session lives there has no state in the config to remember
+  (the limit W1 recorded), so it is added with `AppConfig::add_workspace` the first time it is
+  folded, and folded right after. Adding a workspace through the UI (D7, the New workspace dialog)
+  is W3c, not this slice.
+- A change to the config is ONE step (`AppStateHolder::update_config`): the read, the edit and the
+  install of the new snapshot all happen under the config lock, so two folds of two different
+  workspaces at the same time cannot lose each other, and the revision moves inside the same step.
+  Whether a folder is a workspace at all is decided BEFORE that step, because the answer reads the
+  tree and the session list: no other lock is ever taken inside the config lock.
+- One thread owns the config file for the whole run and always writes the latest snapshot. The lock
+  is never held for disk I/O: the numbered snapshot leaves for the writer's own thread, which
+  drains its queue to the newest one and drops any snapshot numbered below the one already written,
+  so a caller descheduled between its edit and its save cannot undo a newer state. With no config
+  path there is no thread and nothing is written; the change still lives in memory for that run.
+- A save that fails does not panic and does not undo the change: the run keeps the value it holds and
+  the reason reaches the user as `ViewState.config_notice` (the field W3a introduced for a damaged
+  file at startup now carries a failed save too). A later successful save does not clear that line
+  in this slice.
+- An unknown or empty path changes NOTHING: no workspace is added, no revision moves, no file is
+  written and no chat is opened.

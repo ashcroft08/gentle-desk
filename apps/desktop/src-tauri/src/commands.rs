@@ -14,49 +14,76 @@ use tauri::AppHandle;
 use tauri_specta::Event;
 
 use crate::bridge::{AppStateHolder, CommandSink};
-use crate::config::ConfigSnapshot;
+use crate::config::{ConfigSnapshot, ConfigWriter};
 use crate::contract::{StateChanged, UiIntent, ViewState};
 use crate::effects::{self, Ran, RuntimeExecutor};
 use crate::events::{EventPump, Push};
+use crate::pending::PendingFolders;
 use crate::sessions::{startup, SessionsService};
+use crate::workspace;
 
 /// Everything the bridge owns and hands to the worker threads: the state, the
-/// pump the children's events come back through, the session list's passes, and
-/// the seam that runs a chat command. The only managed state of the app.
+/// pump the children's events come back through, the session list's passes, the
+/// seam that runs a chat command and the folders the workspace intents named.
+/// The only managed state of the app.
 pub struct Bridge {
     pub holder: Arc<AppStateHolder>,
     pub executor: Arc<RuntimeExecutor>,
     pub pump: Arc<EventPump>,
     pub sessions: Arc<SessionsService>,
+    /// The folders the workspace intents named, waiting for the open of their
+    /// chat: written by the intent path, taken by the executor.
+    folders: Arc<PendingFolders>,
+    /// The one writer of the config file: a save never runs on this thread.
+    writer: ConfigWriter,
 }
 
 impl Bridge {
-    /// One holder, one pump folding into it, the sessions of this run, and the
-    /// executor that feeds the pump its host when the first command needs one.
+    /// One holder, one pump folding into it, the sessions of this run, the
+    /// executor that feeds the pump its host when the first command needs one,
+    /// and the one writer of the config file.
     ///
     /// The app config file is read HERE, before the holder exists, so the one
-    /// disk read of the config happens outside every lock.
+    /// disk read of the config happens outside every lock; both the read and the
+    /// writer take their path from the same place.
     pub fn new() -> Self {
-        let holder = Arc::new(AppStateHolder::with_config(ConfigSnapshot::from_env()));
+        let path = ConfigSnapshot::path_from_env();
+        let holder = Arc::new(AppStateHolder::with_config(ConfigSnapshot::at(
+            path.as_deref(),
+        )));
         let pump = Arc::new(EventPump::new(Arc::clone(&holder)));
         let sessions = Arc::new(startup::service(Arc::clone(&holder)));
         // The reducer doesn't refresh the list itself: it answers
         // `Command::RefreshSessions` and this is where that one is run.
         holder.arm_commands(command_sink(Arc::clone(&sessions)));
+        let writer = ConfigWriter::spawn(path);
+        holder.arm_config_saves(writer.clone());
+        let folders = Arc::new(PendingFolders::default());
         Self {
             holder,
-            executor: Arc::new(RuntimeExecutor::new(Arc::clone(&pump))),
+            executor: Arc::new(RuntimeExecutor::new(
+                Arc::clone(&pump),
+                Arc::clone(&folders),
+            )),
             pump,
             sessions,
+            folders,
+            writer,
         }
     }
 
     /// The window's emit step of the event pump, installed once at startup, so
     /// the pumped slices reach the web side (only Tauri's setup has the handle).
+    /// The same place arms what a failed config save says, because that reason
+    /// reaches the user through the same push.
     pub fn arm_events(&self, app: &AppHandle<tauri::Wry>) {
-        let app = app.clone();
-        let push: Push = Box::new(move |view| push(&app, view));
-        self.pump.arm(push);
+        self.pump.arm(push_to(app));
+        let holder = Arc::clone(&self.holder);
+        let failure_app = app.clone();
+        self.writer.on_failure(Arc::new(move |message: String| {
+            let view = holder.note_config_problem(message);
+            push(&failure_app, view);
+        }));
     }
 
     /// Announces the list's emit step and asks for the first full pass. The
@@ -70,8 +97,7 @@ impl Bridge {
     /// whatever it missed. The pass is armed here because the setup step is the
     /// only place that has the handle, exactly as the child events are.
     pub fn start_sessions(&self, app: &AppHandle<tauri::Wry>) {
-        let app = app.clone();
-        let push: Push = Box::new(move |view| push(&app, view));
+        let push = push_to(app);
         self.sessions.arm(push);
         self.sessions.request();
     }
@@ -84,8 +110,20 @@ impl Bridge {
         intent: UiIntent,
         app: &AppHandle<tauri::Wry>,
     ) -> Result<ViewState, String> {
+        // The folder of a chat that starts in a workspace travels BESIDE the
+        // command: the reducer names the chat and `crates/app` carries no folder
+        // at all (S2). A blank path names none, so nothing is opened for it.
+        let folder = match &intent {
+            UiIntent::NewChatInWorkspace { path } => Some(path.clone()),
+            _ => None,
+        };
         let (view, commands) = self.holder.dispatch_commands(intent);
         emit_state(app, &view)?;
+        if let Some(folder) = folder {
+            // Before the first command runs on its thread: the executor takes it
+            // from here, once.
+            workspace::remember_folder(&self.folders, &commands, &folder);
+        }
         for command in commands {
             let holder = Arc::clone(&self.holder);
             let executor = Arc::clone(&self.executor);
@@ -123,7 +161,6 @@ fn command_sink(sessions: Arc<SessionsService>) -> CommandSink {
         Command::Send(_) | Command::CopyToClipboard(_) => {}
     })
 }
-
 /// Folds what one command came to and pushes each step, then arms the 20 s net
 /// of a fresh child against the same state and window.
 fn fold_and_push(holder: &Arc<AppStateHolder>, app: &AppHandle<tauri::Wry>, ran: Ran) {
@@ -145,6 +182,13 @@ fn push(app: &AppHandle<tauri::Wry>, view: ViewState) {
         // Nothing to fall back to: the web side still has the command's answer.
         eprintln!("state-changed could not be emitted: {error}");
     }
+}
+
+/// The window's emit step as the [`Push`] a pump or the session list arms: the
+/// same closure at each of the three places one is installed.
+fn push_to(app: &AppHandle<tauri::Wry>) -> Push {
+    let app = app.clone();
+    Box::new(move |view| push(&app, view))
 }
 
 /// The one push of the bridge: the typed event the web side listens on, the

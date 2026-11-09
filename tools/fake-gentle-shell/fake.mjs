@@ -14,7 +14,8 @@
 // A `get_state` for a child started with `--session` reports that path; a child
 // started without one opens a session file under `--home` (when given) and
 // reports it, the way pi does for a new chat. `FAKE_SHELL_LOG` appends one JSON
-// line per received command, for tests that must prove what was never sent.
+// line per received command, for tests that must prove what was never sent, and
+// reports the folder the child was started in on its `start` line.
 //
 // Event shapes follow the recorded streams in
 // crates/gentle-core/tests/fixtures/. It runs no model and writes nothing but
@@ -49,7 +50,7 @@ function log(entry) {
   }
 }
 
-log({ event: 'start', argv: process.argv.slice(2) });
+log({ event: 'start', argv: process.argv.slice(2), cwd: process.cwd() });
 process.on('exit', () => log({ event: 'exit' }));
 
 /** Lines like the fixtures: one JSON object per line, LF-terminated. */

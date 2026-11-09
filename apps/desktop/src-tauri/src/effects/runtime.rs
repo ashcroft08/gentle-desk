@@ -24,6 +24,7 @@ use gentle_runtime::chat_runtime::{ChatRuntime, Outcome};
 
 use super::ChatExecutor;
 use crate::events::EventPump;
+use crate::pending::PendingFolders;
 
 /// The message every command of a run without a host answers with, the one the
 /// iced shell used when gentle-shell could not be resolved at all.
@@ -40,13 +41,17 @@ pub struct RuntimeExecutor {
     /// which is what starts its thread (the `arm` of startup holds the other
     /// half). This is the lazy start the pump documents.
     pump: Arc<EventPump>,
+    /// The folders the workspace intents named, waiting for the open of a chat
+    /// (`pending`).
+    folders: Arc<PendingFolders>,
 }
 
 impl RuntimeExecutor {
-    pub fn new(pump: Arc<EventPump>) -> Self {
+    pub fn new(pump: Arc<EventPump>, folders: Arc<PendingFolders>) -> Self {
         Self {
             runtime: OnceLock::new(),
             pump,
+            folders,
         }
     }
 
@@ -66,8 +71,12 @@ impl RuntimeExecutor {
 
 impl ChatExecutor for RuntimeExecutor {
     fn execute(&self, command: ChatCommand) -> Outcome {
+        let folder = match &command {
+            ChatCommand::OpenProcess { chat } => self.folders.take(chat),
+            ChatCommand::Send { .. } => None,
+        };
         match self.runtime() {
-            Ok(runtime) => runtime.execute(command),
+            Ok(runtime) => runtime.execute_in(command, folder),
             Err(message) => match command {
                 ChatCommand::OpenProcess { chat } => Outcome::OpenFailed { chat, message },
                 ChatCommand::Send { chat, .. } => Outcome::SendFailed { chat, message },

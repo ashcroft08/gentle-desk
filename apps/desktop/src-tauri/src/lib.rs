@@ -13,9 +13,11 @@ pub mod contract;
 pub mod effects;
 pub mod events;
 pub mod intent;
+pub mod pending;
 pub mod sessions;
 pub mod state_view;
 pub mod view;
+pub mod workspace;
 
 use commands::Bridge;
 use tauri::Manager;
