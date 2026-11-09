@@ -19,3 +19,30 @@ jobs:
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo test --workspace
+
+  desktop:
+    # Web frontend (lint/check/test/build) plus the Tauri executable build. Node
+    # is preinstalled on the runner; caching is required (S7) for warm-cache builds.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: apps/desktop/package-lock.json
+      - run: npm ci
+        working-directory: apps/desktop
+      - run: npm run lint
+        working-directory: apps/desktop
+      - run: npm run check
+        working-directory: apps/desktop
+      - run: npm run test
+        working-directory: apps/desktop
+      - run: npm run build
+        working-directory: apps/desktop
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # No bundling (NSIS/MSI): the app icon is still a placeholder.
+      - run: npx tauri build --no-bundle
+        working-directory: apps/desktop
