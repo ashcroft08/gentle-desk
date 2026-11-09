@@ -6,11 +6,16 @@
 //! through the reducer and pushed as the next `state-changed`, so the web side
 //! sees the chat opening, then confirmed, failed or sent, without ever waiting
 //! on a child.
+//!
+//! The two "New workspace" commands of `workspace_commands` end here too: both
+//! of them open a new chat through the same fold, so they finish through
+//! [`Bridge::finish`] and the same worker threads, and a workspace added by hand
+//! behaves like one that was there.
 
 use std::sync::Arc;
 
 use gentle_app::Command;
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 use tauri_specta::Event;
 
 use crate::bridge::{AppStateHolder, CommandSink};
@@ -19,8 +24,9 @@ use crate::contract::{StateChanged, UiIntent, ViewState};
 use crate::effects::{self, Ran, RuntimeExecutor};
 use crate::events::{EventPump, Push};
 use crate::pending::PendingFolders;
+use crate::picker::{FolderPicker, NativeFolderPicker};
 use crate::sessions::{startup, SessionsService};
-use crate::workspace;
+use crate::workspace::{self, WorkspaceAction};
 
 /// Everything the bridge owns and hands to the worker threads: the state, the
 /// pump the children's events come back through, the session list's passes, the
@@ -34,6 +40,11 @@ pub struct Bridge {
     /// The folders the workspace intents named, waiting for the open of their
     /// chat: written by the intent path, taken by the executor.
     folders: Arc<PendingFolders>,
+    /// The folder dialog of the two "New workspace" commands (Q1): the real
+    /// one, kept by its own type because the setup step has to give it the
+    /// window that makes the dialog modal. The flows take the seam, not this
+    /// field.
+    picker: Arc<NativeFolderPicker>,
     /// The one writer of the config file: a save never runs on this thread.
     writer: ConfigWriter,
 }
@@ -68,8 +79,19 @@ impl Bridge {
             pump,
             sessions,
             folders,
+            picker: Arc::new(NativeFolderPicker::new()),
             writer,
         }
+    }
+
+    /// The folder dialog as the seam the workspace flows take.
+    pub fn picker(&self) -> Arc<dyn FolderPicker> {
+        self.picker.clone()
+    }
+
+    /// The folders waiting for the open that takes them.
+    pub fn folders(&self) -> Arc<PendingFolders> {
+        Arc::clone(&self.folders)
     }
 
     /// The window's emit step of the event pump, installed once at startup, so
@@ -78,6 +100,12 @@ impl Bridge {
     /// reaches the user through the same push.
     pub fn arm_events(&self, app: &AppHandle<tauri::Wry>) {
         self.pump.arm(push_to(app));
+        // The folder dialog is owned by the window, so it is modal to the app
+        // instead of to the desktop. The window exists only from this step, and
+        // it is the same step that arms the pump, for the same reason.
+        if let Some(window) = app.get_webview_window("main") {
+            self.picker.set_parent(window);
+        }
         let holder = Arc::clone(&self.holder);
         let failure_app = app.clone();
         self.writer.on_failure(Arc::new(move |message: String| {
@@ -124,6 +152,19 @@ impl Bridge {
             // from here, once.
             workspace::remember_folder(&self.folders, &commands, &folder);
         }
+        self.run_chat_commands(commands, app);
+        Ok(view)
+    }
+
+    /// Runs the per-chat commands one fold asked for, one worker thread per chat
+    /// command, because a child takes seconds to start and a write to it blocks.
+    /// Never waits for one: each outcome folds back through the reducer and
+    /// pushes the next `state-changed`.
+    pub(crate) fn run_chat_commands(
+        &self,
+        commands: Vec<gentle_app::ChatCommand>,
+        app: &AppHandle<tauri::Wry>,
+    ) {
         for command in commands {
             let holder = Arc::clone(&self.holder);
             let executor = Arc::clone(&self.executor);
@@ -141,7 +182,19 @@ impl Bridge {
                 eprintln!("chat command thread unavailable: {error}");
             }
         }
-        Ok(view)
+    }
+
+    /// Pushes the slice one workspace action answers, then runs the new chat it
+    /// opened: exactly what [`Bridge::dispatch`] does with the commands of the
+    /// reducer, so a workspace added by hand behaves like one that was there.
+    pub(crate) fn finish(
+        &self,
+        action: WorkspaceAction,
+        app: &AppHandle<tauri::Wry>,
+    ) -> Result<ViewState, String> {
+        emit_state(app, &action.view)?;
+        self.run_chat_commands(action.commands, app);
+        Ok(action.view)
     }
 }
 

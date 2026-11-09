@@ -190,3 +190,105 @@ What the bridge's workspace intents decided, beyond the specs above:
   in this slice.
 - An unknown or empty path changes NOTHING: no workspace is added, no revision moves, no file is
   written and no chat is opened.
+
+## Q4 answer: the native folder dialog (evidence, not a decision)
+
+Q4 asked whether the Tauri 2 dialog plugin works with tauri built `default-features = false`
+(the `common-controls-v6` problem of `tauri-contract-proof.md`). It was wired, built, and measured
+against tauri 2.12.5 / tauri-plugin-dialog 2.8.4, then REVERTED: the wiring cannot be guarded by a
+test binary, and which picker W3 uses is a decision to make before W3 (options at the end).
+
+What was measured:
+
+- `cargo tree -e features -p gentle-desk-app -i tauri` before and after adding the plugin: the
+  tauri feature set is IDENTICAL (`specta`, `tauri-runtime-wry`, `webkit2gtk`, `webview2-com`, `wry`).
+  The plugin does not re-enable tauri's default features: its own `tauri` dependency is
+  `default-features = false`.
+- New Cargo.lock packages: exactly four, `rfd 0.17.2`, `tauri-plugin 2.7.2`, `tauri-plugin-dialog
+  2.8.4`, `tauri-plugin-fs 2.7.1`. Nothing pulling ashpd, gtk or glib: the plugin's `default`
+  feature is `gtk3` (a Linux-only rfd backend), so it is turned off on a Windows-only app.
+- `cargo build -p gentle-desk-app`: success.
+- `cargo test -p gentle-desk-app` with the plugin registered in `run()`: all 14 integration test
+  binaries and both unit binaries start and pass, no 0xc0000139. Nothing in the suite reaches
+  `run()`, so nothing in the suite links the plugin's code.
+- No capability permission is needed for Rust-side use: `DialogExt::dialog` reads the plugin's
+  managed state, while capabilities gate only the plugin's IPC commands
+  (`dialog:allow-open/save/message`). `capabilities/default.json` was left as `core:default`.
+
+The blocker, exact:
+
+- The plugin's `init()` registers its IPC handler, which includes `commands::message`, which pulls
+  rfd's `MessageDialog` and with it `TaskDialogIndirect` from comctl32 v6. rfd's own
+  `common-controls-v6` feature is enabled UNCONDITIONALLY by the plugin's `rfd` dependency, so it
+  cannot be switched off from this crate.
+- A test binary that only names `tauri_plugin_dialog::init::<tauri::Wry>()` (and one that builds a
+  `tauri::test::mock_builder()` app with the plugin) loads with
+  `STATUS_ENTRYPOINT_NOT_FOUND (0xc0000139)`: `objdump -p` on the test exe shows an import of
+  `TaskDialogIndirect` from `comctl32.dll`, and test exes carry no application manifest. Enabling
+  tauri's empty `test` feature (`features = ["test"]`, adds no crate) does not change this.
+- The GUI exe is not affected: `target/debug/gentle-desk-app.exe` also imports
+  `TaskDialogIndirect`, but it embeds the `Microsoft.Windows.Common-Controls` version `6.0.0.0`
+  assembly manifest, so the import resolves there.
+- A test binary that reaches only the Rust-side picker path (`app.dialog().file()` inside a lib
+  function, no `init()`) links and RUNS: it imports comctl32 without `TaskDialogIndirect`.
+
+Not verified here: that the picker actually opens and returns a folder in a real window. That is the
+parent's real-window check; this slice proved the dependency wiring and its link-time cost only.
+
+Decision for W3 (choices, none implemented):
+
+- A: drop the Tauri plugin and call `rfd` 0.17 directly with `default-features = false`, whose file
+  dialog is the Win32 `IFileDialog`; only its `common-controls-v6`-gated message dialog imports
+  `TaskDialogIndirect`, so no test binary gains the import. Source reading only; not yet linked
+  and measured.
+- B: keep the plugin and give test binaries the comctl32 v6 manifest (build-script
+  `cargo:rustc-link-arg-tests=/MANIFESTDEPENDENCY:...`), documented with the reason.
+- C: keep the plugin and open the picker from the web side (`@tauri-apps/plugin-dialog` plus a
+  `dialog:allow-open` capability): the plugin's code is then only linked through `run()`, which no
+  test binary reaches, at the cost of an npm package and an IPC surface.
+
+## W3c decisions
+
+What the two "New workspace" paths decided, beyond the specs above:
+
+- Q4 is answered by the user as OPTION A: the Tauri dialog plugin is not used and the app depends on
+  `rfd` 0.17 with `default-features = false`. Measured on this branch: `cargo tree -p
+  gentle-desk-app -e features -i tauri` shows the same tauri features as before the dependency
+  (`specta`, `tauri-runtime-wry`, `webkit2gtk`, `webview2-com`, `wry`; no `common-controls-v6`), the
+  new lockfile package is `rfd` alone, and a test binary that links the real picker starts and passes
+  instead of failing with `0xc0000139`. `objdump -p` of that binary shows comctl32 imports
+  (`DefSubclassProc`, `RemoveWindowSubclass`, `SetWindowSubclass`) and no `TaskDialogIndirect`; the
+  app exe imports comctl32 the same way, with no `TaskDialogIndirect` either, and still embeds the
+  common-controls v6 assembly manifest.
+- The picker is a seam, not a call: `picker::FolderPicker` (`pick_folder(title) -> Option<PathBuf>`),
+  held by the bridge as `Arc<dyn FolderPicker>` and taken by the flows as `&dyn`. The real
+  implementation is rfd's `IFileDialog`; every test injects a fake. A dialog can stay open for
+  minutes, so it never runs on the window's thread and never under a lock: both commands run their
+  whole flow on a blocking thread (`tauri::async_runtime::spawn_blocking`) and are `async`.
+- The dialog is MODAL to the main window: `NativeFolderPicker` keeps the window the setup step hands
+  it (`app.get_webview_window("main")`) and passes it to rfd's `set_parent`, which sets the dialog's
+  owner from the window handle. It was little code, not a guess: rfd 0.17 and tauri 2 both take the
+  handle from `raw-window-handle` 0.6.
+- The two paths are COMMANDS (`addWorkspace`, `createWorkspace`), not `UiIntent` variants, because
+  they do not fold in one step: both wait for a human and both touch the disk, then answer the same
+  `ViewState`. The web side awaits them; neither starts a new chat through the reducer directly.
+  `createWorkspace` takes the name; the parent comes from the picker.
+- "Create a new folder" validates the name FIRST, so a name Windows would not accept never opens a
+  dialog. The name is trimmed; it must not be empty, must not end with a space (checked on the typed
+  text, because Windows would drop it silently), must not contain a path separator or `..`, must not
+  contain any of `< > : " | ? *`, must not end with a dot, and must not be a device name (`CON`,
+  `NUL`, `COM1`..., also with an extension).
+- Q6: the target is created with `create_dir`, never `create_dir_all`: the parent comes from the
+  picker and must exist, so a vanished parent is a refusal and not a chain of new folders. An
+  existing EMPTY folder is accepted as the workspace and nothing is written into it; an existing
+  folder that holds anything, or a file of that name, is refused and nothing is written.
+- Both paths end in the same place (`workspace::adopt`): the folder is added to the config with
+  `AppStateHolder::update_config` (idempotent for a folder already there, stored in the canonical
+  spelling the config writes) and a new chat opens there through the same `NewChatInWorkspace` fold
+  W3b built, with the folder waiting in the pending table. The workspace stays whatever becomes of
+  that chat (D7).
+- A refusal has no reducer path: `crates/app` owns the chat and event notices and this slice does not
+  change it. A cancelled dialog changes nothing; a refusal sets the new shell-owned
+  `ViewState.workspace_notice` with one line of plain text, moves no revision and writes nothing, and
+  the next workspace action that works clears it. It is NOT `config_notice`, which says what became
+  of the config file.

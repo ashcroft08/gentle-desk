@@ -15,12 +15,13 @@ use crate::{sessions, view};
 
 /// The slice of `state` as it stands now, carrying the revision the holder
 /// keeps for the session list - the web side compares it to know when the page
-/// of rows it holds is stale - and the notice of the config file, when it could
-/// not be used at startup.
+/// of rows it holds is stale - the notice of the config file, when it could
+/// not be used at startup, and the reason the last workspace action refused.
 pub fn view_state(
     state: &AppState,
     sessions_revision: u32,
     config_notice: Option<String>,
+    workspace_notice: Option<String>,
 ) -> ViewState {
     ViewState {
         foreground_chat: state
@@ -34,6 +35,7 @@ pub fn view_state(
         notices: state.notices.iter().map(NoticeView::of).collect(),
         activity: activity_view(state),
         config_notice,
+        workspace_notice,
     }
 }
 

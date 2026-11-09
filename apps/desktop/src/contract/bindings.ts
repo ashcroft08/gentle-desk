@@ -31,6 +31,24 @@ export const commands = {
 	 *  the first pass already settled reads the settled list here.
 	 */
 	getViewState: () => __TAURI_INVOKE<ViewState_Serialize>("get_view_state"),
+	/**
+	 *  "Choose an existing folder": the picker, then the folder becomes a workspace
+	 *  and a new chat opens there (S7).
+	 * 
+	 *  A cancelled dialog changes NOTHING and answers the current slice; a pick that
+	 *  is not an existing folder is refused and the reason reaches the user as
+	 *  `ViewState.workspace_notice`.
+	 */
+	addWorkspace: () => typedError<ViewState_Serialize, string>(__TAURI_INVOKE("add_workspace")),
+	/**
+	 *  "Create a new folder": the user picks the PARENT, the app makes
+	 *  `<parent>/<name>` under it (Q6: never an overwrite), and the new folder
+	 *  becomes a workspace with a new chat opening there (S7).
+	 * 
+	 *  `name` is checked before any dialog opens, so a name Windows would not
+	 *  accept is refused without asking the user for a place to put it.
+	 */
+	createWorkspace: (name: string) => typedError<ViewState_Serialize, string>(__TAURI_INVOKE("create_workspace", { name })),
 };
 
 /** Events */
@@ -320,6 +338,15 @@ export type ViewState_Deserialize = {
 	 *  failed.
 	 */
 	config_notice?: string | null,
+	/**
+	 *  Why the last workspace action was refused, as one line of plain text: a
+	 *  name Windows would not accept, a folder that is not there, a folder that
+	 *  already holds files (Q6). `None` when nothing was refused, and cleared by
+	 *  the next workspace action that works. A shell-owned line, never the
+	 *  config's: the config notice says what became of the file, this one says
+	 *  what the user asked for that could not be done.
+	 */
+	workspace_notice?: string | null,
 };
 
 /**
@@ -371,6 +398,15 @@ export type ViewState_Serialize = {
 	 *  failed.
 	 */
 	config_notice: string | null,
+	/**
+	 *  Why the last workspace action was refused, as one line of plain text: a
+	 *  name Windows would not accept, a folder that is not there, a folder that
+	 *  already holds files (Q6). `None` when nothing was refused, and cleared by
+	 *  the next workspace action that works. A shell-owned line, never the
+	 *  config's: the config notice says what became of the file, this one says
+	 *  what the user asked for that could not be done.
+	 */
+	workspace_notice: string | null,
 };
 
 /**
