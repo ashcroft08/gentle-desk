@@ -5,6 +5,10 @@
 //! `apps/desktop/src/contract/bindings.ts`. A change on the Rust side must
 //! land together with a regenerated file; `tests/contract_bindings.rs` fails
 //! the build when the committed file no longer matches.
+//!
+//! These types are the SLICES the web state renders (S2 of the migration),
+//! never the whole `AppState`: the mapping to and from `gentle-app` lives in
+//! `bridge`, so nothing here derives on a `crates/app` type.
 
 use serde::{Deserialize, Serialize};
 use specta::Type;
@@ -24,6 +28,57 @@ pub enum ChatActivityMark {
     NewReply,
     NeedsAttention,
     Ended,
+}
+
+/// What the user asked for, as the web side sends it. Only the intents the
+/// current slice needs; the rest are added when their views arrive. The
+/// explicit mapping into `gentle-app`'s [`gentle_app::Intent`] keeps this
+/// enum free of every `crates/app` type.
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(tag = "type", content = "data")]
+pub enum UiIntent {
+    SendPrompt { text: String },
+    NewChat,
+    DismissNotice { id: u32 },
+}
+
+/// The level of a notice, matching `gentle_app`'s notice kinds one to one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub enum NoticeLevel {
+    Info,
+    Warning,
+    Error,
+}
+
+/// One notice, flattened for display: id, text, level. The id the dismiss
+/// intent refers back to. The app lays notices out newest last and keeps the
+/// most recent ones, which the view reflects as received.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub struct NoticeView {
+    pub id: u32,
+    pub text: String,
+    pub level: NoticeLevel,
+}
+
+/// The state the current views render: the foreground chat (as the app names
+/// it, the id the sidebar later passes back) and the notices. The push size is
+/// the whole list of notices, not the whole `AppState` (S2).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+pub struct ViewState {
+    pub foreground_chat: Option<String>,
+    pub notices: Vec<NoticeView>,
+}
+
+/// The state slice after each dispatch, emitted to the web side (typed
+/// tauri-specta event). The name on the wire is kebab-case by `NAME` below.
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+pub struct StateChanged(pub ViewState);
+
+// Manual `Event` implementation instead of the derive: the `derive` feature
+// is not enabled (it would pull the proc-macro crate in); the trait needs
+// only the wire name, every other method has a default.
+impl tauri_specta::Event for StateChanged {
+    const NAME: &'static str = "state-changed";
 }
 
 /// Sample contract command. Trivial by design: it exists so the generator

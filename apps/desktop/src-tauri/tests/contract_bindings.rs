@@ -2,10 +2,12 @@
 //! match what the generator produces from the Rust definitions in
 //! `src/contract.rs`. If this test fails, a Rust-side contract change was
 //! committed without regenerating the TypeScript side (or vice versa).
+//!
+//! Regenerate with `GENTLE_DESK_REGEN_BINDINGS=1 cargo test -p
+//! gentle-desk-app --test contract_bindings`.
 
-use gentle_desk_lib::contract;
+use gentle_desk_lib::contract_builder;
 use specta_typescript::Typescript;
-use tauri_specta::{collect_commands, Builder};
 
 const COMMITTED_BINDINGS: &str = "../src/contract/bindings.ts";
 
@@ -16,10 +18,17 @@ fn committed_bindings_match_the_rust_contract() {
     std::fs::create_dir_all(&scratch_dir).expect("failed to create scratch directory");
     let regenerated_path = scratch_dir.join("bindings.ts");
 
-    let builder = Builder::<tauri::Wry>::new().commands(collect_commands![contract::get_badge,]);
+    let builder = contract_builder();
     builder
         .export(Typescript::default(), &regenerated_path)
         .expect("failed to generate bindings into a scratch directory");
+
+    // The regen switch writes the fresh bindings over the committed file; the
+    // run without the switch is the guard itself and never writes into src.
+    if std::env::var("GENTLE_DESK_REGEN_BINDINGS").as_deref() == Ok("1") {
+        std::fs::copy(&regenerated_path, COMMITTED_BINDINGS)
+            .expect("failed to write the committed bindings file");
+    }
 
     let result = fg_check(&regenerated_path);
 
