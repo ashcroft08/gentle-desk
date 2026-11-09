@@ -1623,6 +1623,7 @@ dependencies = [
 name = "gentle-desk-app"
 version = "0.1.0"
 dependencies = [
+ "gentle-app",
  "serde",
  "serde_json",
  "specta",

@@ -8,10 +8,16 @@ license = "MIT"
 name = "gentle_desk_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+[dev-dependencies]
+# The integration tests fold through `gentle-app`'s public reducer inputs
+# directly; regular dependencies are invisible to test binaries.
+gentle-app = { path = "../../../crates/app" }
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
+gentle-app = { path = "../../../crates/app" }
 tauri = { version = "2", default-features = false, features = ["wry"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
