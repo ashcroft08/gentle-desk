@@ -14,7 +14,6 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 # dependencies are invisible to test binaries.
 gentle-app = { path = "../../../crates/app" }
 gentle-backend = { path = "../../../crates/backend" }
-gentle-core = { path = "../../../crates/gentle-core" }
 gentle-runtime = { path = "../../../crates/runtime" }
 
 [build-dependencies]
@@ -26,6 +25,9 @@ gentle-app = { path = "../../../crates/app" }
 # `Opened`/host parts to build it lazily; no `crates/*` file is touched by the
 # bridge.
 gentle-backend = { path = "../../../crates/backend" }
+# The chat state the bridge slices are read from: its message roles are mapped
+# to the contract's names in `view`, and nothing of it leaves this crate.
+gentle-core = { path = "../../../crates/gentle-core" }
 gentle-runtime = { path = "../../../crates/runtime" }
 tauri = { version = "2", default-features = false, features = ["wry"] }
 serde = { version = "1", features = ["derive"] }

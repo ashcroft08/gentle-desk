@@ -68,6 +68,21 @@ pub enum UiIntent {
     },
 }
 
+/// Who wrote one message of the thread. The two roles a chat thread displays,
+/// matching `gentle_core`'s chat roles one to one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub enum MessageRole {
+    User,
+    Assistant,
+}
+
+/// One message of the foreground chat's thread, flattened for display.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub struct MessageView {
+    pub role: MessageRole,
+    pub text: String,
+}
+
 /// The level of a notice, matching `gentle_app`'s notice kinds one to one.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
 pub enum NoticeLevel {
@@ -87,12 +102,22 @@ pub struct NoticeView {
 }
 
 /// The state the current views render: the foreground chat (as the app names
-/// it, the id the sidebar passes back), the notices, and the per-chat activity
-/// the list rows show. The push size is the notices plus the chats that are not
-/// idle, never the whole `AppState` (S2).
+/// it, the id the sidebar passes back) with its thread, the notices, and the
+/// per-chat activity the list rows show. The push size is the notices, the
+/// chats that are not idle and the tail of one thread, never the whole
+/// `AppState` (S2).
+///
+/// A chat's stderr reason lines are not a slice of their own: the app keeps them
+/// in a bounded ring but exposes them only as the reason of the death notice, so
+/// they reach the web side inside [`NoticeView::text`] and nowhere else.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct ViewState {
     pub foreground_chat: Option<String>,
+    /// The foreground chat's messages, oldest first. Message text is the model's
+    /// whole markdown reply, so the slice carries the last
+    /// [`MESSAGES_PUSHED`](crate::view::MESSAGES_PUSHED) of them and never a
+    /// whole long session.
+    pub messages: Vec<MessageView>,
     pub notices: Vec<NoticeView>,
     pub activity: Vec<ChatActivityView>,
 }

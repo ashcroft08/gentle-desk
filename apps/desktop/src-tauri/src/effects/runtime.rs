@@ -7,13 +7,12 @@
 //! which are other slices - so the three parts a chat host needs are assembled
 //! here, from the same public pieces the runtime's startup uses.
 //!
-//! Child events are NOT pumped yet: the tagged event stream is parked here for
-//! the next slice instead of being dropped, because a dropped receiver makes the
-//! host throw its events away (its forwarder stops on the first failed send).
+//! Child events are NOT handled here: the tagged stream is handed to
+//! [`EventPump`] the moment the host is built, and the pump's own thread turns
+//! them into reducer inputs and pushes the slice. Nothing else reads it.
 
 use std::ffi::OsString;
-use std::sync::mpsc::Receiver;
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, OnceLock};
 
 use gentle_app::ChatCommand;
 use gentle_backend::chat_host::{
@@ -24,6 +23,7 @@ use gentle_backend::launcher::{self, LauncherEnv};
 use gentle_runtime::chat_runtime::{ChatRuntime, Outcome};
 
 use super::ChatExecutor;
+use crate::events::EventPump;
 
 /// The message every command of a run without a host answers with, the one the
 /// iced shell used when gentle-shell could not be resolved at all.
@@ -31,28 +31,34 @@ const NO_HOST: &str = "gentle-shell is not available";
 
 /// Runs chat commands against the real children, building the host the first
 /// time one arrives.
-#[derive(Default)]
 pub struct RuntimeExecutor {
     /// The host, built once. `Err` keeps the run's fatal message, so every
     /// later command answers the same way instead of retrying a broken launcher
     /// on each click.
     runtime: OnceLock<Result<Arc<ChatRuntime>, String>>,
-    /// The one stream of every child's tagged events, parked for the slice that
-    /// pumps them into the window.
-    events: Mutex<Option<Receiver<TaggedEvent>>>,
+    /// Where the child events go: the first build hands it the tagged stream,
+    /// which is what starts its thread (the `arm` of startup holds the other
+    /// half). This is the lazy start the pump documents.
+    pump: Arc<EventPump>,
 }
 
 impl RuntimeExecutor {
-    /// The host, built now if this is the first ask.
+    pub fn new(pump: Arc<EventPump>) -> Self {
+        Self {
+            runtime: OnceLock::new(),
+            pump,
+        }
+    }
+
+    /// The host, built now if this is the first ask, and its event stream handed
+    /// to the pump exactly once.
     fn runtime(&self) -> Result<Arc<ChatRuntime>, String> {
         self.runtime
             .get_or_init(|| {
                 let (runtime, events) = build()?;
-                *self
-                    .events
-                    .lock()
-                    .unwrap_or_else(|poison| poison.into_inner()) = Some(events);
-                Ok(Arc::new(runtime))
+                let runtime = Arc::new(runtime);
+                self.pump.feed(Arc::clone(&runtime), events);
+                Ok(runtime)
             })
             .clone()
     }
@@ -72,7 +78,7 @@ impl ChatExecutor for RuntimeExecutor {
 
 /// The host itself: real children, the searcher's limits, and the launcher plus
 /// the forwarded arguments of this window.
-fn build() -> Result<(ChatRuntime, Receiver<TaggedEvent>), String> {
+fn build() -> Result<(ChatRuntime, std::sync::mpsc::Receiver<TaggedEvent>), String> {
     let spawner = spawner()?;
     let host = ChatHost::with_parts(
         Limits::default(),
