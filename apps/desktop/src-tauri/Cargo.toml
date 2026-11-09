@@ -1,0 +1,20 @@
+[package]
+name = "gentle-desk-app"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[lib]
+name = "gentle_desk_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", default-features = false, features = ["wry"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+specta = { version = "2.0.0-rc.26", features = ["derive"] }
+specta-typescript = "0.0.13"
+tauri-specta = { version = "2.0.0-rc.24", features = ["typescript"] }

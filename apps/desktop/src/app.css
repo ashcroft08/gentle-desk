@@ -1,0 +1,17 @@
+:root {
+  font-family: system-ui, sans-serif;
+  color: #21303f;
+  background: #f7f8fa;
+}
+
+body {
+  margin: 0;
+}
+
+main {
+  padding: 1rem;
+}
+
+.status {
+  color: #5a6a7a;
+}
