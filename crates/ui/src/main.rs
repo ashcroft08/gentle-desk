@@ -4,12 +4,13 @@
 //! (e.g. `--isolated --model claude-bridge/claude-sonnet-5-5`).
 //!
 //! Layout: `app` (state and wiring), `view/` (one file per component),
-//! `message`, `subscription`, `backend` (startup wrapper), `refresh_flow` (which
-//! session refresh runs when) and `session_refresh` (its iced transport). The
-//! UI-agnostic runtime — `chat_runtime` (one child per chat, and the app's
-//! commands over it), `chat_keys` (the two names of one chat), the refresh core
-//! and the pure helpers (`text`, `time_ago`, `sessions`, `cache_path`, `clock`)
-//! — lives in the `gentle-runtime` crate.
+//! `message`, `subscription`, `backend` (startup wrapper), `refresh_flow` (the
+//! iced side of the session refresh: its decisions live in `gentle-runtime`) and
+//! `session_refresh` (its iced transport). The UI-agnostic runtime — `chat_runtime`
+//! (one child per chat, and the app's commands over it), `chat_keys` (the two
+//! names of one chat), the refresh flow, the refresh core and the pure helpers
+//! (`text`, `time_ago`, `sessions`, `cache_path`, `clock`) — lives in the
+//! `gentle-runtime` crate.
 
 mod app;
 mod backend;

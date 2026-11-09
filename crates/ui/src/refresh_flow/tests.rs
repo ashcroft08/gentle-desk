@@ -1,18 +1,18 @@
-use super::*;
-use iced::futures::executor::block_on;
+//! The iced side of the refresh flow: a decision becomes a `Task` (a pass on
+//! its own stream, or nothing at all) and a watcher the core started again ends
+//! up in the subscription's source. The decisions themselves are tested in
+//! `gentle_runtime::refresh_flow`.
+
 use std::fs;
+use std::hash::{DefaultHasher, Hash, Hasher};
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use gentle_backend::session_index::SessionIndex;
-use gentle_backend::session_watch::Batch;
+use gentle_runtime::refresh_queue::Job;
+use gentle_runtime::session_refresh::work;
 
-fn path(name: &str) -> PathBuf {
-    PathBuf::from(name)
-}
-
-fn batch(paths: Vec<PathBuf>, rescan: bool) -> Batch {
-    Batch { paths, rescan }
-}
+use super::*;
 
 /// A home with one session file, so a full pass has something to find.
 fn home() -> (tempfile::TempDir, PathBuf) {
@@ -34,13 +34,7 @@ fn home() -> (tempfile::TempDir, PathBuf) {
     (dir, sessions)
 }
 
-/// A flow that knows where the sessions are but has no watcher: the polling
-/// fallback, which is the case a headless test can drive without a window.
-fn flow_without_watcher(sessions: PathBuf) -> Flow {
-    let shared = Shared::new(
-        Arc::new(Mutex::new(SessionIndex::new(sessions.clone()))),
-        None,
-    );
+fn flow_without_watcher(shared: Shared, sessions: PathBuf) -> Flow {
     Flow::new(
         Some(shared),
         Some(sessions),
@@ -50,146 +44,70 @@ fn flow_without_watcher(sessions: PathBuf) -> Flow {
     )
 }
 
-#[test]
-fn the_first_full_pass_produces_the_list_and_starts_one_worker() {
-    let (_dir, sessions) = home();
-    let mut flow = flow_without_watcher(sessions);
-    assert_eq!(flow.on_tick().units(), 1, "the pass runs on a worker");
-    // One at a time: a second request waits for the first to settle.
-    assert_eq!(flow.on_tick().units(), 0);
+/// Runs one full pass on the index, the way the window's worker does, and
+/// returns the item that settles it.
+fn full_pass(shared: &Shared) -> Refreshed {
+    let mut last = None;
+    work(&Job::Full, shared, &mut || shared.now(), &mut |update| {
+        if let Update::Refreshed(result) = update {
+            last = Some(result);
+        }
+    });
+    last.expect("every pass settles")
+        .expect("a full pass on a readable home")
+}
+
+/// The subscription identity of the source, which is what iced rebuilds a
+/// stream for: a new watcher must be a new identity.
+fn identity(source: &WatchSource) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    source.hash(&mut hasher);
+    hasher.finish()
 }
 
 #[test]
-fn a_finished_full_pass_hands_the_list_over_and_remembers_its_duration() {
+fn a_decision_to_run_a_pass_becomes_one_worker_and_waiting_becomes_no_task() {
     let (_dir, sessions) = home();
-    let mut flow = flow_without_watcher(sessions);
-    assert!(flow.on_tick().units() > 0);
-
-    let shared = flow.shared.clone().expect("a run with an index");
-    let refreshed = block_on(session_refresh::run(
-        gentle_runtime::refresh_queue::Job::Full,
-        shared,
-    ))
-    .unwrap();
-    assert_eq!(refreshed.sessions.items().len(), 1);
-    let took = refreshed.took;
-    let prepared = flow.settle(Ok(refreshed)).expect("a list to show");
-    assert_eq!(prepared.items().len(), 1);
-    assert_eq!(flow.last_full_pass, took);
-}
-
-#[test]
-fn a_failed_pass_reports_nothing_and_frees_the_queue() {
-    let (_dir, sessions) = home();
-    let mut flow = flow_without_watcher(sessions);
-    let _ = flow.on_tick();
-    assert_eq!(flow.settle(Err("unreadable".to_owned())), None);
-    // The queue is free again: the next request starts at once.
-    assert_eq!(flow.on_tick().units(), 1);
-}
-
-#[test]
-fn a_batch_of_paths_asks_for_a_targeted_pass_and_a_rescan_for_a_full_one() {
-    let (_dir, sessions) = home();
-    let mut flow = flow_without_watcher(sessions);
-    assert!(flow.on_batch(batch(vec![path("a.jsonl")], false)).units() > 0);
-    // The targeted pass waits while the first one runs.
-    assert_eq!(flow.settle(Err("failed".to_owned())), None);
-    assert!(flow.on_batch(batch(Vec::new(), true)).units() > 0);
-}
-
-#[test]
-fn without_a_watcher_the_list_polls_every_few_seconds() {
-    let (_dir, sessions) = home();
-    let mut flow = flow_without_watcher(sessions);
-    assert!(!flow.is_watching());
-    assert_eq!(flow.tick_delay(), session_schedule::POLL_BASE);
-    // A settled turn is not covered by any watcher, so it asks for a pass.
-    assert_eq!(flow.on_refresh_command().units(), 1);
-}
-
-#[test]
-fn a_run_without_a_home_does_nothing_at_all() {
-    let mut flow = Flow::new(None, None, None, WatchSource::default(), None);
-    assert_eq!(flow.on_tick().units(), 0);
-    assert_eq!(flow.tick_delay(), session_schedule::POLL_BASE);
-    assert!(!flow.is_watching());
-    flow.flush();
-}
-
-#[test]
-fn losing_the_watcher_falls_back_to_a_full_pass() {
-    let (_dir, sessions) = home();
-    let mut flow = flow_without_watcher(sessions);
-    assert_eq!(flow.on_watcher_lost().units(), 1);
-    assert!(!flow.is_watching());
-}
-
-#[test]
-fn the_safety_net_waits_for_the_last_full_pass() {
-    let (_dir, sessions) = home();
-    let mut flow = flow_without_watcher(sessions.clone());
-    flow.last_full_pass = Duration::from_secs(10);
-    assert_eq!(flow.tick_delay(), Duration::from_secs(200));
-}
-
-/// The case the flow exists for: with a watcher, a settled turn is already
-/// covered (the watcher reports the appended file), so it asks for nothing.
-#[test]
-fn a_settled_turn_still_asks_for_a_pass_with_a_watcher_and_the_safety_net_slows_down() {
-    let (_dir, sessions) = home();
-    let (watcher, batches) = backend::try_start_watcher(&sessions).expect("a watcher");
     let shared = Shared::new(
         Arc::new(Mutex::new(SessionIndex::new(sessions.clone()))),
         None,
     );
-    let mut watch = WatchSource::default();
-    watch.fill(batches);
-    let mut flow = Flow::new(Some(shared), Some(sessions), Some(watcher), watch, None);
-
-    assert!(flow.is_watching());
-    // A settled turn is the user's own write: the watcher's notice of it can come
-    // seconds late (measured on Windows), so the turn end asks for a pass itself.
-    assert_eq!(flow.on_refresh_command().units(), 1);
-    // The timer is still the slow safety net while a watcher runs.
-    assert_eq!(flow.tick_delay(), session_schedule::RECONCILE_BASE);
+    let mut flow = flow_without_watcher(shared, sessions);
+    assert_eq!(flow.on_tick().units(), 1, "the pass runs on a worker");
+    // One at a time: a second request waits, which is no task at all.
+    assert_eq!(flow.on_tick().units(), 0);
 }
 
-/// S4: a watcher that cannot start leaves the list to polling, and every full
-/// pass tries again until one starts; the pass that covers the gap is queued.
 #[test]
-fn a_watcher_is_retried_on_each_full_pass_and_the_restarted_one_asks_for_a_pass() {
-    let (_dir, _sessions) = home();
-    // The sessions directory the run expects does not exist yet.
-    let dir = tempfile::tempdir().unwrap();
-    let missing = dir.path().join("sessions");
-    let shared = Shared::new(
-        Arc::new(Mutex::new(SessionIndex::new(missing.clone()))),
-        None,
-    );
-    let mut flow = Flow::new(
-        Some(shared.clone()),
-        Some(missing.clone()),
-        None,
-        WatchSource::default(),
-        Some("the sessions directory does not exist".to_owned()),
-    );
-
-    let full = || {
-        let shared = shared.clone();
-        async move { session_refresh::run(gentle_runtime::refresh_queue::Job::Full, shared).await }
+fn a_run_without_a_home_asks_iced_for_nothing() {
+    let mut flow = Flow::new(None, None, None, WatchSource::default(), None);
+    assert_eq!(flow.on_tick().units(), 0);
+    assert_eq!(flow.pump().units(), 0);
+    let rescan = Batch {
+        paths: Vec::new(),
+        rescan: true,
     };
-    assert_eq!(flow.on_tick().units(), 1);
-    assert!(flow.settle(block_on(full())).is_some());
-    assert!(!flow.is_watching(), "still nothing to watch");
-    assert_eq!(flow.tick_delay(), session_schedule::POLL_BASE);
+    assert_eq!(flow.on_batch(rescan).units(), 0);
+    // Nothing to persist either.
+    flow.flush();
+}
 
-    // The directory appears: the next full pass starts the watcher again.
-    fs::create_dir_all(&missing).unwrap();
+#[test]
+fn the_watcher_a_settled_pass_started_reports_on_a_new_subscription() {
+    let (_dir, sessions) = home();
+    let shared = Shared::new(
+        Arc::new(Mutex::new(SessionIndex::new(sessions.clone()))),
+        None,
+    );
+    let mut flow = flow_without_watcher(shared.clone(), sessions);
+    let before = identity(flow.watch());
+
     assert_eq!(flow.on_tick().units(), 1);
-    assert!(flow.settle(block_on(full())).is_some());
-    assert!(flow.is_watching());
-    // Events may have been missed before the watcher started: one pass covers it.
-    assert!(flow.pump().units() > 0);
-    assert_eq!(flow.tick_delay(), session_schedule::RECONCILE_BASE);
+    let prepared = flow.settle(Ok(full_pass(&shared))).expect("a list");
+    assert_eq!(prepared.items().len(), 1);
+    // The full pass started the watcher: its batches went to the source, and a
+    // new identity is what makes iced read them instead of the old stream.
+    assert_ne!(identity(flow.watch()), before);
+    // The pass that covers what the watcher may have missed is queued.
+    assert_eq!(flow.pump().units(), 1);
 }
