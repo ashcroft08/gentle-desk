@@ -79,6 +79,11 @@ impl EventPump {
         if *started {
             return;
         }
+        // Check BOTH halves are there before taking either: taking one while the
+        // other is missing would throw it away and the pump could never start.
+        if lock(&self.push).is_none() || lock(&self.tagged).is_none() {
+            return;
+        }
         let (Some(push), Some(tagged)) = (push_of(&self.push), tagged_of(&self.tagged)) else {
             return;
         };
