@@ -79,6 +79,7 @@ fn the_view_state_slice_has_no_invented_fields() {
             messages: Vec::new(),
             notices: Vec::new(),
             activity: Vec::new(),
+            config_notice: None,
         }
     );
 }

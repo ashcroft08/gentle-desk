@@ -10,22 +10,15 @@ use tauri::State;
 use crate::commands::Bridge;
 use crate::contract::{SessionsWindow, ViewState};
 
-/// One page of the session list (S3): the rows `[offset, offset + length)` of
-/// the list `query` narrows, and how many rows it matches in total. It reads the
-/// CURRENT state, so a sidebar that missed a push still gets the truth; the
-/// length is capped, so no caller can ask for a whole 50 000-chat list.
+/// One page of the flattened workspace tree (S3): the rows
+/// `[offset, offset + length)` of it, and how many rows the tree has in total -
+/// workspace headers included. It reads the CURRENT state, so a sidebar that
+/// missed a push still gets the truth; the length is capped, so no caller can
+/// ask for a whole 50 000-chat list.
 #[tauri::command]
 #[specta::specta]
-pub fn sessions_window(
-    offset: u32,
-    length: u32,
-    query: String,
-    bridge: State<'_, Bridge>,
-) -> SessionsWindow {
-    bridge
-        .inner()
-        .holder
-        .sessions_window(offset, length, &query)
+pub fn sessions_window(offset: u32, length: u32, bridge: State<'_, Bridge>) -> SessionsWindow {
+    bridge.inner().holder.sessions_window(offset, length)
 }
 
 /// The first read of a web view: the slice the state holds right now. It emits

@@ -1,12 +1,31 @@
-// The pure rules a session row needs: how tall a row is, which rows a scroll
-// position shows, and which mark a chat activity name draws. All three are
-// display rules only; the list itself comes from Rust one window at a time
-// (S3) and the mark's colour comes from the design system's CSS variables.
+// The pure rules the sidebar tree needs: how tall a row is, which rows a scroll
+// position shows, and which kind a row is. Row heights and the row math are
+// display rules only; the rows themselves come from Rust one window at a time
+// (S3), already flattened: a workspace header, then its chats.
 
+import type { SessionTreeRow_Serialize } from '../contract/bindings'
 import type { MarkKind } from '../icons/shapes'
 
 /** The fixed height of one row (design/system.md, `--row-h`). */
 export const ROW_HEIGHT = 34
+
+/** One row of the tree as `sessions_window` answers it. */
+export type TreeRow = SessionTreeRow_Serialize
+
+/** A workspace header row: the folder and the state of its group. */
+export type WorkspaceRow = Extract<TreeRow, { kind: 'Workspace' }>
+
+/** A chat row: the same row the flat list served, under its folder. */
+export type ChatRow = Extract<TreeRow, { kind: 'Chat' }>
+
+/**
+ * Whether `row` is a workspace header rather than a chat. Headers and chats
+ * share {@link ROW_HEIGHT}, so the tree is one virtualized list of rows and
+ * this guard is the only thing a caller needs to draw one.
+ */
+export function isWorkspaceRow(row: TreeRow): row is WorkspaceRow {
+  return row.kind === 'Workspace'
+}
 
 export type VirtualWindow = {
   /** Index of the first row to draw. */
@@ -21,7 +40,10 @@ export type VirtualWindow = {
 
 /**
  * Which rows a viewport shows: the first one, how many fit, and the two spacer
- * heights that keep the scrollbar honest for a list of 50 000 rows.
+ * heights that keep the scrollbar honest for a tree of 50 000 rows.
+ *
+ * `total` is the count Rust answers with: workspace headers included, so the
+ * scrollbar measures the rows that really exist.
  *
  * The window stops at the last full page, so the last rows are never scrolled
  * past and the bottom spacer reaches exactly zero there.

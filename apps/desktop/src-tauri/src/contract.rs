@@ -93,17 +93,55 @@ pub struct SessionRowView {
     pub modified_ago: String,
 }
 
-/// One page of the session list as `sessions_window` answers it (S3): the rows
-/// `[offset, offset + length)` of the list `query` narrows, and how many rows
-/// that query matches in total, so the sidebar knows how far it can scroll.
+/// One workspace row of the flattened tree: the folder the user works in, with
+/// the state the sidebar draws and whether new chats can start there.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub struct WorkspaceRowView {
+    /// The folder identity two spellings share
+    /// ([`gentle_runtime::app_config::folder_key`]).
+    pub key: String,
+    /// The name extended with the parent segments it takes to tell two
+    /// workspaces with the same name apart.
+    pub label: String,
+    /// The canonical spelling of the folder.
+    pub path: String,
+    /// The last segment of the path.
+    pub name: String,
+    /// Whether the chats of the workspace are folded away (D8).
+    pub collapsed: bool,
+    /// How many chats the workspace holds, folded or not.
+    pub chat_count: u32,
+    /// Whether the folder is there right now, so new chats can start in it.
+    pub available: bool,
+    /// Why a folder that is not available cannot host a chat.
+    pub reason: Option<String>,
+}
+
+/// One row of the flattened workspace tree the sidebar draws: a workspace
+/// header, then - only when the workspace is not collapsed - its chats.
+///
+/// The two kinds share one row height on the web side, so the tree is one
+/// virtualized list of rows rather than a nested one.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(tag = "kind")]
+pub enum SessionTreeRow {
+    Workspace(WorkspaceRowView),
+    Chat(SessionRowView),
+}
+
+/// One page of the workspace tree as `sessions_window` answers it (S3): the rows
+/// `[offset, offset + length)` of the flattened tree, and how many rows the tree
+/// has in total - workspace headers included - so the sidebar knows how far it
+/// can scroll.
 ///
 /// The length is capped ([`MAX_WINDOW`](crate::sessions::window::MAX_WINDOW)),
 /// so this type never carries the whole list of a 50 000-chat home.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
 pub struct SessionsWindow {
-    /// The filtered count: the rows the query matches, not the page's length.
+    /// The count of the flattened rows: headers and chats, collapsed groups
+    /// skipped, never the page's length.
     pub total: u32,
-    pub rows: Vec<SessionRowView>,
+    pub rows: Vec<SessionTreeRow>,
 }
 
 /// Who wrote one message of the thread. The two roles a chat thread displays,
@@ -171,6 +209,10 @@ pub struct ViewState {
     pub messages: Vec<MessageView>,
     pub notices: Vec<NoticeView>,
     pub activity: Vec<ChatActivityView>,
+    /// What the user should be told about the app config file, when it could
+    /// not be used at startup: a damaged file is kept aside and the app starts
+    /// with an empty config. `None` when the file was read, or was not there.
+    pub config_notice: Option<String>,
 }
 
 /// The state slice after each dispatch, emitted to the web side (typed

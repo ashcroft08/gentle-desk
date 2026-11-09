@@ -1,15 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { SessionsWindow } from '../contract/bindings'
+import type { SessionsWindow_Serialize } from '../contract/bindings'
 import {
+  chatRow,
   deferred,
   handlerArgs,
   resetTauriMock,
-  sessionRow,
   sessionsWindow,
   setHandler,
+  workspaceRow,
 } from '../test-support/tauri-mock'
-import { flushMicrotasks, manualTimer } from '../test-support/manual-timer'
-import { createWindowFetcher, MAX_WINDOW, OVERSCAN, pageFor, QUERY_DEBOUNCE_MS } from './window'
+import { flushMicrotasks } from '../test-support/manual-timer'
+import { createWindowFetcher, MAX_WINDOW, OVERSCAN, pageFor } from './window'
 
 vi.mock('@tauri-apps/api/core', () => import('../test-support/tauri-mock').then((m) => m.coreModule()))
 vi.mock('@tauri-apps/api/event', () => import('../test-support/tauri-mock').then((m) => m.eventModule()))
@@ -31,101 +32,85 @@ describe('pageFor', () => {
   it('caps the length the way Rust caps the answer', () => {
     expect(pageFor({ first: 0, visible: 500 }).length).toBe(MAX_WINDOW)
   })
-
-  it('debounces a query change by 150 ms', () => {
-    expect(QUERY_DEBOUNCE_MS).toBe(150)
-  })
 })
 
 describe('window fetcher', () => {
   it('keeps the rows and the total of the page it asked for', async () => {
-    setHandler('sessions_window', () => sessionsWindow(40, [sessionRow('a'), sessionRow('b')]))
+    setHandler('sessions_window', () =>
+      sessionsWindow(40, [workspaceRow('repo', { chat_count: 1 }), chatRow('a')]),
+    )
     const fetcher = createWindowFetcher()
-    fetcher.request('', { first: 0, visible: 10 })
+    fetcher.request({ first: 0, visible: 10 })
     await flushMicrotasks()
-    expect(handlerArgs('sessions_window')).toEqual([{ offset: 0, length: 30, query: '' }])
+    expect(handlerArgs('sessions_window')).toEqual([{ offset: 0, length: 30 }])
     expect(fetcher.get().total).toBe(40)
-    expect(fetcher.get().rows.map((row) => row.id)).toEqual(['a', 'b'])
+    expect(fetcher.get().rows.map((row) => row.kind)).toEqual(['Workspace', 'Chat'])
     expect(fetcher.get().loading).toBe(false)
     expect(fetcher.get().error).toBeNull()
-    expect(fetcher.rowAt(1)?.id).toBe('b')
+    expect(fetcher.rowAt(1)?.kind).toBe('Chat')
   })
 
-  it('answers an empty list without inventing rows', async () => {
+  it('answers a tree with no rows without inventing rows', async () => {
     setHandler('sessions_window', () => sessionsWindow(0, []))
     const fetcher = createWindowFetcher()
-    fetcher.request('', { first: 0, visible: 10 })
+    fetcher.request({ first: 0, visible: 10 })
     await flushMicrotasks()
     expect(fetcher.get().total).toBe(0)
     expect(fetcher.get().rows).toEqual([])
   })
 
-  it('asks for the last page of a long list', async () => {
-    setHandler('sessions_window', () => sessionsWindow(100, [sessionRow('last')]))
+  it('asks for the last page of a long tree', async () => {
+    setHandler('sessions_window', () => sessionsWindow(100, [chatRow('last')]))
     const fetcher = createWindowFetcher()
-    fetcher.request('', { first: 99, visible: 10 })
+    fetcher.request({ first: 99, visible: 10 })
     await flushMicrotasks()
-    expect(handlerArgs('sessions_window')[0]).toEqual({ offset: 89, length: 30, query: '' })
-    expect(fetcher.rowAt(89)?.id).toBe('last')
+    expect(handlerArgs('sessions_window')[0]).toEqual({ offset: 89, length: 30 })
+    expect(fetcher.rowAt(89)?.kind).toBe('Chat')
   })
 
   it('does not refetch a page it already holds', async () => {
-    setHandler('sessions_window', () => sessionsWindow(40, [sessionRow('a')]))
+    setHandler('sessions_window', () => sessionsWindow(40, [chatRow('a')]))
     const fetcher = createWindowFetcher()
-    fetcher.request('', { first: 0, visible: 10 })
+    fetcher.request({ first: 0, visible: 10 })
     await flushMicrotasks()
-    fetcher.request('', { first: 0, visible: 10 })
+    fetcher.request({ first: 0, visible: 10 })
     await flushMicrotasks()
     expect(handlerArgs('sessions_window')).toHaveLength(1)
   })
 
   it('drops the cache when the revision changes', async () => {
-    setHandler('sessions_window', () => sessionsWindow(40, [sessionRow('a')]))
+    setHandler('sessions_window', () => sessionsWindow(40, [chatRow('a')]))
     const fetcher = createWindowFetcher()
-    fetcher.request('', { first: 0, visible: 10 })
+    fetcher.request({ first: 0, visible: 10 })
     await flushMicrotasks()
-    expect(fetcher.rowAt(0)?.id).toBe('a')
+    expect(fetcher.rowAt(0)?.kind).toBe('Chat')
     fetcher.setRevision(2)
     expect(fetcher.rowAt(0)).toBeUndefined()
-    fetcher.request('', { first: 0, visible: 10 })
+    fetcher.request({ first: 0, visible: 10 })
     await flushMicrotasks()
     expect(handlerArgs('sessions_window')).toHaveLength(2)
   })
 
   it('ignores a response that resolves after a newer request', async () => {
-    const older = deferred<SessionsWindow>()
-    const newer = deferred<SessionsWindow>()
+    const older = deferred<SessionsWindow_Serialize>()
+    const newer = deferred<SessionsWindow_Serialize>()
     const answers = [older, newer]
     setHandler('sessions_window', () => answers.shift()?.promise)
     const fetcher = createWindowFetcher()
-    fetcher.request('', { first: 0, visible: 10 })
-    fetcher.request('', { first: 50, visible: 10 })
-    newer.resolve(sessionsWindow(100, [sessionRow('new')]))
+    fetcher.request({ first: 0, visible: 10 })
+    fetcher.request({ first: 50, visible: 10 })
+    newer.resolve(sessionsWindow(100, [chatRow('new')]))
     await flushMicrotasks()
-    older.resolve(sessionsWindow(100, [sessionRow('old')]))
+    older.resolve(sessionsWindow(100, [chatRow('old')]))
     await flushMicrotasks()
-    expect(fetcher.get().rows.map((row) => row.id)).toEqual(['new'])
+    expect(fetcher.get().rows.map((row) => row.kind)).toEqual(['Chat'])
     expect(fetcher.rowAt(0)).toBeUndefined()
-  })
-
-  it('runs a query change once, after the debounce', async () => {
-    const timer = manualTimer()
-    setHandler('sessions_window', () => sessionsWindow(2, [sessionRow('a')]))
-    const fetcher = createWindowFetcher({ schedule: timer.schedule, cancel: timer.cancel })
-    fetcher.request('t', { first: 0, visible: 10 })
-    fetcher.request('ta', { first: 0, visible: 10 })
-    expect(timer.pending()).toBe(1)
-    expect(handlerArgs('sessions_window')).toHaveLength(0)
-    timer.run()
-    await flushMicrotasks()
-    expect(handlerArgs('sessions_window')).toEqual([{ offset: 0, length: 30, query: 'ta' }])
-    expect(fetcher.get().query).toBe('ta')
   })
 
   it('reports a rejected invoke as an error state instead of throwing', async () => {
     setHandler('sessions_window', () => Promise.reject(new Error('list unavailable')))
     const fetcher = createWindowFetcher()
-    fetcher.request('', { first: 0, visible: 10 })
+    fetcher.request({ first: 0, visible: 10 })
     await flushMicrotasks()
     expect(fetcher.get().error).toBe('list unavailable')
     expect(fetcher.get().loading).toBe(false)
