@@ -1,7 +1,11 @@
 // The module runner's source-map stack transform can itself throw on some
 // frames ("column must be >= 0"), which then masks the real error thrown from
 // a Svelte effect. Plain V8 stacks keep the original error visible.
-Error.prepareStackTrace = (err, trace) => {
+// V8-only hook, typed locally so this file does not depend on @types/node.
+(Error as unknown as { prepareStackTrace: (err: Error, trace: unknown[]) => string }).prepareStackTrace = (
+  err,
+  trace
+) => {
   return `${err.name}: ${err.message}` + trace.map((f) => `\n    at ${String(f)}`).join('')
 }
 
