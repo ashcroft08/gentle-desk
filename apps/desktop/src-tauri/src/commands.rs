@@ -15,16 +15,38 @@ use tauri_specta::Event;
 use crate::bridge::AppStateHolder;
 use crate::contract::{StateChanged, UiIntent, ViewState};
 use crate::effects::{self, Ran, RuntimeExecutor};
+use crate::events::{EventPump, Push};
 
-/// Everything the bridge owns and hands to the worker threads: the state, and
-/// the seam that runs a chat command. The only managed state of the app.
-#[derive(Default)]
+/// Everything the bridge owns and hands to the worker threads: the state, the
+/// pump the children's events come back through, and the seam that runs a chat
+/// command. The only managed state of the app.
 pub struct Bridge {
     pub holder: Arc<AppStateHolder>,
     pub executor: Arc<RuntimeExecutor>,
+    pub pump: Arc<EventPump>,
 }
 
 impl Bridge {
+    /// One holder, one pump folding into it, and the executor that feeds the
+    /// pump its host when the first command needs one.
+    pub fn new() -> Self {
+        let holder = Arc::new(AppStateHolder::default());
+        let pump = Arc::new(EventPump::new(Arc::clone(&holder)));
+        Self {
+            holder,
+            executor: Arc::new(RuntimeExecutor::new(Arc::clone(&pump))),
+            pump,
+        }
+    }
+
+    /// The window's emit step of the event pump, installed once at startup, so
+    /// the pumped slices reach the web side (only Tauri's setup has the handle).
+    pub fn arm_events(&self, app: &AppHandle<tauri::Wry>) {
+        let app = app.clone();
+        let push: Push = Box::new(move |view| push(&app, view));
+        self.pump.arm(push);
+    }
+
     /// Folds one intent, pushes the slice it answers, and runs the per-chat
     /// commands on worker threads. Returns the slice the command answers with,
     /// the one the web side may render before any child has answered.
@@ -53,6 +75,13 @@ impl Bridge {
             }
         }
         Ok(view)
+    }
+}
+
+/// A bridge with nothing run yet: the same one [`Bridge::new`] builds.
+impl Default for Bridge {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

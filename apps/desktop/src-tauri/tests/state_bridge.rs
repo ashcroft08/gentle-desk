@@ -73,6 +73,7 @@ fn the_view_state_slice_has_no_invented_fields() {
         holder.view(),
         ViewState {
             foreground_chat: None,
+            messages: Vec::new(),
             notices: Vec::new(),
             activity: Vec::new(),
         }

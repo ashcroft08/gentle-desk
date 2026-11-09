@@ -21,6 +21,7 @@ use gentle_runtime::badge::{Badge, BadgeMark};
 use crate::contract::{
     ChatActivityMark, ChatActivityView, NoticeLevel, NoticeView, UiIntent, ViewState,
 };
+use crate::view;
 
 /// The app state the Tauri shell owns. Created at startup, managed by Tauri;
 /// nothing else anywhere holds an `AppState`.
@@ -118,7 +119,8 @@ fn chat_for(state: &gentle_app::AppState, chat_id: &str) -> ChatId {
 
 /// The `ViewState` slice of an `AppState`: the pure rule that decides what the
 /// web side sees. `foreground_chat` is the id the app names the chat by (the
-/// way the UI holds it); notices arrive flattened, newest last, and the
+/// way the UI holds it), its thread arrives cut to the last few messages
+/// ([`view::MESSAGES_PUSHED`]), notices arrive flattened, newest last, and the
 /// activity list carries only the chats that are not idle.
 pub fn view_state(state: &gentle_app::AppState) -> ViewState {
     ViewState {
@@ -126,6 +128,7 @@ pub fn view_state(state: &gentle_app::AppState) -> ViewState {
             .chats
             .foreground()
             .map(|chat| chat.as_str().to_owned()),
+        messages: view::messages(state),
         notices: state.notices.iter().map(NoticeView::of).collect(),
         activity: activity_view(state),
     }

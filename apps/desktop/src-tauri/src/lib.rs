@@ -10,8 +10,11 @@ pub mod bridge;
 pub mod commands;
 pub mod contract;
 pub mod effects;
+pub mod events;
+pub mod view;
 
 use commands::Bridge;
+use tauri::Manager;
 use tauri_specta::Builder;
 
 /// The whole typed surface of the bridge: the commands and events the
@@ -43,11 +46,15 @@ pub fn run() {
         .expect("failed to export TypeScript bindings to ../src/contract");
 
     tauri::Builder::default()
-        .manage(Bridge::default())
+        .manage(Bridge::new())
         .invoke_handler(builder.invoke_handler())
         .setup(move |app| {
             // Typed events need their registry mounted, or emitting panics.
             builder.mount_events(app);
+            // The pump's emit step needs the window handle, which only setup
+            // has: this is the one place the child events are armed. The pump's
+            // threads start the first time the executor builds its host.
+            app.state::<Bridge>().arm_events(app.handle());
             Ok(())
         })
         .run(tauri::generate_context!())

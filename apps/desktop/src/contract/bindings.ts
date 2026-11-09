@@ -45,6 +45,18 @@ export type ChatBadge = {
 	unread: boolean,
 };
 
+/**
+ *  Who wrote one message of the thread. The two roles a chat thread displays,
+ *  matching `gentle_core`'s chat roles one to one.
+ */
+export type MessageRole = "User" | "Assistant";
+
+/**  One message of the foreground chat's thread, flattened for display. */
+export type MessageView = {
+	role: MessageRole,
+	text: string,
+};
+
 /**  The level of a notice, matching `gentle_app`'s notice kinds one to one. */
 export type NoticeLevel = "Info" | "Warning" | "Error";
 
@@ -101,32 +113,61 @@ export type UiIntent = { type: "SendPrompt"; data: {
 
 /**
  *  The state the current views render: the foreground chat (as the app names
- *  it, the id the sidebar passes back), the notices, and the per-chat activity
- *  the list rows show. The push size is the notices plus the chats that are not
- *  idle, never the whole `AppState` (S2).
+ *  it, the id the sidebar passes back) with its thread, the notices, and the
+ *  per-chat activity the list rows show. The push size is the notices, the
+ *  chats that are not idle and the tail of one thread, never the whole
+ *  `AppState` (S2).
+ * 
+ *  A chat's stderr reason lines are not a slice of their own: the app keeps them
+ *  in a bounded ring but exposes them only as the reason of the death notice, so
+ *  they reach the web side inside [`NoticeView::text`] and nowhere else.
  */
 export type ViewState = ViewState_Serialize | ViewState_Deserialize;
 
 /**
  *  The state the current views render: the foreground chat (as the app names
- *  it, the id the sidebar passes back), the notices, and the per-chat activity
- *  the list rows show. The push size is the notices plus the chats that are not
- *  idle, never the whole `AppState` (S2).
+ *  it, the id the sidebar passes back) with its thread, the notices, and the
+ *  per-chat activity the list rows show. The push size is the notices, the
+ *  chats that are not idle and the tail of one thread, never the whole
+ *  `AppState` (S2).
+ * 
+ *  A chat's stderr reason lines are not a slice of their own: the app keeps them
+ *  in a bounded ring but exposes them only as the reason of the death notice, so
+ *  they reach the web side inside [`NoticeView::text`] and nowhere else.
  */
 export type ViewState_Deserialize = {
 	foreground_chat?: string | null,
+	/**
+	 *  The foreground chat's messages, oldest first. Message text is the model's
+	 *  whole markdown reply, so the slice carries the last
+	 *  [`MESSAGES_PUSHED`](crate::view::MESSAGES_PUSHED) of them and never a
+	 *  whole long session.
+	 */
+	messages: MessageView[],
 	notices: NoticeView[],
 	activity: ChatActivityView[],
 };
 
 /**
  *  The state the current views render: the foreground chat (as the app names
- *  it, the id the sidebar passes back), the notices, and the per-chat activity
- *  the list rows show. The push size is the notices plus the chats that are not
- *  idle, never the whole `AppState` (S2).
+ *  it, the id the sidebar passes back) with its thread, the notices, and the
+ *  per-chat activity the list rows show. The push size is the notices, the
+ *  chats that are not idle and the tail of one thread, never the whole
+ *  `AppState` (S2).
+ * 
+ *  A chat's stderr reason lines are not a slice of their own: the app keeps them
+ *  in a bounded ring but exposes them only as the reason of the death notice, so
+ *  they reach the web side inside [`NoticeView::text`] and nowhere else.
  */
 export type ViewState_Serialize = {
 	foreground_chat: string | null,
+	/**
+	 *  The foreground chat's messages, oldest first. Message text is the model's
+	 *  whole markdown reply, so the slice carries the last
+	 *  [`MESSAGES_PUSHED`](crate::view::MESSAGES_PUSHED) of them and never a
+	 *  whole long session.
+	 */
+	messages: MessageView[],
 	notices: NoticeView[],
 	activity: ChatActivityView[],
 };
