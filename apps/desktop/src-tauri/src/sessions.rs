@@ -9,16 +9,23 @@
 //!   they push. A pass blocks on a `stat` per session file and a full parse of
 //!   the new ones, so it runs on its own thread, never on a Tauri executor
 //!   thread or the window's.
-//! - [`view`]: the slice a `ViewState` carries, the list status and the first
-//!   window of rows.
+//! - [`view`]: the slice a `ViewState` carries: the list status and the count.
+//! - [`window`]: the `offset`/`length`/`query` pages of rows the web side asks
+//!   for as it scrolls, instead of a pushed list (S3).
+//! - [`revision`]: when the page a web side holds went stale.
+//! - [`commands`]: the two read commands of the list, `sessions_window` and
+//!   `get_view_state`, registered with the rest of the contract.
 //! - [`startup`]: the index, its cache and the flow of this run. It starts no
 //!   watcher: the watcher is not part of this slice.
 //!
 //! The seam is [`service::RunPass`] for "run one pass" and [`crate::events::Push`] for
 //! "emit the slice", so the tests run a real home and no window.
 
+pub mod commands;
+pub mod revision;
 pub mod service;
 pub mod startup;
 pub mod view;
+pub mod window;
 
 pub use service::SessionsService;

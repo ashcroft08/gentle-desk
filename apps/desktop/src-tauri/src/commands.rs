@@ -55,16 +55,16 @@ impl Bridge {
         self.pump.arm(push);
     }
 
-    /// The sessions half of startup: the list's emit step, and the first full
-    /// pass. The iced shell asks for that pass as its first task
+    /// Announces the list's emit step and asks for the first full pass. The
+    /// iced shell asks for that pass as its first task
     /// (`crates/ui/src/app/boot.rs`), so the window opens with a list that is
     /// reading rather than a list that claims to be empty.
     ///
-    /// TODO(T4): a push that lands before the webview listens is lost, and a
-    /// small home finishes before it does. The sidebar's first read (a command
-    /// answering the current slice) belongs to the windowed-query slice; the
-    /// pass is armed here because the setup step is the only place that has the
-    /// handle, exactly as the child events are.
+    /// A push that lands before the webview listens is no longer lost: the
+    /// sidebar's first read is `get_view_state`, a command that answers the
+    /// slice the state holds and emits nothing, so it starts from the truth
+    /// whatever it missed. The pass is armed here because the setup step is the
+    /// only place that has the handle, exactly as the child events are.
     pub fn start_sessions(&self, app: &AppHandle<tauri::Wry>) {
         let app = app.clone();
         let push: Push = Box::new(move |view| push(&app, view));
@@ -151,7 +151,7 @@ fn emit_state(app: &AppHandle<tauri::Wry>, view: &ViewState) -> Result<(), Strin
         .map_err(|error| error.to_string())
 }
 
-/// The one command this slice exposes: fold the intent, push the new slice and
+/// One command this slice exposes: fold the intent, push the new slice and
 /// run what it asked for. The emitted event is typed through tauri-specta, so
 /// the Svelte side gets the same [`ViewState`] for the return and the payload.
 #[tauri::command]

@@ -22,6 +22,7 @@ use gentle_runtime::refresh_flow::Flow;
 use gentle_runtime::session_refresh::Shared;
 
 pub mod gate;
+#[allow(unused_imports)] // each test binary uses one part of it
 pub use gate::gated;
 
 /// How long a test waits for a pass to report or a thread to answer.
@@ -88,6 +89,15 @@ pub fn service(home: &Home) -> (SessionsService, Arc<AppStateHolder>, Recorder) 
     let flow = flow_of(home);
     let run = startup::run_pass(flow.shared());
     build(flow, run)
+}
+
+/// The same, with the first pass already requested and settled: the holder and
+/// the recorder, for a test that only reads the result.
+pub fn settled(home: &Home) -> (Arc<AppStateHolder>, Recorder) {
+    let (service, holder, recorder) = service(home);
+    service.request();
+    recorder.wait_for_complete();
+    (holder, recorder)
 }
 
 /// The same for a run with no pi home at all: the flow has no index, so it never

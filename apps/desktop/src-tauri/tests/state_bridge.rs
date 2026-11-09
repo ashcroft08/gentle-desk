@@ -74,7 +74,8 @@ fn the_view_state_slice_has_no_invented_fields() {
         ViewState {
             foreground_chat: None,
             list_status: ListStatusView::Loading { done: 0, total: 0 },
-            sessions: Vec::new(),
+            sessions_revision: 0,
+            total_sessions: 0,
             messages: Vec::new(),
             notices: Vec::new(),
             activity: Vec::new(),
