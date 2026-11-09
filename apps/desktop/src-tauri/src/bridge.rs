@@ -8,29 +8,46 @@
 //!
 //! The mapping is explicit: the contract's [`UiIntent`] turns into
 //! `gentle_app::Intent` by hand, and the state turns into [`ViewState`] by
-//! [`view_state`]. Nothing derives on a `crates/app` type, so the two sides
-//! stay independently defined and generator-checked
+//! [`view_state`]. Nothing derives on a `crates/app` type, so the
+//! two sides stay independently defined and generator-checked
 //! (`tests/contract_bindings.rs`).
 //!
-//! The holder only answers what the reducer asked for; running those per-chat
-//! commands is `effects`' job and the Tauri command layer's.
+//! The holder only answers what the reducer asked for. The per-chat commands
+//! are run by `effects` and the command layer; the SHARED commands (a settled
+//! turn's `Command::RefreshSessions`) go to the [`CommandSink`] installed by the
+//! bridge, which asks the sessions service for that pass. Both kinds run off the
+//! window's thread.
 
-use gentle_app::{ChatCommand, ChatId};
-use gentle_runtime::badge::{Badge, BadgeMark};
+use std::sync::{Arc, Mutex, MutexGuard};
 
-use crate::contract::{
-    ChatActivityMark, ChatActivityView, NoticeLevel, NoticeView, UiIntent, ViewState,
-};
-use crate::view;
+use gentle_app::{ChatId, Command};
+
+use crate::contract::{UiIntent, ViewState};
+use crate::state_view::view_state;
+
+/// What runs one shared command the reducer asked for. `Command::RefreshSessions`
+/// is the session list's in the app; the sink keeps the holder free of how it is
+/// run (a thread, a service, nothing at all before it is installed).
+pub type CommandSink = Arc<dyn Fn(Command) + Send + Sync>;
 
 /// The app state the Tauri shell owns. Created at startup, managed by Tauri;
 /// nothing else anywhere holds an `AppState`.
 #[derive(Default)]
 pub struct AppStateHolder {
-    app: std::sync::Mutex<gentle_app::AppState>,
+    app: Mutex<gentle_app::AppState>,
+    /// Installed once at startup: before it exists a shared command is simply
+    /// dropped, which is what the earlier slices did with all of them.
+    commands: Mutex<Option<CommandSink>>,
 }
 
 impl AppStateHolder {
+    /// Installs what runs the shared commands of every later fold. One sink for
+    /// the whole holder, so the intent path, the child-event pump and a refresh
+    /// pass all reach the same service.
+    pub fn arm_commands(&self, sink: CommandSink) {
+        *lock(&self.commands) = Some(sink);
+    }
+
     /// Folds one intent of the contract through the reducer and answers the
     /// slice to push. Also the path the `state-changed` event payload takes.
     pub fn dispatch(&self, intent: UiIntent) -> ViewState {
@@ -40,22 +57,20 @@ impl AppStateHolder {
     /// [`Self::dispatch`] with the per-chat commands the fold asked for, for the
     /// caller to run through an executor (`effects`). The web sees the same
     /// slice either way: the commands are the shell's business, not the view's.
-    pub fn dispatch_commands(&self, intent: UiIntent) -> (ViewState, Vec<ChatCommand>) {
+    pub fn dispatch_commands(&self, intent: UiIntent) -> (ViewState, Vec<gentle_app::ChatCommand>) {
         let state = self.state();
         let input = gentle_app::Input::Intent(to_intent(&state, intent));
         self.apply(input)
     }
 
-    /// Folds one reducer input through the same path. The intents arrive as
-    /// [`UiIntent`]; this is the slot the later slices fold the backend and
-    /// chat events through (`Input::ChatEvent`, `Input::SessionsPrepared`),
-    /// and it is what the tests seed state with.
+    /// Folds one reducer input through the same path. This is the slot the
+    /// backend and the session passes fold through (`Input::ChatEvent`,
+    /// `Input::SessionsProgress`), and it is what the tests seed state with.
     pub fn fold_input(&self, input: gentle_app::Input) -> ViewState {
         self.apply(input).0
     }
 
     /// Folds several inputs in order, answering the slice after the last one.
-    /// What an outcome came to is usually more than one input.
     pub fn fold_inputs(&self, inputs: impl IntoIterator<Item = gentle_app::Input>) -> ViewState {
         let mut view = self.view();
         for input in inputs {
@@ -69,17 +84,29 @@ impl AppStateHolder {
         view_state(&self.state())
     }
 
-    fn apply(&self, input: gentle_app::Input) -> (ViewState, Vec<ChatCommand>) {
+    fn apply(&self, input: gentle_app::Input) -> (ViewState, Vec<gentle_app::ChatCommand>) {
         let state = self.state();
-        // The shared commands (clipboard, refresh) are still dropped: this
-        // slice runs the per-chat commands only.
         let (state, effects) = gentle_app::update_chats(state, input);
-        *self.app.lock().expect("app state mutex poisoned") = state.clone();
-        (view_state(&state), effects.chat_commands)
+        *lock(&self.app) = state.clone();
+        let view = view_state(&state);
+        // After the state lock is released: a refresh request starts a pass
+        // whose thread folds back into this same holder.
+        self.run_shared(effects.commands);
+        (view, effects.chat_commands)
+    }
+
+    /// Runs the shared commands of one fold through the sink, if any.
+    fn run_shared(&self, commands: Vec<Command>) {
+        let sink = lock(&self.commands).clone();
+        for command in commands {
+            if let Some(sink) = sink.as_ref() {
+                sink(command);
+            }
+        }
     }
 
     fn state(&self) -> gentle_app::AppState {
-        self.app.lock().expect("app state mutex poisoned").clone()
+        lock(&self.app).clone()
     }
 }
 
@@ -102,11 +129,12 @@ fn to_intent(state: &gentle_app::AppState, intent: UiIntent) -> gentle_app::Inte
 /// The app's chat for an id the web side sent back.
 ///
 /// The web only ever holds ids the state named - [`ViewState`] names every chat
-/// by `ChatId::as_str` - so the lookup is the round trip of an id the view was
-/// given, and a chat of no session file (`new-N`, which no path can rebuild)
-/// travels back unchanged. An id the state has not heard of is read as the
-/// session path of a stored chat, which is how the app builds that chat's id:
-/// the sidebar names a row by its path long before any chat exists.
+/// by `ChatId::as_str` and every session row by its path - so the lookup is the
+/// round trip of an id the view was given, and a chat of no session file
+/// (`new-N`, which no path can rebuild) travels back unchanged. An id the state
+/// has not heard of is read as the session path of a stored chat, which is how
+/// the app builds that chat's id: the sidebar names a row by its path long
+/// before any chat exists.
 fn chat_for(state: &gentle_app::AppState, chat_id: &str) -> ChatId {
     state
         .chats
@@ -117,79 +145,8 @@ fn chat_for(state: &gentle_app::AppState, chat_id: &str) -> ChatId {
         .unwrap_or_else(|| ChatId::of_session(chat_id))
 }
 
-/// The `ViewState` slice of an `AppState`: the pure rule that decides what the
-/// web side sees. `foreground_chat` is the id the app names the chat by (the
-/// way the UI holds it), its thread arrives cut to the last few messages
-/// ([`view::MESSAGES_PUSHED`]), notices arrive flattened, newest last, and the
-/// activity list carries only the chats that are not idle.
-pub fn view_state(state: &gentle_app::AppState) -> ViewState {
-    ViewState {
-        foreground_chat: state
-            .chats
-            .foreground()
-            .map(|chat| chat.as_str().to_owned()),
-        messages: view::messages(state),
-        notices: state.notices.iter().map(NoticeView::of).collect(),
-        activity: activity_view(state),
-    }
-}
-
-/// The marks of the chats with something to show, in id order. The rule that
-/// turns a chat's activity into a mark is `crates/runtime`'s (`Badge::on`), so
-/// an idle chat is simply absent and this list stays as small as the chats that
-/// are working, waiting or failed.
-fn activity_view(state: &gentle_app::AppState) -> Vec<ChatActivityView> {
-    state
-        .chats
-        .ids()
-        .into_iter()
-        .filter_map(|chat| {
-            let badge = Badge::on(state.chats.activity(chat)?)?;
-            Some(ChatActivityView {
-                chat_id: chat.as_str().to_owned(),
-                activity: view_mark(badge.mark),
-            })
-        })
-        .collect()
-}
-
-/// The badge mark as the contract names it: the two enums carry the same six
-/// meanings, and the contract's names are the ones already on the wire.
-fn view_mark(mark: BadgeMark) -> ChatActivityMark {
-    match mark {
-        BadgeMark::Working => ChatActivityMark::Working,
-        BadgeMark::NewReply => ChatActivityMark::NewReply,
-        BadgeMark::Queued => ChatActivityMark::Queued,
-        BadgeMark::Opening => ChatActivityMark::Opening,
-        BadgeMark::NeedsAttention => ChatActivityMark::NeedsAttention,
-        BadgeMark::Ended => ChatActivityMark::Ended,
-    }
-}
-
-impl NoticeView {
-    /// Flattens one app notice for display.
-    pub(crate) fn of(notice: &gentle_app::Notice) -> Self {
-        Self {
-            id: view_notice_id(notice),
-            text: notice.text.clone(),
-            level: view_notice_level(notice.level),
-        }
-    }
-}
-
-/// The id the dismiss intent refers back to. The app's ids are a never-reused
-/// counter that stays far below `u32::MAX` in practice; the contract narrows
-/// both sides of the id to `u32`, and the saturating value would mark a
-/// collapse, never silently aliasing another notice (each id is unique).
-fn view_notice_id(notice: &gentle_app::Notice) -> u32 {
-    u32::try_from(notice.id).unwrap_or(u32::MAX)
-}
-
-/// The contract's level enum matches the app's notice kinds one to one.
-fn view_notice_level(level: gentle_app::NoticeLevel) -> NoticeLevel {
-    match level {
-        gentle_app::NoticeLevel::Info => NoticeLevel::Info,
-        gentle_app::NoticeLevel::Warning => NoticeLevel::Warning,
-        gentle_app::NoticeLevel::Error => NoticeLevel::Error,
-    }
+/// A lock that survives a poisoned mutex: nothing here may panic because a
+/// thread died holding one.
+fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
+    mutex.lock().unwrap_or_else(|poison| poison.into_inner())
 }

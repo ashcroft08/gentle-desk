@@ -68,6 +68,33 @@ pub enum UiIntent {
     },
 }
 
+/// How complete the session list is, matching `gentle_app::ListStatus` one to
+/// one. `Loading` carries how far the first pass got, so the sidebar can say it
+/// is still reading; only `Complete` lets an empty list call itself empty.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(tag = "type", content = "data")]
+pub enum ListStatusView {
+    Loading { done: u32, total: u32 },
+    Complete,
+}
+
+/// One row of the session list, flattened for display. Only a WINDOW of rows is
+/// pushed ([`ROWS_PUSHED`](crate::sessions::view::ROWS_PUSHED)); the windowed
+/// `offset`/`length`/`query` query of S3 is a later slice (T4), which is why no
+/// total is part of this row or of the push.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub struct SessionRowView {
+    /// The session file path: the id `OpenChat` takes back, which is exactly
+    /// what `gentle_app::ChatId::of_session` builds a stored chat's id from.
+    pub id: String,
+    pub title: String,
+    pub project: String,
+    pub message_count: u32,
+    /// How long ago the session was last written, as the text the sidebar shows
+    /// (the rule is [`gentle_runtime::time_ago`]).
+    pub modified_ago: String,
+}
+
 /// Who wrote one message of the thread. The two roles a chat thread displays,
 /// matching `gentle_core`'s chat roles one to one.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
@@ -102,10 +129,11 @@ pub struct NoticeView {
 }
 
 /// The state the current views render: the foreground chat (as the app names
-/// it, the id the sidebar passes back) with its thread, the notices, and the
-/// per-chat activity the list rows show. The push size is the notices, the
-/// chats that are not idle and the tail of one thread, never the whole
-/// `AppState` (S2).
+/// it, the id the sidebar passes back) with its thread, the notices, the
+/// per-chat activity the list rows show and the first window of the session
+/// list with how complete it is. The push size is the notices, the chats that
+/// are not idle, the tail of one thread and a bounded window of rows, never the
+/// whole `AppState` (S2).
 ///
 /// A chat's stderr reason lines are not a slice of their own: the app keeps them
 /// in a bounded ring but exposes them only as the reason of the death notice, so
@@ -113,6 +141,13 @@ pub struct NoticeView {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct ViewState {
     pub foreground_chat: Option<String>,
+    /// How complete the session list is. It starts `Loading`, so the sidebar
+    /// never claims there are no chats before the first pass ends.
+    pub list_status: ListStatusView,
+    /// The first [`ROWS_PUSHED`](crate::sessions::view::ROWS_PUSHED) rows of the
+    /// session list, in list order: enough for the sidebar to draw before the
+    /// windowed query of T4 exists.
+    pub sessions: Vec<SessionRowView>,
     /// The foreground chat's messages, oldest first. Message text is the model's
     /// whole markdown reply, so the slice carries the last
     /// [`MESSAGES_PUSHED`](crate::view::MESSAGES_PUSHED) of them and never a
