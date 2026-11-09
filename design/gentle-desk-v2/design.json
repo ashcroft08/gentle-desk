@@ -12,15 +12,15 @@
     },
     {
       "file": "01a-tree-chat.html",
-      "title": "A - Workspace tree (Chat view)",
-      "tradeoff": "Closest to the reference: New chat, Workspace header with icons, folders with chats, independent Chats group. Familiar and complete; the tree needs vertical space and scales by search, not by structure.",
+      "title": "A - Workspaces only (Chat view)",
+      "tradeoff": "Workspaces with their chats, no separate Chats section. Top button is New session (opens a chat in the current workspace folder) and each workspace row shows a new-chat icon on hover or focus. Matches how the terminal works (history per location); open questions: what New session does with no current workspace, and what a workspace menu would hold (not drawn).",
       "width": 1440,
       "height": 900
     },
     {
       "file": "01b-tree-helpers.html",
-      "title": "A - Workspace tree (Helpers view)",
-      "tradeoff": "Same direction with the Helpers view swapped into the same area: list on the left, thread on the right.",
+      "title": "A - Workspaces only (Helpers view)",
+      "tradeoff": "Same direction, Helpers view swapped into the same area as the thread.",
       "width": 1440,
       "height": 900
     },
