@@ -3,6 +3,7 @@
 
 use std::collections::HashMap;
 use std::io;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -23,6 +24,8 @@ pub struct FakeSpawner {
 struct SpawnState {
     spawned: Vec<ChatKey>,
     children: HashMap<ChatKey, Vec<FakeChild>>,
+    /// The folder each child was given, per chat, in start order.
+    folders: HashMap<ChatKey, Vec<Option<PathBuf>>>,
     failures: HashMap<ChatKey, String>,
 }
 
@@ -83,6 +86,17 @@ impl FakeSpawner {
             .count()
     }
 
+    /// The folder every child of `key` was asked to start in, in start order.
+    pub fn folders_of(&self, key: &ChatKey) -> Vec<Option<PathBuf>> {
+        self.state
+            .lock()
+            .unwrap()
+            .folders
+            .get(key)
+            .cloned()
+            .unwrap_or_default()
+    }
+
     /// Every child started for `key`, in start order.
     pub fn children(&self, key: &ChatKey) -> Vec<FakeChild> {
         self.state
@@ -117,13 +131,18 @@ impl FakeSpawner {
 }
 
 impl Spawner for FakeSpawner {
-    fn spawn(&self, key: &ChatKey) -> io::Result<Box<dyn Child>> {
+    fn spawn(&self, key: &ChatKey, folder: Option<&Path>) -> io::Result<Box<dyn Child>> {
         {
             let mut state = self.state.lock().unwrap();
             if let Some(message) = state.failures.get(key) {
                 return Err(io::Error::other(message.clone()));
             }
             state.spawned.push(key.clone());
+            state
+                .folders
+                .entry(key.clone())
+                .or_default()
+                .push(folder.map(Path::to_path_buf));
             let index = state.children.get(key).map_or(0, Vec::len);
             let label = format!("{key}#{index}");
             let writes = match &self.blocked_writes {

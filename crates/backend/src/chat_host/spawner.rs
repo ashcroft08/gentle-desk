@@ -7,6 +7,7 @@
 
 use std::ffi::OsString;
 use std::io;
+use std::path::Path;
 
 use crate::launcher::{self, Launcher, LauncherEnv, LauncherError};
 use crate::process::{RpcProcess, SpawnOptions};
@@ -16,7 +17,9 @@ use super::ChatKey;
 
 /// Starts one child for one chat.
 pub trait Spawner: Send + Sync {
-    fn spawn(&self, key: &ChatKey) -> io::Result<Box<dyn Child>>;
+    /// Starts the child of `key` in `folder`, or in the folder of this process
+    /// when the caller names none.
+    fn spawn(&self, key: &ChatKey, folder: Option<&Path>) -> io::Result<Box<dyn Child>>;
 }
 
 /// Real children: one launcher for every chat, the forwarded arguments of the
@@ -49,8 +52,8 @@ impl ProcessSpawner {
         )
     }
 
-    /// A spawner with an explicit child environment and working directory of
-    /// `None` (the process inherits ours).
+    /// A spawner with an explicit child environment. Every child starts in the
+    /// folder its open names, or in ours when it names none.
     pub fn with_env(launcher: Launcher, env: Vec<(OsString, OsString)>) -> Self {
         Self {
             launcher,
@@ -68,9 +71,10 @@ impl ProcessSpawner {
     }
 
     /// The options for one chat: the forwarded arguments, then `--session
-    /// <path>` for a saved chat and nothing more for a new one. Never a session
-    /// switch: the session is chosen at spawn.
-    pub fn options_for(&self, key: &ChatKey) -> SpawnOptions {
+    /// <path>` for a saved chat and nothing more for a new one, and the folder
+    /// the open named as the working folder. Never a session switch: the session
+    /// is chosen at spawn.
+    pub fn options_for(&self, key: &ChatKey, folder: Option<&Path>) -> SpawnOptions {
         let mut args = self.args.clone();
         if let ChatKey::Saved(path) = key {
             args.extend([OsString::from("--session"), path.clone().into_os_string()]);
@@ -78,14 +82,14 @@ impl ProcessSpawner {
         SpawnOptions {
             args,
             env: self.env.clone(),
-            cwd: None,
+            cwd: folder.map(Path::to_path_buf),
         }
     }
 }
 
 impl Spawner for ProcessSpawner {
-    fn spawn(&self, key: &ChatKey) -> io::Result<Box<dyn Child>> {
-        let options = self.options_for(key);
+    fn spawn(&self, key: &ChatKey, folder: Option<&Path>) -> io::Result<Box<dyn Child>> {
+        let options = self.options_for(key, folder);
         RpcProcess::spawn(&self.launcher, &options)
             .map(|process| Box::new(process) as Box<dyn Child>)
     }

@@ -8,12 +8,12 @@
 //!
 //! What lives here is the I/O side, split by responsibility:
 //!
-//! - `host` — the map `ChatKey -> live child`, and every mutation of it (open,
+//! - `host` - the map `ChatKey -> live child`, and every mutation of it (open,
 //!   send, close, reap, shut down).
-//! - [`spawner`] — turns a chat key into a started child.
-//! - [`child`] — the handle contract the host needs, implemented by
+//! - [`spawner`] - turns a chat key into a started child.
+//! - [`child`] - the handle contract the host needs, implemented by
 //!   [`RpcProcess`](crate::process::RpcProcess).
-//! - [`policy`] — every rule about reaping and caps, as pure functions over a
+//! - [`policy`] - every rule about reaping and caps, as pure functions over a
 //!   `now` the caller supplies, so the clock is injectable and nothing in it
 //!   starts or stops a process.
 //!
@@ -32,6 +32,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use crate::process::ProcessEvent;
 
 pub mod child;
+mod folder;
 mod host;
 pub mod policy;
 pub mod spawner;
@@ -76,8 +77,8 @@ impl fmt::Display for ChatKey {
 pub struct TaggedEvent {
     pub key: ChatKey,
     pub event: ProcessEvent,
-    /// True when the host stopped this child itself — the idle reap, a cap
-    /// victim, a close, or the shutdown of every child — instead of the child
+    /// True when the host stopped this child itself - the idle reap, a cap
+    /// victim, a close, or the shutdown of every child - instead of the child
     /// ending on its own. Only meaningful on [`ProcessEvent::Closed`]; it is how
     /// the shell tells a stop the user asked for from a death worth a notice.
     pub expected: bool,
@@ -108,6 +109,10 @@ pub enum HostError {
     /// The child could not be started (missing launcher, unreadable session,
     /// and so on). The chat has no child afterwards.
     Spawn { key: ChatKey, message: String },
+    /// The folder the chat was asked to open in cannot host a child: it is not
+    /// there, or it is a file. Nothing was started and nothing was reserved, so
+    /// the host is exactly as it was before the call.
+    Folder { message: String },
 }
 
 impl fmt::Display for HostError {
@@ -117,6 +122,7 @@ impl fmt::Display for HostError {
             Self::Spawn { key, message } => {
                 write!(f, "cannot start the child of {key}: {message}")
             }
+            Self::Folder { message } => write!(f, "{message}"),
         }
     }
 }
