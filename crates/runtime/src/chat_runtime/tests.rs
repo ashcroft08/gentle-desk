@@ -12,6 +12,7 @@ use super::{ChatRuntime, Converted, Outcome};
 
 mod calls;
 mod fake;
+mod folder;
 mod open_chat;
 mod rekey;
 use fake::FakeSpawner;

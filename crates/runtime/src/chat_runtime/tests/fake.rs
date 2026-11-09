@@ -3,6 +3,7 @@
 //! tested without a child.
 
 use std::io;
+use std::path::{Path, PathBuf};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -19,6 +20,8 @@ type Stopped = Arc<Mutex<Vec<ChatKey>>>;
 #[derive(Default)]
 pub struct FakeSpawner {
     started: Mutex<Vec<(ChatKey, Written)>>,
+    /// The folder each start was given, in the order of `started`.
+    folders: Mutex<Vec<Option<PathBuf>>>,
     stopped: Stopped,
     failure: Mutex<Option<String>>,
 }
@@ -28,6 +31,11 @@ impl FakeSpawner {
     pub fn started(&self) -> Vec<ChatKey> {
         let started = self.started.lock().unwrap();
         started.iter().map(|(key, _)| key.clone()).collect()
+    }
+
+    /// The folder every start was given, in the order of [`FakeSpawner::started`].
+    pub fn folders(&self) -> Vec<Option<PathBuf>> {
+        self.folders.lock().unwrap().clone()
     }
 
     /// The chats whose child was shut down, in order.
@@ -52,10 +60,14 @@ impl FakeSpawner {
 }
 
 impl Spawner for FakeSpawner {
-    fn spawn(&self, key: &ChatKey) -> io::Result<Box<dyn Child>> {
+    fn spawn(&self, key: &ChatKey, folder: Option<&Path>) -> io::Result<Box<dyn Child>> {
         if let Some(message) = self.failure.lock().unwrap().take() {
             return Err(io::Error::other(message));
         }
+        self.folders
+            .lock()
+            .unwrap()
+            .push(folder.map(Path::to_path_buf));
         let commands = Arc::new(Mutex::new(Vec::new()));
         self.started
             .lock()

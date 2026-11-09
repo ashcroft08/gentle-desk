@@ -21,7 +21,7 @@ use crate::process::ProcessEvent;
 /// Generous on purpose: the child is a cold `node` start, and on a loaded CI runner
 /// (two main-branch runs failed here with a Timeout at 10 s, while the same tests
 /// passed on pull-request runs) a start can take longer than it ever does locally.
-const WAIT: Duration = Duration::from_secs(30);
+pub(super) const WAIT: Duration = Duration::from_secs(30);
 
 /// A child that reports its own pid, its grandchild's pid and its arguments,
 /// then ignores stdin EOF: only the whole tree being killed stops it.
@@ -34,11 +34,16 @@ setInterval(() => {}, 1000);
 "#;
 
 fn real_host(dir: &Path) -> ChatHost {
-    let script = dir.join("fake.mjs");
-    fs::write(&script, STUBBORN_TREE).unwrap();
+    host_for(STUBBORN_TREE, dir)
+}
+
+/// A host whose children are `node` running `script`, written in `dir`.
+pub(super) fn host_for(script: &str, dir: &Path) -> ChatHost {
+    let file = dir.join("fake.mjs");
+    fs::write(&file, script).unwrap();
     let launcher = Launcher {
         program: "node".into(),
-        args: vec![script.into()],
+        args: vec![file.into()],
     };
     ChatHost::with_parts(
         Limits::default(),

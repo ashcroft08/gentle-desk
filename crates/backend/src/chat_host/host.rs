@@ -1,9 +1,10 @@
 //! The map `ChatKey -> live child`: the struct, how it is built, how every
 //! child's events fan into one tagged stream, and the accessors the app reads.
 //!
-//! Mutations live next door: [`lifecycle`] starts, reopens, closes, reaps and
-//! stops children, [`routing`] writes commands and records which chats are
-//! working, and [`state`] is the map itself with its generation bookkeeping.
+//! Mutations live next door: [`open`] starts one chat's child in a folder,
+//! [`lifecycle`] closes, reaps and stops children, [`routing`] writes commands
+//! and records which chats are working, [`state`] holds the map, and [`streams`]
+//! is the one ordered stream their events arrive on.
 //!
 //! One mutex guards the map, the foreground chat and the spawn generations, and
 //! it is never held while a child starts or stops, nor while a command is
@@ -15,24 +16,23 @@
 //! under the lock and writes only after releasing it, so a child that stops
 //! reading its pipe stalls its own chat and nothing else.
 
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
+use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex, MutexGuard};
-use std::thread;
 use std::time::Duration;
 
 use super::policy::{self, Clock, Limits, SystemClock};
 use super::spawner::{ProcessSpawner, Spawner};
 use super::{ChatKey, TaggedEvent};
 use crate::launcher::LauncherError;
-use crate::process::ProcessEvent;
 
-use state::{State, Tag};
+use state::State;
 
 mod lifecycle;
+mod open;
 mod rekey;
 mod routing;
 mod state;
+mod streams;
 
 pub use routing::SendError;
 
@@ -120,74 +120,10 @@ impl ChatHost {
         policy::working_count(&self.state().views())
     }
 
-    /// Hands the tagged event stream to another owner. What stays behind is a
-    /// closed stream, so there is never a second consumer.
-    pub fn take_events(&mut self) -> Receiver<TaggedEvent> {
-        let mut guard = self.events_rx.lock().unwrap_or_else(|p| p.into_inner());
-        std::mem::replace(&mut *guard, mpsc::channel().1)
-    }
-
-    /// The next tagged event, for a caller that polls instead of owning the
-    /// stream.
-    pub fn recv_timeout(&self, wait: Duration) -> Result<TaggedEvent, RecvTimeoutError> {
-        self.events_rx
-            .lock()
-            .unwrap_or_else(|p| p.into_inner())
-            .recv_timeout(wait)
-    }
-
     pub(super) fn state(&self) -> MutexGuard<'_, State> {
         self.state
             .lock()
             .unwrap_or_else(|poison| poison.into_inner())
-    }
-
-    /// Forwards one child's event stream onto the host's channel, tagging every
-    /// event with its chat and saying whether its closure is one the host asked
-    /// for, and clears the child's alive flag when it goes.
-    ///
-    /// A forwarder that cannot be started is not left silent: the child is
-    /// marked gone and one unexpected `Closed` is published at once, so the shell
-    /// offers a Restart instead of waiting forever for a chat that will never
-    /// answer (R4-003).
-    pub(super) fn forward(
-        &self,
-        tag: Tag,
-        alive: Arc<AtomicBool>,
-        stopped: Arc<AtomicBool>,
-        events: Receiver<ProcessEvent>,
-    ) {
-        let sender = self.events_tx.clone();
-        let initial_key = tag.lock().unwrap_or_else(|p| p.into_inner()).clone();
-        let watched = Arc::clone(&alive);
-        let spawned = thread::Builder::new()
-            .name("chat-host-events".to_owned())
-            .spawn(move || {
-                while let Ok(event) = events.recv() {
-                    let closed = event == ProcessEvent::Closed;
-                    if closed {
-                        watched.store(false, Ordering::SeqCst);
-                    }
-                    let key = tag.lock().unwrap_or_else(|p| p.into_inner()).clone();
-                    let tagged = TaggedEvent {
-                        key,
-                        event,
-                        expected: closed && stopped.load(Ordering::SeqCst),
-                    };
-                    if sender.send(tagged).is_err() {
-                        break; // the host is gone
-                    }
-                }
-                watched.store(false, Ordering::SeqCst);
-            });
-        if spawned.is_err() {
-            alive.store(false, Ordering::SeqCst);
-            let _ = self.events_tx.send(TaggedEvent {
-                key: initial_key,
-                event: ProcessEvent::Closed,
-                expected: false,
-            });
-        }
     }
 }
 
