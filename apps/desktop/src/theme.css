@@ -1,0 +1,126 @@
+/* The six gentle-shell themes, as the design artboard spells them
+   (design/gentle-desk-v2/01a-tree-chat.html; design/system.md records where
+   each value comes from). One block per `data-theme` value on <html>, so the
+   same markup looks the same under every theme. No theme picker in this slice:
+   the attribute is `system` until the appearance settings arrive. */
+
+:root,
+[data-theme='dark'] {
+  --bg: #0e1116;
+  --surface: #151a21;
+  --surface2: #1c222b;
+  --border: #2b333d;
+  --text: #e4e8ee;
+  --muted: #9aa4b2;
+  --faint: #7d8593;
+  --accent: #7aa2f7;
+  --tint: rgba(122, 162, 247, 0.14);
+  --success: #7edc9a;
+  --warning: #e7b455;
+  --danger: #ff8585;
+  --shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --row-h: 34px;
+}
+
+[data-theme='light'] {
+  --bg: #f2f4f7;
+  --surface: #ffffff;
+  --surface2: #e9edf2;
+  --border: #cfd5dd;
+  --text: #17202a;
+  --muted: #576272;
+  --faint: #6b7686;
+  --accent: #2e5bd7;
+  --tint: rgba(46, 91, 215, 0.1);
+  --success: #166e38;
+  --warning: #8a5800;
+  --danger: #c22f37;
+  --shadow: 0 8px 24px rgba(23, 32, 42, 0.18);
+  --row-h: 34px;
+}
+
+[data-theme='Gentle'] {
+  --bg: #06080f;
+  --surface: #06080f;
+  --surface2: #0d0f14;
+  --border: #313342;
+  --text: #f3f6f9;
+  --muted: #8394a3;
+  --faint: #96a2b0;
+  --accent: #7fb4ca;
+  --tint: #161d2e;
+  --success: #b7cc85;
+  --warning: #deba87;
+  --danger: #cb7c94;
+  --shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+  --row-h: 34px;
+}
+
+[data-theme='Gentleman-Cute'] {
+  --bg: #060407;
+  --surface: #100a0f;
+  --surface2: #100a0f;
+  --border: #563040;
+  --text: #f6eff3;
+  --muted: #a78e9b;
+  --faint: #d7a0b8;
+  --accent: #f095c8;
+  --tint: #2a1523;
+  --success: #b4e7c7;
+  --warning: #f2b86d;
+  --danger: #ff718f;
+  --shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+  --row-h: 34px;
+}
+
+[data-theme='Gentleman-Sexy'] {
+  --bg: #060407;
+  --surface: #100a0f;
+  --surface2: #100a0f;
+  --border: #563040;
+  --text: #f6eff3;
+  --muted: #a78e9b;
+  --faint: #d7a0b8;
+  --accent: #f43888;
+  --tint: #2e0f1f;
+  --success: #d2cbd0;
+  --warning: #f2b86d;
+  --danger: #ff718f;
+  --shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+  --row-h: 34px;
+}
+
+/* `system` follows the reader's own setting: dark above, light here. */
+@media (prefers-color-scheme: light) {
+  [data-theme='system'] {
+    --bg: #f2f4f7;
+    --surface: #ffffff;
+    --surface2: #e9edf2;
+    --border: #cfd5dd;
+    --text: #17202a;
+    --muted: #576272;
+    --faint: #6b7686;
+    --accent: #2e5bd7;
+    --tint: rgba(46, 91, 215, 0.1);
+    --success: #166e38;
+    --warning: #8a5800;
+    --danger: #c22f37;
+    --shadow: 0 8px 24px rgba(23, 32, 42, 0.18);
+    --row-h: 34px;
+  }
+}
+
+[data-theme='dark'],
+[data-theme='Gentle'],
+[data-theme='Gentleman-Cute'],
+[data-theme='Gentleman-Sexy'] {
+  color-scheme: dark;
+}
+
+[data-theme='light'] {
+  color-scheme: light;
+}
+
+[data-theme='system'] {
+  color-scheme: light dark;
+}

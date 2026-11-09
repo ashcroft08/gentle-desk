@@ -14,9 +14,18 @@ const path = (d: string): Shape => ({ kind: 'path', d })
 const circle = (cx: number, cy: number, r: number): Shape => ({ kind: 'circle', cx, cy, r })
 
 /** The named icons the sidebar's own controls need. */
-export type IconName = 'plus' | 'search' | 'message-square' | 'folder' | 'folder-plus'
+export type IconName =
+  | 'plus'
+  | 'search'
+  | 'message-square'
+  | 'folder'
+  | 'folder-open'
+  | 'folder-plus'
+  | 'circle-plus'
 
 const FOLDER = 'M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z'
+const FOLDER_OPEN =
+  'm6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2'
 
 export const ICON_SHAPES: Record<IconName, Shape[]> = {
   plus: [path('M5 12h14'), path('M12 5v14')],
@@ -25,7 +34,10 @@ export const ICON_SHAPES: Record<IconName, Shape[]> = {
     path('M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z'),
   ],
   folder: [path(FOLDER)],
+  // The header row's two states: closed and open folder, no chevron (D6).
+  'folder-open': [path(FOLDER_OPEN)],
   'folder-plus': [path('M12 10v6'), path('M9 13h6'), path(FOLDER)],
+  'circle-plus': [circle(12, 12, 10), path('M8 12h8'), path('M12 8v8')],
 }
 
 /** The six chat states a session row can mark, as the contract names them. */
