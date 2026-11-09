@@ -11,8 +11,10 @@
     "test": "vitest run"
   },
   "devDependencies": {
+    "@melt-ui/pp": "^0.3.2",
     "@sveltejs/vite-plugin-svelte": "^5.0.0",
     "@testing-library/svelte": "^5.2.0",
+    "@testing-library/user-event": "^14.6.8",
     "@tsconfig/svelte": "^5.0.4",
     "eslint": "^9.0.0",
     "eslint-plugin-svelte": "^2.46.0",
@@ -26,6 +28,9 @@
     "vitest": "^3.0.0"
   },
   "dependencies": {
-    "@tauri-apps/api": "^2.12.4"
+    "@internationalized/date": "^3.12.4",
+    "@melt-ui/svelte": "^0.86.6",
+    "@tauri-apps/api": "^2.12.4",
+    "bits-ui": "^2.20.6"
   }
 }
