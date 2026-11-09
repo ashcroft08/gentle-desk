@@ -65,15 +65,16 @@ fn blank_send_prompt_is_rejected_and_leaves_the_view_unchanged() {
 
 #[test]
 fn the_view_state_slice_has_no_invented_fields() {
-    // The contract pushes exactly the two fields the slice defines; the
-    // compiler fixes the shape, so this check pins the default: an empty
-    // holder has no foreground chat and no notices.
+    // The contract pushes exactly the fields the slice defines; the compiler
+    // fixes the shape, so this check pins the default: an empty holder has no
+    // foreground chat, no notices and no chat to show activity for.
     let holder = AppStateHolder::default();
     assert_eq!(
         holder.view(),
         ViewState {
             foreground_chat: None,
             notices: Vec::new(),
+            activity: Vec::new(),
         }
     );
 }

@@ -1624,6 +1624,9 @@ name = "gentle-desk-app"
 version = "0.1.0"
 dependencies = [
  "gentle-app",
+ "gentle-backend",
+ "gentle-core",
+ "gentle-runtime",
  "serde",
  "serde_json",
  "specta",

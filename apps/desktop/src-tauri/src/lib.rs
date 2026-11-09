@@ -1,12 +1,17 @@
 //! gentle-desk Tauri bridge entry point.
 //!
-//! The bridge owns the app state (`bridge::AppStateHolder`, created at
-//! startup and managed by Tauri) and talks to the web side only through the
-//! generated contract (`contract`), whose TypeScript is exported below.
+//! The bridge owns the app state (`bridge::AppStateHolder`, created at startup
+//! and managed by Tauri) and talks to the web side only through the generated
+//! contract (`contract`), whose TypeScript is exported below. The per-chat
+//! commands the reducer answers are run by `effects`, off the window's thread,
+//! from the command layer in `commands`.
 
 pub mod bridge;
+pub mod commands;
 pub mod contract;
+pub mod effects;
 
+use commands::Bridge;
 use tauri_specta::Builder;
 
 /// The whole typed surface of the bridge: the commands and events the
@@ -17,7 +22,7 @@ pub fn contract_builder() -> Builder<tauri::Wry> {
     Builder::<tauri::Wry>::new()
         .commands(tauri_specta::collect_commands![
             contract::get_badge,
-            bridge::dispatch_intent,
+            commands::dispatch_intent,
         ])
         .events(tauri_specta::collect_events![contract::StateChanged,])
 }
@@ -38,7 +43,7 @@ pub fn run() {
         .expect("failed to export TypeScript bindings to ../src/contract");
 
     tauri::Builder::default()
-        .manage(bridge::AppStateHolder::default())
+        .manage(Bridge::default())
         .invoke_handler(builder.invoke_handler())
         .setup(move |app| {
             // Typed events need their registry mounted, or emitting panics.

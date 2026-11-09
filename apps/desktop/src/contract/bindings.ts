@@ -12,10 +12,9 @@ export const commands = {
 	 */
 	getBadge: (chatId: string) => __TAURI_INVOKE<ChatBadge>("get_badge", { chatId }),
 	/**
-	 *  The one command this slice exposes: fold the intent, then emit the new
-	 *  slice on `state-changed`. The emitted event is typed through tauri-specta
-	 *  (its rc.26 in the lock), so the Svelte side gets the same [`ViewState`]
-	 *  type for the command return and the event payload.
+	 *  The one command this slice exposes: fold the intent, push the new slice and
+	 *  run what it asked for. The emitted event is typed through tauri-specta, so
+	 *  the Svelte side gets the same [`ViewState`] for the return and the payload.
 	 */
 	dispatchIntent: (intent: UiIntent) => typedError<ViewState_Serialize, string>(__TAURI_INVOKE("dispatch_intent", { intent })),
 };
@@ -27,6 +26,18 @@ export const events = {
 
 /* Types */
 export type ChatActivityMark = "Working" | "Queued" | "Opening" | "NewReply" | "NeedsAttention" | "Ended";
+
+/**
+ *  One chat that has something to show, as a list row sees it: the id the app
+ *  names it by (the same text `ViewState::foreground_chat` carries) and its
+ *  mark. Only chats that are not idle are listed, so the push stays as small as
+ *  the working set, and the mark itself is chosen by the rule `crates/runtime`
+ *  owns ([`gentle_runtime::badge`]).
+ */
+export type ChatActivityView = {
+	chat_id: string,
+	activity: ChatActivityMark,
+};
 
 export type ChatBadge = {
 	chat_id: string,
@@ -74,35 +85,50 @@ export type StateChanged_Serialize = ViewState_Serialize;
  */
 export type UiIntent = { type: "SendPrompt"; data: {
 	text: string,
-} } | { type: "NewChat" } | { type: "DismissNotice"; data: {
+} } | { type: "Abort" } | { type: "NewChat" } | 
+/**  Make that chat the foreground one, asking the host for its child. */
+{ type: "OpenChat"; data: {
+	chat_id: string,
+} } | 
+/**  The same for a chat that did not exist before. */
+{ type: "OpenNewChat" } | 
+/**  Start the child of a chat that died again and reopen it (S3). */
+{ type: "RestartChat"; data: {
+	chat_id: string,
+} } | { type: "DismissNotice"; data: {
 	id: number,
 } };
 
 /**
  *  The state the current views render: the foreground chat (as the app names
- *  it, the id the sidebar later passes back) and the notices. The push size is
- *  the whole list of notices, not the whole `AppState` (S2).
+ *  it, the id the sidebar passes back), the notices, and the per-chat activity
+ *  the list rows show. The push size is the notices plus the chats that are not
+ *  idle, never the whole `AppState` (S2).
  */
 export type ViewState = ViewState_Serialize | ViewState_Deserialize;
 
 /**
  *  The state the current views render: the foreground chat (as the app names
- *  it, the id the sidebar later passes back) and the notices. The push size is
- *  the whole list of notices, not the whole `AppState` (S2).
+ *  it, the id the sidebar passes back), the notices, and the per-chat activity
+ *  the list rows show. The push size is the notices plus the chats that are not
+ *  idle, never the whole `AppState` (S2).
  */
 export type ViewState_Deserialize = {
 	foreground_chat?: string | null,
 	notices: NoticeView[],
+	activity: ChatActivityView[],
 };
 
 /**
  *  The state the current views render: the foreground chat (as the app names
- *  it, the id the sidebar later passes back) and the notices. The push size is
- *  the whole list of notices, not the whole `AppState` (S2).
+ *  it, the id the sidebar passes back), the notices, and the per-chat activity
+ *  the list rows show. The push size is the notices plus the chats that are not
+ *  idle, never the whole `AppState` (S2).
  */
 export type ViewState_Serialize = {
 	foreground_chat: string | null,
 	notices: NoticeView[],
+	activity: ChatActivityView[],
 };
 
 /* Tauri Specta runtime */
