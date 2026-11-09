@@ -88,3 +88,32 @@ export const MARK_KINDS: readonly MarkKind[] = [
 export function markKindOf(activity: string): MarkKind | null {
   return (MARK_KINDS as readonly string[]).includes(activity) ? (activity as MarkKind) : null
 }
+
+/**
+ * The workspace each row of one page belongs to: a header to itself, a chat to
+ * the closest header above it. A page that starts in the middle of a group has
+ * chats before any header, which belong to `null`: their header is not drawn,
+ * so their row has no new-chat icon to reveal.
+ */
+export function rowWorkspaceKeys(rows: TreeRow[]): (string | null)[] {
+  const keys: (string | null)[] = []
+  let current: string | null = null
+  for (const row of rows) {
+    if (isWorkspaceRow(row)) current = row.key
+    keys.push(current)
+  }
+  return keys
+}
+
+/**
+ * The folder a chat row sits under, as the path an intent names, or `null` when
+ * the page does not carry that chat's header.
+ */
+export function workspacePathOfChat(rows: TreeRow[], chatId: string): string | null {
+  let path: string | null = null
+  for (const row of rows) {
+    if (isWorkspaceRow(row)) path = row.path
+    else if (row.id === chatId) return path
+  }
+  return null
+}

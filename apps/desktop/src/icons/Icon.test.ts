@@ -3,7 +3,15 @@ import { render } from '@testing-library/svelte'
 import Icon from './Icon.svelte'
 import type { IconName } from './shapes'
 
-const NAMES: IconName[] = ['plus', 'search', 'message-square', 'folder', 'folder-plus']
+const NAMES: IconName[] = [
+  'plus',
+  'search',
+  'message-square',
+  'folder',
+  'folder-open',
+  'folder-plus',
+  'circle-plus',
+]
 
 describe('Icon', () => {
   it('stays out of the accessibility tree', () => {
