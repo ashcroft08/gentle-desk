@@ -6,14 +6,14 @@
     {
       "file": "00-states-board.html",
       "title": "Shared states board",
-      "tradeoff": "Keeps the six per-chat states, notices, rename, delete and the disabled New session state out of the main screens so those stay silent; cost: you judge states away from the real layout.",
+      "tradeoff": "Keeps the six per-chat states, notices, rename, delete, the disabled New session state, the empty first-run sidebar and the New workspace menu out of the main screens so those stay silent; cost: you judge states away from the real layout.",
       "width": 1440,
       "height": 1500
     },
     {
       "file": "01a-tree-chat.html",
       "title": "A - Workspaces (Chat view)",
-      "tradeoff": "Workspaces with their chats and nothing else in the sidebar. New session opens a chat in the current workspace; each workspace shows a new-chat icon on hover or focus. Open or closed folder icon shows the state; no chevron. Matches the terminal (history per location). Not drawn: a workspace menu (no options yet).",
+      "tradeoff": "Workspaces with their chats and nothing else in the sidebar. New session opens a chat in the current workspace; each workspace shows a new-chat icon on hover or focus. The header New workspace icon opens a two-item menu (Choose an existing folder, Create a new folder). Open or closed folder icon shows the state; no chevron. Not drawn: a workspace menu (no options yet).",
       "width": 1440,
       "height": 900
     },
