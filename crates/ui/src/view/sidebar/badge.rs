@@ -1,88 +1,33 @@
-//! What one sidebar row draws for its chat's state (S4).
+//! The glyphs one sidebar row draws for its chat's state (S6).
 //!
-//! This is the rule that turns a [`ChatActivity`] into plain drawing data — a
-//! short mark, the colour family it draws in and whether the title is bold —
-//! so the row itself only renders what is decided here. Idle draws nothing:
-//! most rows in a big home are idle, and a mark would carry no information.
+//! The rule that turns a [`ChatActivity`] into a mark, a colour role and a
+//! bold title moved to `gentle_runtime::badge` so any window can use it; this
+//! module re-exports that plain data and keeps the only iced-side half of the
+//! rule: the exact glyph each mark has drawn so far, shorthanded so the rows
+//! never change before the Tauri parity. Working and NewReply share a dot
+//! today; the new design's different shape is a decision for the drawing, not
+//! for the runtime data.
+//!
+//! Idle draws nothing: most rows in a big home are idle, and a mark would
+//! carry no information.
 
-use gentle_app::ChatActivity;
+pub use gentle_runtime::badge::{Badge, BadgeMark, ColourRole};
 
-/// Which family of the theme's colours a badge and its title draw in.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ColourRole {
-    /// The accent the open chat's row is highlighted with: something is
-    /// running there.
-    Accent,
-    /// A finished reply is waiting to be read.
-    Success,
-    /// A prompt is queued for its turn, but nothing is failed (S7).
-    Muted,
-    /// An extension dialog wants an answer.
-    Warning,
-    /// The chat's child is gone until it is restarted.
-    Error,
-}
+/// How many characters of the title's line a badge costs, no matter which
+/// one: the title truncates this much sooner and the row keeps its height and
+/// its single line.
+pub const TITLE_ROOM: usize = 2;
 
-/// The one short thing a row draws beside its title for its chat's state.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Badge {
-    /// The mark itself: at most two characters wide, so it costs the title
-    /// [`Badge::TITLE_ROOM`] at most instead of rewriting the row.
-    pub mark: &'static str,
-    /// The colour family the mark draws in.
-    pub role: ColourRole,
-    /// Whether the title is drawn bold, so a finished reply is seen without
-    /// reading a mark; only the unread case asks for it.
-    pub bold_title: bool,
-}
-
-impl Badge {
-    /// How many characters of the title's line a badge costs, no matter which
-    /// one: the title truncates this much sooner and the row keeps its height
-    /// and its single line.
-    pub const TITLE_ROOM: usize = 2;
-
-    /// The badge for one chat's state; `None` draws nothing (Idle).
-    pub fn on(activity: ChatActivity) -> Option<Self> {
-        Some(match activity {
-            ChatActivity::Idle => return None,
-            ChatActivity::Working => Self {
-                mark: "●",
-                role: ColourRole::Accent,
-                bold_title: false,
-            },
-            ChatActivity::FinishedUnread => Self {
-                mark: "●",
-                role: ColourRole::Success,
-                bold_title: true,
-            },
-            ChatActivity::Queued => Self {
-                // A clock-like ellipsis: its turn is on its way, so the mark
-                // stays quiet, in the secondary colour.
-                mark: "…",
-                role: ColourRole::Muted,
-                bold_title: false,
-            },
-            ChatActivity::Opening => Self {
-                // An empty circle: the chat's child is coming up from the click
-                // of it. Progress, not failure, so it draws in the muted
-                // colour; not the queued ellipsis, which is a prompt waiting
-                // for its turn, not a child on its way.
-                mark: "◌",
-                role: ColourRole::Muted,
-                bold_title: false,
-            },
-            ChatActivity::NeedsAttention => Self {
-                mark: "!",
-                role: ColourRole::Warning,
-                bold_title: false,
-            },
-            ChatActivity::Ended => Self {
-                mark: "×",
-                role: ColourRole::Error,
-                bold_title: false,
-            },
-        })
+/// The glyph the row draws for a mark, exactly as they have been drawn so
+/// far: at most [`TITLE_ROOM`] characters wide.
+pub fn glyph(mark: BadgeMark) -> &'static str {
+    match mark {
+        BadgeMark::Working => "\u{25CF}",  // filled circle: a working turn
+        BadgeMark::NewReply => "\u{25CF}", // same dot today: the shared shape
+        BadgeMark::Queued => "\u{2026}",   // clock-like ellipsis: on its way
+        BadgeMark::Opening => "\u{25CC}",  // empty circle: the child coming up
+        BadgeMark::NeedsAttention => "!",  // a dialog wants an answer
+        BadgeMark::Ended => "\u{00D7}",    // a cross: the child is gone
     }
 }
 

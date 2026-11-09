@@ -5,6 +5,7 @@
 //! Nothing here draws: the iced window (`crates/ui`) and, later, the Tauri app
 //! both sit on top of this crate.
 
+pub mod badge;
 pub mod cache_path;
 pub mod chat_keys;
 pub mod chat_runtime;
