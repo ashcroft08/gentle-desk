@@ -17,7 +17,11 @@ use crate::chat_host::{ChatHost, Limits, ProcessSpawner, SystemClock};
 use crate::launcher::Launcher;
 use crate::process::ProcessEvent;
 
-const WAIT: Duration = Duration::from_secs(10);
+/// How long a test waits for a real child to speak, or for a process to go away.
+/// Generous on purpose: the child is a cold `node` start, and on a loaded CI runner
+/// (two main-branch runs failed here with a Timeout at 10 s, while the same tests
+/// passed on pull-request runs) a start can take longer than it ever does locally.
+const WAIT: Duration = Duration::from_secs(30);
 
 /// A child that reports its own pid, its grandchild's pid and its arguments,
 /// then ignores stdin EOF: only the whole tree being killed stops it.
