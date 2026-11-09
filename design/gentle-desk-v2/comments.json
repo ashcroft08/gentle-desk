@@ -22,6 +22,39 @@
       "status": "resolved",
       "sentAt": "2026-11-08T23:26:04.415Z",
       "resolvedAt": "2026-11-08T23:29:53.951Z"
+    },
+    {
+      "id": "6k21j0te",
+      "file": "01a-tree-chat.html",
+      "selector": "body > div > aside > nav > div > div:nth-of-type(1) > div > svg:nth-of-type(2)",
+      "excerpt": "",
+      "comment": "hay forma de que cuando este desplegado cambie el icono a carpeta abierta",
+      "createdAt": "2026-11-09T06:16:46.164Z",
+      "status": "resolved",
+      "sentAt": "2026-11-09T06:16:46.729Z",
+      "resolvedAt": "2026-11-09T06:18:57.835Z"
+    },
+    {
+      "id": "jgnxwafr",
+      "file": "01a-tree-chat.html",
+      "selector": "body > div > aside > nav > div > div:nth-of-type(1) > div",
+      "excerpt": "gentle-desk",
+      "comment": "que el boton de new chat sea con hover que aparezca al poner el mouse sobre la seccion de la carpeta",
+      "createdAt": "2026-11-09T06:18:53.452Z",
+      "status": "open",
+      "sentAt": "2026-11-09T06:18:53.488Z",
+      "resolvedAt": null
+    },
+    {
+      "id": "voxx3gaf",
+      "file": "01a-tree-chat.html",
+      "selector": "body > div > aside > nav > div > div:nth-of-type(1) > div",
+      "excerpt": "gentle-desk",
+      "comment": "elimina lo de chevron ya con lo que cambia el icono a carpeta cerrada y abierta se entiende",
+      "createdAt": "2026-11-09T06:19:49.588Z",
+      "status": "open",
+      "sentAt": "2026-11-09T06:19:49.621Z",
+      "resolvedAt": null
     }
   ]
 }
