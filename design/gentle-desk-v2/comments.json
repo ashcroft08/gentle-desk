@@ -22,6 +22,50 @@
       "status": "resolved",
       "sentAt": "2026-11-08T23:26:04.415Z",
       "resolvedAt": "2026-11-08T23:29:53.951Z"
+    },
+    {
+      "id": "6k21j0te",
+      "file": "01a-tree-chat.html",
+      "selector": "body > div > aside > nav > div > div:nth-of-type(1) > div > svg:nth-of-type(2)",
+      "excerpt": "",
+      "comment": "hay forma de que cuando este desplegado cambie el icono a carpeta abierta",
+      "createdAt": "2026-11-09T06:16:46.164Z",
+      "status": "resolved",
+      "sentAt": "2026-11-09T06:16:46.729Z",
+      "resolvedAt": "2026-11-09T06:18:57.835Z"
+    },
+    {
+      "id": "jgnxwafr",
+      "file": "01a-tree-chat.html",
+      "selector": "body > div > aside > nav > div > div:nth-of-type(1) > div",
+      "excerpt": "gentle-desk",
+      "comment": "que el boton de new chat sea con hover que aparezca al poner el mouse sobre la seccion de la carpeta",
+      "createdAt": "2026-11-09T06:18:53.452Z",
+      "status": "resolved",
+      "sentAt": "2026-11-09T06:18:53.488Z",
+      "resolvedAt": "2026-11-09T06:22:23.666Z"
+    },
+    {
+      "id": "voxx3gaf",
+      "file": "01a-tree-chat.html",
+      "selector": "body > div > aside > nav > div > div:nth-of-type(1) > div",
+      "excerpt": "gentle-desk",
+      "comment": "elimina lo de chevron ya con lo que cambia el icono a carpeta cerrada y abierta se entiende",
+      "createdAt": "2026-11-09T06:19:49.588Z",
+      "status": "resolved",
+      "sentAt": "2026-11-09T06:19:49.621Z",
+      "resolvedAt": "2026-11-09T06:23:53.482Z"
+    },
+    {
+      "id": "e3ub0sco",
+      "file": "01a-tree-chat.html",
+      "selector": "body > div > aside > nav > div > div:nth-of-type(1) > button",
+      "excerpt": "New chat in gentle-desk",
+      "comment": "al poner el mouse encima se dibuja un cuadrado como una card como que esta encerrado el icono",
+      "createdAt": "2026-11-09T06:22:07.030Z",
+      "status": "resolved",
+      "sentAt": "2026-11-09T06:22:07.084Z",
+      "resolvedAt": "2026-11-09T06:25:20.879Z"
     }
   ]
 }
