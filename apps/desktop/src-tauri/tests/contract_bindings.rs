@@ -37,7 +37,9 @@ fn fg_check(regenerated_path: &std::path::Path) -> Result<(), String> {
         .map_err(|e| format!("committed bindings file is missing or unreadable: {e}"))?;
     let regenerated = std::fs::read_to_string(regenerated_path)
         .map_err(|e| format!("regenerated bindings unreadable: {e}"))?;
-    if committed == regenerated {
+    // A Windows checkout may convert the committed file to CRLF; compare content, not line endings.
+    let normalize = |text: &str| text.replace("\r\n", "\n");
+    if normalize(&committed) == normalize(&regenerated) {
         Ok(())
     } else {
         Err(format!(
