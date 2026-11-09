@@ -151,3 +151,11 @@ fn collapsing_an_unknown_workspace_changes_nothing() {
     assert!(!config.set_collapsed(r"C:\dev\other", true));
     assert!(!config.workspaces[0].collapsed);
 }
+
+#[test]
+fn the_canonical_spelling_is_what_a_workspace_is_stored_with() {
+    assert_eq!(canonical_path(r"\\?\C:\dev\p\"), r"C:\dev\p");
+    assert_eq!(canonical_path(r"\\?\UNC\srv\share"), r"\\srv\share");
+    assert_eq!(canonical_path(r"C:\"), r"C:\");
+    assert_eq!(canonical_path("/"), "/");
+}

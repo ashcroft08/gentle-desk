@@ -24,6 +24,7 @@ mod paths;
 mod status;
 mod store;
 
+pub(crate) use config::canonical_path;
 pub use config::{folder_key, AppConfig, WorkspaceEntry, CONFIG_VERSION};
 pub use paths::config_path;
 pub use status::{workspace_status, WorkspaceStatus};
