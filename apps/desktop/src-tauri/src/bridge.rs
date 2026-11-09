@@ -38,6 +38,7 @@ use crate::state_view::view_state;
 use crate::workspace;
 
 mod config;
+mod notice;
 
 /// What runs one shared command the reducer asked for. `Command::RefreshSessions`
 /// is the session list's in the app; the sink keeps the holder free of how it is
@@ -73,6 +74,10 @@ pub struct AppStateHolder {
     /// The flattened tree of the last built revision, so a page of rows never
     /// regroups 50 000 sessions again (see [`TreeCache`]).
     tree: TreeCache,
+    /// What the last workspace action refused, as `ViewState.workspace_notice`
+    /// carries it: a shell-owned line, because no reducer path records one
+    /// (`bridge::notice`).
+    workspace_notice: Mutex<Option<String>>,
 }
 
 impl AppStateHolder {
@@ -137,7 +142,13 @@ impl AppStateHolder {
     /// emits, so a webview that missed the pushes still gets the whole slice.
     pub fn view(&self) -> ViewState {
         let notice = self.config_notice();
-        view_state(&self.state(), self.sessions_revision(), notice)
+        let workspace_notice = self.workspace_notice();
+        view_state(
+            &self.state(),
+            self.sessions_revision(),
+            notice,
+            workspace_notice,
+        )
     }
 
     /// One window of the flattened workspace tree as the state holds it NOW:
@@ -168,6 +179,7 @@ impl AppStateHolder {
         // once. The shared commands run after the lock is released, because a
         // refresh pass folds back into this same holder.
         let notice = self.config_notice();
+        let workspace_notice = self.workspace_notice();
         let (view, chat_commands, commands) = {
             let mut app = lock(&self.app);
             let previous = app.clone();
@@ -177,7 +189,7 @@ impl AppStateHolder {
                 self.sessions_revision.fetch_add(1, Ordering::Relaxed);
             }
             *app = state;
-            let view = view_state(&app, self.sessions_revision(), notice);
+            let view = view_state(&app, self.sessions_revision(), notice, workspace_notice);
             (view, effects.chat_commands, effects.commands)
         };
         self.run_shared(commands);

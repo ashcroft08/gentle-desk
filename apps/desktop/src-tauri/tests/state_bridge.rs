@@ -80,6 +80,9 @@ fn the_view_state_slice_has_no_invented_fields() {
             notices: Vec::new(),
             activity: Vec::new(),
             config_notice: None,
+            // The shell-owned line a refused workspace action sets: nothing was
+            // refused here, so it carries nothing.
+            workspace_notice: None,
         }
     );
 }

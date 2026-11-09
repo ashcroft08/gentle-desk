@@ -133,6 +133,7 @@ export function viewState(overrides: Partial<ViewState_Serialize> = {}): ViewSta
     notices: [],
     activity: [],
     config_notice: null,
+    workspace_notice: null,
     ...overrides,
   }
 }

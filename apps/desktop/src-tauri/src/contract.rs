@@ -229,6 +229,13 @@ pub struct ViewState {
     /// memory only. `None` when the file was read, or was not there, and nothing
     /// failed.
     pub config_notice: Option<String>,
+    /// Why the last workspace action was refused, as one line of plain text: a
+    /// name Windows would not accept, a folder that is not there, a folder that
+    /// already holds files (Q6). `None` when nothing was refused, and cleared by
+    /// the next workspace action that works. A shell-owned line, never the
+    /// config's: the config notice says what became of the file, this one says
+    /// what the user asked for that could not be done.
+    pub workspace_notice: Option<String>,
 }
 
 /// The state slice after each dispatch, emitted to the web side (typed

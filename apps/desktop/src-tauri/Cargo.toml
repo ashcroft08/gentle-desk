@@ -31,6 +31,11 @@ gentle-backend = { path = "../../../crates/backend" }
 # to the contract's names in `view`, and nothing of it leaves this crate.
 gentle-core = { path = "../../../crates/gentle-core" }
 gentle-runtime = { path = "../../../crates/runtime" }
+# The native folder picker of "Choose an existing folder" (Q1 option A, W3c):
+# rfd's Win32 IFileDialog. Its `default` features (xdg-portal, wayland) are the
+# Linux backends and its `common-controls-v6` feature is the only one that pulls
+# comctl32 v6's TaskDialogIndirect into a test binary, so neither is on.
+rfd = { version = "0.17", default-features = false }
 tauri = { version = "2", default-features = false, features = ["wry"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

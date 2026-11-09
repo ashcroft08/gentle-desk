@@ -12,12 +12,18 @@ pub mod config;
 pub mod contract;
 pub mod effects;
 pub mod events;
+pub mod folder_name;
 pub mod intent;
+pub mod new_folder;
 pub mod pending;
+pub mod picker;
 pub mod sessions;
 pub mod state_view;
 pub mod view;
 pub mod workspace;
+pub mod workspace_add;
+pub mod workspace_commands;
+pub mod workspace_create;
 
 use commands::Bridge;
 use tauri::Manager;
@@ -34,6 +40,8 @@ pub fn contract_builder() -> Builder<tauri::Wry> {
             commands::dispatch_intent,
             sessions::commands::sessions_window,
             sessions::commands::get_view_state,
+            workspace_commands::add_workspace,
+            workspace_commands::create_workspace,
         ])
         .events(tauri_specta::collect_events![contract::StateChanged,])
 }
