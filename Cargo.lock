@@ -1634,6 +1634,7 @@ dependencies = [
  "tauri",
  "tauri-build",
  "tauri-specta",
+ "tempfile",
 ]
 
 [[package]]

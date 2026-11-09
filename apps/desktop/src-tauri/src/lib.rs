@@ -11,6 +11,8 @@ pub mod commands;
 pub mod contract;
 pub mod effects;
 pub mod events;
+pub mod sessions;
+pub mod state_view;
 pub mod view;
 
 use commands::Bridge;
@@ -55,6 +57,9 @@ pub fn run() {
             // has: this is the one place the child events are armed. The pump's
             // threads start the first time the executor builds its host.
             app.state::<Bridge>().arm_events(app.handle());
+            // The session list is armed the same way, and its first pass asked
+            // for here: the window opens with a list that says it is reading.
+            app.state::<Bridge>().start_sessions(app.handle());
             Ok(())
         })
         .run(tauri::generate_context!())

@@ -8,7 +8,7 @@
 
 use gentle_app::{ChatId, Input, Intent};
 use gentle_desk_lib::bridge::AppStateHolder;
-use gentle_desk_lib::contract::{NoticeLevel, UiIntent, ViewState};
+use gentle_desk_lib::contract::{ListStatusView, NoticeLevel, UiIntent, ViewState};
 
 #[test]
 fn new_chat_clears_the_foreground_chat() {
@@ -73,6 +73,8 @@ fn the_view_state_slice_has_no_invented_fields() {
         holder.view(),
         ViewState {
             foreground_chat: None,
+            list_status: ListStatusView::Loading { done: 0, total: 0 },
+            sessions: Vec::new(),
             messages: Vec::new(),
             notices: Vec::new(),
             activity: Vec::new(),

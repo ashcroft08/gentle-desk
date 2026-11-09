@@ -9,33 +9,41 @@
 
 use std::sync::Arc;
 
+use gentle_app::Command;
 use tauri::AppHandle;
 use tauri_specta::Event;
 
-use crate::bridge::AppStateHolder;
+use crate::bridge::{AppStateHolder, CommandSink};
 use crate::contract::{StateChanged, UiIntent, ViewState};
 use crate::effects::{self, Ran, RuntimeExecutor};
 use crate::events::{EventPump, Push};
+use crate::sessions::{startup, SessionsService};
 
 /// Everything the bridge owns and hands to the worker threads: the state, the
-/// pump the children's events come back through, and the seam that runs a chat
-/// command. The only managed state of the app.
+/// pump the children's events come back through, the session list's passes, and
+/// the seam that runs a chat command. The only managed state of the app.
 pub struct Bridge {
     pub holder: Arc<AppStateHolder>,
     pub executor: Arc<RuntimeExecutor>,
     pub pump: Arc<EventPump>,
+    pub sessions: Arc<SessionsService>,
 }
 
 impl Bridge {
-    /// One holder, one pump folding into it, and the executor that feeds the
-    /// pump its host when the first command needs one.
+    /// One holder, one pump folding into it, the sessions of this run, and the
+    /// executor that feeds the pump its host when the first command needs one.
     pub fn new() -> Self {
         let holder = Arc::new(AppStateHolder::default());
         let pump = Arc::new(EventPump::new(Arc::clone(&holder)));
+        let sessions = Arc::new(startup::service(Arc::clone(&holder)));
+        // The reducer doesn't refresh the list itself: it answers
+        // `Command::RefreshSessions` and this is where that one is run.
+        holder.arm_commands(command_sink(Arc::clone(&sessions)));
         Self {
             holder,
             executor: Arc::new(RuntimeExecutor::new(Arc::clone(&pump))),
             pump,
+            sessions,
         }
     }
 
@@ -45,6 +53,23 @@ impl Bridge {
         let app = app.clone();
         let push: Push = Box::new(move |view| push(&app, view));
         self.pump.arm(push);
+    }
+
+    /// The sessions half of startup: the list's emit step, and the first full
+    /// pass. The iced shell asks for that pass as its first task
+    /// (`crates/ui/src/app/boot.rs`), so the window opens with a list that is
+    /// reading rather than a list that claims to be empty.
+    ///
+    /// TODO(T4): a push that lands before the webview listens is lost, and a
+    /// small home finishes before it does. The sidebar's first read (a command
+    /// answering the current slice) belongs to the windowed-query slice; the
+    /// pass is armed here because the setup step is the only place that has the
+    /// handle, exactly as the child events are.
+    pub fn start_sessions(&self, app: &AppHandle<tauri::Wry>) {
+        let app = app.clone();
+        let push: Push = Box::new(move |view| push(&app, view));
+        self.sessions.arm(push);
+        self.sessions.request();
     }
 
     /// Folds one intent, pushes the slice it answers, and runs the per-chat
@@ -83,6 +108,16 @@ impl Default for Bridge {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// What runs the shared commands of the reducer: the session list's pass here,
+/// and nothing for the two that belong to other slices (a clipboard copy and the
+/// single child the one-child shell sent to).
+fn command_sink(sessions: Arc<SessionsService>) -> CommandSink {
+    Arc::new(move |command| match command {
+        Command::RefreshSessions => sessions.request(),
+        Command::Send(_) | Command::CopyToClipboard(_) => {}
+    })
 }
 
 /// Folds what one command came to and pushes each step, then arms the 20 s net
