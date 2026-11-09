@@ -13,8 +13,19 @@ use session_seam::{file_name, gated, homeless, service, Home};
 use std::time::Duration;
 
 use gentle_app::{prepare_sessions, AppState, Input, SessionItem};
-use gentle_desk_lib::contract::ListStatusView;
+use gentle_desk_lib::contract::{ListStatusView, SessionRowView, SessionTreeRow};
+use gentle_desk_lib::sessions::tree::Tree;
 use gentle_desk_lib::sessions::window;
+
+/// The chat rows of a page: the workspace headers of the tree are not chats.
+fn chats(rows: &[SessionTreeRow]) -> Vec<&SessionRowView> {
+    rows.iter()
+        .filter_map(|row| match row {
+            SessionTreeRow::Chat(chat) => Some(chat),
+            SessionTreeRow::Workspace(_) => None,
+        })
+        .collect()
+}
 
 #[test]
 fn the_first_pass_pushes_a_reading_list_then_the_whole_one() {
@@ -45,13 +56,16 @@ fn the_first_pass_pushes_a_reading_list_then_the_whole_one() {
     assert_eq!(last.list_status, ListStatusView::Complete);
     assert_eq!(last.total_sessions, 3, "one row per session file");
 
-    // The rows are not part of the push: they come back as a window (S3).
-    let rows = holder.sessions_window(0, window::MAX_WINDOW, "");
-    assert_eq!(rows.rows.len(), 3);
-    let mut names: Vec<&str> = rows.rows.iter().map(|row| file_name(&row.id)).collect();
+    // The rows are not part of the push: they come back as a window (S3), as a
+    // workspace header followed by its chats.
+    let page = holder.sessions_window(0, window::MAX_WINDOW);
+    assert_eq!(page.total, 4, "one workspace header and its three chats");
+    let rows = chats(&page.rows);
+    assert_eq!(rows.len(), 3);
+    let mut names: Vec<&str> = rows.iter().map(|row| file_name(&row.id)).collect();
     names.sort();
     assert_eq!(names, vec!["a.jsonl", "b.jsonl", "c.jsonl"]);
-    for row in &rows.rows {
+    for row in &rows {
         assert_eq!(
             row.project, "p",
             "the project is the session's last directory"
@@ -62,7 +76,7 @@ fn the_first_pass_pushes_a_reading_list_then_the_whole_one() {
             "every row carries its age text"
         );
     }
-    let titles: Vec<&str> = rows.rows.iter().map(|row| row.title.as_str()).collect();
+    let titles: Vec<&str> = rows.iter().map(|row| row.title.as_str()).collect();
     assert!(titles.contains(&"first chat"), "got {titles:?}");
 
     // The holder is what the last push said: the web side and the state agree.
@@ -83,9 +97,10 @@ fn a_big_list_is_pushed_without_rows_and_read_back_by_the_window() {
     let last = pushes.last().expect("the list settles");
     assert_eq!(last.list_status, ListStatusView::Complete);
     assert_eq!(last.total_sessions, 60, "the push carries the count only");
-    let rows = holder.sessions_window(0, window::MAX_WINDOW, "");
-    assert_eq!(rows.total, 60);
-    let mut ids: Vec<&str> = rows.rows.iter().map(|row| row.id.as_str()).collect();
+    let page = holder.sessions_window(0, window::MAX_WINDOW);
+    assert_eq!(page.total, 61, "one header and sixty chats");
+    let rows = chats(&page.rows);
+    let mut ids: Vec<&str> = rows.iter().map(|row| row.id.as_str()).collect();
     assert_eq!(ids.len(), 60, "no row is served twice");
     ids.sort();
     ids.dedup();
@@ -183,7 +198,20 @@ fn a_row_carries_the_texts_the_runtime_rules_produce() {
     )
     .0;
 
-    let rows = window::window(&state, "", 0, window::MAX_WINDOW, 1_000 + 3 * 60 * 60_000).rows;
+    let tree = Tree::build(
+        1,
+        &gentle_runtime::app_config::AppConfig::default(),
+        &state.sessions,
+    );
+    let rows = window::window(
+        &tree,
+        0,
+        window::MAX_WINDOW,
+        1_000 + 3 * 60 * 60_000,
+        &window::folder_status,
+    )
+    .rows;
+    let rows = chats(&rows);
 
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0].id, "/sessions/p/a.jsonl");

@@ -14,9 +14,14 @@ use crate::contract::{ChatActivityMark, ChatActivityView, NoticeLevel, NoticeVie
 use crate::{sessions, view};
 
 /// The slice of `state` as it stands now, carrying the revision the holder
-/// keeps for the session list: the web side compares it to know when the page
-/// of rows it holds is stale.
-pub fn view_state(state: &AppState, sessions_revision: u32) -> ViewState {
+/// keeps for the session list - the web side compares it to know when the page
+/// of rows it holds is stale - and the notice of the config file, when it could
+/// not be used at startup.
+pub fn view_state(
+    state: &AppState,
+    sessions_revision: u32,
+    config_notice: Option<String>,
+) -> ViewState {
     ViewState {
         foreground_chat: state
             .chats
@@ -28,6 +33,7 @@ pub fn view_state(state: &AppState, sessions_revision: u32) -> ViewState {
         messages: view::messages(state),
         notices: state.notices.iter().map(NoticeView::of).collect(),
         activity: activity_view(state),
+        config_notice,
     }
 }
 

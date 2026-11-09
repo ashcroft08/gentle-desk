@@ -10,9 +10,10 @@
 
 import type {
   ChatActivityView,
-  SessionRowView,
-  SessionsWindow,
+  SessionsWindow_Serialize,
+  SessionTreeRow_Serialize,
   ViewState_Serialize,
+  WorkspaceRowView_Serialize,
 } from '../contract/bindings'
 
 /** The arguments of one invoke call, as the bridge commands take them. */
@@ -131,6 +132,7 @@ export function viewState(overrides: Partial<ViewState_Serialize> = {}): ViewSta
     messages: [],
     notices: [],
     activity: [],
+    config_notice: null,
     ...overrides,
   }
 }
@@ -140,9 +142,13 @@ export function activity(chatId: string, mark: ChatActivityView['activity']): Ch
   return { chat_id: chatId, activity: mark }
 }
 
-/** One session row, as `sessions_window` answers it. */
-export function sessionRow(id: string, overrides: Partial<SessionRowView> = {}): SessionRowView {
+/** One chat row, as `sessions_window` answers it under its workspace header. */
+export function chatRow(
+  id: string,
+  overrides: Partial<Omit<Extract<SessionTreeRow_Serialize, { kind: 'Chat' }>, 'kind'>> = {},
+): SessionTreeRow_Serialize {
   return {
+    kind: 'Chat',
     id,
     title: id,
     project: 'gentle-desk',
@@ -152,7 +158,29 @@ export function sessionRow(id: string, overrides: Partial<SessionRowView> = {}):
   }
 }
 
+/** One workspace header row, as `sessions_window` answers it. */
+export function workspaceRow(
+  label: string,
+  overrides: Partial<Omit<WorkspaceRowView_Serialize, 'label'>> = {},
+): SessionTreeRow_Serialize {
+  return {
+    kind: 'Workspace',
+    key: label.toLowerCase(),
+    label,
+    path: `C:\\dev\\${label}`,
+    name: label,
+    collapsed: false,
+    chat_count: 0,
+    available: true,
+    reason: null,
+    ...overrides,
+  }
+}
+
 /** One window page, as `sessions_window` answers it. */
-export function sessionsWindow(total: number, rows: SessionRowView[]): SessionsWindow {
+export function sessionsWindow(
+  total: number,
+  rows: SessionTreeRow_Serialize[],
+): SessionsWindow_Serialize {
   return { total, rows }
 }

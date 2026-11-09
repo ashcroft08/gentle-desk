@@ -8,9 +8,11 @@
 
 pub mod bridge;
 pub mod commands;
+pub mod config;
 pub mod contract;
 pub mod effects;
 pub mod events;
+pub mod intent;
 pub mod sessions;
 pub mod state_view;
 pub mod view;

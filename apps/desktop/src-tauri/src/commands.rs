@@ -14,6 +14,7 @@ use tauri::AppHandle;
 use tauri_specta::Event;
 
 use crate::bridge::{AppStateHolder, CommandSink};
+use crate::config::ConfigSnapshot;
 use crate::contract::{StateChanged, UiIntent, ViewState};
 use crate::effects::{self, Ran, RuntimeExecutor};
 use crate::events::{EventPump, Push};
@@ -32,8 +33,11 @@ pub struct Bridge {
 impl Bridge {
     /// One holder, one pump folding into it, the sessions of this run, and the
     /// executor that feeds the pump its host when the first command needs one.
+    ///
+    /// The app config file is read HERE, before the holder exists, so the one
+    /// disk read of the config happens outside every lock.
     pub fn new() -> Self {
-        let holder = Arc::new(AppStateHolder::default());
+        let holder = Arc::new(AppStateHolder::with_config(ConfigSnapshot::from_env()));
         let pump = Arc::new(EventPump::new(Arc::clone(&holder)));
         let sessions = Arc::new(startup::service(Arc::clone(&holder)));
         // The reducer doesn't refresh the list itself: it answers

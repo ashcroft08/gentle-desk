@@ -10,8 +10,12 @@
 //!   the new ones, so it runs on its own thread, never on a Tauri executor
 //!   thread or the window's.
 //! - [`view`]: the slice a `ViewState` carries: the list status and the count.
-//! - [`window`]: the `offset`/`length`/`query` pages of rows the web side asks
-//!   for as it scrolls, instead of a pushed list (S3).
+//! - [`tree`]: the flattened workspace tree, one row per workspace header and
+//!   one per chat of the workspaces that are not collapsed.
+//! - [`cache`]: the tree of the last revision, so a page of rows never regroups
+//!   the whole list again.
+//! - [`window`]: the `offset`/`length` pages of tree rows the web side asks for
+//!   as it scrolls, instead of a pushed list (S3).
 //! - [`revision`]: when the page a web side holds went stale.
 //! - [`commands`]: the two read commands of the list, `sessions_window` and
 //!   `get_view_state`, registered with the rest of the contract.
@@ -21,10 +25,12 @@
 //! The seam is [`service::RunPass`] for "run one pass" and [`crate::events::Push`] for
 //! "emit the slice", so the tests run a real home and no window.
 
+pub mod cache;
 pub mod commands;
 pub mod revision;
 pub mod service;
 pub mod startup;
+pub mod tree;
 pub mod view;
 pub mod window;
 

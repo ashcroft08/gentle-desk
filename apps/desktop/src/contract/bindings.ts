@@ -18,12 +18,13 @@ export const commands = {
 	 */
 	dispatchIntent: (intent: UiIntent) => typedError<ViewState_Serialize, string>(__TAURI_INVOKE("dispatch_intent", { intent })),
 	/**
-	 *  One page of the session list (S3): the rows `[offset, offset + length)` of
-	 *  the list `query` narrows, and how many rows it matches in total. It reads the
-	 *  CURRENT state, so a sidebar that missed a push still gets the truth; the
-	 *  length is capped, so no caller can ask for a whole 50 000-chat list.
+	 *  One page of the flattened workspace tree (S3): the rows
+	 *  `[offset, offset + length)` of it, and how many rows the tree has in total -
+	 *  workspace headers included. It reads the CURRENT state, so a sidebar that
+	 *  missed a push still gets the truth; the length is capped, so no caller can
+	 *  ask for a whole 50 000-chat list.
 	 */
-	sessionsWindow: (offset: number, length: number, query: string) => __TAURI_INVOKE<SessionsWindow>("sessions_window", { offset, length, query }),
+	sessionsWindow: (offset: number, length: number) => __TAURI_INVOKE<SessionsWindow_Serialize>("sessions_window", { offset, length }),
 	/**
 	 *  The first read of a web view: the slice the state holds right now. It emits
 	 *  nothing, so it cannot race the pushes it duplicates; a view that starts after
@@ -115,17 +116,85 @@ export type SessionRowView = {
 };
 
 /**
- *  One page of the session list as `sessions_window` answers it (S3): the rows
- *  `[offset, offset + length)` of the list `query` narrows, and how many rows
- *  that query matches in total, so the sidebar knows how far it can scroll.
+ *  One row of the flattened workspace tree the sidebar draws: a workspace
+ *  header, then - only when the workspace is not collapsed - its chats.
+ * 
+ *  The two kinds share one row height on the web side, so the tree is one
+ *  virtualized list of rows rather than a nested one.
+ */
+export type SessionTreeRow = SessionTreeRow_Serialize | SessionTreeRow_Deserialize;
+
+/**
+ *  One row of the flattened workspace tree the sidebar draws: a workspace
+ *  header, then - only when the workspace is not collapsed - its chats.
+ * 
+ *  The two kinds share one row height on the web side, so the tree is one
+ *  virtualized list of rows rather than a nested one.
+ */
+export type SessionTreeRow_Deserialize = {
+	kind: "Workspace",
+} & WorkspaceRowView_Deserialize | {
+	kind: "Chat",
+} & SessionRowView;
+
+/**
+ *  One row of the flattened workspace tree the sidebar draws: a workspace
+ *  header, then - only when the workspace is not collapsed - its chats.
+ * 
+ *  The two kinds share one row height on the web side, so the tree is one
+ *  virtualized list of rows rather than a nested one.
+ */
+export type SessionTreeRow_Serialize = {
+	kind: "Workspace",
+} & WorkspaceRowView_Serialize | {
+	kind: "Chat",
+} & SessionRowView;
+
+/**
+ *  One page of the workspace tree as `sessions_window` answers it (S3): the rows
+ *  `[offset, offset + length)` of the flattened tree, and how many rows the tree
+ *  has in total - workspace headers included - so the sidebar knows how far it
+ *  can scroll.
  * 
  *  The length is capped ([`MAX_WINDOW`](crate::sessions::window::MAX_WINDOW)),
  *  so this type never carries the whole list of a 50 000-chat home.
  */
-export type SessionsWindow = {
-	/**  The filtered count: the rows the query matches, not the page's length. */
+export type SessionsWindow = SessionsWindow_Serialize | SessionsWindow_Deserialize;
+
+/**
+ *  One page of the workspace tree as `sessions_window` answers it (S3): the rows
+ *  `[offset, offset + length)` of the flattened tree, and how many rows the tree
+ *  has in total - workspace headers included - so the sidebar knows how far it
+ *  can scroll.
+ * 
+ *  The length is capped ([`MAX_WINDOW`](crate::sessions::window::MAX_WINDOW)),
+ *  so this type never carries the whole list of a 50 000-chat home.
+ */
+export type SessionsWindow_Deserialize = {
+	/**
+	 *  The count of the flattened rows: headers and chats, collapsed groups
+	 *  skipped, never the page's length.
+	 */
 	total: number,
-	rows: SessionRowView[],
+	rows: SessionTreeRow_Deserialize[],
+};
+
+/**
+ *  One page of the workspace tree as `sessions_window` answers it (S3): the rows
+ *  `[offset, offset + length)` of the flattened tree, and how many rows the tree
+ *  has in total - workspace headers included - so the sidebar knows how far it
+ *  can scroll.
+ * 
+ *  The length is capped ([`MAX_WINDOW`](crate::sessions::window::MAX_WINDOW)),
+ *  so this type never carries the whole list of a 50 000-chat home.
+ */
+export type SessionsWindow_Serialize = {
+	/**
+	 *  The count of the flattened rows: headers and chats, collapsed groups
+	 *  skipped, never the page's length.
+	 */
+	total: number,
+	rows: SessionTreeRow_Serialize[],
 };
 
 /**
@@ -225,6 +294,12 @@ export type ViewState_Deserialize = {
 	messages: MessageView[],
 	notices: NoticeView[],
 	activity: ChatActivityView[],
+	/**
+	 *  What the user should be told about the app config file, when it could
+	 *  not be used at startup: a damaged file is kept aside and the app starts
+	 *  with an empty config. `None` when the file was read, or was not there.
+	 */
+	config_notice?: string | null,
 };
 
 /**
@@ -268,6 +343,76 @@ export type ViewState_Serialize = {
 	messages: MessageView[],
 	notices: NoticeView[],
 	activity: ChatActivityView[],
+	/**
+	 *  What the user should be told about the app config file, when it could
+	 *  not be used at startup: a damaged file is kept aside and the app starts
+	 *  with an empty config. `None` when the file was read, or was not there.
+	 */
+	config_notice: string | null,
+};
+
+/**
+ *  One workspace row of the flattened tree: the folder the user works in, with
+ *  the state the sidebar draws and whether new chats can start there.
+ */
+export type WorkspaceRowView = WorkspaceRowView_Serialize | WorkspaceRowView_Deserialize;
+
+/**
+ *  One workspace row of the flattened tree: the folder the user works in, with
+ *  the state the sidebar draws and whether new chats can start there.
+ */
+export type WorkspaceRowView_Deserialize = {
+	/**
+	 *  The folder identity two spellings share
+	 *  ([`gentle_runtime::app_config::folder_key`]).
+	 */
+	key: string,
+	/**
+	 *  The name extended with the parent segments it takes to tell two
+	 *  workspaces with the same name apart.
+	 */
+	label: string,
+	/**  The canonical spelling of the folder. */
+	path: string,
+	/**  The last segment of the path. */
+	name: string,
+	/**  Whether the chats of the workspace are folded away (D8). */
+	collapsed: boolean,
+	/**  How many chats the workspace holds, folded or not. */
+	chat_count: number,
+	/**  Whether the folder is there right now, so new chats can start in it. */
+	available: boolean,
+	/**  Why a folder that is not available cannot host a chat. */
+	reason?: string | null,
+};
+
+/**
+ *  One workspace row of the flattened tree: the folder the user works in, with
+ *  the state the sidebar draws and whether new chats can start there.
+ */
+export type WorkspaceRowView_Serialize = {
+	/**
+	 *  The folder identity two spellings share
+	 *  ([`gentle_runtime::app_config::folder_key`]).
+	 */
+	key: string,
+	/**
+	 *  The name extended with the parent segments it takes to tell two
+	 *  workspaces with the same name apart.
+	 */
+	label: string,
+	/**  The canonical spelling of the folder. */
+	path: string,
+	/**  The last segment of the path. */
+	name: string,
+	/**  Whether the chats of the workspace are folded away (D8). */
+	collapsed: boolean,
+	/**  How many chats the workspace holds, folded or not. */
+	chat_count: number,
+	/**  Whether the folder is there right now, so new chats can start in it. */
+	available: boolean,
+	/**  Why a folder that is not available cannot host a chat. */
+	reason: string | null,
 };
 
 /* Tauri Specta runtime */

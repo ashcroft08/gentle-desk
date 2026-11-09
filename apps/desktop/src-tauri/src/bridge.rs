@@ -21,12 +21,16 @@
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use gentle_app::{ChatId, Command};
+use gentle_app::{Command, SessionItem};
+use gentle_runtime::app_config::AppConfig;
 use gentle_runtime::clock::now_ms;
 
+use crate::config::ConfigSnapshot;
 use crate::contract::{SessionsWindow, UiIntent, ViewState};
+use crate::sessions::cache::TreeCache;
 use crate::sessions::revision;
-use crate::sessions::window::window;
+use crate::sessions::tree::Tree;
+use crate::sessions::window::{self, folder_status};
 use crate::state_view::view_state;
 
 /// What runs one shared command the reducer asked for. `Command::RefreshSessions`
@@ -42,13 +46,29 @@ pub struct AppStateHolder {
     /// Installed once at startup: before it exists a shared command is simply
     /// dropped, which is what the earlier slices did with all of them.
     commands: Mutex<Option<CommandSink>>,
-    /// Bumped whenever the folded list or its status changes, and carried by
-    /// every slice as `ViewState::sessions_revision`. It wraps: the web side
-    /// compares two revisions for inequality, so a wrap names no old list.
+    /// Bumped whenever the folded list, its status or the config changes, and
+    /// carried by every slice as `ViewState::sessions_revision`. It wraps: the
+    /// web side compares two revisions for inequality, so a wrap names no old
+    /// list.
     sessions_revision: AtomicU32,
+    /// The app config of this run: one snapshot, loaded at startup outside
+    /// every lock and replaced as a whole ([`Self::replace_config`]).
+    config: Mutex<Arc<ConfigSnapshot>>,
+    /// The flattened tree of the last built revision, so a page of rows never
+    /// regroups 50 000 sessions again (see [`TreeCache`]).
+    tree: TreeCache,
 }
 
 impl AppStateHolder {
+    /// A holder for a run whose config file was read at startup, before any
+    /// lock existed.
+    pub fn with_config(config: ConfigSnapshot) -> Self {
+        Self {
+            config: Mutex::new(Arc::new(config)),
+            ..Self::default()
+        }
+    }
+
     /// Installs what runs the shared commands of every later fold. One sink for
     /// the whole holder, so the intent path, the child-event pump and a refresh
     /// pass all reach the same service.
@@ -67,7 +87,7 @@ impl AppStateHolder {
     /// slice either way: the commands are the shell's business, not the view's.
     pub fn dispatch_commands(&self, intent: UiIntent) -> (ViewState, Vec<gentle_app::ChatCommand>) {
         let state = self.state();
-        let input = gentle_app::Input::Intent(to_intent(&state, intent));
+        let input = gentle_app::Input::Intent(crate::intent::to_intent(&state, intent));
         self.apply(input)
     }
 
@@ -91,15 +111,34 @@ impl AppStateHolder {
     /// answer of `get_view_state`, the first read a sidebar makes. Reading never
     /// emits, so a webview that missed the pushes still gets the whole slice.
     pub fn view(&self) -> ViewState {
-        view_state(&self.state(), self.sessions_revision())
+        let notice = self.config_notice();
+        view_state(&self.state(), self.sessions_revision(), notice)
     }
 
-    /// One window of the session list as the state holds it NOW: the rows
-    /// `[offset, offset + length)` of the list `query` narrows, and the filtered
-    /// total. The state is cloned so the filter runs off the lock and a fold on
-    /// the pump's thread never waits for a page (S3).
-    pub fn sessions_window(&self, offset: u32, length: u32, query: &str) -> SessionsWindow {
-        window(&self.state(), query, offset, length, now_ms())
+    /// One window of the flattened workspace tree as the state holds it NOW:
+    /// the rows `[offset, offset + length)` of the tree, and how many rows the
+    /// tree has in total. The tree is built once per revision, from snapshots
+    /// taken off the lock, so a fold on the pump's thread never waits for a
+    /// page.
+    pub fn sessions_window(&self, offset: u32, length: u32) -> SessionsWindow {
+        let revision = self.sessions_revision();
+        let tree = self.tree.get_or_build(revision, || {
+            let config = self.config_snapshot();
+            let sessions = self.sessions_snapshot();
+            Tree::build(revision, &config.config, &sessions)
+        });
+        window::window(&tree, offset, length, now_ms(), &folder_status)
+    }
+
+    /// Replaces the config snapshot and bumps the revision, so the page of rows
+    /// the web side holds is stale at once: the tree is built from the config
+    /// too. The startup notice is kept, because it describes the file this run
+    /// found and this slice never writes a config back.
+    pub fn replace_config(&self, config: AppConfig) {
+        let mut snapshot = self.config_snapshot();
+        Arc::make_mut(&mut snapshot).config = config;
+        *lock(&self.config) = snapshot;
+        self.sessions_revision.fetch_add(1, Ordering::Relaxed);
     }
 
     /// The revision of the session list this holder has reached.
@@ -109,9 +148,11 @@ impl AppStateHolder {
 
     fn apply(&self, input: gentle_app::Input) -> (ViewState, Vec<gentle_app::ChatCommand>) {
         // One lock for the fold and the slice it answers: a revision read here
-        // describes exactly the state it is pushed with. The shared commands
-        // run after it is released, because a refresh pass folds back into this
-        // same holder.
+        // describes exactly the state it is pushed with. The config notice is
+        // read before it, so no path ever holds the state and the config at
+        // once. The shared commands run after the lock is released, because a
+        // refresh pass folds back into this same holder.
+        let notice = self.config_notice();
         let (view, chat_commands, commands) = {
             let mut app = lock(&self.app);
             let previous = app.clone();
@@ -121,7 +162,7 @@ impl AppStateHolder {
                 self.sessions_revision.fetch_add(1, Ordering::Relaxed);
             }
             *app = state;
-            let view = view_state(&app, self.sessions_revision());
+            let view = view_state(&app, self.sessions_revision(), notice);
             (view, effects.chat_commands, effects.commands)
         };
         self.run_shared(commands);
@@ -141,41 +182,21 @@ impl AppStateHolder {
     fn state(&self) -> gentle_app::AppState {
         lock(&self.app).clone()
     }
-}
 
-/// Maps one intent of the contract to the reducer's intent. Explicit so the
-/// contract stays free of `crates/app` types (S2).
-fn to_intent(state: &gentle_app::AppState, intent: UiIntent) -> gentle_app::Intent {
-    match intent {
-        UiIntent::SendPrompt { text } => gentle_app::Intent::SendPrompt(text),
-        UiIntent::Abort => gentle_app::Intent::Abort,
-        UiIntent::NewChat => gentle_app::Intent::NewChat,
-        UiIntent::OpenChat { chat_id } => gentle_app::Intent::OpenChat(chat_for(state, &chat_id)),
-        UiIntent::OpenNewChat => gentle_app::Intent::OpenNewChat,
-        UiIntent::RestartChat { chat_id } => {
-            gentle_app::Intent::RestartChat(chat_for(state, &chat_id))
-        }
-        UiIntent::DismissNotice { id } => gentle_app::Intent::DismissNotice(u64::from(id)),
+    /// The session list the tree is built from, taken off the lock.
+    fn sessions_snapshot(&self) -> Vec<SessionItem> {
+        lock(&self.app).sessions.clone()
     }
-}
 
-/// The app's chat for an id the web side sent back.
-///
-/// The web only ever holds ids the state named - [`ViewState`] names every chat
-/// by `ChatId::as_str` and every session row by its path - so the lookup is the
-/// round trip of an id the view was given, and a chat of no session file
-/// (`new-N`, which no path can rebuild) travels back unchanged. An id the state
-/// has not heard of is read as the session path of a stored chat, which is how
-/// the app builds that chat's id: the sidebar names a row by its path long
-/// before any chat exists.
-fn chat_for(state: &gentle_app::AppState, chat_id: &str) -> ChatId {
-    state
-        .chats
-        .ids()
-        .into_iter()
-        .find(|chat| chat.as_str() == chat_id)
-        .cloned()
-        .unwrap_or_else(|| ChatId::of_session(chat_id))
+    /// The config snapshot of this run, taken off the lock.
+    fn config_snapshot(&self) -> Arc<ConfigSnapshot> {
+        Arc::clone(&lock(&self.config))
+    }
+
+    /// The config notice as the view state carries it.
+    fn config_notice(&self) -> Option<String> {
+        self.config_snapshot().notice.clone()
+    }
 }
 
 /// A lock that survives a poisoned mutex: nothing here may panic because a

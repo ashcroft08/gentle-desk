@@ -66,7 +66,8 @@ Proposed by the assistant (not yet confirmed by the user):
   hidden; derived ones that are temporary folders are hidden by default.
 - P3: order workspaces by last activity (the newest session, or the time it was added if it has none); chats
   inside by last activity.
-- P4: the sidebar search keeps searching all workspaces at once.
+- P4 (DROPPED in L15): the sidebar search keeps searching all workspaces at once. The user removed the
+  search (`tauri-migration-m19.md` L15), so the tree has no query and the window command carries none.
 - P5: the current workspace is the workspace of the selected chat, or the workspace row the user selected.
 - P6: the app keeps its own small config file (added workspaces, collapse state) apart from the session-index
   cache, which is only a cache and can be deleted. Place, as W0 built it: `<roaming app data>/gentle-desk/config.json`
@@ -118,3 +119,29 @@ What the workspace builder decided, beyond the specs above:
 - A workspace with no chat has nothing to be ordered by, and the config holds no "added at" time: workspaces with
   no chat follow the ones with activity, in the order the config lists them. Ties among workspaces that have
   activity are broken by `key`.
+
+## W3a decisions
+
+What the tree window of the bridge decided, beyond the specs above:
+
+- The window serves a ROW UNION, not a session list: `SessionTreeRow` is a serde enum tagged by
+  `kind`, with a `Workspace` variant (key, label, path, name, collapsed, chat_count, available,
+  reason) and a `Chat` variant carrying the fields of `SessionRowView`. The web side reads one flat
+  array and draws headers and chats at the same fixed row height.
+- `SessionsWindow.total` counts the flattened rows: workspace headers included, chats of a collapsed
+  workspace excluded, so it is exactly the number of rows the sidebar can scroll through.
+- A collapsed workspace still serves its header - with `collapsed` and its full `chat_count` - and
+  none of its chats, so folding a group never changes what the group says about itself.
+- The search is gone from the contract (L15, P4 dropped): `sessions_window` takes `offset` and
+  `length` only. `crates/app` keeps `SetSessionQuery` for the iced app until `crates/ui` is deleted.
+- Whether a workspace folder still exists (`available`, `reason`) touches the file system, so it is
+  asked per served page and only for the header rows that page holds: at most MAX_WINDOW (200)
+  probes, never one per workspace of the whole list.
+- The flattened tree is cached by the holder's revision: a window call reuses the tree until the
+  session list or the config moves, and the rebuild reads a snapshot of the state and of the config
+  outside every lock.
+- `sessions_revision` also moves when the config snapshot is replaced
+  (`AppStateHolder::replace_config`), because the tree is built from the config too.
+- The app config is read once at startup, outside every lock, and the notice of a damaged file reaches
+  the web side as the new optional `ViewState.config_notice` field. A run with no config path holds the
+  empty config in memory, and this slice never writes a config file.
