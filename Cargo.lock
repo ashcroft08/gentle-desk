@@ -1644,6 +1644,7 @@ dependencies = [
  "gentle-app",
  "gentle-backend",
  "gentle-core",
+ "serde",
  "serde_json",
  "tempfile",
 ]
