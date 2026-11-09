@@ -30,9 +30,10 @@ The user's own words, kept as typed:
   never passes a folder, so the child inherits the process folder silently. gentle-desk must not copy that.
 - The real sessions folder of this machine holds 12 project folders and 18 chats. Some folders are empty
   (one is the user's home folder), and several are temporary folders (their origin is not known; the dates are from before this work).
-- The process layer can start a child with a working folder (`crates/backend/src/process.rs`, option `cwd`), but
-  the chat host's spawner always passes none (`crates/backend/src/chat_host/spawner.rs`, `cwd: None`). The folder
-  has to be plumbed through the chat host; the capability exists.
+- The process layer can start a child with a working folder (`crates/backend/src/process.rs`, option `cwd`), and
+  since W2 the chat host carries it: `ChatHost::open_in(key, folder)` refuses a folder that cannot host a child
+  (`crates/backend/src/chat_host/folder.rs`) and starts the child there through `Spawner::spawn(key, folder)`, which
+  sets `cwd` in `ProcessSpawner::options_for` (`crates/backend/src/chat_host/spawner.rs`).
 - Today the list is flat: `sessions_window(offset, length, query)` returns rows of one list, and a row carries
   `id, title, project, message_count, modified_ago` (`apps/desktop/src-tauri/src/contract.rs`).
 
@@ -68,7 +69,8 @@ Proposed by the assistant (not yet confirmed by the user):
 - P4: the sidebar search keeps searching all workspaces at once.
 - P5: the current workspace is the workspace of the selected chat, or the workspace row the user selected.
 - P6: the app keeps its own small config file (added workspaces, collapse state) apart from the session-index
-  cache, which is only a cache and can be deleted. Suggested place: `%APPDATA%gentle-deskconfig.json`.
+  cache, which is only a cache and can be deleted. Place, as W0 built it: `<roaming app data>/gentle-desk/config.json`
+  (`crates/runtime/src/app_config/paths.rs`).
   The cache lives in `%LOCALAPPDATA%gentle-desksession-index.json` today.
 
 ## Open questions
@@ -99,3 +101,20 @@ Proposed by the assistant (not yet confirmed by the user):
   `bindings.ts`.
 - W4 (web): the sidebar as a tree on top of the T4b data layer, the empty state (Q2), and the New workspace UI
   (Q1), checked in a real window against `01a` by the parent.
+
+## W1 decisions
+
+What the workspace builder decided, beyond the specs above:
+
+- The builder is a pure module of `crates/runtime` (`crates/runtime/src/workspaces.rs`), not of `crates/app`:
+  `gentle-runtime` depends on `gentle-app`, so a builder in `gentle-app` that reads a `SessionItem` would close a
+  cycle. It takes the config and the session items and returns the list: no file, no environment, no clock.
+- The list is the union of the folders the config holds and the `cwd` values of the session headers, matched by
+  `folder_key`, so one folder is one workspace whatever spelling each side reports. The row shows the config's
+  spelling when both sides have the folder. A session with an empty or blank `cwd` belongs to no workspace: none
+  is invented for it, and `WorkspaceList::unplaced` counts it.
+- Temporary folders are not hidden: no rule tells a temporary folder from a lasting one yet, so hiding any of them
+  would be a guess.
+- A workspace with no chat has nothing to be ordered by, and the config holds no "added at" time: workspaces with
+  no chat follow the ones with activity, in the order the config lists them. Ties among workspaces that have
+  activity are broken by `key`.

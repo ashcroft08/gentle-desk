@@ -58,7 +58,7 @@ impl AppConfig {
             return false;
         }
         self.workspaces.push(WorkspaceEntry {
-            path: plain(path),
+            path: canonical_path(path),
             collapsed: false,
         });
         true
@@ -80,10 +80,11 @@ impl AppConfig {
     }
 }
 
-/// The spelling a workspace is stored with: `path` with the Windows verbatim
-/// prefix removed and without a trailing separator, so the same folder is
-/// stored the same way however it was reported.
-fn plain(path: &str) -> String {
+/// The spelling a workspace is stored with, and the one the sidebar shows: `path`
+/// with the Windows verbatim prefix removed and without a trailing separator (a
+/// root keeps its own), so the same folder is stored and shown the same way
+/// however it was reported.
+pub(crate) fn canonical_path(path: &str) -> String {
     // `\\?\C:` and `\??\C:` mean `C:`, and the verbatim form of a share,
     // `\\?\UNC\srv\share`, means `\\srv\share`.
     let stripped = match verbatim_rest(path) {
@@ -127,8 +128,8 @@ fn unc_share(rest: &str) -> Option<&str> {
 /// empty parts dropped (so a trailing or doubled separator does not matter),
 /// and the letter case folded on Windows.
 pub fn folder_key(path: &str) -> String {
-    let plain = plain(path);
-    let parts: Vec<String> = plain
+    let path = canonical_path(path);
+    let parts: Vec<String> = path
         .split(['\\', '/'])
         .filter(|part| !part.is_empty())
         .map(fold)
