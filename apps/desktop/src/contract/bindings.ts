@@ -230,6 +230,24 @@ export type UiIntent = { type: "SendPrompt"; data: {
 } } | 
 /**  The same for a chat that did not exist before. */
 { type: "OpenNewChat" } | 
+/**
+ *  Start a NEW chat in the workspace at `path`: what the header's New
+ *  session button (D2) and a workspace's own new-chat icon (D3) send. The
+ *  web side decides which workspace is the current one and names it; the
+ *  chat started here is the same new chat `OpenNewChat` starts, only in
+ *  that folder, and never the legacy single-child `NewChat`.
+ */
+{ type: "NewChatInWorkspace"; data: {
+	path: string,
+} } | 
+/**
+ *  Fold or unfold the chats of the workspace at `path` in the sidebar (D8):
+ *  the state is remembered in the app config, so it survives the run.
+ */
+{ type: "SetWorkspaceCollapsed"; data: {
+	path: string,
+	collapsed: boolean,
+} } | 
 /**  Start the child of a chat that died again and reopen it (S3). */
 { type: "RestartChat"; data: {
 	chat_id: string,
@@ -295,9 +313,11 @@ export type ViewState_Deserialize = {
 	notices: NoticeView[],
 	activity: ChatActivityView[],
 	/**
-	 *  What the user should be told about the app config file, when it could
-	 *  not be used at startup: a damaged file is kept aside and the app starts
-	 *  with an empty config. `None` when the file was read, or was not there.
+	 *  What the user should be told about the app config file: a file that
+	 *  could not be used at startup is kept aside and the app starts with an
+	 *  empty config, and a file that could not be written leaves the change in
+	 *  memory only. `None` when the file was read, or was not there, and nothing
+	 *  failed.
 	 */
 	config_notice?: string | null,
 };
@@ -344,9 +364,11 @@ export type ViewState_Serialize = {
 	notices: NoticeView[],
 	activity: ChatActivityView[],
 	/**
-	 *  What the user should be told about the app config file, when it could
-	 *  not be used at startup: a damaged file is kept aside and the app starts
-	 *  with an empty config. `None` when the file was read, or was not there.
+	 *  What the user should be told about the app config file: a file that
+	 *  could not be used at startup is kept aside and the app starts with an
+	 *  empty config, and a file that could not be written leaves the change in
+	 *  memory only. `None` when the file was read, or was not there, and nothing
+	 *  failed.
 	 */
 	config_notice: string | null,
 };

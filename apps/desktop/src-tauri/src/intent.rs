@@ -8,19 +8,27 @@ use gentle_app::ChatId;
 
 use crate::contract::UiIntent;
 
-/// Maps one intent of the contract to the reducer's intent.
-pub fn to_intent(state: &gentle_app::AppState, intent: UiIntent) -> gentle_app::Intent {
-    match intent {
+/// Maps one intent of the contract to the reducer's intent, `None` for the one
+/// the reducer has no answer for: folding a workspace's chats away is the
+/// config's business (D8), so the holder answers it before asking this
+/// (`bridge::AppStateHolder::workspace_intent`).
+pub fn to_intent(state: &gentle_app::AppState, intent: UiIntent) -> Option<gentle_app::Intent> {
+    Some(match intent {
         UiIntent::SendPrompt { text } => gentle_app::Intent::SendPrompt(text),
         UiIntent::Abort => gentle_app::Intent::Abort,
         UiIntent::NewChat => gentle_app::Intent::NewChat,
         UiIntent::OpenChat { chat_id } => gentle_app::Intent::OpenChat(chat_for(state, &chat_id)),
         UiIntent::OpenNewChat => gentle_app::Intent::OpenNewChat,
+        // The folder is not the reducer's business: `crates/app` carries no
+        // folder at all (S2), so it travels beside the command in the bridge's
+        // pending-folder table (`pending`), keyed by the chat allocated here.
+        UiIntent::NewChatInWorkspace { .. } => gentle_app::Intent::OpenNewChat,
+        UiIntent::SetWorkspaceCollapsed { .. } => return None,
         UiIntent::RestartChat { chat_id } => {
             gentle_app::Intent::RestartChat(chat_for(state, &chat_id))
         }
         UiIntent::DismissNotice { id } => gentle_app::Intent::DismissNotice(u64::from(id)),
-    }
+    })
 }
 
 /// The app's chat for an id the web side sent back.

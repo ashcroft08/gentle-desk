@@ -37,10 +37,12 @@ use gentle_backend::home::{with_home_flag, HomeEnv};
 use gentle_backend::launcher::{self, LauncherEnv};
 use gentle_desk_lib::bridge::AppStateHolder;
 use gentle_desk_lib::contract::{
-    ChatActivityMark, ChatActivityView, MessageRole, MessageView, UiIntent, ViewState,
+    ChatActivityMark, ChatActivityView, MessageRole, MessageView, NoticeLevel, UiIntent, ViewState,
 };
 use gentle_desk_lib::effects::{self, ChatExecutor, RuntimeExecutor};
 use gentle_desk_lib::events::{EventPump, Push};
+use gentle_desk_lib::pending::PendingFolders;
+use gentle_desk_lib::workspace;
 use gentle_runtime::chat_runtime::{ChatRuntime, Outcome};
 
 /// The stand-in child, relative to the repository root.
@@ -156,6 +158,7 @@ struct Bridge {
     holder: Arc<AppStateHolder>,
     executor: Arc<dyn ChatExecutor>,
     pushed: Arc<Mutex<Vec<ViewState>>>,
+    folders: Arc<PendingFolders>,
 }
 
 impl Bridge {
@@ -166,10 +169,15 @@ impl Bridge {
         let pump = Arc::new(EventPump::new(Arc::clone(&holder)));
         let pushed = Arc::new(Mutex::new(Vec::new()));
         arm(&pump, Arc::clone(&pushed));
+        let folders = Arc::new(PendingFolders::default());
         Self {
             holder,
-            executor: Arc::new(RuntimeExecutor::new(Arc::clone(&pump))),
+            executor: Arc::new(RuntimeExecutor::new(
+                Arc::clone(&pump),
+                Arc::clone(&folders),
+            )),
             pushed,
+            folders,
         }
     }
 
@@ -189,16 +197,26 @@ impl Bridge {
             holder,
             executor: Arc::new(Direct(Arc::clone(&runtime))),
             pushed,
+            folders: Arc::new(PendingFolders::default()),
         };
         (bridge, runtime)
     }
 
-    /// `Bridge::dispatch` minus the emit: fold the intent, push the slice,
-    /// run each per-chat command and fold what it came to, pushing each step.
+    /// `Bridge::dispatch` minus the emit: fold the intent, push the slice, run
+    /// each per-chat command and fold what it came to, pushing each step.
     /// Inline rather than on a worker thread, so the push order is fixed.
     fn dispatch(&self, intent: UiIntent) -> ViewState {
+        // The folder a workspace named, taken from the intent before the fold, as
+        // `Bridge::dispatch` does; a blank path names none.
+        let folder = match &intent {
+            UiIntent::NewChatInWorkspace { path } => Some(path.clone()),
+            _ => None,
+        };
         let (view, commands) = self.holder.dispatch_commands(intent);
         record(&self.pushed, view.clone());
+        if let Some(folder) = folder {
+            workspace::remember_folder(&self.folders, &commands, &folder);
+        }
         for command in commands {
             let ran = effects::run_one(command, self.executor.as_ref());
             for input in ran.inputs {
@@ -498,5 +516,95 @@ fn shutting_the_host_down_leaves_no_child_behind() {
         view.activity.is_empty(),
         "the chat is idle once its child stops: {:?}",
         view.activity
+    );
+}
+
+#[test]
+fn a_new_chat_in_a_workspace_runs_its_child_in_that_folder() {
+    let Some(harness) = Harness::new() else {
+        return;
+    };
+    let repo = harness.root.join("workspace");
+    std::fs::create_dir_all(&repo).expect("the workspace folder is creatable");
+    let bridge = Bridge::runtime_executor();
+
+    let opened = bridge.dispatch(UiIntent::NewChatInWorkspace {
+        path: repo.to_string_lossy().into_owned(),
+    });
+    let chat = opened
+        .foreground_chat
+        .clone()
+        .expect("a new chat is the foreground one");
+    assert!(chat.starts_with("new-"), "got {chat}");
+
+    // The stand-in reports the folder it was started in, and a child only logs
+    // its start once its process is really there.
+    let started = wait_for("the child to log its start", || {
+        log_lines(harness.log())
+            .into_iter()
+            .find(|line| line["event"] == "start")
+    });
+    let cwd = started["cwd"]
+        .as_str()
+        .expect("the start line carries the folder");
+    assert_eq!(
+        std::fs::canonicalize(cwd).expect("the folder the child reports"),
+        std::fs::canonicalize(&repo).expect("the workspace folder"),
+        "the child runs in the folder of the workspace"
+    );
+    assert_eq!(
+        start_pids(harness.log()).len(),
+        1,
+        "one workspace click starts one child"
+    );
+    assert!(
+        bridge.folders.is_empty(),
+        "the open consumed the folder it was given"
+    );
+
+    wait_for("the chat's child to answer its first request", || {
+        (bridge.holder.view().activity.is_empty()).then_some(())
+    });
+}
+
+#[test]
+fn a_workspace_folder_that_is_gone_starts_no_child() {
+    let Some(harness) = Harness::new() else {
+        return;
+    };
+    let gone = harness.root.join("gone");
+    let bridge = Bridge::runtime_executor();
+
+    bridge.dispatch(UiIntent::NewChatInWorkspace {
+        path: gone.to_string_lossy().into_owned(),
+    });
+
+    // The host's refusal comes back through the failed-open path the reducer
+    // already defines: one error notice naming the chat and its reason, and the
+    // opening phase over.
+    let view = wait_for("the failed open to be reported", || {
+        last_where(&bridge.pushed, |view| !view.notices.is_empty())
+    });
+    assert_eq!(view.notices.len(), 1, "one notice for one attempt");
+    assert_eq!(view.notices[0].level, NoticeLevel::Error);
+    assert!(
+        view.notices[0].text.contains("no folder at"),
+        "the reason names the folder, got {:?}",
+        view.notices[0].text
+    );
+    assert!(
+        view.activity.is_empty(),
+        "a failed open ends the opening phase"
+    );
+
+    // The refusal happens before any child is started, so nothing ran.
+    std::thread::sleep(QUIET);
+    assert!(
+        start_pids(harness.log()).is_empty(),
+        "a child ran for a folder that is not there"
+    );
+    assert!(
+        bridge.folders.is_empty(),
+        "the entry was taken, so it cannot leak"
     );
 }

@@ -17,21 +17,27 @@
 //! turn's `Command::RefreshSessions`) go to the [`CommandSink`] installed by the
 //! bridge, which asks the sessions service for that pass. Both kinds run off the
 //! window's thread.
+//!
+//! The config snapshot and everything that writes it live in the `config`
+//! module below: one atomic edit, one version per snapshot, one writer.
 
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use gentle_app::{Command, SessionItem};
-use gentle_runtime::app_config::AppConfig;
+use gentle_runtime::app_config::folder_key;
 use gentle_runtime::clock::now_ms;
 
-use crate::config::ConfigSnapshot;
+use crate::config::{ConfigSnapshot, ConfigWriter};
 use crate::contract::{SessionsWindow, UiIntent, ViewState};
 use crate::sessions::cache::TreeCache;
 use crate::sessions::revision;
 use crate::sessions::tree::Tree;
 use crate::sessions::window::{self, folder_status};
 use crate::state_view::view_state;
+use crate::workspace;
+
+mod config;
 
 /// What runs one shared command the reducer asked for. `Command::RefreshSessions`
 /// is the session list's in the app; the sink keeps the holder free of how it is
@@ -52,8 +58,18 @@ pub struct AppStateHolder {
     /// list.
     sessions_revision: AtomicU32,
     /// The app config of this run: one snapshot, loaded at startup outside
-    /// every lock and replaced as a whole ([`Self::replace_config`]).
+    /// every lock and replaced as a whole by `config::update_config` or
+    /// `config::replace_config`.
     config: Mutex<Arc<ConfigSnapshot>>,
+    /// The number of the snapshot `config` holds, bumped under the same lock as
+    /// the snapshot itself: the writer keeps the file ordered by it, so a caller
+    /// that is descheduled between its edit and its save can never rewrite an
+    /// older state.
+    config_version: AtomicU64,
+    /// Installed once at startup: the one writer of the config file. Before it
+    /// exists a config change is kept in memory and nothing is written, which is
+    /// what a run with no config path does for its whole life.
+    saver: Mutex<Option<ConfigWriter>>,
     /// The flattened tree of the last built revision, so a page of rows never
     /// regroups 50 000 sessions again (see [`TreeCache`]).
     tree: TreeCache,
@@ -86,9 +102,18 @@ impl AppStateHolder {
     /// caller to run through an executor (`effects`). The web sees the same
     /// slice either way: the commands are the shell's business, not the view's.
     pub fn dispatch_commands(&self, intent: UiIntent) -> (ViewState, Vec<gentle_app::ChatCommand>) {
+        // The intents the reducer does not fold, answered first: folding a
+        // workspace is the config's (D8), and a workspace that names no folder
+        // starts nothing at all.
+        if let Some(view) = self.workspace_intent(&intent) {
+            return (view, Vec::new());
+        }
         let state = self.state();
-        let input = gentle_app::Input::Intent(crate::intent::to_intent(&state, intent));
-        self.apply(input)
+        match crate::intent::to_intent(&state, intent) {
+            Some(intent) => self.apply(gentle_app::Input::Intent(intent)),
+            // Every intent has an answer: the reducer's, or the config's above.
+            None => (self.view(), Vec::new()),
+        }
     }
 
     /// Folds one reducer input through the same path. This is the slot the
@@ -121,24 +146,14 @@ impl AppStateHolder {
     /// taken off the lock, so a fold on the pump's thread never waits for a
     /// page.
     pub fn sessions_window(&self, offset: u32, length: u32) -> SessionsWindow {
-        let revision = self.sessions_revision();
-        let tree = self.tree.get_or_build(revision, || {
-            let config = self.config_snapshot();
-            let sessions = self.sessions_snapshot();
-            Tree::build(revision, &config.config, &sessions)
-        });
-        window::window(&tree, offset, length, now_ms(), &folder_status)
+        window::window(&self.tree(), offset, length, now_ms(), &folder_status)
     }
 
-    /// Replaces the config snapshot and bumps the revision, so the page of rows
-    /// the web side holds is stale at once: the tree is built from the config
-    /// too. The startup notice is kept, because it describes the file this run
-    /// found and this slice never writes a config back.
-    pub fn replace_config(&self, config: AppConfig) {
-        let mut snapshot = self.config_snapshot();
-        Arc::make_mut(&mut snapshot).config = config;
-        *lock(&self.config) = snapshot;
-        self.sessions_revision.fetch_add(1, Ordering::Relaxed);
+    /// Whether the workspace tree already holds `path` as a workspace, because a
+    /// session lives there: a folder that only the history names has no state in
+    /// the config to remember yet (the W1 limit).
+    pub fn knows_workspace(&self, path: &str) -> bool {
+        self.tree().knows(&folder_key(path))
     }
 
     /// The revision of the session list this holder has reached.
@@ -179,6 +194,30 @@ impl AppStateHolder {
         }
     }
 
+    /// The intents the reducer has no answer for: folding a workspace's chats
+    /// away is the config's (D8), and a workspace that names no folder starts
+    /// nothing. Answers the slice to push, `None` for the reducer's intents.
+    fn workspace_intent(&self, intent: &UiIntent) -> Option<ViewState> {
+        match intent {
+            UiIntent::SetWorkspaceCollapsed { path, collapsed } => {
+                Some(workspace::collapse(self, path, *collapsed))
+            }
+            UiIntent::NewChatInWorkspace { path } if path.trim().is_empty() => Some(self.view()),
+            _ => None,
+        }
+    }
+
+    /// The flattened tree of the revision the state is at: built once per
+    /// revision, from snapshots read off every lock.
+    fn tree(&self) -> Arc<Tree> {
+        let revision = self.sessions_revision();
+        self.tree.get_or_build(revision, || {
+            let config = self.config_snapshot();
+            let sessions = self.sessions_snapshot();
+            Tree::build(revision, &config.config, &sessions)
+        })
+    }
+
     fn state(&self) -> gentle_app::AppState {
         lock(&self.app).clone()
     }
@@ -186,11 +225,6 @@ impl AppStateHolder {
     /// The session list the tree is built from, taken off the lock.
     fn sessions_snapshot(&self) -> Vec<SessionItem> {
         lock(&self.app).sessions.clone()
-    }
-
-    /// The config snapshot of this run, taken off the lock.
-    fn config_snapshot(&self) -> Arc<ConfigSnapshot> {
-        Arc::clone(&lock(&self.config))
     }
 
     /// The config notice as the view state carries it.
