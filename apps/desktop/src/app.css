@@ -1176,6 +1176,27 @@ p {
   color: var(--muted);
 }
 
+.install-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.install-failed {
+  margin-top: 16px;
+  border: 1px solid var(--danger);
+  border-radius: 10px;
+  padding: 12px 16px;
+}
+
+.install-failed pre {
+  margin: 8px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  color: var(--muted);
+}
+
 .welcome-go:disabled {
   opacity: 0.6;
   cursor: default;

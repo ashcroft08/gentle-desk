@@ -69,7 +69,13 @@ export type ChatViewDeps = { store?: SessionsStore }
 const NO_NOTICES: NoticeView[] = []
 
 /** Before the first push: no pi found, nothing chosen, nothing asked. */
-const NO_SHELL: ShellView = { pi_path: null, choice: null, ask: false }
+const NO_SHELL: ShellView = {
+  pi_path: null,
+  choice: null,
+  ask: false,
+  launcher_found: true,
+  install: { type: 'Idle' },
+}
 
 /** The slice of `view` the main area's chrome draws. */
 export function chatOf(view: ViewState | null): ChatViewState {
@@ -112,7 +118,13 @@ export function chatOf(view: ViewState | null): ChatViewState {
  * delta, and ignoring it would never draw the answer to the welcome question.
  */
 function sameShell(a: ShellView, b: ShellView): boolean {
-  return a.pi_path === b.pi_path && a.choice === b.choice && a.ask === b.ask
+  return (
+    a.pi_path === b.pi_path &&
+    a.choice === b.choice &&
+    a.ask === b.ask &&
+    a.launcher_found === b.launcher_found &&
+    JSON.stringify(a.install) === JSON.stringify(b.install)
+  )
 }
 
 /**
