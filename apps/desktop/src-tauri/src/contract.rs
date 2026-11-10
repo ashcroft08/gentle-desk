@@ -281,6 +281,22 @@ pub enum MessageRole {
     Assistant,
 }
 
+/// One image a chat holds, as the composer and the thread draw it.
+///
+/// It is a NAME and a URL, never a byte of the image: the shell reads the file
+/// and serves its thumbnail from the drop's own path, so nothing but a path ever
+/// travels up from the page (S4).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub struct ImageView {
+    /// The id the remove intent takes back.
+    pub id: String,
+    /// The file's own name, for the thumbnail's accessible text.
+    pub name: String,
+    /// Where the webview loads this thumbnail from: the shell's own scheme,
+    /// served from the file the user dropped.
+    pub preview_url: String,
+}
+
 /// One message of the foreground chat's thread, flattened for display.
 ///
 /// The three fields after the text are what a streamed thread needs and the
@@ -299,6 +315,10 @@ pub struct MessageView {
     /// The provider's own error text when this turn ended in `stopReason:
     /// error`. The text above is then the provider's message, never a reply.
     pub error: Option<String>,
+    /// The images this message was sent with, drawn as the same thumbnails the
+    /// composer showed (S2). Empty for every message that carried none, which
+    /// is every assistant reply and every prompt typed without a drop.
+    pub images: Vec<ImageView>,
 }
 
 /// The first blocking dialog the foreground chat's extension is waiting on,
@@ -590,6 +610,16 @@ pub struct ViewState {
     /// memory only. `None` when the file was read, or was not there, and nothing
     /// failed.
     pub config_notice: Option<String>,
+    /// The foreground chat's images, waiting for its send: drawn in the composer
+    /// as thumbnails with a remove button, and never sent by themselves (S2).
+    /// `None`/empty for a chat with none, and for no chat at all.
+    pub images: Vec<ImageView>,
+    /// Why the last drop was refused, as one line of plain text: a file that is
+    /// not one of the four image types, one that is no longer there, or one that
+    /// would pass the eight-image or 64 MB cap (S1). `None` when nothing was
+    /// refused. A shell-owned line like [`ViewState::workspace_notice`]: the
+    /// shell reads the files, so the shell is what says no.
+    pub images_notice: Option<String>,
     /// Why the last workspace action was refused, as one line of plain text: a
     /// name Windows would not accept, a folder that is not there, a folder that
     /// already holds files (Q6). `None` when nothing was refused, and cleared by

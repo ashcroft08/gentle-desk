@@ -8,6 +8,7 @@
 //   vi.mock('@tauri-apps/api/core', () => import('../test-support/tauri-mock').then((m) => m.coreModule()))
 //   vi.mock('@tauri-apps/api/event', () => import('../test-support/tauri-mock').then((m) => m.eventModule()))
 
+import { resetDrags } from './webview'
 import type {
   ChatActivityView,
   DialogView_Serialize,
@@ -51,10 +52,11 @@ export function deferred<T>(): Deferred<T> {
   return { promise, resolve, reject }
 }
 
-/** Forgets handlers, listeners and recorded calls. Call it in `beforeEach`. */
+/** Forgets handlers, listeners, drag listeners and recorded calls. */
 export function resetTauriMock(): void {
   handlers.clear()
   listeners.clear()
+  resetDrags()
   invokeCalls.length = 0
 }
 
@@ -93,11 +95,8 @@ function tauriInvoke(command: string, args?: InvokeArgs): Promise<unknown> {
 }
 
 function tauriListen(name: string, callback: (event: MockEvent) => void): Promise<() => void> {
-  let set = listeners.get(name)
-  if (set === undefined) {
-    set = new Set()
-    listeners.set(name, set)
-  }
+  const set = listeners.get(name) ?? new Set<(event: MockEvent) => void>()
+  listeners.set(name, set)
   set.add(callback)
   return Promise.resolve(() => {
     set.delete(callback)
@@ -149,6 +148,8 @@ export function viewState(overrides: Partial<ViewState_Serialize> = {}): ViewSta
     selected_helper: null,
     helper_thread: null,
     activity: [],
+    images: [],
+    images_notice: null,
     fatal: null,
     config_notice: null,
     workspace_notice: null,

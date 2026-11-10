@@ -13,6 +13,9 @@
 //   selection opens (T7b-2);
 // - the first pending dialog of that chat, one at a time, which the dialogs
 //   slice draws as a modal;
+// - the images the chat holds and the line that says why a drop was refused,
+//   which are the shell's own: it reads the files, so it is what answers with a
+//   thumbnail's URL or with a refusal (S1, S4);
 // - the run's one fatal failure, which belongs to no chat and outlives all of
 //   them: a launcher that cannot be resolved means no chat can start at all.
 //
@@ -23,6 +26,7 @@
 import type {
   ChatActivityMark,
   DialogView,
+  ImageView,
   HelperThreadView as HelperThreadView,
   HelpersView_Serialize as HelpersView,
   NoticeView,
@@ -49,6 +53,10 @@ export type ChatViewState = {
   helperThread: HelperThreadView | null
   /** The first dialog that chat's extension is waiting on, or `null`. */
   dialog: DialogView | null
+  /** The images the foreground chat holds, waiting for its send. */
+  images: ImageView[]
+  /** Why the last drop was refused, or `null`. */
+  imagesNotice: string | null
   /** The run's fatal launcher failure, or `null`; not about any one chat. */
   fatal: string | null
   /** What the app found about pi and what was chosen; not about any one chat. */
@@ -67,6 +75,9 @@ export type ChatViewDeps = { store?: SessionsStore }
 
 /** The one empty notice list, so "no notices" never looks like a new push. */
 const NO_NOTICES: NoticeView[] = []
+
+/** The one empty image list, for the same reason. */
+const NO_IMAGES: ImageView[] = []
 
 /** Before the first push: no pi found, nothing chosen, nothing asked. */
 const NO_SHELL: ShellView = {
@@ -95,6 +106,8 @@ export function chatOf(view: ViewState | null): ChatViewState {
       selectedHelper: null,
       helperThread: null,
       dialog: null,
+      images: NO_IMAGES,
+      imagesNotice: null,
       fatal,
       shell,
     }
@@ -108,6 +121,8 @@ export function chatOf(view: ViewState | null): ChatViewState {
     selectedHelper: view?.selected_helper ?? null,
     helperThread: view?.helper_thread ?? null,
     dialog: view?.dialog ?? null,
+    images: view?.images ?? NO_IMAGES,
+    imagesNotice: view?.images_notice ?? null,
     fatal,
     shell,
   }
@@ -153,6 +168,8 @@ export function createChatView(deps: ChatViewDeps = {}): ChatView {
     selectedHelper: null,
     helperThread: null,
     dialog: null,
+    images: [],
+    imagesNotice: null,
     fatal: null,
     shell: NO_SHELL,
   }
@@ -176,6 +193,8 @@ export function createChatView(deps: ChatViewDeps = {}): ChatView {
       next.selectedHelper === state.selectedHelper &&
       next.helperThread === state.helperThread &&
       next.dialog === state.dialog &&
+      next.images === state.images &&
+      next.imagesNotice === state.imagesNotice &&
       next.fatal === state.fatal &&
       sameShell(next.shell, state.shell)
     ) {

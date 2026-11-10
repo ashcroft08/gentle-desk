@@ -29,5 +29,13 @@ export const MAX_HEIGHT = 120
 /** Opening: the chat's process is coming up and cannot take a prompt yet. */
 export const OPENING_REASON = 'Send is available once the chat is ready.'
 
+/** What the composer says while files are dragged over the window: the whole
+ * window is the target, and the composer is where they land. */
+export const DROP_HINT = 'Drop the images here to attach them.'
+
+/** The accessible name of the button that takes one attached image away; the
+ * drawn name adds the file it takes. */
+export const REMOVE_IMAGE = 'Remove'
+
 /** Ended: the chat's process is gone until it is restarted. */
 export const ENDED_REASON = "This chat's process exited. Restart it to keep talking."

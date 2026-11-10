@@ -21,7 +21,7 @@
        visible name, and the article is what a reader navigates by. -->
   <p class="vh" id={whoId}>{fromUser ? YOU_SAID : ASSISTANT_SAID}</p>
   {#if fromUser}
-    <UserMessage text={message.text} />
+    <UserMessage text={message.text} images={message.images} />
   {:else if message.error != null}
     <ModelError error={message.error} />
   {:else}

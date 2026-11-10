@@ -299,6 +299,30 @@ impl Bridge {
         Ok(view)
     }
 
+    /// Attaches the images the drop named: the paths come from Tauri's own drop
+    /// event (a browser `File` has no path), and the files are read here, once,
+    /// before anything is held. Answers the slice to push, so a refusal reaches
+    /// the composer as `images_notice` in the same answer.
+    pub fn attach_images(
+        &self,
+        paths: &[String],
+        app: &AppHandle<tauri::Wry>,
+    ) -> Result<ViewState, String> {
+        self.accepting_work()?;
+        let view = self.holder.attach_images(paths);
+        emit_state(app, &view)?;
+        Ok(view)
+    }
+
+    /// Takes one attached image away before its send. Nothing is sent: the send
+    /// that follows carries the images the chat still holds.
+    pub fn remove_image(&self, id: &str, app: &AppHandle<tauri::Wry>) -> Result<ViewState, String> {
+        self.accepting_work()?;
+        let view = self.holder.remove_image(id);
+        emit_state(app, &view)?;
+        Ok(view)
+    }
+
     /// Runs the per-chat commands one fold asked for, one worker thread per chat
     /// command, because a child takes seconds to start and a write to it blocks.
     /// Never waits for one: each outcome folds back through the reducer and
@@ -445,4 +469,30 @@ pub fn dispatch_intent(
     app: AppHandle<tauri::Wry>,
 ) -> Result<ViewState, String> {
     bridge.inner().dispatch(intent, &app)
+}
+
+/// The images a drop attached, as one command: the paths are the files the user
+/// dragged, and they come from Tauri's own drop event, because the webview's
+/// `File` has no path. Nothing but paths travel up: the shell reads the files,
+/// checks them, and answers the slice with a thumbnail's name and URL.
+#[tauri::command]
+#[specta::specta]
+pub fn attach_images(
+    paths: Vec<String>,
+    bridge: tauri::State<'_, Bridge>,
+    app: AppHandle<tauri::Wry>,
+) -> Result<ViewState, String> {
+    bridge.inner().attach_images(&paths, &app)
+}
+
+/// Takes one attached image away before its send, named by the id
+/// [`crate::contract::ImageView`] carried. Nothing is sent.
+#[tauri::command]
+#[specta::specta]
+pub fn remove_image(
+    id: String,
+    bridge: tauri::State<'_, Bridge>,
+    app: AppHandle<tauri::Wry>,
+) -> Result<ViewState, String> {
+    bridge.inner().remove_image(&id, &app)
 }

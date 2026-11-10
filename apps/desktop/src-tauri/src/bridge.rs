@@ -30,16 +30,18 @@ use gentle_runtime::clock::now_ms;
 
 use crate::config::{ConfigSnapshot, ConfigWriter};
 use crate::contract::{SessionsWindow, UiIntent, ViewState};
+use crate::images::Images;
 use crate::sessions::cache::TreeCache;
 use crate::sessions::revision;
 use crate::sessions::tree::Tree;
 use crate::sessions::window::{self, folder_status};
-use crate::state_view::view_state;
+use crate::state_view::{view_state, ShellParts};
 use crate::theme::WindowTheme;
 use crate::workspace;
 
 mod config;
 mod fatal;
+mod images;
 mod notice;
 mod shell;
 mod theme;
@@ -95,6 +97,9 @@ pub struct AppStateHolder {
     /// carries it: a shell-owned line, because no reducer path records one
     /// (`bridge::notice`).
     workspace_notice: Mutex<Option<String>>,
+    /// The images each chat holds: attached in the composer, read here, taken by
+    /// that chat's send and served back as previews (`bridge::images`).
+    images: Images,
     /// The run's one fatal failure, as `ViewState.fatal` carries it: the
     /// launcher could not be resolved, so no chat can start (`bridge::fatal`).
     fatal: Mutex<Option<String>>,
@@ -169,11 +174,14 @@ impl AppStateHolder {
         view_state(
             &self.state(),
             self.sessions_revision(),
-            notice,
-            workspace_notice,
-            fatal,
-            theme,
-            shell,
+            ShellParts {
+                config_notice: notice,
+                workspace_notice,
+                fatal,
+                theme,
+                shell,
+                images: &self.images,
+            },
         )
     }
 
@@ -221,11 +229,14 @@ impl AppStateHolder {
             let view = view_state(
                 &app,
                 self.sessions_revision(),
-                notice,
-                workspace_notice,
-                fatal,
-                theme,
-                shell,
+                ShellParts {
+                    config_notice: notice,
+                    workspace_notice,
+                    fatal,
+                    theme,
+                    shell,
+                    images: &self.images,
+                },
             );
             (view, effects.chat_commands, effects.commands)
         };
@@ -275,6 +286,12 @@ impl AppStateHolder {
             let sessions = self.sessions_snapshot();
             Tree::build(revision, &config.config, &sessions)
         })
+    }
+
+    /// The images the chats hold, for a caller that reads or changes them
+    /// outside a fold (`bridge::images`).
+    pub fn images(&self) -> &Images {
+        &self.images
     }
 
     fn state(&self) -> gentle_app::AppState {

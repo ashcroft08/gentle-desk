@@ -93,7 +93,12 @@
             visible={tab === 'chat'}
             bind:scrollTop={threadScroll}
           />
-          <Composer chat={model.chat} mark={chat.mark} />
+          <Composer
+            chat={model.chat}
+            mark={chat.mark}
+            images={chat.images}
+            imagesNotice={chat.imagesNotice}
+          />
         </div>
         <div class="view" id="p-helpers" role="tabpanel" aria-labelledby="t-help" hidden={tab !== 'helpers'}>
           {#if chat.helpers !== null}

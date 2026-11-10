@@ -6,42 +6,65 @@
 //! first dialog its extension waits on, the notices flattened, the chats that
 //! are not idle, its helpers panel and the open helper's thread, and the session
 //! list as a status, a total and a revision instead of rows - the rows are
-//! served one window at a time (S3). The fatal launcher failure is the one
-//! shell-owned line here, because the app state has no process at all
-//! (`bridge::fatal`).
+//! served one window at a time (S3). What the app state does NOT carry comes in
+//! beside it ([`ShellParts`]): the config's notice, the fatal launcher failure
+//! (the state has no process at all, `bridge::fatal`), the line a refused
+//! workspace action left (`bridge::notice`), and the images a chat holds or sent,
+//! which the shell reads and the reducer never sees (`bridge::images`).
 
 use gentle_app::AppState;
 use gentle_runtime::app_config::Theme;
 use gentle_runtime::badge::{Badge, BadgeMark};
 
 use crate::contract::{
-    ChatActivityMark, ChatActivityView, NoticeActionView, NoticeLevel, NoticeView, ShellView,
-    ThemeView, ViewState,
+    ChatActivityMark, ChatActivityView, ImageView, NoticeActionView, NoticeLevel, NoticeView,
+    ShellView, ThemeView, ViewState,
 };
+use crate::images::Images;
 use crate::{dialogs, helper_thread, helpers, sessions, view};
 
+/// Everything the slice carries that the app state does not: the shell's own
+/// lines, the theme of this run, what the app found about the shell, and the
+/// images the chats hold.
+///
+/// One value rather than six arguments, so [`view_state`] reads as what it is
+/// (the state plus what the shell knows) instead of a wall of parameters.
+pub struct ShellParts<'a> {
+    /// What became of the config file: read, or not.
+    pub config_notice: Option<String>,
+    /// Why the last workspace action was refused.
+    pub workspace_notice: Option<String>,
+    /// The run's one fatal launcher failure.
+    pub fatal: Option<String>,
+    /// The theme this run holds, as the app config remembers it.
+    pub theme: Theme,
+    /// The shell and home this run sees.
+    pub shell: ShellView,
+    /// The images each chat holds or sent.
+    pub images: &'a Images,
+}
+
 /// The slice of `state` as it stands now, carrying the revision the holder
-/// keeps for the session list - the web side compares it to know when the page
-/// of rows it holds is stale - the theme this run holds, the notice of the
-/// config file, when it could not be used at startup, the reason the last
-/// workspace action refused, and the one fatal launcher failure of the run.
-pub fn view_state(
-    state: &AppState,
-    sessions_revision: u32,
-    config_notice: Option<String>,
-    workspace_notice: Option<String>,
-    fatal: Option<String>,
-    theme: Theme,
-    shell: ShellView,
-) -> ViewState {
+/// keeps for the session list (the web side compares it to know when the page of
+/// rows it holds is stale) and everything the shell owns ([`ShellParts`]).
+pub fn view_state(state: &AppState, sessions_revision: u32, shell: ShellParts<'_>) -> ViewState {
+    let ShellParts {
+        config_notice,
+        workspace_notice,
+        fatal,
+        theme,
+        shell,
+        images,
+    } = shell;
     let helpers_view = helpers::helpers(state);
+    let foreground = state
+        .chats
+        .foreground()
+        .map(|chat| chat.as_str().to_owned());
     ViewState {
         theme: view_theme(theme),
         shell,
-        foreground_chat: state
-            .chats
-            .foreground()
-            .map(|chat| chat.as_str().to_owned()),
+        foreground_chat: foreground.clone(),
         foreground_title: state
             .chats
             .foreground()
@@ -49,13 +72,23 @@ pub fn view_state(
         list_status: sessions::view::status(state),
         sessions_revision,
         total_sessions: sessions::view::total(state),
-        messages: view::messages(state),
+        messages: view::messages(state, images),
         notices: state.notices.iter().map(NoticeView::of).collect(),
         dialog: dialogs::dialog(state),
         helpers: helpers_view,
         selected_helper: state.selected_helper.clone(),
         helper_thread: helper_thread::thread(state),
         activity: activity_view(state),
+        images: foreground
+            .map(|chat| {
+                images
+                    .pending(&chat)
+                    .into_iter()
+                    .map(ImageView::from)
+                    .collect()
+            })
+            .unwrap_or_default(),
+        images_notice: images.notice(),
         config_notice,
         workspace_notice,
         fatal,

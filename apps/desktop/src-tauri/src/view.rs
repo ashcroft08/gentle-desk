@@ -8,7 +8,8 @@
 use gentle_app::AppState;
 use gentle_core::chat::ChatRole;
 
-use crate::contract::{MessageRole, MessageView};
+use crate::contract::{ImageView, MessageRole, MessageView};
+use crate::images::Images;
 
 /// How many of the foreground chat's messages the push carries.
 ///
@@ -20,14 +21,19 @@ pub const MESSAGES_PUSHED: usize = 50;
 
 /// The foreground chat's messages, oldest first, cut to the last
 /// [`MESSAGES_PUSHED`]. No foreground chat is no thread.
-pub(crate) fn messages(state: &AppState) -> Vec<MessageView> {
-    let Some(thread) = state
-        .chats
-        .foreground()
-        .and_then(|chat| state.chats.state(chat))
-    else {
+///
+/// `images` answers which of them were sent with images: the app state carries
+/// none (S2 of the migration: `crates/app` is not changed by this slice), so the
+/// shell remembers them per chat and message id, and a message without any draws
+/// the empty list it always drew.
+pub(crate) fn messages(state: &AppState, images: &Images) -> Vec<MessageView> {
+    let Some(chat) = state.chats.foreground() else {
         return Vec::new();
     };
+    let Some(thread) = state.chats.state(chat) else {
+        return Vec::new();
+    };
+    let sent = images.sent(chat.as_str());
     let start = thread.messages.len().saturating_sub(MESSAGES_PUSHED);
     thread.messages[start..]
         .iter()
@@ -39,6 +45,10 @@ pub(crate) fn messages(state: &AppState) -> Vec<MessageView> {
             text: message.text.clone(),
             streaming: message.streaming,
             error: message.error.clone(),
+            images: sent
+                .get(&message.id)
+                .map(|images| images.iter().cloned().map(ImageView::from).collect())
+                .unwrap_or_default(),
         })
         .collect()
 }

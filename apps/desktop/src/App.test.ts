@@ -19,6 +19,7 @@ import App from './App.svelte'
 
 vi.mock('@tauri-apps/api/core', () => import('./test-support/tauri-mock').then((m) => m.coreModule()))
 vi.mock('@tauri-apps/api/event', () => import('./test-support/tauri-mock').then((m) => m.eventModule()))
+vi.mock('@tauri-apps/api/webview', () => import('./test-support/webview').then((m) => m.webviewModule()))
 
 const MESSAGE = {
   id: 'msg-1',
@@ -26,6 +27,7 @@ const MESSAGE = {
   text: 'hello from the pushed thread',
   streaming: false,
   error: null,
+  images: [],
 }
 
 afterEach(cleanup)

@@ -34,6 +34,7 @@ fn an_assistant_event_is_pushed_as_a_message_of_the_foreground_chat() {
             // arrived, so the message is still open.
             streaming: true,
             error: None,
+            images: Vec::new(),
         }],
         "the next slice carries what the child said"
     );

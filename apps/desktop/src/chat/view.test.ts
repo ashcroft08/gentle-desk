@@ -40,6 +40,8 @@ describe('chatOf', () => {
       selectedHelper: null,
       helperThread: null,
       dialog: null,
+      images: [],
+      imagesNotice: null,
       fatal: null,
       shell: { pi_path: null, choice: null, ask: false, launcher_found: true, install: { type: 'Idle' }, restart_needed: false },
     })
@@ -89,6 +91,8 @@ describe('chatOf', () => {
       selectedHelper: null,
       helperThread: null,
       dialog: null,
+      images: [],
+      imagesNotice: null,
       fatal: null,
       shell: { pi_path: null, choice: null, ask: false, launcher_found: true, install: { type: 'Idle' }, restart_needed: false },
     })

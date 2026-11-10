@@ -33,6 +33,7 @@ fn closed(id: &str, role: MessageRole, text: &str, error: Option<&str>) -> Messa
         text: text.to_owned(),
         streaming: false,
         error: error.map(str::to_owned),
+        images: Vec::new(),
     }
 }
 
@@ -52,6 +53,7 @@ fn an_open_assistant_message_reaches_the_view_streaming_with_its_id() {
             // not to offer Copy yet.
             streaming: true,
             error: None,
+            images: Vec::new(),
         }],
         "the open message arrives with the id the copy intent takes back"
     );

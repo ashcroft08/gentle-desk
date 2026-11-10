@@ -16,6 +16,7 @@ import { ENDED_REASON, OPENING_REASON } from './copy'
 
 vi.mock('@tauri-apps/api/core', () => import('../test-support/tauri-mock').then((m) => m.coreModule()))
 vi.mock('@tauri-apps/api/event', () => import('../test-support/tauri-mock').then((m) => m.eventModule()))
+vi.mock('@tauri-apps/api/webview', () => import('../test-support/webview').then((m) => m.webviewModule()))
 
 const MESSAGE = 'Message'
 
@@ -51,6 +52,8 @@ afterEach(cleanup)
 beforeEach(() => {
   resetTauriMock()
   setHandler('dispatch_intent', () => viewState())
+  setHandler('attach_images', () => viewState())
+  setHandler('remove_image', () => viewState())
 })
 
 describe('Composer', () => {

@@ -8,8 +8,17 @@ use serde_json::Value;
 /// A command written to the child's stdin.
 #[derive(Debug, Clone, PartialEq)]
 pub enum RpcCommand {
+    /// A prompt with nothing attached: the line every prompt sent before
+    /// images existed, byte for byte.
     Prompt {
         message: String,
+    },
+    /// The same prompt with the images the user attached, in pi's own `images`
+    /// field. Built by [`RpcCommand::prompt_with_images`], which answers
+    /// [`Self::Prompt`] when there is nothing to attach.
+    PromptWithImages {
+        message: String,
+        images: Vec<ImageContent>,
     },
     Abort,
     NewSession,
@@ -25,6 +34,47 @@ pub enum RpcCommand {
         id: String,
         answer: UiAnswer,
     },
+}
+
+impl RpcCommand {
+    /// A prompt that carries no images.
+    pub fn prompt(message: impl Into<String>) -> Self {
+        Self::Prompt {
+            message: message.into(),
+        }
+    }
+
+    /// A prompt carrying `images`. With none this is [`Self::prompt`], so a
+    /// chat that attached nothing sends exactly the line it always sent.
+    pub fn prompt_with_images(message: impl Into<String>, images: Vec<ImageContent>) -> Self {
+        if images.is_empty() {
+            return Self::prompt(message);
+        }
+        Self::PromptWithImages {
+            message: message.into(),
+            images,
+        }
+    }
+
+    /// The text this command asks the child with, for the two prompt shapes:
+    /// `None` for every other command.
+    pub fn prompt_text(&self) -> Option<&str> {
+        match self {
+            Self::Prompt { message } | Self::PromptWithImages { message, .. } => Some(message),
+            _ => None,
+        }
+    }
+}
+
+/// One image a prompt carries, in the shape pi documents
+/// (`RpcCommand`'s `images?: ImageContent[]`):
+/// `{ type: "image", data: <base64>, mimeType }`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ImageContent {
+    /// `image/png`, `image/jpeg`, `image/webp` or `image/gif`.
+    pub mime_type: String,
+    /// The whole file, base64 encoded ([`super::base64::encode`]).
+    pub data: String,
 }
 
 /// How a blocking extension dialog is answered.
