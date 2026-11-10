@@ -1050,6 +1050,127 @@ p {
   background: transparent;
 }
 
+/* The first-start question: one centred card over the whole window, drawn after
+   the gentle-shell welcome screen. Two answers side by side, the recommended one
+   edged and filled in the accent colour; they stack on a narrow window. */
+.welcome {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.welcome-card {
+  width: min(820px, 100%);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 32px 36px;
+}
+
+.welcome-card h1 {
+  margin: 0 0 12px;
+  font-size: 26px;
+}
+
+.welcome-card h2 {
+  margin: 0 0 6px;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.welcome-intro {
+  margin: 0 0 20px;
+  color: var(--muted);
+}
+
+.welcome-found {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+}
+
+.welcome-path,
+.welcome-where {
+  margin: 0;
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: 12.5px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.welcome-choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 720px) {
+  .welcome-choices {
+    grid-template-columns: 1fr;
+  }
+}
+
+.welcome-choice {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px 20px;
+}
+
+.welcome-pick {
+  border-color: var(--accent);
+}
+
+.welcome-choice ul {
+  margin: 0;
+  padding-left: 18px;
+  flex: 1;
+}
+
+.welcome-badge {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--bg);
+}
+
+.welcome-go {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--bg);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.welcome-go.welcome-quiet {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.welcome-go:hover {
+  filter: brightness(1.08);
+}
+
+.welcome-skip {
+  margin: 18px 0 0;
+  color: var(--faint);
+  font-size: 13px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     transition: none !important;

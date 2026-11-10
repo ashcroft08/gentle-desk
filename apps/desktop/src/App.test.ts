@@ -125,6 +125,30 @@ describe('App', () => {
     expect(screen.queryByText('Skill registry refreshed (19 skills)')).toBeNull()
   })
 
+  it('asks the welcome question instead of the app while a choice is due', async () => {
+    serveSidebar({
+      view: viewState({
+        shell: { pi_path: 'C:/Users/someone/.pi/agent', choice: null, ask: true },
+      }),
+    })
+    render(App)
+
+    expect(await screen.findByRole('heading', { name: 'Welcome to gentle shell' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'New session' })).toBeNull()
+  })
+
+  it('draws the app and no question once a home is chosen', async () => {
+    serveSidebar({
+      view: viewState({
+        shell: { pi_path: 'C:/Users/someone/.pi/agent', choice: 'link', ask: false },
+      }),
+    })
+    render(App)
+
+    expect(await screen.findByText('No chat open')).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: 'Welcome to gentle shell' })).toBeNull()
+  })
+
   it('shows the fatal launcher bar above everything, with no chat open', async () => {
     serveSidebar({
       view: viewState({ foreground_chat: null, fatal: 'gentle-shell is not available' }),

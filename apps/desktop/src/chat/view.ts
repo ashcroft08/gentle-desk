@@ -26,6 +26,7 @@ import type {
   HelperThreadView as HelperThreadView,
   HelpersView_Serialize as HelpersView,
   NoticeView,
+  ShellView_Serialize as ShellView,
   ViewState_Serialize as ViewState,
 } from '../contract/bindings'
 import { createSessionsStore, type SessionsStore } from '../sessions/store'
@@ -50,6 +51,8 @@ export type ChatViewState = {
   dialog: DialogView | null
   /** The run's fatal launcher failure, or `null`; not about any one chat. */
   fatal: string | null
+  /** What the app found about pi and what was chosen; not about any one chat. */
+  shell: ShellView
 }
 
 export type ChatView = {
@@ -65,11 +68,16 @@ export type ChatViewDeps = { store?: SessionsStore }
 /** The one empty notice list, so "no notices" never looks like a new push. */
 const NO_NOTICES: NoticeView[] = []
 
+/** Before the first push: no pi found, nothing chosen, nothing asked. */
+const NO_SHELL: ShellView = { pi_path: null, choice: null, ask: false }
+
 /** The slice of `view` the main area's chrome draws. */
 export function chatOf(view: ViewState | null): ChatViewState {
   const chat = view?.foreground_chat ?? null
   // The fatal bar is the run's, so it is read whatever chat is open.
   const fatal = view?.fatal ?? null
+  // So is what the app found about the shell: it is not about a chat either.
+  const shell = view?.shell ?? NO_SHELL
   if (chat === null) {
     return {
       chat: null,
@@ -81,6 +89,7 @@ export function chatOf(view: ViewState | null): ChatViewState {
       helperThread: null,
       dialog: null,
       fatal,
+      shell,
     }
   }
   return {
@@ -93,7 +102,17 @@ export function chatOf(view: ViewState | null): ChatViewState {
     helperThread: view?.helper_thread ?? null,
     dialog: view?.dialog ?? null,
     fatal,
+    shell,
   }
+}
+
+/**
+ * Whether two pushes say the same about the shell. By value, because every push
+ * brings a new object: comparing identity would redraw the app on every text
+ * delta, and ignoring it would never draw the answer to the welcome question.
+ */
+function sameShell(a: ShellView, b: ShellView): boolean {
+  return a.pi_path === b.pi_path && a.choice === b.choice && a.ask === b.ask
 }
 
 /**
@@ -121,6 +140,7 @@ export function createChatView(deps: ChatViewDeps = {}): ChatView {
     helperThread: null,
     dialog: null,
     fatal: null,
+    shell: NO_SHELL,
   }
   const listeners = new Set<(state: ChatViewState) => void>()
 
@@ -142,7 +162,8 @@ export function createChatView(deps: ChatViewDeps = {}): ChatView {
       next.selectedHelper === state.selectedHelper &&
       next.helperThread === state.helperThread &&
       next.dialog === state.dialog &&
-      next.fatal === state.fatal
+      next.fatal === state.fatal &&
+      sameShell(next.shell, state.shell)
     ) {
       return
     }

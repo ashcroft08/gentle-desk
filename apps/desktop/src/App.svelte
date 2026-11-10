@@ -20,6 +20,7 @@
   import Sidebar from './sidebar/Sidebar.svelte'
   import Thread from './thread/Thread.svelte'
   import { createThreadView } from './thread/view'
+  import Welcome from './welcome/Welcome.svelte'
 
   const thread = createThreadView()
   const chrome = createChatView()
@@ -41,6 +42,11 @@
   })
 </script>
 
+{#if chat.shell.ask}
+  <!-- The first-start question takes the whole window: nothing runs on a home
+       the user has not chosen yet (shell-choice S2). -->
+  <Welcome piPath={chat.shell.pi_path ?? ''} />
+{:else}
 <a class="skip" href="#main">Skip to chat</a>
 {#if chat.fatal !== null}
   <FatalBanner text={chat.fatal} />
@@ -98,3 +104,4 @@
   </main>
 </div>
 <Dialogs dialog={chat.dialog} />
+{/if}

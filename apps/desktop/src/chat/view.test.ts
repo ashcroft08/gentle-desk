@@ -41,6 +41,7 @@ describe('chatOf', () => {
       helperThread: null,
       dialog: null,
       fatal: null,
+      shell: { pi_path: null, choice: null, ask: false },
     })
   })
 
@@ -89,6 +90,7 @@ describe('chatOf', () => {
       helperThread: null,
       dialog: null,
       fatal: null,
+      shell: { pi_path: null, choice: null, ask: false },
     })
     expect(chatOf(null).chat).toBeNull()
   })
@@ -106,6 +108,26 @@ describe('createChatView', () => {
 
     pushEvent('state-changed', viewState({ foreground_chat: null }))
     await vi.waitFor(() => expect(view.get().chat).toBeNull())
+    view.dispose()
+  })
+
+  it('follows a push whose only change is the answer to the welcome question', async () => {
+    const pi = 'C:/Users/someone/.pi/agent'
+    setHandler('get_view_state', () =>
+      viewState({ sessions_revision: 1, shell: { pi_path: pi, choice: null, ask: true } }),
+    )
+    const view = createChatView()
+    await view.ready
+    expect(view.get().shell.ask).toBe(true)
+
+    // Nothing else moved: no chat, no notice, no helper. Only the choice.
+    pushEvent(
+      'state-changed',
+      viewState({ sessions_revision: 2, shell: { pi_path: pi, choice: 'link', ask: false } }),
+    )
+
+    await vi.waitFor(() => expect(view.get().shell.ask).toBe(false))
+    expect(view.get().shell.choice).toBe('link')
     view.dispose()
   })
 })
