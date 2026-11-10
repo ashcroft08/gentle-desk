@@ -32,6 +32,13 @@ export const commands = {
 	 */
 	getViewState: () => __TAURI_INVOKE<ViewState_Serialize>("get_view_state"),
 	/**
+	 *  Opens `url` in the system's default browser, or refuses it here.
+	 * 
+	 *  Only a plain `http`/`https` url with a host and no credentials is opened;
+	 *  everything else is refused with the reason, and the browser is never called.
+	 */
+	openLink: (url: string) => typedError<null, string>(__TAURI_INVOKE("open_link", { url })),
+	/**
 	 *  "Choose an existing folder": the picker, then the folder becomes a workspace
 	 *  and a new chat opens there (S7).
 	 * 
@@ -93,10 +100,61 @@ export type ListStatusView = { type: "Loading"; data: {
  */
 export type MessageRole = "User" | "Assistant";
 
-/**  One message of the foreground chat's thread, flattened for display. */
-export type MessageView = {
+/**
+ *  One message of the foreground chat's thread, flattened for display.
+ * 
+ *  The three fields after the text are what a streamed thread needs and the
+ *  text alone cannot offer (T5a): the id the Copy intent names back, whether
+ *  the message is still growing (no Copy, no "done" mark before it ends), and
+ *  the provider's failure text when this turn was a model error, which is drawn
+ *  as a failure instead of a normal reply.
+ */
+export type MessageView = MessageView_Serialize | MessageView_Deserialize;
+
+/**
+ *  One message of the foreground chat's thread, flattened for display.
+ * 
+ *  The three fields after the text are what a streamed thread needs and the
+ *  text alone cannot offer (T5a): the id the Copy intent names back, whether
+ *  the message is still growing (no Copy, no "done" mark before it ends), and
+ *  the provider's failure text when this turn was a model error, which is drawn
+ *  as a failure instead of a normal reply.
+ */
+export type MessageView_Deserialize = {
+	/**  `msg-<n>` in the chat's own scheme: what [`UiIntent::CopyMessage`] takes. */
+	id: string,
 	role: MessageRole,
 	text: string,
+	/**  True between the message's start and its end. */
+	streaming: boolean,
+	/**
+	 *  The provider's own error text when this turn ended in `stopReason:
+	 *  error`. The text above is then the provider's message, never a reply.
+	 */
+	error?: string | null,
+};
+
+/**
+ *  One message of the foreground chat's thread, flattened for display.
+ * 
+ *  The three fields after the text are what a streamed thread needs and the
+ *  text alone cannot offer (T5a): the id the Copy intent names back, whether
+ *  the message is still growing (no Copy, no "done" mark before it ends), and
+ *  the provider's failure text when this turn was a model error, which is drawn
+ *  as a failure instead of a normal reply.
+ */
+export type MessageView_Serialize = {
+	/**  `msg-<n>` in the chat's own scheme: what [`UiIntent::CopyMessage`] takes. */
+	id: string,
+	role: MessageRole,
+	text: string,
+	/**  True between the message's start and its end. */
+	streaming: boolean,
+	/**
+	 *  The provider's own error text when this turn ended in `stopReason:
+	 *  error`. The text above is then the provider's message, never a reply.
+	 */
+	error: string | null,
 };
 
 /**  The level of a notice, matching `gentle_app`'s notice kinds one to one. */
@@ -269,6 +327,14 @@ export type UiIntent = { type: "SendPrompt"; data: {
 /**  Start the child of a chat that died again and reopen it (S3). */
 { type: "RestartChat"; data: {
 	chat_id: string,
+} } | 
+/**
+ *  Copy one message's raw markdown: the message is named by the id the
+ *  thread was given ([`MessageView::id`]), and the copy itself is the
+ *  shell's side effect, never the view's.
+ */
+{ type: "CopyMessage"; data: {
+	message_id: string,
 } } | { type: "DismissNotice"; data: {
 	id: number,
 } };
@@ -327,7 +393,7 @@ export type ViewState_Deserialize = {
 	 *  [`MESSAGES_PUSHED`](crate::view::MESSAGES_PUSHED) of them and never a
 	 *  whole long session.
 	 */
-	messages: MessageView[],
+	messages: MessageView_Deserialize[],
 	notices: NoticeView[],
 	activity: ChatActivityView[],
 	/**
@@ -387,7 +453,7 @@ export type ViewState_Serialize = {
 	 *  [`MESSAGES_PUSHED`](crate::view::MESSAGES_PUSHED) of them and never a
 	 *  whole long session.
 	 */
-	messages: MessageView[],
+	messages: MessageView_Serialize[],
 	notices: NoticeView[],
 	activity: ChatActivityView[],
 	/**

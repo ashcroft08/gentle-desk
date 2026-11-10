@@ -27,8 +27,13 @@ fn an_assistant_event_is_pushed_as_a_message_of_the_foreground_chat() {
     assert_eq!(
         last.messages,
         vec![MessageView {
+            id: "msg-0".to_owned(),
             role: MessageRole::Assistant,
             text: "hello".to_owned(),
+            // The turn has not ended yet: the pump pushed the deltas as they
+            // arrived, so the message is still open.
+            streaming: true,
+            error: None,
         }],
         "the next slice carries what the child said"
     );
