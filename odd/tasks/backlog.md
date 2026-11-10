@@ -40,4 +40,6 @@ Ordered by (1) shipped-but-unverified first, (2) risk of user-visible problems, 
 31. **Windowless tests for the bridge wiring** (shell-choice, verifier 4/10): the startup launcher probe, `RestartApp` -> relaunch flag -> exit step and `ask` reaching the web are only checked by hand in a real window; give `Bridge` a seam that does not need an `AppHandle`.
 32. **First-run `Found: sign-ins` line** (shell-choice S2): the reference welcome screen of gentle-shell-desktop names what it found in pi; this app only checks that the folder exists and never reads it. Decide whether to read file names only.
 33. **Welcome screen is the first thing, wordmark animation is not** (shell-choice): the welcome and the missing-shell screens do not show the Gentle Shell wordmark that the sidebar types in; consider using it there.
+34. **Images: the drop path has no automated window check** (chat-images limits): a mouse drag cannot be automated here, so the boundary stays covered by the web tests and by hand. To revisit if a driver that can drop files appears.
+35. **Attachments and history** (chat-images): thumbnails past 256 in one very long session stop being served, and dropping the same file twice attaches it twice. Decide whether to dedupe and to re-serve old ones on demand.
 

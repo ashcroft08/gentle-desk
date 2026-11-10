@@ -55,6 +55,20 @@ To run the app against the stand-in shell instead of a real gentle-shell, set
 
 The fixtures under `crates/gentle-core/tests/fixtures/` are recorded RPC streams copied from the reference TypeScript app (`gentle-shell-desktop`).
 
+## The chat
+
+Dragging saved image files (png, jpg, jpeg, webp, gif; up to 8 and 64 MB per
+message) onto the composer attaches them: each shows a thumbnail with a remove
+button, the message you send shows the same thumbnails, and the model receives
+the picture itself, not a path. The path is written in the text as well, so the
+conversation reads the same in gentle shell's own transcript. A clipboard
+screenshot cannot be pasted: the file has to exist on disk first, like in the
+terminal.
+
+The conversation keeps a readable width instead of filling a large window: one
+`--chat-max` (880px, about 75 characters per line) applies to the thread and to
+the composer, so the two stay aligned.
+
 ## First start: which home
 
 At the first start the app looks (existence only, never contents) for the folder of

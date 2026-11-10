@@ -13,13 +13,22 @@ Drag an image from the file manager onto the composer, see it as a preview in th
 
 ## Tasks
 
-- [ ] T1 (S3, S4) Protocol and chat host: `RpcCommand::Prompt` carries images, codec writes the field only when non-empty, round-trip tests, and the host sends them.
-- [ ] T2 (S1, S4, S5) Bridge: paths from the web, read and validated in Rust, held per chat until that chat's send, refused with a reason otherwise; contract and bindings.
-- [ ] T3 (S2) Web: drop zone on the composer, thumbnails with remove, refusal messages, thumbnails in the user message.
-- [ ] T4 (S6, S7) Real-window check with the fake shell (drop, preview, remove, send) and one live check against the real shell that the model sees the image; docs.
+- [x] T1 (S3, S4) Protocol: `RpcCommand::PromptWithImages`, the `images` key written only when something is attached, pi's block shape `{type, data, mimeType}`, base64 in `crates/gentle-core/src/rpc/base64.rs`. Route: writer; commit: b8078c7 (#77).
+- [x] T2 (S1, S4, S5) Bridge: paths from the web, read and validated in Rust (`apps/desktop/src-tauri/src/images.rs`: 8 images, 64 MB, png/jpg/jpeg/webp/gif), held per chat, merged into that chat's prompt in `effects/runtime.rs` beside `PendingFolders`, never through `crates/app`. Route: writer; commit: b8078c7.
+- [x] T3 (S2) Web: Tauri's drop event (`composer/drop.ts`), thumbnails with a remove button, refusals said out loud, the same thumbnails in the sent message. Route: writer; commit: b8078c7, polished in #78.
+- [x] T4 (S6, S7) Real-window check and the end-to-end proof: the user dropped two saved images in the app and the model answered describing them; the session file shows the user turn with a text part and an image part (`image/png`, 201420 base64 bytes), so the picture travelled, not only its path. Commit: b8078c7.
+
+### Known limits
+
+- A real drag can only be done with a mouse: the agent's automation cannot drag a file onto the window, so the drop path is covered by the web tests and this real-window run by the user, not by an automated window check.
+- Thumbnails past 256 attached images in one very long session stop being served (`MAX_SERVED`), and those draw nothing.
+- The image is read once per attachment; dropping the same file twice attaches it twice.
 
 ## Log
 
 - L1 (2026-11-10, user): "yo queria que en la app se pudiera arrastrar la imagen y se previsualice en el chat pero que internamente se lo envie como texto la ruta. dale prueba".
 - L2 (2026-11-10, user): "suspend" no; after the finding that the RPC does not turn a path into an attachment: "dale con la 2" (send the image through pi's `images` field).
 - L3 (2026-11-10, agent): the live probe against the real shell in an isolated home never started a turn (131-137 extension_ui_request events, no session file), so the decisive check still waits for a home that answers those requests.
+- L4 (2026-11-10, CI): the first CI run of the images failed only at `npm run test`, in `App.tabs.test.ts`, because the composer's drop effect asked Tauri for a webview the test does not have; the full suite had passed locally only because another file left a global stub behind. Fixed in a08ad49 with a try/catch that answers a working unsubscribe when there is nothing to listen to, and a test that fails without it.
+- L5 (2026-11-10, user): "si me respondio mandando la imagen" plus the design review of the attachments row; the polish (whole picture, smaller remove inside the corner, file name on hover) went to #78.
+- L6 (2026-11-10, agent): the writer given this feature was cancelled at 120 turns with the tree green; the parent finished the verification and committed. Too wide a surface for one writer: the lesson is one slice per launch, as the delegation card says.
