@@ -36,3 +36,8 @@ Ordered by (1) shipped-but-unverified first, (2) risk of user-visible problems, 
 27. **Theme picker follow-ups** (m19 L22): the title bar of the four dark themes and the system theme under OS light mode are unverified in a window.
 28. **Warm start does not settle faster than cold** (m19 T9): with 50 000 chats the list settles in ~11 s with or without the session cache; cause not investigated (suspect: background revalidation of every file). First row appears at ~1.2 s either way.
 29. **Comments naming crates/ui** (m19 T9): doc comments in apps/desktop/src-tauri and crates/runtime still reference deleted crates/ui paths; reword when the files are next touched.
+30. **Install progress and orphan npm** (shell-choice L4, verifier 1/5/8): the install shows one static line, an app closed mid-install leaves npm running to its end (on purpose), and the 20-minute timeout may leave `node` alive on Windows. Stream the output tail as progress and stop the whole process tree on timeout.
+31. **Windowless tests for the bridge wiring** (shell-choice, verifier 4/10): the startup launcher probe, `RestartApp` -> relaunch flag -> exit step and `ask` reaching the web are only checked by hand in a real window; give `Bridge` a seam that does not need an `AppHandle`.
+32. **First-run `Found: sign-ins` line** (shell-choice S2): the reference welcome screen of gentle-shell-desktop names what it found in pi; this app only checks that the folder exists and never reads it. Decide whether to read file names only.
+33. **Welcome screen is the first thing, wordmark animation is not** (shell-choice): the welcome and the missing-shell screens do not show the Gentle Shell wordmark that the sidebar types in; consider using it there.
+

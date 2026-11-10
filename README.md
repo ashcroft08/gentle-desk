@@ -53,6 +53,23 @@ To run the app against the stand-in shell instead of a real gentle-shell, set
 
 The fixtures under `crates/gentle-core/tests/fixtures/` are recorded RPC streams copied from the reference TypeScript app (`gentle-shell-desktop`).
 
+## First start: which home
+
+At the first start the app looks (existence only, never contents) for the folder of
+your pi (`PI_CODING_AGENT_DIR`, else `~/.pi/agent`) and for the `gentle-shell` launcher:
+
+- **No `gentle-shell` found:** a screen says it is required, shows the command it would run
+  (`npm install -g gentle-pi`) and installs it ONLY when you press "Install gentle-shell". It needs
+  Node and npm. If you close the app while it installs, the install keeps running to the end on its own.
+- **pi found and nothing chosen yet:** a welcome screen asks whether to use your pi
+  ("Use my pi setup", `--link`) or keep gentle shell separate (`--isolated`, `~/.gentle-shell/agent`).
+  The app saves the answer in its config (`shell_home`) and starts again so it applies at once.
+- **No pi:** the question is skipped and gentle shell runs in its own space.
+
+You can change it later with the "My pi / Separate" control in the sidebar footer; the change applies
+after "Restart now". `GENTLE_SHELL_HOME` (a developer override) still wins over the choice.
+For tests, `GENTLE_DESK_NPM` replaces the `npm` program with a stand-in (a `.mjs`/`.js` file runs with `node`).
+
 ## Code organization
 
 One responsibility per file; no file that collects everything. Rules of thumb:
