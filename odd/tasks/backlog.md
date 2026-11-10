@@ -31,4 +31,6 @@ Ordered by (1) shipped-but-unverified first, (2) risk of user-visible problems, 
 22. **One shared web state store instead of three readers** (m19 L19): the thread, the header and the sidebar each read the pushed state separately; a shared store would be cleaner.
 23. **Measure and cut the whole-tail push per delta** (m19 L19, S3 spirit): every text delta still pushes the 50-message tail whole and Svelte re-diffs the list, unmeasured. Measure it in T9 together with the 50 000-chat tree, then cut it.
 24. **Native review follow-ups of W3a and W3c** (m19 L19): W3a - the cache key race on the revision read, the config path with no signal when APPDATA is missing, and the latency of the folder probe on slow shares; W3c - `workspace_commands.rs`, `new_folder.rs`, five non-blocking findings.
-25. **Theme picker (Appearance)** (m19 L16): part of v1, not built; the theme is fixed to the system theme today.
+25. **DONE (#63, 7b049ed) - Theme picker (Appearance)** (m19 L16): part of v1; built as the Appearance setting.
+26. **Native review follow-ups of T8** (m19 L21): five non-blocking findings from the review of the file watcher and close flow (#61, #62); the residual close race documented in T8a stays open.
+27. **Theme picker follow-ups** (m19 L22): the title bar of the four dark themes and the system theme under OS light mode are unverified in a window.
