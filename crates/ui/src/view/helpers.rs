@@ -1,6 +1,7 @@
 //! The helpers (delegated subagents) panel: counters and one card per task.
 
-use gentle_core::helpers::{HelperStatus, HelperTask, HelpersActivity, HelpersSummary};
+use gentle_core::helpers::{HelperStatus, HelperTask, HelpersActivity};
+use gentle_runtime::helper_text::{status_label, summary_line, task_title};
 use iced::widget::{button, column, container, scrollable, text};
 use iced::{Element, Length, Theme};
 
@@ -85,39 +86,6 @@ fn colored(r: u8, g: u8, b: u8) -> text::Style {
     text::Style {
         color: Some(iced::Color::from_rgb8(r, g, b)),
     }
-}
-
-/// "1 running · 0 queued · 0 waiting · 2 finished"
-fn summary_line(summary: &HelpersSummary) -> String {
-    format!(
-        "{} running · {} queued · {} waiting · {} finished",
-        summary.running, summary.queued, summary.waiting, summary.finished
-    )
-}
-
-pub fn status_label(status: HelperStatus) -> &'static str {
-    match status {
-        HelperStatus::Queued => "queued",
-        HelperStatus::Running => "running",
-        HelperStatus::Waiting => "waiting",
-        HelperStatus::Done => "done",
-        HelperStatus::Failed => "failed",
-        HelperStatus::Cancelled => "cancelled",
-    }
-}
-
-/// The label if there is one, else the first line of the prompt, else the agent, else the id.
-pub fn task_title(task: &HelperTask) -> String {
-    let first_line = |text: &str| {
-        text.lines()
-            .map(str::trim)
-            .find(|l| !l.is_empty())
-            .map(str::to_owned)
-    };
-    first_line(&task.label)
-        .or_else(|| first_line(&task.prompt))
-        .or_else(|| first_line(&task.agent))
-        .unwrap_or_else(|| task.id.clone())
 }
 
 #[cfg(test)]
