@@ -32,8 +32,13 @@ pub(crate) fn messages(state: &AppState) -> Vec<MessageView> {
     thread.messages[start..]
         .iter()
         .map(|message| MessageView {
+            // Cloned, never moved: the state keeps its own copy of every id,
+            // text and error string.
+            id: message.id.clone(),
             role: view_role(message.role),
             text: message.text.clone(),
+            streaming: message.streaming,
+            error: message.error.clone(),
         })
         .collect()
 }

@@ -2,6 +2,7 @@
 //!
 //! A `Pump` is one pump thread fed by hand with translated values, recording
 //! every slice it pushes: no child, no window, no launcher ever runs here.
+#![allow(dead_code)] // each test binary uses one part of it
 
 use std::sync::mpsc::{channel, Sender};
 use std::sync::{Arc, Mutex};
@@ -93,16 +94,10 @@ pub fn assistant_message(chat: &ChatId, text: &str) -> Vec<Converted> {
         role: "assistant".to_owned(),
         raw: serde_json::json!({}),
     };
-    let event_at = |event, now_ms| {
-        Converted::Input(Input::ChatEventAt {
-            chat: chat.clone(),
-            event,
-            now_ms,
-        })
-    };
     vec![
-        event_at(RpcEvent::MessageStart(message), 7),
+        event_at(chat, RpcEvent::MessageStart(message), 7),
         event_at(
+            chat,
             RpcEvent::MessageUpdate(AssistantMessageEvent::TextDelta {
                 content_index: 0,
                 delta: text.to_owned(),
@@ -110,4 +105,48 @@ pub fn assistant_message(chat: &ChatId, text: &str) -> Vec<Converted> {
             8,
         ),
     ]
+}
+
+/// The same turn as it ENDS, the way a provider that answered well closes it:
+/// the message's own authoritative text, no failure flag.
+pub fn assistant_turn(chat: &ChatId, text: &str) -> Vec<Converted> {
+    let mut turn = assistant_message(chat, text);
+    turn.push(message_end(
+        chat,
+        serde_json::json!({ "stopReason": "stop" }),
+    ));
+    turn
+}
+
+/// A turn the provider failed: the model's own text, and the `stopReason`
+/// `error` the reducer keeps as the message's error.
+pub fn errored_turn(chat: &ChatId, text: &str, error: &str) -> Vec<Converted> {
+    let mut turn = assistant_message(chat, text);
+    turn.push(message_end(
+        chat,
+        serde_json::json!({ "stopReason": "error", "errorMessage": error }),
+    ));
+    turn
+}
+
+/// One event of `chat`'s child, as the translating thread reports it.
+fn event_at(chat: &ChatId, event: RpcEvent, now_ms: u64) -> Converted {
+    Converted::Input(Input::ChatEventAt {
+        chat: chat.clone(),
+        event,
+        now_ms,
+    })
+}
+
+/// The close of the message the turn opened, `raw` carrying what the provider
+/// said about it.
+fn message_end(chat: &ChatId, raw: serde_json::Value) -> Converted {
+    event_at(
+        chat,
+        RpcEvent::MessageEnd(RpcMessage {
+            role: "assistant".to_owned(),
+            raw,
+        }),
+        9,
+    )
 }

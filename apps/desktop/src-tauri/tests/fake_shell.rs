@@ -364,8 +364,11 @@ fn an_opened_chat_reaches_the_child_and_its_echo_is_pushed() {
     });
 
     let echo = MessageView {
+        id: "msg-1".to_owned(),
         role: MessageRole::Assistant,
         text: "echo: hello".to_owned(),
+        streaming: false,
+        error: None,
     };
     let view = wait_for("the echo to be pushed and the turn to settle", || {
         last_where(&bridge.pushed, |view| {
@@ -374,8 +377,11 @@ fn an_opened_chat_reaches_the_child_and_its_echo_is_pushed() {
     });
 
     let user = MessageView {
+        id: "msg-0".to_owned(),
         role: MessageRole::User,
         text: "hello".to_owned(),
+        streaming: false,
+        error: None,
     };
     assert_eq!(view.foreground_chat.as_deref(), Some(chat.as_str()));
     assert_eq!(
@@ -433,17 +439,24 @@ fn an_error_turn_ends_in_the_state_the_reducer_defines() {
     });
 
     // What the reducer defines for `stopReason: "error"`: the provider's own
-    // text stays in the assistant bubble (its `error` flag is not part of this
-    // slice), the turn ends, and no notice appears - the per-chat fold does not
-    // turn an extension `notify` into one.
+    // text is the message's text AND its error flag carries what the provider
+    // said, so the thread can draw it as a failure (T5a). The turn ends and no
+    // notice appears - the per-chat fold does not turn an extension `notify`
+    // into one.
     let expected = vec![
         MessageView {
+            id: "msg-0".to_owned(),
             role: MessageRole::User,
             text: "error".to_owned(),
+            streaming: false,
+            error: None,
         },
         MessageView {
+            id: "msg-1".to_owned(),
             role: MessageRole::Assistant,
             text: "Provider says no.".to_owned(),
+            streaming: false,
+            error: Some("quota exceeded (fake)".to_owned()),
         },
     ];
     let view = wait_for("the failed turn to settle", || {

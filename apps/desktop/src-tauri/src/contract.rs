@@ -77,6 +77,12 @@ pub enum UiIntent {
     RestartChat {
         chat_id: String,
     },
+    /// Copy one message's raw markdown: the message is named by the id the
+    /// thread was given ([`MessageView::id`]), and the copy itself is the
+    /// shell's side effect, never the view's.
+    CopyMessage {
+        message_id: String,
+    },
     DismissNotice {
         id: u32,
     },
@@ -167,10 +173,23 @@ pub enum MessageRole {
 }
 
 /// One message of the foreground chat's thread, flattened for display.
+///
+/// The three fields after the text are what a streamed thread needs and the
+/// text alone cannot offer (T5a): the id the Copy intent names back, whether
+/// the message is still growing (no Copy, no "done" mark before it ends), and
+/// the provider's failure text when this turn was a model error, which is drawn
+/// as a failure instead of a normal reply.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
 pub struct MessageView {
+    /// `msg-<n>` in the chat's own scheme: what [`UiIntent::CopyMessage`] takes.
+    pub id: String,
     pub role: MessageRole,
     pub text: String,
+    /// True between the message's start and its end.
+    pub streaming: bool,
+    /// The provider's own error text when this turn ended in `stopReason:
+    /// error`. The text above is then the provider's message, never a reply.
+    pub error: Option<String>,
 }
 
 /// The level of a notice, matching `gentle_app`'s notice kinds one to one.

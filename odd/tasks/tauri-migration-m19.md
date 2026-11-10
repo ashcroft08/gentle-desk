@@ -120,6 +120,42 @@ Recorded uncertainties:
 - The `gentle-term` `end_to_end` six cases failing in the in-office workspace checkout (m18 Log) do not block T1's extraction, since none touch `crates/ui`; they are named environmental failures.
 - app/UI-level feature parity is reviewed by features of `crates/ui`, so a bug present in iced today (e.g. stored history not being drawn in the stand-in's `get_messages` of `{}`) is NOT replay-parity: what is checked is the feature's behaviour compared with today's, not reproduced character-for-character behaviour.
 
+### T5a decisions (thread contract, Copy and links, Rust side)
+
+- Contract: `MessageView` gained `id`, `streaming` and `error` (`Option<String>`), mapped in
+  `apps/desktop/src-tauri/src/view.rs` from `gentle_core`'s `ChatMessage`, which already carried
+  all three. `crates/app` and `crates/gentle-core` are unchanged (S2). `id` is the `msg-<n>` the
+  Copy intent takes back, `streaming` is true between `message_start` and `message_end`, and
+  `error` is the provider's own text when the turn ended in `stopReason: error`. The fields split
+  the generated type into `MessageView_Serialize`/`_Deserialize`, as every other contract type
+  with an `Option` already does.
+- Copy is an intent, not a command: `UiIntent::CopyMessage { message_id }` maps to
+  `gentle_app::Intent::CopyMessage`, the reducer answers `Command::CopyToClipboard(text)`, and the
+  bridge's command sink now writes that text with `arboard` (text only, `default-features = false`,
+  so the image path and its GDI feature stay out). The write runs on a thread of its own, never on
+  the window's thread and never under a lock. A copy that fails is one `eprintln!` line and
+  nothing else: no notice, because the notices slice is T7 and a push claiming a copy the user
+  cannot verify would be worse than silence.
+- Links: the command `open_link(url)` (a command, not an intent: it folds nothing and changes no
+  state) opens the URL with `opener` on a blocking thread. It opens ONLY `http` and `https` with a
+  host and no embedded credentials, and refuses empty, relative, `file:`, `javascript:`, `data:`,
+  `mailto:`, every other scheme, and any URL carrying control characters - checked before parsing,
+  because the URL standard strips tabs and newlines. Parsing is the `url` crate already in the
+  lock.
+- Both crates are used directly behind a small trait seam (`Clipboard`, `LinkOpener`) that the
+  bridge holds, so tests inject fakes and never touch the machine's clipboard or browser. The
+  Tauri clipboard/opener plugins were NOT used: the folder picker's history (`Q4 answer`) is that
+  a plugin's link cost cannot be kept out of a test binary. With `arboard` and `opener` added,
+  `cargo tree -e features -p gentle-desk-app -i tauri` still shows no `common-controls-v6`, and
+  `tests/clipboard_link.rs` - a test binary that links both real implementations - starts and
+  passes (no `0xc0000139`).
+- Left for T5b (the web thread): rendering markdown incrementally, the model-error box, the Copy
+  button (only for a message whose `streaming` is false) and clickable links calling `open_link`.
+  Nothing Svelte changed here beyond the regenerated `bindings.ts`.
+- Known cost, not measured yet (S3 spirit, measured in T9): every text delta pushes the whole
+  50-message tail of the foreground thread, so a long reply re-sends its tail once per delta. The
+  slice is bounded (`MESSAGES_PUSHED`), but the bytes per delta are not.
+
 ## Log
 
 - L1: "Me decidi por tauri, pero vamos a mantener el trabajo de componentes no todo metido en un solo archivo"

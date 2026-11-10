@@ -19,10 +19,12 @@ use tauri::{AppHandle, Manager};
 use tauri_specta::Event;
 
 use crate::bridge::{AppStateHolder, CommandSink};
+use crate::clipboard::{self, Clipboard, SystemClipboard};
 use crate::config::{ConfigSnapshot, ConfigWriter};
 use crate::contract::{StateChanged, UiIntent, ViewState};
 use crate::effects::{self, Ran, RuntimeExecutor};
 use crate::events::{EventPump, Push};
+use crate::link_opener::{LinkOpener, SystemLinkOpener};
 use crate::pending::PendingFolders;
 use crate::picker::{FolderPicker, NativeFolderPicker};
 use crate::sessions::{startup, SessionsService};
@@ -37,9 +39,15 @@ pub struct Bridge {
     pub executor: Arc<RuntimeExecutor>,
     pub pump: Arc<EventPump>,
     pub sessions: Arc<SessionsService>,
-    /// The folders the workspace intents named, waiting for the open of their
+    /// The folders of the workspace intents, waiting for the open of their
     /// chat: written by the intent path, taken by the executor.
     folders: Arc<PendingFolders>,
+    /// The clipboard the Copy action writes to (T5a). The command sink is armed
+    /// with it at startup, which is how a fold's `Command::CopyToClipboard`
+    /// reaches it without the holder ever knowing a clipboard exists.
+    clipboard: Arc<dyn Clipboard>,
+    /// The browser opener the `open_link` command uses (T5a).
+    opener: Arc<dyn LinkOpener>,
     /// The folder dialog of the two "New workspace" commands (Q1): the real
     /// one, kept by its own type because the setup step has to give it the
     /// window that makes the dialog modal. The flows take the seam, not this
@@ -58,19 +66,20 @@ impl Bridge {
     /// disk read of the config happens outside every lock; both the read and the
     /// writer take their path from the same place.
     pub fn new() -> Self {
+        // The two seams of the thread slice: the system clipboard the Copy
+        // action writes to, and the system browser a link opens in.
+        let clipboard: Arc<dyn Clipboard> = Arc::new(SystemClipboard::new());
+        let opener: Arc<dyn LinkOpener> = Arc::new(SystemLinkOpener::new());
         let path = ConfigSnapshot::path_from_env();
         let holder = Arc::new(AppStateHolder::with_config(ConfigSnapshot::at(
             path.as_deref(),
         )));
         let pump = Arc::new(EventPump::new(Arc::clone(&holder)));
         let sessions = Arc::new(startup::service(Arc::clone(&holder)));
-        // The reducer doesn't refresh the list itself: it answers
-        // `Command::RefreshSessions` and this is where that one is run.
-        holder.arm_commands(command_sink(Arc::clone(&sessions)));
         let writer = ConfigWriter::spawn(path);
         holder.arm_config_saves(writer.clone());
         let folders = Arc::new(PendingFolders::default());
-        Self {
+        let bridge = Self {
             holder,
             executor: Arc::new(RuntimeExecutor::new(
                 Arc::clone(&pump),
@@ -79,9 +88,26 @@ impl Bridge {
             pump,
             sessions,
             folders,
+            clipboard,
+            opener,
             picker: Arc::new(NativeFolderPicker::new()),
             writer,
-        }
+        };
+        // The reducer doesn't refresh the list itself: it answers
+        // `Command::RefreshSessions` and this is where that one is run. A copy
+        // is run by the same sink, off the thread that folded it, so the two
+        // services are taken from the bridge they belong to.
+        bridge.holder.arm_commands(command_sink(
+            Some(Arc::clone(&bridge.sessions)),
+            Arc::clone(&bridge.clipboard),
+        ));
+        bridge
+    }
+
+    /// The browser opener, as the `open_link` command takes it: cloned out of
+    /// the bridge before the open runs, so no lock is held while it does.
+    pub fn opener(&self) -> Arc<dyn LinkOpener> {
+        Arc::clone(&self.opener)
     }
 
     /// The folder dialog as the seam the workspace flows take.
@@ -205,13 +231,28 @@ impl Default for Bridge {
     }
 }
 
-/// What runs the shared commands of the reducer: the session list's pass here,
-/// and nothing for the two that belong to other slices (a clipboard copy and the
-/// single child the one-child shell sent to).
-fn command_sink(sessions: Arc<SessionsService>) -> CommandSink {
+/// What runs the shared commands of the reducer: the session list's pass and
+/// the message Copy here, and nothing for the one that belongs to the one-child
+/// shell (a send to the child this app does not use).
+///
+/// `sessions` is `None` in a test that only exercises the clipboard: the list's
+/// branch then answers nothing, and the copy branch is the one under test.
+pub fn command_sink(
+    sessions: Option<Arc<SessionsService>>,
+    clipboard: Arc<dyn Clipboard>,
+) -> CommandSink {
     Arc::new(move |command| match command {
-        Command::RefreshSessions => sessions.request(),
-        Command::Send(_) | Command::CopyToClipboard(_) => {}
+        Command::RefreshSessions => {
+            if let Some(sessions) = sessions.as_ref() {
+                sessions.request();
+            }
+        }
+        // Never on the thread that folded the intent, and never under a lock:
+        // the write happens on a thread of its own (`clipboard`).
+        Command::CopyToClipboard(text) => {
+            clipboard::copy_off_thread(Arc::clone(&clipboard), text);
+        }
+        Command::Send(_) => {}
     })
 }
 /// Folds what one command came to and pushes each step, then arms the 20 s net

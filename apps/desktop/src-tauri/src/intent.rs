@@ -27,6 +27,9 @@ pub fn to_intent(state: &gentle_app::AppState, intent: UiIntent) -> Option<gentl
         UiIntent::RestartChat { chat_id } => {
             gentle_app::Intent::RestartChat(chat_for(state, &chat_id))
         }
+        // The message id is not a chat: the reducer finds it in the foreground
+        // chat's thread and answers the copy command the shell runs.
+        UiIntent::CopyMessage { message_id } => gentle_app::Intent::CopyMessage(message_id),
         UiIntent::DismissNotice { id } => gentle_app::Intent::DismissNotice(u64::from(id)),
     })
 }

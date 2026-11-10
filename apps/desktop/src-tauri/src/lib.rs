@@ -7,6 +7,7 @@
 //! from the command layer in `commands`.
 
 pub mod bridge;
+pub mod clipboard;
 pub mod commands;
 pub mod config;
 pub mod contract;
@@ -14,6 +15,9 @@ pub mod effects;
 pub mod events;
 pub mod folder_name;
 pub mod intent;
+pub mod link;
+pub mod link_commands;
+pub mod link_opener;
 pub mod new_folder;
 pub mod pending;
 pub mod picker;
@@ -40,6 +44,7 @@ pub fn contract_builder() -> Builder<tauri::Wry> {
             commands::dispatch_intent,
             sessions::commands::sessions_window,
             sessions::commands::get_view_state,
+            link_commands::open_link,
             workspace_commands::add_workspace,
             workspace_commands::create_workspace,
         ])
