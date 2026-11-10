@@ -156,7 +156,7 @@
     <ul class="shots">
       {#each images as image (image.id)}
         <li class="shot">
-          <img class="thumb" src={image.preview_url} alt={image.name} />
+          <img class="thumb" src={image.preview_url} alt={image.name} title={image.name} />
           <button
             class="take"
             type="button"

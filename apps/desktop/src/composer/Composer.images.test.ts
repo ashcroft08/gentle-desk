@@ -77,6 +77,15 @@ describe('Composer images', () => {
     expect(handlerArgs('dispatch_intent')).toEqual([])
   })
 
+  it('offers the file name on the thumbnail too, so several can be told apart', () => {
+    draw({ chat: 'chat-1', images: [image('img-1', 'captura de pantalla.png')] })
+
+    // The name is the alt already; the title is what a mouse can read.
+    expect(screen.getByRole('img', { name: 'captura de pantalla.png' }).getAttribute('title')).toBe(
+      'captura de pantalla.png',
+    )
+  })
+
   it('says why a dropped file was refused', () => {
     const notice = 'notes.txt was not attached: only png, jpg, jpeg, webp and gif images can be.'
 

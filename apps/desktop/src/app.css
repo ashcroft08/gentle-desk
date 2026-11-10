@@ -480,26 +480,31 @@ p {
   display: block;
   width: 72px;
   height: 72px;
-  object-fit: cover;
+  /* The whole picture, not a centre crop: a screenshot of text keeps its shape
+     and can be recognised before it is sent. */
+  object-fit: contain;
   border-radius: 10px;
   border: 1px solid var(--border);
   background: var(--surface);
 }
 
-/* The way out of one attachment: small, on the corner, and named for a reader. */
+/* The way out of one attachment: small, inside the corner so it never leans on
+   the thumbnail beside it, on a translucent backing so it reads over a bright
+   picture as well as a dark one, and named for a reader. */
 .shot .take {
   position: absolute;
-  top: -6px;
-  right: -6px;
-  width: 20px;
-  height: 20px;
+  top: 3px;
+  right: 3px;
+  width: 16px;
+  height: 16px;
   display: inline-grid;
   place-items: center;
   border-radius: 999px;
   border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--muted);
+  background: color-mix(in srgb, var(--bg) 78%, transparent);
+  color: var(--text);
   cursor: pointer;
+  padding: 0;
 }
 
 .shot .take:hover {
