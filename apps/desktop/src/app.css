@@ -451,6 +451,16 @@ p {
   padding-left: 16px;
 }
 
+/* The key hints under the box: quiet, left-aligned with the box's text, never
+   competing with it. */
+.composer-dock .keys {
+  margin: 8px 0 0;
+  padding-left: 16px;
+  text-align: left;
+  color: var(--faint);
+  font-size: 12px;
+}
+
 .placeholder {
   color: var(--muted);
   padding: 28px 24px;

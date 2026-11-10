@@ -109,6 +109,29 @@ describe('Composer', () => {
     expect(intents()).toEqual([])
   })
 
+  it('asks what the user needs, and lists its three keys under the box', () => {
+    const { box } = draw({ chat: 'chat-1' })
+
+    expect(box.placeholder).toBe('Tell Gentle what you need...')
+    expect(screen.getByText('Enter to send \u00b7 Shift+Enter for a new line \u00b7 Esc to stop')).toBeTruthy()
+  })
+
+  it('stops the turn on Escape while the chat works', async () => {
+    const { box } = draw({ chat: 'chat-1', mark: 'Working' })
+
+    await fireEvent.keyDown(box, { key: 'Escape' })
+
+    expect(intents()).toEqual([{ type: 'Abort' }])
+  })
+
+  it('does nothing on Escape when the chat is idle', async () => {
+    const { box } = draw({ chat: 'chat-1' })
+
+    await fireEvent.keyDown(box, { key: 'Escape' })
+
+    expect(intents()).toEqual([])
+  })
+
   it('shows Stop and sends Abort while the chat is working', async () => {
     draw({ chat: 'chat-1', mark: 'Working' })
 
