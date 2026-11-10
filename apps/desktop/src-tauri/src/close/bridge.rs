@@ -3,10 +3,10 @@
 //! Nothing here owns a policy: the order and the deadlines are
 //! [`super::flow`]'s. This is where each step names the bridge part that does
 //! the work: the executor (stop new work, stop every child), the event pump (end
-//! its threads), the session cache and the config writer. It is also where the
-//! process finally ends; the exit runs through the closure the app arms at
-//! startup, so this module names no Tauri type and a test runs it with a flag
-//! instead.
+//! its threads), the session service (stop the watcher and the safety net), the
+//! session cache and the config writer. It is also where the process finally
+//! ends; the exit runs through the closure the app arms at startup, so this
+//! module names no Tauri type and a test runs it with a flag instead.
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -17,11 +17,16 @@ use super::flow::CloseSteps;
 use crate::config::ConfigWriter;
 use crate::effects::RuntimeExecutor;
 use crate::events::EventPump;
+use crate::sessions::SessionsService;
 
 /// The close of a running bridge.
 pub struct BridgeSteps {
     executor: Arc<RuntimeExecutor>,
     pump: Arc<EventPump>,
+    /// The session refresh of this run, when the close may stop its threads.
+    /// `None` in a test that only exercises the other steps: a run with no
+    /// session service has no watcher and no timer to stop.
+    sessions: Option<Arc<SessionsService>>,
     /// The index cache of this run: `None` when the pi home is unknown, and then
     /// there is nothing to flush.
     shared: Option<Shared>,
@@ -41,9 +46,20 @@ impl BridgeSteps {
         Self {
             executor,
             pump,
+            sessions: None,
             shared,
             writer,
             exit,
+        }
+    }
+
+    /// The same close with the session refresh of the run, so its watcher and
+    /// its safety net stop before the cache is written. The app always sets it;
+    /// a test that names no session service leaves the step with nothing to do.
+    pub fn with_sessions(self, sessions: Arc<SessionsService>) -> Self {
+        Self {
+            sessions: Some(sessions),
+            ..self
         }
     }
 }
@@ -64,6 +80,17 @@ impl CloseSteps for BridgeSteps {
         if !self.pump.join(budget) {
             // The flow already logged the miss; this says which thread it was.
             eprintln!("close: the child event threads did not end within {budget:?}");
+        }
+    }
+
+    fn stop_watch(&self, budget: Duration) {
+        let Some(sessions) = self.sessions.as_ref() else {
+            return;
+        };
+        if !sessions.stop(budget) {
+            // The flow already logged the miss; this says which threads they
+            // were. The threads are abandoned, never killed: the close goes on.
+            eprintln!("close: the session watcher or its timer did not end within {budget:?}");
         }
     }
 

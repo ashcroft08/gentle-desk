@@ -50,20 +50,25 @@ pub struct Gated {
 
 /// A gated service over `home`, the gate that drives it and the recorder.
 pub fn gated(home: &Home) -> (Gated, SessionsService, Arc<AppStateHolder>, Recorder) {
+    let (gate, run) = gated_run();
+    let (service, holder, recorder) = super::build(flow_of(home), run);
+    (gate, service, holder, recorder)
+}
+
+/// The fake pass alone, with the gate that drives it: a test that wires its own
+/// service around it (the wiring tests) takes this pair.
+pub fn gated_run() -> (Gated, RunPass) {
     let (entered_tx, entered) = channel();
     let (release, release_rx) = channel();
     let counts = Arc::new(Counts::default());
     let run = fake_pass(Arc::clone(&counts), entered_tx, Mutex::new(release_rx));
-    let (service, holder, recorder) = super::build(flow_of(home), run);
     (
         Gated {
             counts,
             entered,
             release,
         },
-        service,
-        holder,
-        recorder,
+        run,
     )
 }
 

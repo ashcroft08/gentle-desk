@@ -29,6 +29,11 @@ pub struct Deadlines {
     /// The child-event threads: they end on the stop signal within their poll
     /// interval, so this only covers a wedged thread.
     pub pump: Duration,
+    /// The session watcher and the safety-net timer: the batch threads and the
+    /// timer end on the stop signal within their poll interval, and the platform
+    /// watch's own thread ends when its handle drops. This only covers a wedged
+    /// one, as the pump's deadline does for the child events.
+    pub watch: Duration,
     /// The session index cache: one JSON document, about 29 MB at 50 000 chats.
     pub cache: Duration,
     /// The config writer: one small file, after the queue drains.
@@ -40,6 +45,7 @@ impl Default for Deadlines {
         Self {
             children: Duration::from_secs(10),
             pump: Duration::from_secs(2),
+            watch: Duration::from_secs(5),
             cache: Duration::from_secs(30),
             config: Duration::from_secs(5),
         }
@@ -56,6 +62,10 @@ pub trait CloseSteps: Send + Sync {
     fn stop_children(&self);
     /// Ends the child-event threads and waits for them, at most `budget`.
     fn join_pump(&self, budget: Duration);
+    /// Stops the session watcher and the safety-net timer, and waits at most
+    /// `budget` for their threads. Before the cache flush, so no batch asks for
+    /// a pass after the last one was written.
+    fn stop_watch(&self, budget: Duration);
     /// Writes the session index cache the throttle held back. Blocking by
     /// design (one file write); the flow's [`Deadlines::cache`] covers it.
     fn flush_cache(&self);
@@ -115,6 +125,11 @@ fn shutdown(steps: Arc<dyn CloseSteps>, deadlines: Deadlines) {
     let pump_budget = deadlines.pump;
     bounded("pump", pump_budget, move || {
         pump_steps.join_pump(pump_budget)
+    });
+    let watch_steps = Arc::clone(&steps);
+    let watch_budget = deadlines.watch;
+    bounded("watch", watch_budget, move || {
+        watch_steps.stop_watch(watch_budget)
     });
     let cache_steps = Arc::clone(&steps);
     bounded("cache", deadlines.cache, move || cache_steps.flush_cache());

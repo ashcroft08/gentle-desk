@@ -1,16 +1,17 @@
-//! What the session list needs from a run: the index, its cache and the flow
-//! that decides which pass runs when.
+//! What the session list needs from a run: the index, its cache, the flow that
+//! decides which pass runs when, and the wiring round it.
 //!
 //! This is the sessions half of [`gentle_runtime::startup`], assembled from the
 //! same public pieces (`home`, `cache_path`, `session_cache`, `SessionIndex`,
-//! `Shared`) for the same reason `effects::runtime` assembles the chat host that
-//! way: the runtime's `start` also brings up the chat host and the watcher, and
-//! those are other slices. Nothing here starts a watcher. TODO(watcher): start
-//! it on boot and adopt its batches once the watcher slice lands.
+//! `Shared`, `try_start_watcher`) for the same reason `effects::runtime`
+//! assembles the chat host that way: the runtime's `start` also brings up the
+//! chat host, and the host is another slice. The watcher and the safety net are
+//! not started here either: [`SessionsService::boot`] starts them, because the
+//! setup step is the one place that can arm the emit step first.
 //!
 //! A home that cannot be resolved is data, not a failure: the flow has no index,
-//! runs no pass, and the list keeps the reducer's initial loading state rather
-//! than claiming the home is empty.
+//! runs no pass, starts no watcher, and the list keeps the reducer's initial
+//! loading state rather than claiming the home is empty.
 
 use std::sync::{Arc, Mutex};
 
@@ -23,22 +24,25 @@ use gentle_runtime::refresh_queue::Job;
 use gentle_runtime::session_refresh::{self, Shared, Update};
 
 use super::service::{RunPass, SessionsService};
+use super::wiring::Wiring;
 use crate::bridge::AppStateHolder;
 
 /// The message a pass of a run without a home reports. It never reaches a user:
 /// a flow without an index answers `Idle` to every request, so no pass starts.
 const NO_HOME: &str = "no pi home to read sessions from";
 
-/// The sessions of this run: the flow of its index, and the service that runs
-/// the passes it asks for.
+/// The sessions of this run: the flow of its index, the service that runs the
+/// passes it asks for, and the wiring that starts the watcher and the safety net
+/// at boot.
 pub fn service(holder: Arc<AppStateHolder>) -> SessionsService {
     let flow = flow();
     let run = run_pass(flow.shared());
-    SessionsService::new(holder, flow, run)
+    SessionsService::wired(holder, flow, run, Wiring::real())
 }
 
 /// The refresh flow of this run: the index restored from the cache when it is
-/// valid, the directory a pass enumerates, and no watcher.
+/// valid, the directory a pass enumerates, and the directory a watcher is
+/// started on. The watcher itself is started at boot.
 fn flow() -> Flow {
     let home_env = HomeEnv::from_process();
     let args = with_home_flag(std::env::args_os().skip(1).collect(), &home_env);
