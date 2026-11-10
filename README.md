@@ -38,6 +38,16 @@ npm run lint && npm run check && npm run test
 npm run build   # the Rust app embeds the built dist/
 ```
 
+To build the Windows installer (NSIS, per-user, no admin rights needed):
+
+```sh
+cd apps/desktop
+npx tauri build   # writes target/release/bundle/nsis/gentle-desk_<version>_x64-setup.exe
+```
+
+The icon set under `apps/desktop/src-tauri/icons/` is generated from `apps/desktop/app-icon.png`
+with `npx tauri icon app-icon.png -o src-tauri/icons`.
+
 To run the app against the stand-in shell instead of a real gentle-shell, set
 `GENTLE_SHELL_BIN` to `tools/fake-gentle-shell/fake.mjs`.
 
