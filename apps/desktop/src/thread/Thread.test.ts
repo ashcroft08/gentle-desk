@@ -47,6 +47,28 @@ beforeEach(() => {
   setHandler('open_link', () => null)
 })
 
+describe('Thread activity line', () => {
+  it('draws Working under the last message while a turn runs', () => {
+    render(Thread, {
+      props: { messages: [user('u1', 'hi')], foregroundChat: 'chat-1', mark: 'Working' },
+    })
+
+    expect(screen.getByText('Working')).toBeTruthy()
+  })
+
+  it('draws Opening chat in an empty thread while the chat opens', () => {
+    render(Thread, { props: { messages: [], foregroundChat: 'chat-1', mark: 'Opening' } })
+
+    expect(screen.getByRole('status').textContent).toContain('Opening chat')
+  })
+
+  it('draws no line once the chat is idle', () => {
+    render(Thread, { props: { messages: [user('u1', 'hi')], foregroundChat: 'chat-1', mark: null } })
+
+    expect(screen.queryByText('Working')).toBeNull()
+  })
+})
+
 describe('Thread', () => {
   it('draws a user message as plain text, never as markdown', () => {
     const region = draw([user('m1', '# not a heading\n\n**not bold**')])
