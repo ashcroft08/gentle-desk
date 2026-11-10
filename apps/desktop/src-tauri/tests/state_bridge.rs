@@ -80,11 +80,16 @@ fn the_view_state_slice_has_no_invented_fields() {
             total_sessions: 0,
             messages: Vec::new(),
             notices: Vec::new(),
+            // No chat is open, so no extension is waiting for an answer.
+            dialog: None,
             activity: Vec::new(),
             config_notice: None,
             // The shell-owned line a refused workspace action sets: nothing was
             // refused here, so it carries nothing.
             workspace_notice: None,
+            // The launcher is resolved on the first command, so a run that has
+            // asked for nothing yet has no fatal bar.
+            fatal: None,
         }
     );
 }

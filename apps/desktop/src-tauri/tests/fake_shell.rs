@@ -113,6 +113,10 @@ impl Harness {
     fn log(&self) -> &Path {
         &self.log
     }
+
+    fn root(&self) -> &Path {
+        &self.root
+    }
 }
 
 impl Drop for Harness {
@@ -171,10 +175,11 @@ impl Bridge {
         arm(&pump, Arc::clone(&pushed));
         let folders = Arc::new(PendingFolders::default());
         Self {
-            holder,
+            holder: Arc::clone(&holder),
             executor: Arc::new(RuntimeExecutor::new(
                 Arc::clone(&pump),
                 Arc::clone(&folders),
+                Arc::clone(&holder),
             )),
             pushed,
             folders,
@@ -619,5 +624,40 @@ fn a_workspace_folder_that_is_gone_starts_no_child() {
     assert!(
         bridge.folders.is_empty(),
         "the entry was taken, so it cannot leak"
+    );
+}
+
+#[test]
+fn an_unresolvable_launcher_is_the_runs_global_banner() {
+    // The launcher is resolved on the first command that needs a child. When it
+    // cannot be resolved at all, no chat can ever start, so the run says so
+    // once, in the bar above everything, instead of only in that chat's notice.
+    // The path does not exist, so nothing is ever spawned.
+    let Some(harness) = Harness::new() else {
+        return;
+    };
+    let missing = harness.root().join("no-such-gentle-shell");
+    std::env::set_var("GENTLE_SHELL_BIN", &missing);
+    let bridge = Bridge::runtime_executor();
+
+    bridge.dispatch(UiIntent::OpenNewChat);
+
+    let view = wait_for("the failed open to be reported", || {
+        last_where(&bridge.pushed, |view| view.fatal.is_some())
+    });
+    assert_eq!(
+        view.fatal.as_deref(),
+        Some("gentle-shell is not available"),
+        "the bar says the launcher is not there, never a path or a stack"
+    );
+    assert!(
+        view.notices
+            .iter()
+            .any(|notice| notice.text.contains("gentle-shell is not available")),
+        "the chat that could not start still gets its own notice, as iced did"
+    );
+    assert!(
+        start_pids(harness.log()).is_empty(),
+        "a launcher that is not there starts no child"
     );
 }

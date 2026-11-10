@@ -7,14 +7,19 @@
 // - the mark the foreground chat's activity calls for, which is what decides
 //   Send, Stop and the disabled composer's reason (S6: the rule itself lives in
 //   Rust, `crates/runtime`, and arrives here as plain data);
-// - the notices, unchanged and in the order Rust keeps them, so only the ones
-//   that carry an action are drawn as a restart notice.
+// - the notices, unchanged and in the order Rust keeps them, every level drawn;
+// - the first pending dialog of that chat, one at a time, which the dialogs
+//   slice draws as a modal;
+// - the run's one fatal failure, which belongs to no chat and outlives all of
+//   them: a launcher that cannot be resolved means no chat can start at all.
 //
-// No chat open draws no chrome at all: a push that carries a title or a notice
-// for a chat that is already gone must not leave a header behind.
+// No chat open draws no chat chrome at all: a push that carries a title, a
+// notice or a dialog for a chat that is already gone must not leave a header
+// behind. The fatal bar is the exception, because it is not about a chat.
 
 import type {
   ChatActivityMark,
+  DialogView,
   NoticeView,
   ViewState_Serialize as ViewState,
 } from '../contract/bindings'
@@ -28,8 +33,12 @@ export type ChatViewState = {
   title: string | null
   /** That chat's mark, or `null` when it is idle (or no chat is open). */
   mark: ChatActivityMark | null
-  /** Every notice Rust pushes, oldest first; most carry no action (T7 draws those). */
+  /** Every notice Rust pushes, oldest first, with its level and its one action. */
   notices: NoticeView[]
+  /** The first dialog that chat's extension is waiting on, or `null`. */
+  dialog: DialogView | null
+  /** The run's fatal launcher failure, or `null`; not about any one chat. */
+  fatal: string | null
 }
 
 export type ChatView = {
@@ -48,14 +57,18 @@ const NO_NOTICES: NoticeView[] = []
 /** The slice of `view` the main area's chrome draws. */
 export function chatOf(view: ViewState | null): ChatViewState {
   const chat = view?.foreground_chat ?? null
+  // The fatal bar is the run's, so it is read whatever chat is open.
+  const fatal = view?.fatal ?? null
   if (chat === null) {
-    return { chat: null, title: null, mark: null, notices: NO_NOTICES }
+    return { chat: null, title: null, mark: null, notices: NO_NOTICES, dialog: null, fatal }
   }
   return {
     chat,
     title: view?.foreground_title ?? null,
     mark: markOf(view, chat),
     notices: view?.notices ?? NO_NOTICES,
+    dialog: view?.dialog ?? null,
+    fatal,
   }
 }
 
@@ -74,7 +87,14 @@ function markOf(view: ViewState | null, chat: string): ChatActivityMark | null {
  */
 export function createChatView(deps: ChatViewDeps = {}): ChatView {
   const store = deps.store ?? createSessionsStore()
-  let state: ChatViewState = { chat: null, title: null, mark: null, notices: [] }
+  let state: ChatViewState = {
+    chat: null,
+    title: null,
+    mark: null,
+    notices: [],
+    dialog: null,
+    fatal: null,
+  }
   const listeners = new Set<(state: ChatViewState) => void>()
 
   function emit(next: ChatViewState): void {
@@ -90,7 +110,9 @@ export function createChatView(deps: ChatViewDeps = {}): ChatView {
       next.chat === state.chat &&
       next.title === state.title &&
       next.mark === state.mark &&
-      next.notices === state.notices
+      next.notices === state.notices &&
+      next.dialog === state.dialog &&
+      next.fatal === state.fatal
     ) {
       return
     }

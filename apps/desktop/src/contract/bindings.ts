@@ -85,6 +85,72 @@ export type ChatBadge = {
 };
 
 /**
+ *  How the user answered a dialog, as the web side sends it back. The three
+ *  shapes are the child's own protocol (`gentle_core::rpc::UiAnswer`), named
+ *  here so the contract stays free of that type (S2).
+ */
+export type DialogAnswer = 
+/**  What a select option or a typed value answers. */
+{ type: "Value"; data: {
+	value: string,
+} } | 
+/**  What a confirm dialog's Yes (`true`) or No (`false`) answers. */
+{ type: "Confirmed"; data: {
+	confirmed: boolean,
+} } | 
+/**  Escape, Cancel or a closed dialog: the extension decides what that means. */
+{ type: "Cancelled" };
+
+/**
+ *  The first blocking dialog the foreground chat's extension is waiting on,
+ *  flattened for display: exactly the fields the iced shell draws
+ *  (`crates/ui/src/view/dialog.rs`), never a `crates/gentle-core` type.
+ * 
+ *  The app queues dialogs oldest first, and a dialog blocks its chat until it is
+ *  answered, so the view draws the FIRST pending one at a time; the next arrives
+ *  in a later slice, once this one is answered.
+ */
+export type DialogView = DialogView_Serialize | DialogView_Deserialize;
+
+/**
+ *  The first blocking dialog the foreground chat's extension is waiting on,
+ *  flattened for display: exactly the fields the iced shell draws
+ *  (`crates/ui/src/view/dialog.rs`), never a `crates/gentle-core` type.
+ * 
+ *  The app queues dialogs oldest first, and a dialog blocks its chat until it is
+ *  answered, so the view draws the FIRST pending one at a time; the next arrives
+ *  in a later slice, once this one is answered.
+ */
+export type DialogView_Deserialize = 
+/**  Yes / No / Cancel, with the question above the buttons. */
+{ kind: "Confirm"; id: string; title: string; message: string } | 
+/**  One button per option, in the order the extension sent them. */
+{ kind: "Select"; id: string; title: string; options: string[] } | 
+/**  One line of text; `placeholder` is the hint an empty field shows. */
+{ kind: "Input"; id: string; title: string; placeholder?: string | null } | 
+/**  A multiline box; `prefill` is the text it starts with. */
+{ kind: "Editor"; id: string; title: string; prefill?: string | null };
+
+/**
+ *  The first blocking dialog the foreground chat's extension is waiting on,
+ *  flattened for display: exactly the fields the iced shell draws
+ *  (`crates/ui/src/view/dialog.rs`), never a `crates/gentle-core` type.
+ * 
+ *  The app queues dialogs oldest first, and a dialog blocks its chat until it is
+ *  answered, so the view draws the FIRST pending one at a time; the next arrives
+ *  in a later slice, once this one is answered.
+ */
+export type DialogView_Serialize = 
+/**  Yes / No / Cancel, with the question above the buttons. */
+{ kind: "Confirm"; id: string; title: string; message: string } | 
+/**  One button per option, in the order the extension sent them. */
+{ kind: "Select"; id: string; title: string; options: string[] } | 
+/**  One line of text; `placeholder` is the hint an empty field shows. */
+{ kind: "Input"; id: string; title: string; placeholder: string | null } | 
+/**  A multiline box; `prefill` is the text it starts with. */
+{ kind: "Editor"; id: string; title: string; prefill: string | null };
+
+/**
  *  How complete the session list is, matching `gentle_app::ListStatus` one to
  *  one. `Loading` carries how far the first pass got, so the sidebar can say it
  *  is still reading; only `Complete` lets an empty list call itself empty.
@@ -382,6 +448,15 @@ export type UiIntent = { type: "SendPrompt"; data: {
 	message_id: string,
 } } | { type: "DismissNotice"; data: {
 	id: number,
+} } | 
+/**
+ *  Answer the foreground chat's pending dialog, named by [`DialogView`]'s
+ *  `id`. An id that is no longer pending answers nothing, so a second click
+ *  on the same dialog never reaches the child twice.
+ */
+{ type: "AnswerDialog"; data: {
+	id: string,
+	answer: DialogAnswer,
 } };
 
 /**
@@ -449,7 +524,21 @@ export type ViewState_Deserialize = {
 	 */
 	messages: MessageView_Deserialize[],
 	notices: NoticeView_Deserialize[],
+	/**
+	 *  The foreground chat's first pending blocking dialog, if an extension is
+	 *  waiting for an answer. `None` when no chat is foreground or nothing is
+	 *  pending, which is also what lets the composer work.
+	 */
+	dialog?: DialogView_Deserialize | null,
 	activity: ChatActivityView[],
+	/**
+	 *  The one failure that ends the whole run instead of one chat: the
+	 *  `gentle-shell` launcher could not be resolved, so no chat can ever
+	 *  start. Drawn as the bar above everything
+	 *  (`crates/ui/src/view/banner.rs`), never as a notice. `None` for every
+	 *  run whose launcher resolved, which is every run that has not tried yet.
+	 */
+	fatal?: string | null,
 	/**
 	 *  What the user should be told about the app config file: a file that
 	 *  could not be used at startup is kept aside and the app starts with an
@@ -518,7 +607,21 @@ export type ViewState_Serialize = {
 	 */
 	messages: MessageView_Serialize[],
 	notices: NoticeView_Serialize[],
+	/**
+	 *  The foreground chat's first pending blocking dialog, if an extension is
+	 *  waiting for an answer. `None` when no chat is foreground or nothing is
+	 *  pending, which is also what lets the composer work.
+	 */
+	dialog: DialogView_Serialize | null,
 	activity: ChatActivityView[],
+	/**
+	 *  The one failure that ends the whole run instead of one chat: the
+	 *  `gentle-shell` launcher could not be resolved, so no chat can ever
+	 *  start. Drawn as the bar above everything
+	 *  (`crates/ui/src/view/banner.rs`), never as a notice. `None` for every
+	 *  run whose launcher resolved, which is every run that has not tried yet.
+	 */
+	fatal: string | null,
 	/**
 	 *  What the user should be told about the app config file: a file that
 	 *  could not be used at startup is kept aside and the app starts with an

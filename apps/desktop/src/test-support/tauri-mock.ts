@@ -10,6 +10,7 @@
 
 import type {
   ChatActivityView,
+  DialogView_Serialize,
   NoticeView_Serialize,
   SessionsWindow_Serialize,
   SessionTreeRow_Serialize,
@@ -133,7 +134,9 @@ export function viewState(overrides: Partial<ViewState_Serialize> = {}): ViewSta
     total_sessions: 0,
     messages: [],
     notices: [],
+    dialog: null,
     activity: [],
+    fatal: null,
     config_notice: null,
     workspace_notice: null,
     ...overrides,
@@ -153,6 +156,42 @@ export function restartNotice(id: number, text: string, chatId: string): NoticeV
     level: 'Error',
     action: { type: 'RestartChat', data: { chat_id: chatId } },
   }
+}
+
+/** The confirm dialog a `confirm` extension request leaves. */
+export function confirmDialog(
+  id: string,
+  title = 'Allow this command?',
+  message = 'Run the command?',
+): DialogView_Serialize {
+  return { kind: 'Confirm', id, title, message }
+}
+
+/** The select dialog a `select` extension request leaves. */
+export function selectDialog(
+  id: string,
+  options: string[] = ['a', 'b'],
+  title = 'Pick a letter',
+): DialogView_Serialize {
+  return { kind: 'Select', id, title, options }
+}
+
+/** The input dialog an `input` extension request leaves. */
+export function inputDialog(
+  id: string,
+  placeholder: string | null = 'name',
+  title = 'Your name',
+): DialogView_Serialize {
+  return { kind: 'Input', id, title, placeholder }
+}
+
+/** The editor dialog an `editor` extension request leaves. */
+export function editorDialog(
+  id: string,
+  prefill: string | null = null,
+  title = 'Edit the note',
+): DialogView_Serialize {
+  return { kind: 'Editor', id, title, prefill }
 }
 
 /** A notice that only reports something, with nothing to fix (T7's to draw). */

@@ -34,6 +34,8 @@ describe('chatOf', () => {
       title: 'Tauri skeleton: window and bridge',
       mark: 'Working',
       notices: [],
+      dialog: null,
+      fatal: null,
     })
   })
 
@@ -57,7 +59,14 @@ describe('chatOf', () => {
       notices: [restartNotice(1, 'The chat process exited.', 'chat-1')],
     })
 
-    expect(chatOf(state)).toEqual({ chat: null, title: null, mark: null, notices: [] })
+    expect(chatOf(state)).toEqual({
+      chat: null,
+      title: null,
+      mark: null,
+      notices: [],
+      dialog: null,
+      fatal: null,
+    })
     expect(chatOf(null).chat).toBeNull()
   })
 })

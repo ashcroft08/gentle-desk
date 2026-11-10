@@ -86,6 +86,13 @@ pub enum UiIntent {
     DismissNotice {
         id: u32,
     },
+    /// Answer the foreground chat's pending dialog, named by [`DialogView`]'s
+    /// `id`. An id that is no longer pending answers nothing, so a second click
+    /// on the same dialog never reaches the child twice.
+    AnswerDialog {
+        id: String,
+        answer: DialogAnswer,
+    },
 }
 
 /// How complete the session list is, matching `gentle_app::ListStatus` one to
@@ -192,6 +199,56 @@ pub struct MessageView {
     pub error: Option<String>,
 }
 
+/// The first blocking dialog the foreground chat's extension is waiting on,
+/// flattened for display: exactly the fields the iced shell draws
+/// (`crates/ui/src/view/dialog.rs`), never a `crates/gentle-core` type.
+///
+/// The app queues dialogs oldest first, and a dialog blocks its chat until it is
+/// answered, so the view draws the FIRST pending one at a time; the next arrives
+/// in a later slice, once this one is answered.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(tag = "kind")]
+pub enum DialogView {
+    /// Yes / No / Cancel, with the question above the buttons.
+    Confirm {
+        id: String,
+        title: String,
+        message: String,
+    },
+    /// One button per option, in the order the extension sent them.
+    Select {
+        id: String,
+        title: String,
+        options: Vec<String>,
+    },
+    /// One line of text; `placeholder` is the hint an empty field shows.
+    Input {
+        id: String,
+        title: String,
+        placeholder: Option<String>,
+    },
+    /// A multiline box; `prefill` is the text it starts with.
+    Editor {
+        id: String,
+        title: String,
+        prefill: Option<String>,
+    },
+}
+
+/// How the user answered a dialog, as the web side sends it back. The three
+/// shapes are the child's own protocol (`gentle_core::rpc::UiAnswer`), named
+/// here so the contract stays free of that type (S2).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(tag = "type", content = "data")]
+pub enum DialogAnswer {
+    /// What a select option or a typed value answers.
+    Value { value: String },
+    /// What a confirm dialog's Yes (`true`) or No (`false`) answers.
+    Confirmed { confirmed: bool },
+    /// Escape, Cancel or a closed dialog: the extension decides what that means.
+    Cancelled,
+}
+
 /// The level of a notice, matching `gentle_app`'s notice kinds one to one.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
 pub enum NoticeLevel {
@@ -263,7 +320,17 @@ pub struct ViewState {
     /// whole long session.
     pub messages: Vec<MessageView>,
     pub notices: Vec<NoticeView>,
+    /// The foreground chat's first pending blocking dialog, if an extension is
+    /// waiting for an answer. `None` when no chat is foreground or nothing is
+    /// pending, which is also what lets the composer work.
+    pub dialog: Option<DialogView>,
     pub activity: Vec<ChatActivityView>,
+    /// The one failure that ends the whole run instead of one chat: the
+    /// `gentle-shell` launcher could not be resolved, so no chat can ever
+    /// start. Drawn as the bar above everything
+    /// (`crates/ui/src/view/banner.rs`), never as a notice. `None` for every
+    /// run whose launcher resolved, which is every run that has not tried yet.
+    pub fatal: Option<String>,
     /// What the user should be told about the app config file: a file that
     /// could not be used at startup is kept aside and the app starts with an
     /// empty config, and a file that could not be written leaves the change in

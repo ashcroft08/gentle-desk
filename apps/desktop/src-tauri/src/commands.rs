@@ -80,10 +80,11 @@ impl Bridge {
         holder.arm_config_saves(writer.clone());
         let folders = Arc::new(PendingFolders::default());
         let bridge = Self {
-            holder,
+            holder: Arc::clone(&holder),
             executor: Arc::new(RuntimeExecutor::new(
                 Arc::clone(&pump),
                 Arc::clone(&folders),
+                Arc::clone(&holder),
             )),
             pump,
             sessions,
