@@ -30,6 +30,8 @@
   "dependencies": {
     "@internationalized/date": "^3.12.4",
     "@tauri-apps/api": "^2.12.4",
-    "bits-ui": "^2.20.6"
+    "bits-ui": "^2.20.6",
+    "dompurify": "^3.4.17",
+    "marked": "^18.2.0"
   }
 }

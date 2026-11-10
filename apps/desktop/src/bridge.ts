@@ -30,6 +30,30 @@ export async function addWorkspace(): Promise<void> {
 }
 
 /**
+ * Copies the raw markdown of one message: the thread names the message by the id
+ * Rust gave it, and the clipboard write is the shell's own side effect (T5a).
+ * A failed copy is not pushed anywhere: Rust logs it, and a view that claimed a
+ * copy the user cannot verify would be worse than silence.
+ */
+export async function copyMessage(messageId: string): Promise<void> {
+  await dispatchIntent({ type: 'CopyMessage', data: { message_id: messageId } })
+}
+
+/**
+ * Opens a link of a drawn reply in the system browser. The web side only
+ * forwards (and refuses an empty or non-web href before calling); Rust decides
+ * what it opens, and a refusal is silent here because the shell already told
+ * the user nothing happened.
+ */
+export async function openLink(url: string): Promise<void> {
+  try {
+    await commands.openLink(url)
+  } catch {
+    // Rust refuses with a reason that has no drawn home in this slice.
+  }
+}
+
+/**
  * "Create a new folder": Rust validates the name and then asks for the parent
  * folder, so the name can sit behind a picker for minutes; the caller shows a
  * busy state meanwhile. A refusal is not thrown back at the view either: the

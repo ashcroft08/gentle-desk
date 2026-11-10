@@ -72,12 +72,197 @@ p {
   grid-template-columns: 280px 1fr;
 }
 
-/* The chat itself is the next slice (T5/T6): the main area is a placeholder. */
+/* The main area: the header and the placeholder while no chat is open, or the
+   thread of the foreground chat (T5b), which fills both rows. */
 .main {
   display: grid;
   grid-template-rows: auto 1fr;
   min-height: 0;
   background: var(--bg);
+}
+
+.main > .thread {
+  grid-row: 1 / -1;
+}
+
+/* The thread and its messages: the artboard's rules for `.thread`, `.thread-in`
+   and `.msg` (design/gentle-desk-v2/01a-tree-chat.html). Copy and the
+   model-error box are not drawn there, so those two borrow the states board's
+   shape for a text action and for a danger line (00-states-board.html). */
+.thread {
+  overflow: auto;
+  padding: 28px 24px 12px;
+  min-height: 0;
+}
+
+.thread-in {
+  max-width: 720px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.msg {
+  max-width: 100%;
+}
+
+.msg.u {
+  align-self: flex-end;
+  background: var(--tint);
+  border-radius: 14px 14px 4px 14px;
+  padding: 8px 14px;
+  max-width: 78%;
+}
+
+/* A user message is plain text: the line breaks they typed, nothing parsed. */
+.ut {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.msg.a {
+  padding: 0 4px;
+}
+
+/* The drawn reply. Every rule is a tag the sanitizer allows. */
+.md > :first-child {
+  margin-top: 0;
+}
+
+.md > :last-child {
+  margin-bottom: 0;
+}
+
+.md p,
+.md ul,
+.md ol,
+.md pre,
+.md blockquote,
+.md table {
+  margin: 0 0 12px;
+}
+
+.md h1,
+.md h2,
+.md h3,
+.md h4,
+.md h5,
+.md h6 {
+  margin: 16px 0 8px;
+  line-height: 1.3;
+}
+
+.md h1 {
+  font-size: 18px;
+}
+
+.md h2 {
+  font-size: 16px;
+}
+
+.md h3,
+.md h4,
+.md h5,
+.md h6 {
+  font-size: 14px;
+}
+
+.md ul,
+.md ol {
+  padding-left: 22px;
+}
+
+.md code {
+  background: var(--surface2);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 13px;
+}
+
+.md pre {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  overflow: auto;
+}
+
+.md pre code {
+  background: transparent;
+  padding: 0;
+}
+
+.md blockquote {
+  border-left: 2px solid var(--border);
+  padding-left: 12px;
+  color: var(--muted);
+}
+
+.md a {
+  color: var(--accent);
+}
+
+.md table {
+  border-collapse: collapse;
+}
+
+.md th,
+.md td {
+  border: 1px solid var(--border);
+  padding: 4px 8px;
+  text-align: left;
+}
+
+.copy {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  padding: 2px 6px;
+  margin-top: 6px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.copy:hover {
+  background: var(--surface2);
+  color: var(--text);
+}
+
+/* A model error replaces the reply: the iced danger box, drawn with the states
+   board's error edge. */
+.err {
+  border: 1px solid var(--danger);
+  box-shadow: inset 3px 0 0 var(--danger);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: var(--surface2);
+}
+
+.err .et {
+  font-weight: 600;
+  color: var(--danger);
+}
+
+.err .em {
+  color: var(--text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* A line only a screen reader reads: the author line of a message and the one
+   live status of the thread. */
+.vh {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 
 .mh {
