@@ -129,11 +129,12 @@ p {
 }
 
 /* The widest the conversation gets: the messages and the box under them share
-   it, so a wide window is used and the box lines up with the thread. Past it the
-   lines would be too long to read comfortably, so the sides stay empty only on
-   a very large screen. */
+   it, so the box lines up with the thread. The number is a readability one, not
+   a taste one: at this size and font a line holds about 75 characters, which is
+   the comfortable band (60-80). Wider lines make the eye lose its place on the
+   way back, and the empty sides on a big screen cost less than that. */
 :root {
-  --chat-max: 1400px;
+  --chat-max: 880px;
 }
 
 /* The thread and its messages: the artboard's rules for `.thread`, `.thread-in`
