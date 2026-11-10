@@ -19,11 +19,19 @@ body {
   margin: 0;
 }
 
-body {
-  /* A column, so the fatal bar and the app split the window between them
-     instead of the bar pushing the composer out of it. */
+/* The mount point is the body's only child and the parent of the fatal bar and
+   of `.app`: a column, so the two split the window between them instead of the
+   bar pushing the composer out of it. The flex column has to be HERE, on the
+   element that actually holds them: on `body` it did nothing, because `#app`
+   sat in between and took the height of its content. */
+#app {
+  height: 100%;
   display: flex;
   flex-direction: column;
+  min-height: 0;
+}
+
+body {
   background: var(--bg);
   color: var(--text);
   font:
