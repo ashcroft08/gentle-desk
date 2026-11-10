@@ -104,3 +104,95 @@ fn without_a_user_home_isolated_cannot_be_resolved() {
 fn a_dangling_home_flag_resolves_to_nothing_useful() {
     assert_eq!(agent_dir(&os(&["--home"]), &env()), None);
 }
+
+#[test]
+fn a_chosen_link_adds_the_link_flag() {
+    let env = HomeEnv {
+        choice: Some(HomeChoice::Link),
+        ..env()
+    };
+
+    assert_eq!(
+        with_home_flag(os(&["--model", "m"]), &env),
+        os(&["--model", "m", "--link"])
+    );
+}
+
+#[test]
+fn a_chosen_separate_home_adds_the_isolated_flag() {
+    let env = HomeEnv {
+        choice: Some(HomeChoice::Isolated),
+        ..env()
+    };
+
+    assert_eq!(with_home_flag(os(&[]), &env), os(&["--isolated"]));
+}
+
+#[test]
+fn the_developer_home_variable_beats_the_choice() {
+    let env = HomeEnv {
+        choice: Some(HomeChoice::Link),
+        gentle_shell_home: Some(PathBuf::from("/custom")),
+        ..env()
+    };
+
+    assert_eq!(with_home_flag(os(&[]), &env), os(&["--home", "/custom"]));
+}
+
+#[test]
+fn an_explicit_flag_beats_the_choice() {
+    let env = HomeEnv {
+        choice: Some(HomeChoice::Link),
+        ..env()
+    };
+
+    assert_eq!(
+        with_home_flag(os(&["--isolated"]), &env),
+        os(&["--isolated"])
+    );
+}
+
+#[test]
+fn a_chosen_link_reads_the_sessions_of_pi() {
+    let env = HomeEnv {
+        choice: Some(HomeChoice::Link),
+        ..env()
+    };
+    let args = with_home_flag(os(&[]), &env);
+
+    assert_eq!(agent_dir(&args, &env), Some(PathBuf::from("/u/.pi/agent")));
+}
+
+#[test]
+fn pi_is_found_where_the_default_or_the_variable_says_and_the_folder_exists() {
+    let default = PathBuf::from("/u/.pi/agent");
+    assert_eq!(
+        detect_pi(&env(), |path| path == default),
+        Some(default.clone())
+    );
+    assert_eq!(detect_pi(&env(), |_| false), None);
+
+    let custom = HomeEnv {
+        pi_coding_agent_dir: Some(PathBuf::from("/elsewhere")),
+        ..env()
+    };
+    assert_eq!(
+        detect_pi(&custom, |path| path == Path::new("/elsewhere")),
+        Some(PathBuf::from("/elsewhere"))
+    );
+    assert_eq!(detect_pi(&custom, |path| path == default), None);
+}
+
+#[test]
+fn a_choice_is_spelled_the_way_the_config_stores_it() {
+    assert_eq!(
+        serde_json::to_string(&HomeChoice::Link).unwrap(),
+        "\"link\""
+    );
+    assert_eq!(
+        serde_json::to_string(&HomeChoice::Isolated).unwrap(),
+        "\"isolated\""
+    );
+    assert_eq!(HomeChoice::from_name("link"), Some(HomeChoice::Link));
+    assert_eq!(HomeChoice::from_name("separate"), None);
+}

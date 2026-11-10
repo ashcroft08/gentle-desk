@@ -19,7 +19,7 @@ use gentle_app::ChatCommand;
 use gentle_backend::chat_host::{
     ChatHost, Clock, Limits, ProcessSpawner, Spawner, SystemClock, TaggedEvent,
 };
-use gentle_backend::home::{with_home_flag, HomeEnv};
+use gentle_backend::home::{with_home_flag, HomeChoice, HomeEnv};
 use gentle_backend::launcher::{self, LauncherEnv};
 use gentle_runtime::chat_runtime::{ChatRuntime, Outcome};
 
@@ -53,6 +53,9 @@ pub struct RuntimeExecutor {
     /// Set by the close before anything else: from then on no command resolves a
     /// launcher, builds a host or starts a child.
     closed: AtomicBool,
+    /// The home the user chose on the welcome screen, as the config said when
+    /// the app started: a later change takes effect on the next start.
+    home_choice: Option<HomeChoice>,
 }
 
 impl RuntimeExecutor {
@@ -67,7 +70,14 @@ impl RuntimeExecutor {
             folders,
             holder,
             closed: AtomicBool::new(false),
+            home_choice: None,
         }
+    }
+
+    /// The home the children are started with (the user's choice).
+    pub fn with_home_choice(mut self, choice: Option<HomeChoice>) -> Self {
+        self.home_choice = choice;
+        self
     }
 
     /// Stops accepting new work: the close flow's first step, and the reason a
@@ -96,7 +106,7 @@ impl RuntimeExecutor {
     /// to the pump exactly once.
     fn runtime(&self) -> Result<Arc<ChatRuntime>, String> {
         self.runtime
-            .get_or_init(|| match build() {
+            .get_or_init(|| match build(self.home_choice) {
                 Ok((runtime, events)) => {
                     let runtime = Arc::new(runtime);
                     self.pump.feed(Arc::clone(&runtime), events);
@@ -149,8 +159,10 @@ fn refuse(command: ChatCommand) -> Outcome {
 
 /// The host itself: real children, the searcher's limits, and the launcher plus
 /// the forwarded arguments of this window.
-fn build() -> Result<(ChatRuntime, std::sync::mpsc::Receiver<TaggedEvent>), String> {
-    let spawner = spawner()?;
+fn build(
+    home_choice: Option<HomeChoice>,
+) -> Result<(ChatRuntime, std::sync::mpsc::Receiver<TaggedEvent>), String> {
+    let spawner = spawner(home_choice)?;
     let host = ChatHost::with_parts(
         Limits::default(),
         Arc::new(spawner) as Arc<dyn Spawner>,
@@ -162,10 +174,13 @@ fn build() -> Result<(ChatRuntime, std::sync::mpsc::Receiver<TaggedEvent>), Stri
 /// The spawner of one child per chat, with the launcher this run resolves and
 /// the arguments this process was started with (a home flag is added when they
 /// name none).
-fn spawner() -> Result<ProcessSpawner, String> {
+fn spawner(choice: Option<HomeChoice>) -> Result<ProcessSpawner, String> {
     let args: Vec<OsString> = with_home_flag(
         std::env::args_os().skip(1).collect(),
-        &HomeEnv::from_process(),
+        &HomeEnv {
+            choice,
+            ..HomeEnv::from_process()
+        },
     );
     let launcher = launcher::resolve(&LauncherEnv::from_process()).map_err(|error| {
         // Logged once, here: a notice saying "not available" is for the user,

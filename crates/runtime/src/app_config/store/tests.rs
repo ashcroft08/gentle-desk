@@ -277,3 +277,47 @@ fn the_saved_document_carries_the_theme_as_the_stylesheet_names_it() {
     assert_eq!(document["theme"], serde_json::json!("Gentleman-Cute"));
     assert_eq!(document["version"], serde_json::json!(CONFIG_VERSION));
 }
+
+/// A v1 document written BEFORE the shell home choice existed.
+#[test]
+fn a_config_without_the_shell_home_field_loads_with_no_choice() {
+    let data =
+        br#"{"version":1,"theme":"dark","workspaces":[{"path":"C:/dev/p","collapsed":false}]}"#;
+    let loaded = super::document::parse(data).expect("an older v1 document loads");
+
+    assert_eq!(loaded.shell_home, None);
+    assert_eq!(loaded.workspaces.len(), 1);
+}
+
+#[test]
+fn a_shell_home_choice_round_trips_and_is_not_written_while_unset() {
+    for choice in [
+        gentle_backend::home::HomeChoice::Link,
+        gentle_backend::home::HomeChoice::Isolated,
+    ] {
+        let mut config = crate::app_config::AppConfig::default();
+        assert!(config.set_shell_home(choice));
+        let bytes = super::document::bytes(&config).expect("serialises");
+        let back = super::document::parse(&bytes).expect("parses");
+        assert_eq!(back.shell_home, Some(choice));
+    }
+    let bytes = super::document::bytes(&crate::app_config::AppConfig::default()).unwrap();
+    assert!(!String::from_utf8(bytes).unwrap().contains("shell_home"));
+}
+
+#[test]
+fn an_unknown_shell_home_loads_as_no_choice_and_keeps_the_workspaces() {
+    let data = br#"{"version":1,"shell_home":"cloud","workspaces":[{"path":"C:/dev/p","collapsed":false}]}"#;
+    let loaded = super::document::parse(data).expect("an unknown choice is not a damaged file");
+
+    assert_eq!(loaded.shell_home, None);
+    assert_eq!(loaded.workspaces.len(), 1);
+}
+
+#[test]
+fn choosing_the_same_shell_home_again_changes_nothing() {
+    let mut config = crate::app_config::AppConfig::default();
+    assert!(config.set_shell_home(gentle_backend::home::HomeChoice::Link));
+    assert!(!config.set_shell_home(gentle_backend::home::HomeChoice::Link));
+    assert!(config.set_shell_home(gentle_backend::home::HomeChoice::Isolated));
+}

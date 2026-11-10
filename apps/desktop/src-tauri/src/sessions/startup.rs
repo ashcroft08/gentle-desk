@@ -15,7 +15,7 @@
 
 use std::sync::{Arc, Mutex};
 
-use gentle_backend::home::{agent_dir, with_home_flag, HomeEnv};
+use gentle_backend::home::{agent_dir, with_home_flag, HomeChoice, HomeEnv};
 use gentle_backend::session_cache;
 use gentle_backend::session_index::SessionIndex;
 use gentle_runtime::cache_path;
@@ -34,8 +34,8 @@ const NO_HOME: &str = "no pi home to read sessions from";
 /// The sessions of this run: the flow of its index, the service that runs the
 /// passes it asks for, and the wiring that starts the watcher and the safety net
 /// at boot.
-pub fn service(holder: Arc<AppStateHolder>) -> SessionsService {
-    let flow = flow();
+pub fn service(holder: Arc<AppStateHolder>, choice: Option<HomeChoice>) -> SessionsService {
+    let flow = flow(choice);
     let run = run_pass(flow.shared());
     SessionsService::wired(holder, flow, run, Wiring::real())
 }
@@ -43,8 +43,11 @@ pub fn service(holder: Arc<AppStateHolder>) -> SessionsService {
 /// The refresh flow of this run: the index restored from the cache when it is
 /// valid, the directory a pass enumerates, and the directory a watcher is
 /// started on. The watcher itself is started at boot.
-fn flow() -> Flow {
-    let home_env = HomeEnv::from_process();
+fn flow(choice: Option<HomeChoice>) -> Flow {
+    let home_env = HomeEnv {
+        choice,
+        ..HomeEnv::from_process()
+    };
     let args = with_home_flag(std::env::args_os().skip(1).collect(), &home_env);
     // A missing sessions directory is an empty list, not an error: the flow
     // still runs the pass that settles the list to complete.

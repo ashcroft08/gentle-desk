@@ -76,21 +76,22 @@ impl Bridge {
         let clipboard: Arc<dyn Clipboard> = Arc::new(SystemClipboard::new());
         let opener: Arc<dyn LinkOpener> = Arc::new(SystemLinkOpener::new());
         let path = ConfigSnapshot::path_from_env();
-        let holder = Arc::new(AppStateHolder::with_config(ConfigSnapshot::at(
-            path.as_deref(),
-        )));
+        let snapshot = ConfigSnapshot::at(path.as_deref());
+        // Read once: the home the user chose applies from this start on, and a
+        // change made while the app runs waits for the next one.
+        let home_choice = snapshot.config.shell_home;
+        let holder = Arc::new(AppStateHolder::with_config(snapshot));
         let pump = Arc::new(EventPump::new(Arc::clone(&holder)));
-        let sessions = Arc::new(startup::service(Arc::clone(&holder)));
+        let sessions = Arc::new(startup::service(Arc::clone(&holder), home_choice));
         let writer = ConfigWriter::spawn(path);
         holder.arm_config_saves(writer.clone());
         let folders = Arc::new(PendingFolders::default());
         let bridge = Self {
             holder: Arc::clone(&holder),
-            executor: Arc::new(RuntimeExecutor::new(
-                Arc::clone(&pump),
-                Arc::clone(&folders),
-                Arc::clone(&holder),
-            )),
+            executor: Arc::new(
+                RuntimeExecutor::new(Arc::clone(&pump), Arc::clone(&folders), Arc::clone(&holder))
+                    .with_home_choice(home_choice),
+            ),
             pump,
             sessions,
             folders,
