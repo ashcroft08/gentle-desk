@@ -1,0 +1,33 @@
+// The composer's words: the artboard's own text where it draws one
+// (design/gentle-desk-v2/01a-tree-chat.html for the box, 00-states-board.html for
+// what each state says), so the design and the app cannot drift apart silently.
+//
+// The three reasons are this slice's own words: the states board names the
+// composer's behaviour per state ("Send disabled until the chat is ready",
+// "says it is waiting for a slot") but draws no line, so the text below says the
+// same thing in the form the app can show, and nothing more.
+
+/** The prompt box's accessible name (the artboard's `aria-label`). */
+export const MESSAGE_LABEL = 'Message'
+
+/** The box's placeholder (the artboard's `placeholder`). */
+export const MESSAGE_PLACEHOLDER = 'Message gentle-shell'
+
+/** The two buttons, each its own accessible name (the artboard's). */
+export const SEND = 'Send'
+export const STOP = 'Stop'
+
+/** The id of the line that says why Send is disabled; Send is described by it. */
+export const SEND_WHY_ID = 'composer-send-why'
+
+/** The tallest the box grows before it scrolls (the artboard's `max-height`). */
+export const MAX_HEIGHT = 120
+
+/** Opening: the chat's process is coming up and cannot take a prompt yet. */
+export const OPENING_REASON = 'Send is available once the chat is ready.'
+
+/** Queued: the chat's own prompt waits for a free working slot. */
+export const QUEUED_REASON = 'Waiting for a free slot.'
+
+/** Ended: the chat's process is gone until it is restarted. */
+export const ENDED_REASON = "This chat's process exited. Restart it to keep talking."

@@ -10,8 +10,19 @@
   {#each ICON_SHAPES[name] as shape, index (index)}
     {#if shape.kind === 'path'}
       <path d={shape.d} />
-    {:else}
+    {:else if shape.kind === 'circle'}
       <circle cx={shape.cx} cy={shape.cy} r={shape.r} />
+    {:else}
+      <!-- The one filled element the artboard draws (Stop's square). -->
+      <rect
+        x={shape.x}
+        y={shape.y}
+        width={shape.width}
+        height={shape.height}
+        rx={shape.rx}
+        fill="currentColor"
+        stroke="none"
+      />
     {/if}
   {/each}
 </svg>

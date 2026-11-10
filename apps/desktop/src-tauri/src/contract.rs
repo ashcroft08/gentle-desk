@@ -200,14 +200,29 @@ pub enum NoticeLevel {
     Error,
 }
 
-/// One notice, flattened for display: id, text, level. The id the dismiss
-/// intent refers back to. The app lays notices out newest last and keeps the
-/// most recent ones, which the view reflects as received.
+/// The one thing the user can do about a notice, when the notice reports
+/// something the app can fix by itself (S3). It names its own target, so a
+/// notice about a background chat is fixed without opening that chat first.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(tag = "type", content = "data")]
+pub enum NoticeActionView {
+    /// Start that chat's child again and reopen it: what a death notice offers
+    /// as its one action ([`UiIntent::RestartChat`], which takes this id back).
+    RestartChat { chat_id: String },
+}
+
+/// One notice, flattened for display: id, text, level, and the one action that
+/// fixes it when there is one. The id is the one the dismiss intent refers back
+/// to. The app lays notices out newest last and keeps the most recent ones,
+/// which the view reflects as received.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
 pub struct NoticeView {
     pub id: u32,
     pub text: String,
     pub level: NoticeLevel,
+    /// `None` for a notice that only reports something (an extension's own
+    /// message), so the view never draws a button that does nothing.
+    pub action: Option<NoticeActionView>,
 }
 
 /// The state the current views render: the foreground chat (as the app names
@@ -225,6 +240,13 @@ pub struct NoticeView {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct ViewState {
     pub foreground_chat: Option<String>,
+    /// The title the chat header draws for the foreground chat: the stored
+    /// session's own title, which is the text a sidebar row draws (and the same
+    /// source), untruncated here because the header cuts it for its own width and
+    /// keeps the whole name for whoever asks. A chat with no session file yet is
+    /// named [`NEW_CHAT_TITLE`](crate::sessions::view::NEW_CHAT_TITLE), and no
+    /// foreground chat has no title.
+    pub foreground_title: Option<String>,
     /// How complete the session list is. It starts `Loading`, so the sidebar
     /// never claims there are no chats before the first pass ends.
     pub list_status: ListStatusView,
