@@ -10,10 +10,12 @@
 //! The choice applies from the next start: the children and the session index
 //! of this run already took the home they started with.
 
+use std::sync::atomic::Ordering;
+
 use gentle_backend::home::HomeChoice;
 
 use super::{lock, AppStateHolder};
-use crate::contract::{HomeChoiceView, ShellView, ViewState};
+use crate::contract::{HomeChoiceView, InstallView, ShellView, ViewState};
 
 impl AppStateHolder {
     /// Records the folder of the user's pi, as found at startup (`None` when
@@ -29,6 +31,41 @@ impl AppStateHolder {
         self.view()
     }
 
+    /// Records whether the `gentle-shell` launcher resolves on this machine.
+    pub fn set_launcher_found(&self, found: bool) {
+        self.launcher_missing.store(!found, Ordering::SeqCst);
+    }
+
+    /// "Check again": looks for the launcher once more through `probe` and
+    /// answers the slice to push. The install outcome is left as it is, so the
+    /// screen still says how the install went.
+    pub fn recheck_launcher(&self, probe: &dyn Fn() -> bool) -> ViewState {
+        self.set_launcher_found(probe());
+        self.view()
+    }
+
+    /// Marks an install as started. `true` when the caller must run it: the
+    /// first request, or one after a failure. While it runs, and once it is
+    /// done, nothing starts a second one.
+    pub fn begin_install(&self) -> bool {
+        let mut install = lock(&self.install);
+        match *install {
+            InstallView::Idle | InstallView::Failed { .. } => {
+                *install = InstallView::Running;
+                true
+            }
+            InstallView::Running | InstallView::Done => false,
+        }
+    }
+
+    /// Records how the install ended.
+    pub fn finish_install(&self, outcome: Result<(), String>) {
+        *lock(&self.install) = match outcome {
+            Ok(()) => InstallView::Done,
+            Err(message) => InstallView::Failed { message },
+        };
+    }
+
     /// What this run knows about the shell, taken off the config lock before any
     /// state lock is taken, as the theme is.
     pub(super) fn shell_view(&self) -> ShellView {
@@ -38,6 +75,8 @@ impl AppStateHolder {
             ask: pi_path.is_some() && choice.is_none(),
             choice: choice.map(view_choice),
             pi_path,
+            launcher_found: !self.launcher_missing.load(Ordering::SeqCst),
+            install: lock(&self.install).clone(),
         }
     }
 }

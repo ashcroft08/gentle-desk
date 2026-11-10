@@ -9,7 +9,7 @@
 use gentle_app::{ChatId, Input, Intent};
 use gentle_desk_lib::bridge::AppStateHolder;
 use gentle_desk_lib::contract::{
-    ListStatusView, NoticeLevel, ShellView, ThemeView, UiIntent, ViewState,
+    InstallView, ListStatusView, NoticeLevel, ShellView, ThemeView, UiIntent, ViewState,
 };
 
 #[test]
@@ -81,6 +81,9 @@ fn the_view_state_slice_has_no_invented_fields() {
                 pi_path: None,
                 choice: None,
                 ask: false,
+                // Nothing looked for the launcher, so none is claimed missing.
+                launcher_found: true,
+                install: InstallView::Idle,
             },
             foreground_chat: None,
             // No chat is open, so no header title is drawn either.

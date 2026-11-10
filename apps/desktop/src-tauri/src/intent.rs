@@ -31,6 +31,8 @@ pub fn to_intent(state: &gentle_app::AppState, intent: UiIntent) -> Option<gentl
         UiIntent::SetShellHome { .. } => return None,
         // The relaunch is the bridge's: it needs the window handle.
         UiIntent::RestartApp => return None,
+        // So are the install and the look for the launcher.
+        UiIntent::InstallShell | UiIntent::CheckShellAgain => return None,
         UiIntent::RestartChat { chat_id } => {
             gentle_app::Intent::RestartChat(chat_for(state, &chat_id))
         }

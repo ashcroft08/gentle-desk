@@ -74,6 +74,22 @@ pub enum HomeChoiceView {
     Isolated,
 }
 
+/// Where installing gentle-shell stands (shell-choice S4). It only leaves `Idle`
+/// when the user gave permission on the permission screen.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(tag = "type", content = "data")]
+pub enum InstallView {
+    #[default]
+    Idle,
+    Running,
+    Done,
+    /// The install ended badly; `message` is its exit code and the last lines
+    /// of what it printed, bounded.
+    Failed {
+        message: String,
+    },
+}
+
 /// What the app knows about the shell and the home it runs on: what it found at
 /// start and what the user chose (shell-choice S1-S3).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
@@ -86,6 +102,12 @@ pub struct ShellView {
     /// Whether the welcome question is due: pi was found and nothing is chosen
     /// yet. With no pi there is nothing to choose between, so it is never due.
     pub ask: bool,
+    /// Whether the `gentle-shell` launcher resolves on this machine. `true`
+    /// until the app has looked, so a run that did not look never claims it is
+    /// missing.
+    pub launcher_found: bool,
+    /// Where installing gentle-shell stands.
+    pub install: InstallView,
 }
 
 /// What the user asked for, as the web side sends it. Only the intents the
@@ -135,6 +157,11 @@ pub enum UiIntent {
     /// Start the app again after the orderly close (config and cache flushed
     /// first): a home chosen at the welcome question applies to a new run.
     RestartApp,
+    /// The user gave permission to install gentle-shell (the button of the
+    /// permission screen). Nothing installs without this intent.
+    InstallShell,
+    /// Look for the `gentle-shell` launcher once more ("Check again").
+    CheckShellAgain,
     /// Start the child of a chat that died again and reopen it (S3).
     RestartChat {
         chat_id: String,

@@ -29,6 +29,7 @@ use crate::link_opener::{LinkOpener, SystemLinkOpener};
 use crate::pending::PendingFolders;
 use crate::picker::{FolderPicker, NativeFolderPicker};
 use crate::sessions::{startup, SessionsService};
+use crate::shell_install::{CommandInstaller, Installer};
 use crate::theme::SystemWindowTheme;
 use crate::workspace::{self, WorkspaceAction};
 
@@ -63,6 +64,8 @@ pub struct Bridge {
     /// Set by [`UiIntent::RestartApp`]: the close that follows ends by starting
     /// the app again instead of leaving.
     relaunch: Arc<std::sync::atomic::AtomicBool>,
+    /// What installs gentle-shell, once the user asked for it (shell-choice S4).
+    installer: Arc<dyn Installer>,
 }
 
 impl Bridge {
@@ -84,6 +87,9 @@ impl Bridge {
         // change made while the app runs waits for the next one.
         let home_choice = snapshot.config.shell_home;
         let holder = Arc::new(AppStateHolder::with_config(snapshot));
+        // Whether the launcher resolves is asked once here too, so a machine with
+        // no gentle-shell is told at the first frame, not at the first chat.
+        holder.set_launcher_found(launcher_resolves());
         // Only the existence of pi's folder is asked, once, outside every lock.
         holder.set_pi_path(
             gentle_backend::home::detect_pi(
@@ -112,6 +118,7 @@ impl Bridge {
             writer,
             close: Mutex::new(None),
             relaunch: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            installer: Arc::new(CommandInstaller::npm()),
         };
         // The reducer doesn't refresh the list itself: it answers
         // `Command::RefreshSessions` and this is where that one is run. A copy
@@ -235,6 +242,34 @@ impl Bridge {
         app: &AppHandle<tauri::Wry>,
     ) -> Result<ViewState, String> {
         self.accepting_work()?;
+        // Installing gentle-shell: only the permission screen's button sends
+        // this, and the install runs on a thread of its own, so the window keeps
+        // answering and shows its progress through the next push.
+        if matches!(intent, UiIntent::InstallShell) {
+            if self.holder.begin_install() {
+                let holder = Arc::clone(&self.holder);
+                let installer = Arc::clone(&self.installer);
+                let app = app.clone();
+                let started = std::thread::Builder::new()
+                    .name("shell-install".to_owned())
+                    .spawn(move || {
+                        holder.finish_install(installer.install());
+                        push(&app, holder.view());
+                    });
+                if started.is_err() {
+                    self.holder
+                        .finish_install(Err("could not start the install".to_owned()));
+                }
+            }
+            let view = self.holder.view();
+            emit_state(app, &view)?;
+            return Ok(view);
+        }
+        if matches!(intent, UiIntent::CheckShellAgain) {
+            let view = self.holder.recheck_launcher(&launcher_resolves);
+            emit_state(app, &view)?;
+            return Ok(view);
+        }
         // A relaunch is the close flow with a different last step: the config
         // writer and the session cache are flushed first, as for any close.
         if matches!(intent, UiIntent::RestartApp) {
@@ -315,6 +350,12 @@ impl Bridge {
         }
         Ok(())
     }
+}
+
+/// Whether the `gentle-shell` launcher resolves on this machine right now.
+fn launcher_resolves() -> bool {
+    gentle_backend::launcher::resolve(&gentle_backend::launcher::LauncherEnv::from_process())
+        .is_ok()
 }
 
 /// A bridge with nothing run yet: the same one [`Bridge::new`] builds.
