@@ -12,7 +12,7 @@
   //   and Escape never touches the draft.
   import { dispatchIntent } from '../bridge'
   import type { ChatActivityMark } from '../contract/bindings'
-  import { MESSAGE_LABEL, MESSAGE_PLACEHOLDER, SEND_WHY_ID } from './copy'
+  import { KEYS_HINT, MESSAGE_LABEL, MESSAGE_PLACEHOLDER, SEND_WHY_ID } from './copy'
   import { fittedHeight, shouldSend } from './keys'
   import SendButton from './SendButton.svelte'
   import { composerStateOf } from './state'
@@ -66,6 +66,13 @@
   }
 
   function keyed(event: KeyboardEvent): void {
+    // Escape stops a running turn, the same Abort the Stop button sends; with
+    // nothing running it keeps the meaning the box gives it.
+    if (event.key === 'Escape' && rule.mode === 'stop') {
+      event.preventDefault()
+      stop()
+      return
+    }
     // Only a send takes the Enter: with nothing to send, or a chat that cannot
     // take a prompt, the key keeps the meaning the box gives it.
     if (!shouldSend(event) || !sendable) return
@@ -114,4 +121,5 @@
     <!-- The visible reason for a disabled Send, which Send is described by. -->
     <p class="why" id={SEND_WHY_ID}>{rule.reason}</p>
   {/if}
+  <p class="keys">{KEYS_HINT}</p>
 </div>

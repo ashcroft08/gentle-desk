@@ -107,6 +107,24 @@ describe('App', () => {
     expect(screen.getByRole('button', { name: 'Dismiss' })).toBeTruthy()
   })
 
+  it('draws no info notice, only the warning beside it', async () => {
+    serveSidebar({
+      view: viewState({
+        foreground_chat: 'c:chat-1',
+        foreground_title: 'Quiet one',
+        messages: [MESSAGE],
+        notices: [
+          plainNotice(1, 'Skill registry refreshed (19 skills)', 'Info'),
+          plainNotice(2, 'Could not read 3 chat files.', 'Warning'),
+        ],
+      }),
+    })
+    render(App)
+
+    expect(await screen.findByText('Could not read 3 chat files.')).toBeTruthy()
+    expect(screen.queryByText('Skill registry refreshed (19 skills)')).toBeNull()
+  })
+
   it('shows the fatal launcher bar above everything, with no chat open', async () => {
     serveSidebar({
       view: viewState({ foreground_chat: null, fatal: 'gentle-shell is not available' }),

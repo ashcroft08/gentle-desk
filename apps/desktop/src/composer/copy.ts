@@ -11,7 +11,10 @@
 export const MESSAGE_LABEL = 'Message'
 
 /** The box's placeholder (the artboard's `placeholder`). */
-export const MESSAGE_PLACEHOLDER = 'Message gentle-shell'
+export const MESSAGE_PLACEHOLDER = 'Tell Gentle what you need...'
+
+/** The line under the box that lists the three keys the box answers to. */
+export const KEYS_HINT = 'Enter to send \u00b7 Shift+Enter for a new line \u00b7 Esc to stop'
 
 /** The two buttons, each its own accessible name (the artboard's). */
 export const SEND = 'Send'

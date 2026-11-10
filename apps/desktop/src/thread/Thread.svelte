@@ -4,7 +4,8 @@
   // the growing tail per delta, never the finished blocks again) and the scroll
   // rule (stick to the bottom while the reader is there, leave them be if they
   // scrolled up).
-  import type { MessageView } from '../contract/bindings'
+  import type { ChatActivityMark, MessageView } from '../contract/bindings'
+  import Activity from './Activity.svelte'
   import Message from './Message.svelte'
   import { REPLYING_STATUS, THREAD_LABEL } from './copy'
   import { createMarkdownCache } from './markdown'
@@ -15,6 +16,7 @@
     foregroundChat = null,
     visible = true,
     scrollTop = $bindable(0),
+    mark = null,
   }: {
     /** The foreground chat's messages, oldest first, as Rust pushed them. */
     messages?: MessageView[]
@@ -29,6 +31,8 @@
     visible?: boolean
     /** Where the reader was, kept by the shell across a trip to Helpers. */
     scrollTop?: number
+    /** What the chat is doing: the activity line under the last message follows it. */
+    mark?: ChatActivityMark | null
   } = $props()
 
   /** The one cache of this thread: per message id, only the growing tail renders. */
@@ -67,13 +71,14 @@
     // and the whole drawn list, whose height changes on any delta.
     const chat = foregroundChat
     const list = rows
+    const busy = mark
     const moved = chat !== shown
     if (moved) {
       shown = chat
       // A new chat starts at the bottom, whatever the previous one was scrolled to.
       stick = true
     }
-    if (box === null || list.length === 0) return
+    if (box === null || (list.length === 0 && busy === null)) return
     const top = nextScrollTop(
       { scrollTop: box.scrollTop, scrollHeight: box.scrollHeight, clientHeight: box.clientHeight },
       stick || moved,
@@ -108,6 +113,7 @@
     {#each rows as row (row.message.id)}
       <Message message={row.message} html={row.html} />
     {/each}
+    <Activity {mark} />
   </div>
   {#if streaming}
     <!-- The only live region of the thread: the reply bodies stay out of it, so

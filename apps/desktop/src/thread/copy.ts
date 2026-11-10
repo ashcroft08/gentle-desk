@@ -21,3 +21,9 @@ export const REPLYING_STATUS = 'Assistant is replying'
 
 /** The dimension of the danger box, unchanged from the iced thread. */
 export const MODEL_ERROR_TITLE = 'Model error'
+
+/** The activity line while the chat's process comes up. */
+export const OPENING_STATUS = 'Opening chat'
+
+/** The activity line while the model works on a turn. */
+export const WORKING_STATUS = 'Working'

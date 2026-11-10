@@ -16,6 +16,7 @@
   import Dialogs from './dialogs/Dialogs.svelte'
   import HelpersPanel from './helpers/HelpersPanel.svelte'
   import Notices from './notices/Notices.svelte'
+  import { visibleNotices } from './notices/visible'
   import Sidebar from './sidebar/Sidebar.svelte'
   import Thread from './thread/Thread.svelte'
   import { createThreadView } from './thread/view'
@@ -24,6 +25,7 @@
   const chrome = createChatView()
   const model = $derived($thread)
   const chat = $derived($chrome)
+  const shownNotices = $derived(visibleNotices(chat.notices))
 
   // The active view is the shell's own choice, never Rust's state: it survives a
   // push and a chat switch, and the next start begins on Chat.
@@ -58,9 +60,9 @@
         running={chat.helpers?.running ?? 0}
         onSelect={(next) => (tab = next)}
       />
-      {#if chat.notices.length > 0}
+      {#if shownNotices.length > 0}
         <div class="notices">
-          <Notices notices={chat.notices} />
+          <Notices notices={shownNotices} />
         </div>
       {/if}
       <!-- Both views stay mounted, one `hidden`, as 01b draws them: the composer
@@ -76,6 +78,7 @@
           <Thread
             messages={model.messages}
             foregroundChat={model.chat}
+            mark={chat.mark}
             visible={tab === 'chat'}
             bind:scrollTop={threadScroll}
           />
