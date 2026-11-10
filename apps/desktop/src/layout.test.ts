@@ -13,11 +13,14 @@ function ruleBody(selector: string): string {
 }
 
 describe('the conversation width', () => {
-  it('has one maximum, wide enough for a big window', () => {
+  it('keeps the line in the readable band instead of filling any window', () => {
     const declared = /--chat-max:\s*(\d+)px/.exec(APP_CSS)
 
     expect(declared).not.toBeNull()
-    expect(Number(declared?.[1])).toBeGreaterThanOrEqual(1200)
+    // About 60 to 80 characters at this font size: the band reading research
+    // agrees on. Below it the text is cramped, above it the eye loses its place.
+    expect(Number(declared?.[1])).toBeGreaterThanOrEqual(700)
+    expect(Number(declared?.[1])).toBeLessThanOrEqual(1000)
   })
 
   it('applies it to the thread and to the box, not a narrow number of their own', () => {
