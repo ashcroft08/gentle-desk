@@ -223,7 +223,7 @@ Real gentle-shell (global install, `gentle-pi\bin\gentle-shell.mjs`), spawned ex
 the app does: `node …gentle-shell.mjs --mode rpc --home <home> [--session <path>]` with
 `GENTLE_SHELL_INTERACTIVE_HOST=1`, cwd = the gentle-desk repo. Scratch home in a
 `mktemp -d` outside the repo, populated with `node tools/perf/gen-home.mjs <dir>/home 6 4`
-(6 sessions); every header's `cwd` was rewritten to `C:/Users/josep/dev/gentle-desk`
+(6 sessions); every header's `cwd` was rewritten to `<repo>`
 except one session kept at the generator's `C:/dev/proj5` (which does not exist).
 Only no-model calls were sent, read-only: `get_state` right after spawn and
 `get_messages` right after the state reply. Every spawned tree was killed after its
@@ -262,7 +262,7 @@ exited with **code 1 after 354 ms**. Its stderr ends with:
 ```text
 Stored session working directory does not exist: C:\dev\proj5
 Session file: <path to the session .jsonl>
-Current working directory: C:\Users\josep\dev\gentle-desk
+Current working directory: <repo>
 ```
 
 It is a clean, fast, reported failure — never a crash and never a silent dead-end.

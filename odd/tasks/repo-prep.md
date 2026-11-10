@@ -10,7 +10,7 @@
 - [x] T1 `main` branch at the tip of the linear history (17 commits + this one); the feature branches are its ancestors and were left in place
 - [x] T2 `LICENSE` (MIT, holder `ashcroft08` as chosen by the user: "dejar solo ashcroft08") and `NOTICE.md` crediting the reference app (MIT, Gentleman Programming) for the copied fixtures and the ported reducer behaviour
 - [x] T3 `.github/workflows/ci.yml`: windows-latest, fmt --check, clippy -D warnings, test (the same three commands pass locally; the workflow itself has not run — it needs a remote)
-- [x] T4 Review of what would become public: no secrets (matches were token-usage fields and `%dp0%`); three lines in `odd/` name the local path `C:\Users\josep\...`; commit metadata carries the git author `ashcroft08 <johangracia40@gmail.com>`
+- [x] T4 Review of what would become public: no secrets (matches were token-usage fields and `%dp0%`); three lines in `odd/` name the local path `[path anonymised]`; commit metadata carries the git author `ashcroft08 <johangracia40@gmail.com>`
 
 ## Open decisions for the user
 

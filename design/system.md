@@ -17,11 +17,11 @@ status colours `0x7aa2f7`, `0x7edc9a`, `0xff7b7b` still hold for the entry that 
 
 | Picker entry | Resolves to | Source file | State of values |
 |---|---|---|---|
-| `system` | `dark` or `light` via `prefers-color-scheme` | built-in; no theme file under `C:/Users/josep/AppData/Roaming/npm/node_modules/gentle-pi/themes/` | PROPOSED (uses this document's `dark` / `light` tables) |
+| `system` | `dark` or `light` via `prefers-color-scheme` | built-in; no theme file under `<npm global>/node_modules/gentle-pi/themes/` | PROPOSED (uses this document's `dark` / `light` tables) |
 | `dark` | dark built-in | built-in; no theme file found | PROPOSED (round-1 values, unchanged) |
-| `Gentle` | - | `C:/Users/josep/AppData/Roaming/npm/node_modules/gentle-pi/themes/Gentle.json` | real values from the file |
-| `Gentleman-Cute` | - | `C:/Users/josep/AppData/Roaming/npm/node_modules/gentle-pi/themes/Gentleman-Cute.json` | real values from the file |
-| `Gentleman-Sexy` | - | `C:/Users/josep/AppData/Roaming/npm/node_modules/gentle-pi/themes/Gentleman-Sexy.json` | real values from the file |
+| `Gentle` | - | `<npm global>/node_modules/gentle-pi/themes/Gentle.json` | real values from the file |
+| `Gentleman-Cute` | - | `<npm global>/node_modules/gentle-pi/themes/Gentleman-Cute.json` | real values from the file |
+| `Gentleman-Sexy` | - | `<npm global>/node_modules/gentle-pi/themes/Gentleman-Sexy.json` | real values from the file |
 | `light` | light built-in | built-in; no theme file found | PROPOSED (round-1 values, unchanged) |
 
 Legend for the Source column in the tables below: `real: <terminal var>` means the value is that
