@@ -1,5 +1,15 @@
 # Third-party material
 
+The copyright line of `LICENSE` names the chain this app stands on, the way
+[gentle-shell](https://github.com/Gentleman-Programming/gentle-shell) names pi's
+creator in its own MIT license:
+
+- **Mario Zechner (2025)**: pi, the coding agent this app talks to. It speaks pi's
+  JSONL RPC and only passes it flags; no pi code is copied here.
+- **Gentleman Programming (2026)**: gentle-shell, the workspace built on pi, and
+  gentle-shell-desktop, the reference client.
+- **ashcroft08 (2026)**: this app, Gentle Shell Desktop.
+
 ## gentle-shell-desktop (MIT)
 
 The recorded RPC streams in `crates/gentle-core/tests/fixtures/` were copied from
