@@ -45,6 +45,8 @@ cd apps/desktop
 npx tauri build   # writes target/release/bundle/nsis/gentle-desk_<version>_x64-setup.exe
 ```
 
+The installer shows the rose on its welcome and header pages: `tools/installer/make-images.ps1` draws
+`apps/desktop/src-tauri/installer/sidebar.bmp` and `header.bmp` from the app icon (run it again after changing the icon).
 The icon set under `apps/desktop/src-tauri/icons/` is generated from `apps/desktop/app-icon.png`
 with `npx tauri icon app-icon.png -o src-tauri/icons`.
 
