@@ -30,7 +30,7 @@ What a turn does depends on the prompt text:
 | `error`    | assistant message ending with `stopReason: "error"` (`quota exceeded (fake)`), then a `notify` warning; the turn settles normally |
 | `dialog`   | a `confirm` (`d1`), a `select` (`d2`, options `a`/`b`) and an `input` (`d3`), one at a time; the reply echoes the raw responses    |
 | `flood`    | one turn with 300 markdown assistant messages (heading, list, code block), to stress long threads |
-| `helpers` | publishes a helpers widget with one helper per state (running, waiting, queued, done, failed), then echoes |
+| `helpers` | publishes a helpers widget with one helper per state (running, waiting, queued, done, failed), then echoes; every helper's thread shows a different item shape (see below) |
 | `slow`     | a `text_delta` of `tick ` every 100 ms until `{"type":"abort"}`; the message then ends with `ABORTED`                             |
 | `stream N` | the same `tick ` deltas for N seconds (0.2 to 60), then the message ends with the whole streamed text: a working chat that finishes on its own |
 | anything   | `echo: <prompt>`                                                                                                                |
@@ -40,6 +40,16 @@ Every turn starts by acknowledging the prompt with
 
 `slow` self-terminates after 30 s with the same `ABORTED` message, so a client
 that forgets to abort cannot keep the process alive.
+
+### The `helpers` frame
+
+`helpers-frame.mjs` fills every helper's thread with one of the shapes a helper
+thread view draws: markdown the helper said (bold, inline code, a link), what it
+thought, a note, tool calls with arguments, output and their status (running,
+ok, failed), a `dropped` count on the running helper (2 earlier items), and an
+empty thread on the queued one. That is enough to check the thread header, the
+said/thought/ran rows, the dropped line and the "no activity yet" line by eye
+without a model.
 
 ## Sessions and logging
 

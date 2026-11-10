@@ -137,6 +137,7 @@ export function viewState(overrides: Partial<ViewState_Serialize> = {}): ViewSta
     dialog: null,
     helpers: null,
     selected_helper: null,
+    helper_thread: null,
     activity: [],
     fatal: null,
     config_notice: null,

@@ -53,7 +53,8 @@ fn row(task: &gentle_core::helpers::HelperTask) -> HelperRowView {
 }
 
 /// The contract's status enum matches the helper state's statuses one to one.
-fn view_status(status: HelperStatus) -> HelperStatusView {
+/// Shared with the helper thread slice, whose header carries the same status.
+pub(crate) fn view_status(status: HelperStatus) -> HelperStatusView {
     match status {
         HelperStatus::Queued => HelperStatusView::Queued,
         HelperStatus::Running => HelperStatusView::Running,
@@ -67,6 +68,6 @@ fn view_status(status: HelperStatus) -> HelperStatusView {
 /// A counter the app keeps as `u64` in the contract's `u32`. The saturating
 /// value would mark a clamp, never a silent alias: no chat delegates four
 /// billion helpers.
-fn narrow(value: u64) -> u32 {
+pub(crate) fn narrow(value: u64) -> u32 {
     u32::try_from(value).unwrap_or(u32::MAX)
 }

@@ -221,6 +221,66 @@ export type HelperRowView_Serialize = {
 export type HelperStatusView = "Queued" | "Running" | "Waiting" | "Done" | "Failed" | "Cancelled";
 
 /**
+ *  One item of a helper's thread, flattened for display: what the helper said,
+ *  what it thought, a note it left, or one tool call it ran. Every text is
+ *  already built by `gentle_runtime::helper_text` and its `format` module, so no
+ *  `serde_json::Value` crosses the contract.
+ */
+export type HelperThreadItemView = 
+/**
+ *  A piece of the helper's own reply, drawn as markdown like the chat
+ *  thread's assistant messages.
+ */
+{ kind: "Said"; text: string } | 
+/**  The helper's reasoning, drawn as a muted block. */
+{ kind: "Thought"; text: string } | 
+/**  A note the helper left, drawn as plain muted text. */
+{ kind: "Note"; text: string } | 
+/**
+ *  One tool call: its name, how it stands, its arguments on one line and the
+ *  first lines of its output, both already truncated by the rules.
+ */
+{ kind: "Ran"; name: string; status: ToolStatusView; args_line: string; output_preview: string };
+
+/**
+ *  The open helper's thread: the header both windows draw and the items the
+ *  thread scrolls through.
+ * 
+ *  Only the SELECTED helper of the FOREGROUND chat is here, so this slice never
+ *  carries another task's transcript. It is bounded too: the push carries the
+ *  last [`THREAD_ITEMS_PUSHED`](crate::helper_thread::THREAD_ITEMS_PUSHED) items
+ *  and [`dropped`](Self::dropped) counts the ones left out, so the thread's own
+ *  "earlier items were dropped" line stays true.
+ */
+export type HelperThreadView = {
+	/**
+	 *  The id [`HelperRowView::id`] carried and [`UiIntent::SelectHelper`] takes
+	 *  back.
+	 */
+	id: string,
+	/**  The thread's headline, from [`gentle_runtime::helper_text::task_title`]. */
+	title: string,
+	agent: string,
+	status: HelperStatusView,
+	/**
+	 *  The status as text, from
+	 *  [`gentle_runtime::helper_text::status_label`]: it is the thread's
+	 *  accessible name for the status mark, so the text, not the colour, carries
+	 *  the state.
+	 */
+	status_label: string,
+	/**  The task's prompt, truncated to the length iced echoes at the top. */
+	prompt: string,
+	/**
+	 *  How many earlier items the thread does not show: the ones the helper
+	 *  state itself dropped, plus the ones this push left out of a long thread.
+	 */
+	dropped: number,
+	/**  The items the thread draws, oldest first. */
+	items: HelperThreadItemView[],
+};
+
+/**
  *  The helpers panel of the foreground chat: the counters line both windows
  *  draw, the four counts the working badge is derived from, and one row per
  *  task.
@@ -544,6 +604,15 @@ export type StateChanged_Deserialize = ViewState_Deserialize;
 export type StateChanged_Serialize = ViewState_Serialize;
 
 /**
+ *  How one tool call of a helper's thread stands. The two booleans the helper
+ *  state carries are folded into these three by
+ *  [`gentle_runtime::helper_text::format::tool_status`]; the WORD each state is
+ *  drawn with stays the view's own, as it is in iced (`running`, `failed`,
+ *  `ok`).
+ */
+export type ToolStatusView = "Running" | "Failed" | "Ok";
+
+/**
  *  What the user asked for, as the web side sends it. Only the intents the
  *  current slice needs; the rest are added when their views arrive. The
  *  explicit mapping into `gentle-app`'s [`gentle_app::Intent`] keeps this
@@ -700,6 +769,13 @@ export type ViewState_Deserialize = {
 	 *  itself, and always with no foreground chat.
 	 */
 	selected_helper?: string | null,
+	/**
+	 *  The open helper's thread, and only that one: the selected task of the
+	 *  foreground chat, with the header iced draws and its items. `None` when no
+	 *  helper is selected, when no chat is foreground, or when the selected id
+	 *  names no task of that chat (a task the next frame no longer reports).
+	 */
+	helper_thread?: HelperThreadView | null,
 	activity: ChatActivityView[],
 	/**
 	 *  The one failure that ends the whole run instead of one chat: the
@@ -798,6 +874,13 @@ export type ViewState_Serialize = {
 	 *  itself, and always with no foreground chat.
 	 */
 	selected_helper: string | null,
+	/**
+	 *  The open helper's thread, and only that one: the selected task of the
+	 *  foreground chat, with the header iced draws and its items. `None` when no
+	 *  helper is selected, when no chat is foreground, or when the selected id
+	 *  names no task of that chat (a task the next frame no longer reports).
+	 */
+	helper_thread: HelperThreadView | null,
 	activity: ChatActivityView[],
 	/**
 	 *  The one failure that ends the whole run instead of one chat: the
