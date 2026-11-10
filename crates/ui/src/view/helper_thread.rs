@@ -1,13 +1,12 @@
 //! A helper's thread: what it said, thought and ran.
 
-mod format;
-
 use gentle_core::helpers::{HelperTask, HelperThreadItem};
 use iced::widget::{button, column, container, row, scrollable, text};
 use iced::{Element, Font, Length};
 
-use super::helpers::{status_label, status_style, task_title};
-use format::{args_line, output_preview, tool_status, ToolStatus};
+use super::helpers::status_style;
+use gentle_runtime::helper_text::format::{args_line, output_preview, tool_status, ToolStatus};
+use gentle_runtime::helper_text::{status_label, task_title};
 use gentle_runtime::text::truncate;
 
 /// Longest prompt echoed at the top, in characters.

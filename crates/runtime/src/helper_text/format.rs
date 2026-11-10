@@ -2,7 +2,7 @@
 
 use serde_json::Value;
 
-use gentle_runtime::text::truncate;
+use crate::text::truncate;
 
 /// How a tool call of a helper stands.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

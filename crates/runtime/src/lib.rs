@@ -11,6 +11,7 @@ pub mod cache_path;
 pub mod chat_keys;
 pub mod chat_runtime;
 pub mod clock;
+pub mod helper_text;
 pub mod refresh_flow;
 pub mod refresh_queue;
 pub mod save_throttle;
