@@ -23,6 +23,7 @@ use gentle_backend::launcher::{self, LauncherEnv};
 use gentle_runtime::chat_runtime::{ChatRuntime, Outcome};
 
 use super::ChatExecutor;
+use crate::bridge::AppStateHolder;
 use crate::events::EventPump;
 use crate::pending::PendingFolders;
 
@@ -44,14 +45,22 @@ pub struct RuntimeExecutor {
     /// The folders the workspace intents named, waiting for the open of a chat
     /// (`pending`).
     folders: Arc<PendingFolders>,
+    /// Where a launcher that cannot be resolved is reported: the run's one fatal
+    /// bar (`bridge::fatal`), which the next push carries.
+    holder: Arc<AppStateHolder>,
 }
 
 impl RuntimeExecutor {
-    pub fn new(pump: Arc<EventPump>, folders: Arc<PendingFolders>) -> Self {
+    pub fn new(
+        pump: Arc<EventPump>,
+        folders: Arc<PendingFolders>,
+        holder: Arc<AppStateHolder>,
+    ) -> Self {
         Self {
             runtime: OnceLock::new(),
             pump,
             folders,
+            holder,
         }
     }
 
@@ -59,11 +68,20 @@ impl RuntimeExecutor {
     /// to the pump exactly once.
     fn runtime(&self) -> Result<Arc<ChatRuntime>, String> {
         self.runtime
-            .get_or_init(|| {
-                let (runtime, events) = build()?;
-                let runtime = Arc::new(runtime);
-                self.pump.feed(Arc::clone(&runtime), events);
-                Ok(runtime)
+            .get_or_init(|| match build() {
+                Ok((runtime, events)) => {
+                    let runtime = Arc::new(runtime);
+                    self.pump.feed(Arc::clone(&runtime), events);
+                    Ok(runtime)
+                }
+                // A launcher that cannot be resolved makes every chat
+                // impossible, so it is the run's fatal bar and not only this
+                // chat's notice. Noted once, here, because this resolution is
+                // kept: no later command retries a broken launcher.
+                Err(message) => {
+                    self.holder.note_fatal(message.clone());
+                    Err(message)
+                }
             })
             .clone()
     }

@@ -38,6 +38,7 @@ use crate::state_view::view_state;
 use crate::workspace;
 
 mod config;
+mod fatal;
 mod notice;
 
 /// What runs one shared command the reducer asked for. `Command::RefreshSessions`
@@ -78,6 +79,9 @@ pub struct AppStateHolder {
     /// carries it: a shell-owned line, because no reducer path records one
     /// (`bridge::notice`).
     workspace_notice: Mutex<Option<String>>,
+    /// The run's one fatal failure, as `ViewState.fatal` carries it: the
+    /// launcher could not be resolved, so no chat can start (`bridge::fatal`).
+    fatal: Mutex<Option<String>>,
 }
 
 impl AppStateHolder {
@@ -143,11 +147,13 @@ impl AppStateHolder {
     pub fn view(&self) -> ViewState {
         let notice = self.config_notice();
         let workspace_notice = self.workspace_notice();
+        let fatal = self.fatal();
         view_state(
             &self.state(),
             self.sessions_revision(),
             notice,
             workspace_notice,
+            fatal,
         )
     }
 
@@ -180,6 +186,7 @@ impl AppStateHolder {
         // refresh pass folds back into this same holder.
         let notice = self.config_notice();
         let workspace_notice = self.workspace_notice();
+        let fatal = self.fatal();
         let (view, chat_commands, commands) = {
             let mut app = lock(&self.app);
             let previous = app.clone();
@@ -189,7 +196,13 @@ impl AppStateHolder {
                 self.sessions_revision.fetch_add(1, Ordering::Relaxed);
             }
             *app = state;
-            let view = view_state(&app, self.sessions_revision(), notice, workspace_notice);
+            let view = view_state(
+                &app,
+                self.sessions_revision(),
+                notice,
+                workspace_notice,
+                fatal,
+            );
             (view, effects.chat_commands, effects.commands)
         };
         self.run_shared(commands);

@@ -20,6 +20,10 @@ body {
 }
 
 body {
+  /* A column, so the fatal bar and the app split the window between them
+     instead of the bar pushing the composer out of it. */
+  display: flex;
+  flex-direction: column;
   background: var(--bg);
   color: var(--text);
   font:
@@ -67,7 +71,8 @@ p {
 }
 
 .app {
-  height: 100vh;
+  flex: 1;
+  min-height: 0;
   display: grid;
   grid-template-columns: 280px 1fr;
 }
@@ -317,6 +322,34 @@ p {
 
 .notice.err {
   box-shadow: inset 3px 0 0 var(--danger);
+}
+
+.notice.warn {
+  box-shadow: inset 3px 0 0 var(--warning);
+}
+
+.notice.info {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+/* The fatal launcher bar: the one failure that ends the run instead of one chat
+   (crates/ui/src/view/banner.rs draws it above everything on the iced side). The
+   states board draws no banner, so it borrows the error card's language: the
+   notice surface with the danger edge, spanning the window above the app. */
+.fatal {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+  box-shadow: inset 3px 0 0 var(--danger);
+  color: var(--text);
+  font-size: 13px;
+}
+
+.fatal .m {
+  flex: 1;
 }
 
 /* The composer: the artboard's rules for `.composer`, `.composer textarea` and
@@ -600,6 +633,43 @@ p {
   justify-content: flex-end;
   gap: 8px;
   margin-top: 16px;
+}
+
+/* The dialog's own field and its options: the box the user types in, and one
+   button per option for a select. Both take the focus the dialog gives them. */
+.dlg .field {
+  width: 100%;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 7px 10px;
+  background: var(--bg);
+  font-size: 13px;
+}
+
+.dlg .area {
+  resize: vertical;
+  font-family: inherit;
+}
+
+.dlg .msg {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.dlg .opts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.dlg .opt {
+  text-align: left;
+}
+
+.dlg .btn.primary {
+  border-color: var(--accent);
 }
 
 .btn {

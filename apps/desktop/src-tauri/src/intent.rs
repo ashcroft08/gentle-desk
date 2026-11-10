@@ -31,7 +31,24 @@ pub fn to_intent(state: &gentle_app::AppState, intent: UiIntent) -> Option<gentl
         // chat's thread and answers the copy command the shell runs.
         UiIntent::CopyMessage { message_id } => gentle_app::Intent::CopyMessage(message_id),
         UiIntent::DismissNotice { id } => gentle_app::Intent::DismissNotice(u64::from(id)),
+        // The dialog id and its answer are the child's own protocol: the
+        // reducer drops the dialog it just answered, so a repeated answer to
+        // the same id reaches nothing.
+        UiIntent::AnswerDialog { id, answer } => gentle_app::Intent::AnswerDialog {
+            id,
+            answer: ui_answer(answer),
+        },
     })
+}
+
+/// The contract's answer shape as `gentle_core`'s, one to one.
+fn ui_answer(answer: crate::contract::DialogAnswer) -> gentle_core::rpc::UiAnswer {
+    use crate::contract::DialogAnswer;
+    match answer {
+        DialogAnswer::Value { value } => gentle_core::rpc::UiAnswer::Value(value),
+        DialogAnswer::Confirmed { confirmed } => gentle_core::rpc::UiAnswer::Confirmed(confirmed),
+        DialogAnswer::Cancelled => gentle_core::rpc::UiAnswer::Cancelled,
+    }
 }
 
 /// The app's chat for an id the web side sent back.

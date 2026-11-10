@@ -11,6 +11,7 @@ pub mod clipboard;
 pub mod commands;
 pub mod config;
 pub mod contract;
+pub mod dialogs;
 pub mod effects;
 pub mod events;
 pub mod folder_name;

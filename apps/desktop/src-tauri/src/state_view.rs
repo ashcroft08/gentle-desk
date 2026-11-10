@@ -3,9 +3,11 @@
 //!
 //! Every field is a slice the state really holds, never the whole `AppState`:
 //! the foreground chat named as the app names it, the tail of its thread, the
-//! notices flattened, the chats that are not idle, and the session list as a
-//! status, a total and a revision instead of rows - the rows are served one
-//! window at a time (S3).
+//! first dialog its extension waits on, the notices flattened, the chats that
+//! are not idle, and the session list as a status, a total and a revision
+//! instead of rows - the rows are served one window at a time (S3). The fatal
+//! launcher failure is the one shell-owned line here, because the app state has
+//! no process at all (`bridge::fatal`).
 
 use gentle_app::AppState;
 use gentle_runtime::badge::{Badge, BadgeMark};
@@ -13,17 +15,19 @@ use gentle_runtime::badge::{Badge, BadgeMark};
 use crate::contract::{
     ChatActivityMark, ChatActivityView, NoticeActionView, NoticeLevel, NoticeView, ViewState,
 };
-use crate::{sessions, view};
+use crate::{dialogs, sessions, view};
 
 /// The slice of `state` as it stands now, carrying the revision the holder
 /// keeps for the session list - the web side compares it to know when the page
 /// of rows it holds is stale - the notice of the config file, when it could
-/// not be used at startup, and the reason the last workspace action refused.
+/// not be used at startup, the reason the last workspace action refused, and the
+/// one fatal launcher failure of the run.
 pub fn view_state(
     state: &AppState,
     sessions_revision: u32,
     config_notice: Option<String>,
     workspace_notice: Option<String>,
+    fatal: Option<String>,
 ) -> ViewState {
     ViewState {
         foreground_chat: state
@@ -39,9 +43,11 @@ pub fn view_state(
         total_sessions: sessions::view::total(state),
         messages: view::messages(state),
         notices: state.notices.iter().map(NoticeView::of).collect(),
+        dialog: dialogs::dialog(state),
         activity: activity_view(state),
         config_notice,
         workspace_notice,
+        fatal,
     }
 }
 
