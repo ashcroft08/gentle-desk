@@ -13,7 +13,24 @@ export type Shape =
 const path = (d: string): Shape => ({ kind: 'path', d })
 const circle = (cx: number, cy: number, r: number): Shape => ({ kind: 'circle', cx, cy, r })
 
-/** The named icons the sidebar's own controls need. */
+/**
+ * One element of an icon: the three shapes above plus a filled rectangle, which
+ * the artboard draws for Stop (`<rect width="18" height="18" x="3" y="3"
+ * rx="2">` inside `fill="currentColor"`). Marks never need it, so the filled
+ * shape stays with the icons instead of widening what a chat mark may draw.
+ */
+export type IconShape = Shape | { kind: 'rect'; x: number; y: number; width: number; height: number; rx: number }
+
+const rect = (x: number, y: number, width: number, height: number, rx: number): IconShape => ({
+  kind: 'rect',
+  x,
+  y,
+  width,
+  height,
+  rx,
+})
+
+/** The named icons the controls need: the sidebar's and the composer's. */
 export type IconName =
   | 'plus'
   | 'search'
@@ -22,12 +39,16 @@ export type IconName =
   | 'folder-open'
   | 'folder-plus'
   | 'circle-plus'
+  | 'send'
+  | 'stop'
+  | 'restart'
+  | 'x'
 
 const FOLDER = 'M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z'
 const FOLDER_OPEN =
   'm6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2'
 
-export const ICON_SHAPES: Record<IconName, Shape[]> = {
+export const ICON_SHAPES: Record<IconName, IconShape[]> = {
   plus: [path('M5 12h14'), path('M12 5v14')],
   search: [path('m21 21-4.34-4.34'), circle(11, 11, 8)],
   'message-square': [
@@ -38,6 +59,12 @@ export const ICON_SHAPES: Record<IconName, Shape[]> = {
   'folder-open': [path(FOLDER_OPEN)],
   'folder-plus': [path('M12 10v6'), path('M9 13h6'), path(FOLDER)],
   'circle-plus': [circle(12, 12, 10), path('M8 12h8'), path('M12 8v8')],
+  // The composer's two actions and the restart notice's: the artboard's own
+  // paths (01a, the `i-send`, `i-stop`, `i-restart` and `i-x` symbols).
+  send: [path('m5 12 7-7 7 7'), path('M12 19V5')],
+  stop: [rect(3, 3, 18, 18, 2)],
+  restart: [path('M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8'), path('M3 3v5h5')],
+  x: [path('M18 6 6 18'), path('m6 6 12 12')],
 }
 
 /** The six chat states a session row can mark, as the contract names them. */

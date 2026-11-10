@@ -157,18 +157,63 @@ export type MessageView_Serialize = {
 	error: string | null,
 };
 
+/**
+ *  The one thing the user can do about a notice, when the notice reports
+ *  something the app can fix by itself (S3). It names its own target, so a
+ *  notice about a background chat is fixed without opening that chat first.
+ */
+export type NoticeActionView = 
+/**
+ *  Start that chat's child again and reopen it: what a death notice offers
+ *  as its one action ([`UiIntent::RestartChat`], which takes this id back).
+ */
+{ type: "RestartChat"; data: {
+	chat_id: string,
+} };
+
 /**  The level of a notice, matching `gentle_app`'s notice kinds one to one. */
 export type NoticeLevel = "Info" | "Warning" | "Error";
 
 /**
- *  One notice, flattened for display: id, text, level. The id the dismiss
- *  intent refers back to. The app lays notices out newest last and keeps the
- *  most recent ones, which the view reflects as received.
+ *  One notice, flattened for display: id, text, level, and the one action that
+ *  fixes it when there is one. The id is the one the dismiss intent refers back
+ *  to. The app lays notices out newest last and keeps the most recent ones,
+ *  which the view reflects as received.
  */
-export type NoticeView = {
+export type NoticeView = NoticeView_Serialize | NoticeView_Deserialize;
+
+/**
+ *  One notice, flattened for display: id, text, level, and the one action that
+ *  fixes it when there is one. The id is the one the dismiss intent refers back
+ *  to. The app lays notices out newest last and keeps the most recent ones,
+ *  which the view reflects as received.
+ */
+export type NoticeView_Deserialize = {
 	id: number,
 	text: string,
 	level: NoticeLevel,
+	/**
+	 *  `None` for a notice that only reports something (an extension's own
+	 *  message), so the view never draws a button that does nothing.
+	 */
+	action?: NoticeActionView | null,
+};
+
+/**
+ *  One notice, flattened for display: id, text, level, and the one action that
+ *  fixes it when there is one. The id is the one the dismiss intent refers back
+ *  to. The app lays notices out newest last and keeps the most recent ones,
+ *  which the view reflects as received.
+ */
+export type NoticeView_Serialize = {
+	id: number,
+	text: string,
+	level: NoticeLevel,
+	/**
+	 *  `None` for a notice that only reports something (an extension's own
+	 *  message), so the view never draws a button that does nothing.
+	 */
+	action: NoticeActionView | null,
 };
 
 /**
@@ -372,6 +417,15 @@ export type ViewState = ViewState_Serialize | ViewState_Deserialize;
 export type ViewState_Deserialize = {
 	foreground_chat?: string | null,
 	/**
+	 *  The title the chat header draws for the foreground chat: the stored
+	 *  session's own title, which is the text a sidebar row draws (and the same
+	 *  source), untruncated here because the header cuts it for its own width and
+	 *  keeps the whole name for whoever asks. A chat with no session file yet is
+	 *  named [`NEW_CHAT_TITLE`](crate::sessions::view::NEW_CHAT_TITLE), and no
+	 *  foreground chat has no title.
+	 */
+	foreground_title?: string | null,
+	/**
 	 *  How complete the session list is. It starts `Loading`, so the sidebar
 	 *  never claims there are no chats before the first pass ends.
 	 */
@@ -394,7 +448,7 @@ export type ViewState_Deserialize = {
 	 *  whole long session.
 	 */
 	messages: MessageView_Deserialize[],
-	notices: NoticeView[],
+	notices: NoticeView_Deserialize[],
 	activity: ChatActivityView[],
 	/**
 	 *  What the user should be told about the app config file: a file that
@@ -432,6 +486,15 @@ export type ViewState_Deserialize = {
 export type ViewState_Serialize = {
 	foreground_chat: string | null,
 	/**
+	 *  The title the chat header draws for the foreground chat: the stored
+	 *  session's own title, which is the text a sidebar row draws (and the same
+	 *  source), untruncated here because the header cuts it for its own width and
+	 *  keeps the whole name for whoever asks. A chat with no session file yet is
+	 *  named [`NEW_CHAT_TITLE`](crate::sessions::view::NEW_CHAT_TITLE), and no
+	 *  foreground chat has no title.
+	 */
+	foreground_title: string | null,
+	/**
 	 *  How complete the session list is. It starts `Loading`, so the sidebar
 	 *  never claims there are no chats before the first pass ends.
 	 */
@@ -454,7 +517,7 @@ export type ViewState_Serialize = {
 	 *  whole long session.
 	 */
 	messages: MessageView_Serialize[],
-	notices: NoticeView[],
+	notices: NoticeView_Serialize[],
 	activity: ChatActivityView[],
 	/**
 	 *  What the user should be told about the app config file: a file that

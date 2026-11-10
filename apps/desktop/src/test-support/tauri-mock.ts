@@ -10,6 +10,7 @@
 
 import type {
   ChatActivityView,
+  NoticeView_Serialize,
   SessionsWindow_Serialize,
   SessionTreeRow_Serialize,
   ViewState_Serialize,
@@ -126,6 +127,7 @@ export function eventModule(): {
 export function viewState(overrides: Partial<ViewState_Serialize> = {}): ViewState_Serialize {
   return {
     foreground_chat: null,
+    foreground_title: null,
     list_status: { type: 'Complete' },
     sessions_revision: 1,
     total_sessions: 0,
@@ -141,6 +143,25 @@ export function viewState(overrides: Partial<ViewState_Serialize> = {}): ViewSta
 /** One activity entry, as `ViewState.activity` carries it. */
 export function activity(chatId: string, mark: ChatActivityView['activity']): ChatActivityView {
   return { chat_id: chatId, activity: mark }
+}
+
+/** The notice a chat's death leaves: an error that offers the one action. */
+export function restartNotice(id: number, text: string, chatId: string): NoticeView_Serialize {
+  return {
+    id,
+    text,
+    level: 'Error',
+    action: { type: 'RestartChat', data: { chat_id: chatId } },
+  }
+}
+
+/** A notice that only reports something, with nothing to fix (T7's to draw). */
+export function plainNotice(
+  id: number,
+  text: string,
+  level: NoticeView_Serialize['level'] = 'Warning',
+): NoticeView_Serialize {
+  return { id, text, level, action: null }
 }
 
 /** One chat row, as `sessions_window` answers it under its workspace header. */

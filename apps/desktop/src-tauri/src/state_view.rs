@@ -10,7 +10,9 @@
 use gentle_app::AppState;
 use gentle_runtime::badge::{Badge, BadgeMark};
 
-use crate::contract::{ChatActivityMark, ChatActivityView, NoticeLevel, NoticeView, ViewState};
+use crate::contract::{
+    ChatActivityMark, ChatActivityView, NoticeActionView, NoticeLevel, NoticeView, ViewState,
+};
 use crate::{sessions, view};
 
 /// The slice of `state` as it stands now, carrying the revision the holder
@@ -28,6 +30,10 @@ pub fn view_state(
             .chats
             .foreground()
             .map(|chat| chat.as_str().to_owned()),
+        foreground_title: state
+            .chats
+            .foreground()
+            .map(|chat| sessions::view::header_title(state, chat)),
         list_status: sessions::view::status(state),
         sessions_revision,
         total_sessions: sessions::view::total(state),
@@ -78,7 +84,19 @@ impl NoticeView {
             id: view_notice_id(notice),
             text: notice.text.clone(),
             level: view_notice_level(notice.level),
+            action: notice.action.as_ref().map(view_action),
         }
+    }
+}
+
+/// The one action a notice may offer, as the contract names it. The chat id is
+/// the one the restart intent takes back, exactly as `foreground_chat` carries
+/// it, so a background chat's notice fixes that chat.
+fn view_action(action: &gentle_app::NoticeAction) -> NoticeActionView {
+    match action {
+        gentle_app::NoticeAction::RestartChat(chat) => NoticeActionView::RestartChat {
+            chat_id: chat.as_str().to_owned(),
+        },
     }
 }
 

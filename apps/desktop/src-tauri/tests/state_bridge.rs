@@ -73,6 +73,8 @@ fn the_view_state_slice_has_no_invented_fields() {
         holder.view(),
         ViewState {
             foreground_chat: None,
+            // No chat is open, so no header title is drawn either.
+            foreground_title: None,
             list_status: ListStatusView::Loading { done: 0, total: 0 },
             sessions_revision: 0,
             total_sessions: 0,

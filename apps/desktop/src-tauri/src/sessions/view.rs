@@ -7,7 +7,7 @@
 //! `crates/runtime` already owns ([`time_ago`], [`truncate`]), never from a
 //! second implementation here.
 
-use gentle_app::{AppState, ListStatus, SessionItem};
+use gentle_app::{AppState, ChatId, ListStatus, SessionItem};
 use gentle_runtime::text::truncate;
 use gentle_runtime::time_ago::time_ago;
 
@@ -15,6 +15,12 @@ use crate::contract::{ListStatusView, SessionRowView};
 
 /// Longest title a row shows, in characters, as the iced sidebar draws it.
 const TITLE_CHARS: usize = 32;
+
+/// What the header calls a chat whose session file does not exist yet: a chat
+/// started a moment ago has no stored title to draw, and a blank header would
+/// read as no chat at all. The words are the shell's own (the iced header's
+/// button said the same), never the session's.
+pub const NEW_CHAT_TITLE: &str = "New chat";
 
 /// How complete the list is, as the contract says it. The counters narrow to
 /// `u32`: a home has files, not billions of them, and a saturating value would
@@ -47,6 +53,21 @@ pub fn row(session: &SessionItem, now_ms: u64) -> SessionRowView {
         message_count: session.message_count,
         modified_ago: time_ago(now_ms, session.modified_ms),
     }
+}
+
+/// The title the chat header draws for `chat`: the stored session's own title,
+/// which is the text a sidebar row draws, untruncated here because the header cuts
+/// it for its own width and keeps the whole name for whoever asks. A chat whose
+/// session file does not exist yet reads [`NEW_CHAT_TITLE`]. The lookup goes
+/// through the same list the rows come from, so the header and the row can never
+/// name the same chat differently.
+pub fn header_title(state: &AppState, chat: &ChatId) -> String {
+    chat.session_path()
+        .and_then(|path| state.sessions.iter().find(|session| session.path == path))
+        .map_or_else(
+            || NEW_CHAT_TITLE.to_owned(),
+            |session| session.title.clone(),
+        )
 }
 
 /// A list length narrows without ever aliasing: a count past `u32::MAX` reads
