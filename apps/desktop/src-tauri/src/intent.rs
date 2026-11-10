@@ -8,10 +8,10 @@ use gentle_app::ChatId;
 
 use crate::contract::UiIntent;
 
-/// Maps one intent of the contract to the reducer's intent, `None` for the one
-/// the reducer has no answer for: folding a workspace's chats away is the
-/// config's business (D8), so the holder answers it before asking this
-/// (`bridge::AppStateHolder::workspace_intent`).
+/// Maps one intent of the contract to the reducer's intent, `None` for the ones
+/// the reducer has no answer for: folding a workspace's chats away and choosing
+/// the theme are the config's business (D8), so the holder answers them before
+/// asking this (`bridge::AppStateHolder::config_intent`).
 pub fn to_intent(state: &gentle_app::AppState, intent: UiIntent) -> Option<gentle_app::Intent> {
     Some(match intent {
         UiIntent::SendPrompt { text } => gentle_app::Intent::SendPrompt(text),
@@ -24,6 +24,9 @@ pub fn to_intent(state: &gentle_app::AppState, intent: UiIntent) -> Option<gentl
         // pending-folder table (`pending`), keyed by the chat allocated here.
         UiIntent::NewChatInWorkspace { .. } => gentle_app::Intent::OpenNewChat,
         UiIntent::SetWorkspaceCollapsed { .. } => return None,
+        // The chosen theme is the app config's too (the v1 Appearance setting),
+        // so the holder answers it before asking this.
+        UiIntent::SetTheme { .. } => return None,
         UiIntent::RestartChat { chat_id } => {
             gentle_app::Intent::RestartChat(chat_for(state, &chat_id))
         }

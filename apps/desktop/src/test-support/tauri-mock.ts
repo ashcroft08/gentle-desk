@@ -127,6 +127,7 @@ export function eventModule(): {
 /** A view state as Rust pushes it, with the fields a test cares about set. */
 export function viewState(overrides: Partial<ViewState_Serialize> = {}): ViewState_Serialize {
   return {
+    theme: 'system',
     foreground_chat: null,
     foreground_title: null,
     list_status: { type: 'Complete' },

@@ -7,6 +7,7 @@
 use serde::Serialize;
 
 use super::super::config::{AppConfig, WorkspaceEntry, CONFIG_VERSION};
+use super::super::theme::Theme;
 use super::ConfigProblem;
 
 /// The document as this app writes it: the version is always
@@ -14,6 +15,7 @@ use super::ConfigProblem;
 #[derive(Serialize)]
 struct DocumentRef<'a> {
     version: u32,
+    theme: Theme,
     workspaces: &'a [WorkspaceEntry],
 }
 
@@ -21,6 +23,7 @@ struct DocumentRef<'a> {
 pub(super) fn bytes(config: &AppConfig) -> std::io::Result<Vec<u8>> {
     let document = DocumentRef {
         version: CONFIG_VERSION,
+        theme: config.theme,
         workspaces: &config.workspaces,
     };
     serde_json::to_vec(&document)

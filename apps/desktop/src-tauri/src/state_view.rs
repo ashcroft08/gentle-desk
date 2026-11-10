@@ -11,27 +11,31 @@
 //! (`bridge::fatal`).
 
 use gentle_app::AppState;
+use gentle_runtime::app_config::Theme;
 use gentle_runtime::badge::{Badge, BadgeMark};
 
 use crate::contract::{
-    ChatActivityMark, ChatActivityView, NoticeActionView, NoticeLevel, NoticeView, ViewState,
+    ChatActivityMark, ChatActivityView, NoticeActionView, NoticeLevel, NoticeView, ThemeView,
+    ViewState,
 };
 use crate::{dialogs, helper_thread, helpers, sessions, view};
 
 /// The slice of `state` as it stands now, carrying the revision the holder
 /// keeps for the session list - the web side compares it to know when the page
-/// of rows it holds is stale - the notice of the config file, when it could
-/// not be used at startup, the reason the last workspace action refused, and the
-/// one fatal launcher failure of the run.
+/// of rows it holds is stale - the theme this run holds, the notice of the
+/// config file, when it could not be used at startup, the reason the last
+/// workspace action refused, and the one fatal launcher failure of the run.
 pub fn view_state(
     state: &AppState,
     sessions_revision: u32,
     config_notice: Option<String>,
     workspace_notice: Option<String>,
     fatal: Option<String>,
+    theme: Theme,
 ) -> ViewState {
     let helpers_view = helpers::helpers(state);
     ViewState {
+        theme: view_theme(theme),
         foreground_chat: state
             .chats
             .foreground()
@@ -53,6 +57,19 @@ pub fn view_state(
         config_notice,
         workspace_notice,
         fatal,
+    }
+}
+
+/// The theme as the contract names it: the two enums carry the same six names,
+/// so the value never travels as a string that could drift from the stylesheet.
+fn view_theme(theme: Theme) -> ThemeView {
+    match theme {
+        Theme::System => ThemeView::System,
+        Theme::Dark => ThemeView::Dark,
+        Theme::Gentle => ThemeView::Gentle,
+        Theme::GentlemanCute => ThemeView::GentlemanCute,
+        Theme::GentlemanSexy => ThemeView::GentlemanSexy,
+        Theme::Light => ThemeView::Light,
     }
 }
 

@@ -200,3 +200,80 @@ fn a_file_of_a_version_this_app_does_not_write_is_kept_aside() {
     assert!(message.contains("2"), "{message}");
     assert!(message.is_ascii(), "{message}");
 }
+
+/// A v1 document as the version BEFORE the theme field wrote it.
+const WITHOUT_THEME: &[u8] =
+    br#"{"version":1,"workspaces":[{"path":"C:/dev/p","collapsed":true}]}"#;
+
+#[test]
+fn a_config_without_the_theme_field_loads_with_the_system_theme() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = config_file(dir.path());
+    write_damaged(&path, WITHOUT_THEME);
+
+    let loaded = load(&path);
+
+    assert_eq!(loaded.notice, None, "an older file is still this document");
+    assert_eq!(loaded.config.theme, crate::app_config::Theme::System);
+    assert_eq!(
+        loaded.config.workspaces.len(),
+        1,
+        "the workspaces of the file are kept"
+    );
+    assert!(loaded.config.workspaces[0].collapsed);
+}
+
+#[test]
+fn every_theme_round_trips_through_the_file() {
+    for theme in crate::app_config::Theme::ALL {
+        let dir = tempfile::tempdir().unwrap();
+        let path = config_file(dir.path());
+        let mut config = AppConfig::default();
+        assert!(config.add_workspace(r"C:\dev\p"));
+        config.set_theme(theme);
+
+        save(&path, &config).unwrap();
+
+        let loaded = load(&path);
+        assert_eq!(loaded.notice, None);
+        assert_eq!(loaded.config, config, "{theme:?} did not survive the file");
+        assert_eq!(loaded.config.theme, theme);
+    }
+}
+
+#[test]
+fn an_unknown_theme_loads_as_the_system_theme_and_keeps_the_workspaces() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = config_file(dir.path());
+    let document =
+        br#"{"version":1,"theme":"Neon","workspaces":[{"path":"C:/dev/p","collapsed":false}]}"#;
+    write_damaged(&path, document);
+
+    let loaded = load(&path);
+
+    assert_eq!(
+        loaded.notice, None,
+        "an unknown theme is not a damaged file"
+    );
+    assert_eq!(loaded.config.theme, crate::app_config::Theme::System);
+    assert_eq!(
+        loaded.config.workspaces.len(),
+        1,
+        "the workspaces are not discarded with the unknown theme"
+    );
+    assert!(path.exists(), "the file is not moved aside");
+}
+
+#[test]
+fn the_saved_document_carries_the_theme_as_the_stylesheet_names_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = config_file(dir.path());
+    let mut config = AppConfig::default();
+    config.set_theme(crate::app_config::Theme::GentlemanCute);
+
+    save(&path, &config).unwrap();
+
+    let document: serde_json::Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    assert_eq!(document["theme"], serde_json::json!("Gentleman-Cute"));
+    assert_eq!(document["version"], serde_json::json!(CONFIG_VERSION));
+}

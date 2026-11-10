@@ -581,6 +581,56 @@ p {
   transform: none;
 }
 
+/* The footer theme control (01a, `.foot`, `.tp` and `.tpl`): the panel is drawn
+   above the button, in the page's own colors, so the list follows the theme it
+   offers. No native popup is involved. */
+.foot {
+  display: flex;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.tp {
+  position: relative;
+}
+
+.tpl {
+  position: absolute;
+  left: 0;
+  bottom: 38px;
+  z-index: 25;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  min-width: 180px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+}
+
+.tpl li {
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--text);
+  background: transparent;
+  cursor: pointer;
+}
+
+.tpl li:hover {
+  background: var(--surface2);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.tpl li[aria-selected='true'] {
+  background: var(--tint);
+}
+
+.tpl li[aria-selected='true']:hover {
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
 /* The New workspace menu: the artboard's rules for it (01a, `.menu`), except
    for the placement, which bits-ui's floating layer owns; the trigger and the
    items keep the artboard's hover look, and `data-highlighted` is the keyboard

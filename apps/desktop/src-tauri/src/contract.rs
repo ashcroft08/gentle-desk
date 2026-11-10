@@ -41,6 +41,27 @@ pub struct ChatActivityView {
     pub activity: ChatActivityMark,
 }
 
+/// The six themes the whole window can be set to (the v1 Appearance setting),
+/// named exactly as `design/system.md` and the artboard's picker name them: one
+/// spelling for the config file, the `data-theme` attribute the page paints, and
+/// the label the picker draws, so no side translates a name.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub enum ThemeView {
+    /// The reader's own setting, and the theme of a run that chose none.
+    #[serde(rename = "system")]
+    System,
+    #[serde(rename = "dark")]
+    Dark,
+    #[serde(rename = "Gentle")]
+    Gentle,
+    #[serde(rename = "Gentleman-Cute")]
+    GentlemanCute,
+    #[serde(rename = "Gentleman-Sexy")]
+    GentlemanSexy,
+    #[serde(rename = "light")]
+    Light,
+}
+
 /// What the user asked for, as the web side sends it. Only the intents the
 /// current slice needs; the rest are added when their views arrive. The
 /// explicit mapping into `gentle-app`'s [`gentle_app::Intent`] keeps this
@@ -72,6 +93,12 @@ pub enum UiIntent {
     SetWorkspaceCollapsed {
         path: String,
         collapsed: bool,
+    },
+    /// Choose the window's theme (the v1 Appearance setting). The choice is
+    /// remembered in the app config, so it survives the run, and the window's
+    /// own chrome follows it ([`gentle_runtime::app_config::Theme`]).
+    SetTheme {
+        theme: ThemeView,
     },
     /// Start the child of a chat that died again and reopen it (S3).
     RestartChat {
@@ -435,6 +462,10 @@ pub struct HelperThreadView {
 /// they reach the web side inside [`NoticeView::text`] and nowhere else.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct ViewState {
+    /// The chosen appearance of the whole window, as the app config remembers
+    /// it ([`ThemeView`]): the page paints its `data-theme` from it, and the
+    /// window's own chrome follows it. `System` until the user chooses.
+    pub theme: ThemeView,
     pub foreground_chat: Option<String>,
     /// The title the chat header draws for the foreground chat: the stored
     /// session's own title, which is the text a sidebar row draws (and the same
