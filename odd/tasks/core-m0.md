@@ -1,10 +1,10 @@
 # core-m0: toolchain, workspace and RPC core
 
-Native Rust desktop client for gentle-shell (pi RPC over JSONL). M0 = toolchain + a UI-free core crate validated against the reference app's fixtures. Reference clone: `C:\Users\josep\dev\gentle-shell-desktop\repo`.
+Native Rust desktop client for gentle-shell (pi RPC over JSONL). M0 = toolchain + a UI-free core crate validated against the reference app's fixtures. Reference clone: `<home>\dev\gentle-shell-desktop\repo`.
 
 ## Specs
 
-- S1: "vamos desde cero" — a new Rust project, not a fork of the TypeScript app. Location: `C:\Users\josep\dev\gentle-desk`.
+- S1: "vamos desde cero" — a new Rust project, not a fork of the TypeScript app. Location: `<repo>`.
 - S2: "UI 100% nativa en Rust (egui, iced, Slint, Dioxus)" — the final UI is native Rust; the framework is chosen later by prototype, never Electron or a webview.
 - S3: "la logica la maneja gentle-shell" — this project is only the frontend: it spawns `gentle-shell --mode rpc` and speaks pi's JSONL RPC; it does not reimplement agent logic.
 - S4: Architecture in three one-way layers: `ui` (renders state, emits intents, no I/O) -> `app` (state, reducers, commands; pure and testable) -> `backend` (process spawner, session index, config, launcher resolution). M0 builds the core crate only: no UI crate yet.
@@ -21,6 +21,6 @@ Native Rust desktop client for gentle-shell (pi RPC over JSONL). M0 = toolchain 
 ## Log
 
 - L1: "vamos desde cero"
-- L2: Decisions: location `C:\Users\josep\dev\gentle-desk`; toolchain "rustup + MSVC Build Tools (recomendado)". Context: the user prefers a UI 100% native in Rust, taken as a slow personal project; two bugs of the reference app were found (sidebar loaded once, "New chat" no-op) and a Windows `.cmd` spawn bug (EINVAL), which the Rust design must avoid.
+- L2: Decisions: location `<repo>`; toolchain "rustup + MSVC Build Tools (recomendado)". Context: the user prefers a UI 100% native in Rust, taken as a slow personal project; two bugs of the reference app were found (sidebar loaded once, "New chat" no-op) and a Windows `.cmd` spawn bug (EINVAL), which the Rust design must avoid.
 - L3: T4 delegated to `gentle-ai-worker` (context backstop); helpers activity (`setWidget` `gentle-agents.activity/v1`) and the Windows launcher resolution (`gentle-shell.cmd` cannot be spawned without a shell, EINVAL) are open items for M1, not covered by M0.
 - L4: Runtime: global gentle-shell updated to 4.6.0 (pi 1.5.0); RPC prompt verified with claude-bridge / claude-sonnet-5-5. gentle-desk should use the global one, not the `dev\gentle-shell` checkout (pi 1.4.0).

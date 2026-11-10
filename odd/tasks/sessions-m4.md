@@ -8,7 +8,7 @@ List pi's saved sessions without re-reading every file, keep the list fresh, and
 - S2: Bugs of the reference app not to repeat: "la lista de chats se cargaba una sola vez" (the list must refresh) and "listAll() parseaba todos los archivos de sesión".
 - S3: Layers (core-m0 S4): parsing is pure (`gentle-core`), file system and cache live in `gentle-backend`, state/intents in `gentle-app`, rendering in `gentle-ui`.
 - S4: Same semantics as pi's own `SessionManager` listing (`buildSessionInfo`): sessions live in `<home>/sessions/--<encoded-cwd>--/<timestamp>_<id>.jsonl`; first line is the `session` header (id, timestamp, cwd); name = latest `session_info` entry; first message = first user text; activity = latest user/assistant message time.
-- S5: Home is the isolated `C:\Users\josep\.gentle-shell\agent` (from the M1 brief).
+- S5: Home is the isolated `<home>\.gentle-shell\agent` (from the M1 brief).
 
 ## Tasks
 
