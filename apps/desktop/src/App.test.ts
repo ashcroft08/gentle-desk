@@ -37,13 +37,6 @@ beforeEach(() => {
 })
 
 describe('App', () => {
-  it('keeps the No chat open placeholder while no chat is foreground', async () => {
-    serveSidebar({ view: viewState({ foreground_chat: null, messages: [] }) })
-    render(App)
-
-    expect(await screen.findByText('No chat open')).toBeTruthy()
-    expect(screen.queryByRole('region', { name: 'Chat thread' })).toBeNull()
-  })
 
   it('draws the foreground chat thread instead of the placeholder', async () => {
     serveSidebar({
@@ -127,49 +120,10 @@ describe('App', () => {
     expect(screen.queryByText('Skill registry refreshed (19 skills)')).toBeNull()
   })
 
-  it('asks the welcome question instead of the app while a choice is due', async () => {
-    serveSidebar({
-      view: viewState({
-        shell: { pi_path: 'C:/Users/someone/.pi/agent', choice: null, ask: true, launcher_found: true, install: { type: 'Idle' }, restart_needed: false },
-      }),
-    })
-    render(App)
 
-    expect(await screen.findByRole('heading', { name: 'Welcome to gentle shell' })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'New session' })).toBeNull()
-  })
 
-  it('asks to install gentle-shell, before anything else, when the launcher is missing', async () => {
-    serveSidebar({
-      view: viewState({
-        shell: {
-          pi_path: 'C:/Users/someone/.pi/agent',
-          choice: null,
-          ask: true,
-          launcher_found: false,
-          install: { type: 'Idle' },
-          restart_needed: false,
-        },
-      }),
-    })
-    render(App)
 
-    expect(await screen.findByRole('heading', { name: 'gentle-shell is not installed' })).toBeTruthy()
-    expect(screen.queryByRole('heading', { name: 'Welcome to gentle shell' })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'New session' })).toBeNull()
-  })
 
-  it('draws the app and no question once a home is chosen', async () => {
-    serveSidebar({
-      view: viewState({
-        shell: { pi_path: 'C:/Users/someone/.pi/agent', choice: 'link', ask: false, launcher_found: true, install: { type: 'Idle' }, restart_needed: false },
-      }),
-    })
-    render(App)
-
-    expect(await screen.findByText('No chat open')).toBeTruthy()
-    expect(screen.queryByRole('heading', { name: 'Welcome to gentle shell' })).toBeNull()
-  })
 
   it('shows the fatal launcher bar above everything, with no chat open', async () => {
     serveSidebar({

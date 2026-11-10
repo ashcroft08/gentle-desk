@@ -43,14 +43,16 @@
   })
 </script>
 
-{#if !chat.shell.launcher_found}
-  <!-- Nothing here works without gentle-shell: the permission to install it
-       comes before any other question (shell-choice S4). -->
-  <MissingShell install={chat.shell.install} />
-{:else if chat.shell.ask}
-  <!-- The first-start question takes the whole window: nothing runs on a home
-       the user has not chosen yet (shell-choice S2). -->
+{#if chat.shell.ask}
+  <!-- The first-start question comes first: someone who already has pi must be
+       recognised for what they have, not told that an agent is missing. The ask
+       to install gentle-shell follows once the home is chosen (shell-choice S2,
+       S4). -->
   <Welcome piPath={chat.shell.pi_path ?? ''} />
+{:else if !chat.shell.launcher_found}
+  <!-- Nothing here works without gentle-shell, so once the home is settled the
+       permission to install it is what the window holds. -->
+  <MissingShell install={chat.shell.install} />
 {:else}
 <a class="skip" href="#main">Skip to chat</a>
 {#if chat.fatal !== null}
