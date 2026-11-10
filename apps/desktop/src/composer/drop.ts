@@ -45,7 +45,16 @@ export function dropAction(payload: DragPayload): DropAction {
  * away first still unsubscribes when it lands.
  */
 export function watchDrops(handle: (action: DropAction) => void): Promise<() => void> {
-  return getCurrentWebview().onDragDropEvent((event) =>
-    handle(dropAction(event.payload as DragPayload)),
-  )
+  // A page with no Tauri behind it - `npm run dev` in a plain browser, and every
+  // test that draws the composer without a webview - has no drop events to
+  // listen to, and asking for them throws. Answering a working unsubscribe
+  // keeps the composer drawable instead of failing on a call with nothing to
+  // talk to.
+  try {
+    return getCurrentWebview().onDragDropEvent((event) =>
+      handle(dropAction(event.payload as DragPayload)),
+    )
+  } catch {
+    return Promise.resolve(() => {})
+  }
 }

@@ -3,7 +3,7 @@
 // keeps the rule testable without a window, a webview or a file.
 
 import { describe, expect, it } from 'vitest'
-import { dropAction } from './drop'
+import { dropAction, watchDrops } from './drop'
 
 describe('dropAction', () => {
   it('says a drag can be taken while files are over the window', () => {
@@ -22,5 +22,25 @@ describe('dropAction', () => {
   it('clears the hint when the drag leaves or a drop names no file', () => {
     expect(dropAction({ type: 'leave' })).toEqual({ kind: 'clear' })
     expect(dropAction({ type: 'drop' })).toEqual({ kind: 'drop', paths: [] })
+  })
+})
+
+describe('watchDrops', () => {
+  it('is a no-op where there is no Tauri to listen to', async () => {
+    // A plain browser (`npm run dev`) and every test that renders the composer
+    // without a webview reach this line: it must answer a working unsubscribe
+    // instead of throwing, or the composer cannot even be drawn.
+    const globals = globalThis as unknown as Record<string, unknown>
+    const saved = globals.__TAURI_INTERNALS__
+    delete globals.__TAURI_INTERNALS__
+    try {
+      const stop = await watchDrops(() => {
+        throw new Error('no event may arrive without Tauri')
+      })
+      expect(typeof stop).toBe('function')
+      expect(() => stop()).not.toThrow()
+    } finally {
+      if (saved !== undefined) globals.__TAURI_INTERNALS__ = saved
+    }
   })
 })
