@@ -62,6 +62,32 @@ pub enum ThemeView {
     Light,
 }
 
+/// The two homes the welcome screen offers for `gentle-shell` (shell-choice S2),
+/// spelled the way the app config stores them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub enum HomeChoiceView {
+    /// Use the user's own pi (`~/.pi/agent`).
+    #[serde(rename = "link")]
+    Link,
+    /// Keep a space of its own (`~/.gentle-shell/agent`).
+    #[serde(rename = "isolated")]
+    Isolated,
+}
+
+/// What the app knows about the shell and the home it runs on: what it found at
+/// start and what the user chose (shell-choice S1-S3).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub struct ShellView {
+    /// The folder of the user's pi, when it exists on this machine. Only its
+    /// existence was checked, never its contents.
+    pub pi_path: Option<String>,
+    /// The home the user chose, `None` until they do.
+    pub choice: Option<HomeChoiceView>,
+    /// Whether the welcome question is due: pi was found and nothing is chosen
+    /// yet. With no pi there is nothing to choose between, so it is never due.
+    pub ask: bool,
+}
+
 /// What the user asked for, as the web side sends it. Only the intents the
 /// current slice needs; the rest are added when their views arrive. The
 /// explicit mapping into `gentle-app`'s [`gentle_app::Intent`] keeps this
@@ -100,6 +126,15 @@ pub enum UiIntent {
     SetTheme {
         theme: ThemeView,
     },
+    /// Choose which home `gentle-shell` runs on (the welcome screen and the
+    /// sidebar footer). Remembered in the app config; it applies from the next
+    /// start of the app.
+    SetShellHome {
+        choice: HomeChoiceView,
+    },
+    /// Start the app again after the orderly close (config and cache flushed
+    /// first): a home chosen at the welcome question applies to a new run.
+    RestartApp,
     /// Start the child of a chat that died again and reopen it (S3).
     RestartChat {
         chat_id: String,
@@ -466,6 +501,8 @@ pub struct ViewState {
     /// it ([`ThemeView`]): the page paints its `data-theme` from it, and the
     /// window's own chrome follows it. `System` until the user chooses.
     pub theme: ThemeView,
+    /// The shell and home this run sees (shell-choice).
+    pub shell: ShellView,
     pub foreground_chat: Option<String>,
     /// The title the chat header draws for the foreground chat: the stored
     /// session's own title, which is the text a sidebar row draws (and the same

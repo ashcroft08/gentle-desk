@@ -41,6 +41,7 @@ use crate::workspace;
 mod config;
 mod fatal;
 mod notice;
+mod shell;
 mod theme;
 
 /// What runs one shared command the reducer asked for. `Command::RefreshSessions`
@@ -78,6 +79,8 @@ pub struct AppStateHolder {
     /// bar) follow the chosen theme. Before it exists the theme is still the
     /// user's, and the page is colored by it either way.
     window_theme: Mutex<Option<Arc<dyn WindowTheme>>>,
+    /// The folder of the user's pi when it was found at startup (`bridge::shell`).
+    pi_path: Mutex<Option<String>>,
     /// The flattened tree of the last built revision, so a page of rows never
     /// regroups 50 000 sessions again (see [`TreeCache`]).
     tree: TreeCache,
@@ -155,6 +158,7 @@ impl AppStateHolder {
         let workspace_notice = self.workspace_notice();
         let fatal = self.fatal();
         let theme = self.theme_value();
+        let shell = self.shell_view();
         view_state(
             &self.state(),
             self.sessions_revision(),
@@ -162,6 +166,7 @@ impl AppStateHolder {
             workspace_notice,
             fatal,
             theme,
+            shell,
         )
     }
 
@@ -196,6 +201,7 @@ impl AppStateHolder {
         let workspace_notice = self.workspace_notice();
         let fatal = self.fatal();
         let theme = self.theme_value();
+        let shell = self.shell_view();
         let (view, chat_commands, commands) = {
             let mut app = lock(&self.app);
             let previous = app.clone();
@@ -212,6 +218,7 @@ impl AppStateHolder {
                 workspace_notice,
                 fatal,
                 theme,
+                shell,
             );
             (view, effects.chat_commands, effects.commands)
         };
@@ -240,6 +247,7 @@ impl AppStateHolder {
                 Some(workspace::collapse(self, path, *collapsed))
             }
             UiIntent::SetTheme { theme } => Some(self.set_theme(*theme)),
+            UiIntent::SetShellHome { choice } => Some(self.set_shell_home(*choice)),
             UiIntent::NewChatInWorkspace { path } if path.trim().is_empty() => Some(self.view()),
             _ => None,
         }

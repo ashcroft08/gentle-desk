@@ -60,6 +60,9 @@ pub struct Bridge {
     /// The close of this run, armed once at startup because only the setup step
     /// has the handle that ends the process (`arm_close`).
     close: Mutex<Option<Arc<CloseFlow>>>,
+    /// Set by [`UiIntent::RestartApp`]: the close that follows ends by starting
+    /// the app again instead of leaving.
+    relaunch: Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl Bridge {
@@ -81,6 +84,14 @@ impl Bridge {
         // change made while the app runs waits for the next one.
         let home_choice = snapshot.config.shell_home;
         let holder = Arc::new(AppStateHolder::with_config(snapshot));
+        // Only the existence of pi's folder is asked, once, outside every lock.
+        holder.set_pi_path(
+            gentle_backend::home::detect_pi(
+                &gentle_backend::home::HomeEnv::from_process(),
+                |dir| dir.is_dir(),
+            )
+            .map(|dir| dir.to_string_lossy().into_owned()),
+        );
         let pump = Arc::new(EventPump::new(Arc::clone(&holder)));
         let sessions = Arc::new(startup::service(Arc::clone(&holder), home_choice));
         let writer = ConfigWriter::spawn(path);
@@ -100,6 +111,7 @@ impl Bridge {
             picker: Arc::new(NativeFolderPicker::new()),
             writer,
             close: Mutex::new(None),
+            relaunch: Arc::new(std::sync::atomic::AtomicBool::new(false)),
         };
         // The reducer doesn't refresh the list itself: it answers
         // `Command::RefreshSessions` and this is where that one is run. A copy
@@ -189,10 +201,17 @@ impl Bridge {
             Arc::clone(&self.pump),
             self.sessions.shared(),
             self.writer.clone(),
-            Box::new({
-                let app = app.clone();
-                move || app.exit(0)
-            }),
+            close::exit_step(
+                Arc::clone(&self.relaunch),
+                {
+                    let app = app.clone();
+                    move || app.restart()
+                },
+                {
+                    let app = app.clone();
+                    move || app.exit(0)
+                },
+            ),
         )
         // The watcher and the safety net stop before the cache write: a batch
         // must not ask for a pass after the last state was written.
@@ -216,6 +235,16 @@ impl Bridge {
         app: &AppHandle<tauri::Wry>,
     ) -> Result<ViewState, String> {
         self.accepting_work()?;
+        // A relaunch is the close flow with a different last step: the config
+        // writer and the session cache are flushed first, as for any close.
+        if matches!(intent, UiIntent::RestartApp) {
+            self.relaunch
+                .store(true, std::sync::atomic::Ordering::SeqCst);
+            if let Some(close) = self.close_flow() {
+                close.request();
+            }
+            return Ok(self.holder.view());
+        }
         // The folder of a chat that starts in a workspace travels BESIDE the
         // command: the reducer names the chat and `crates/app` carries no folder
         // at all (S2). A blank path names none, so nothing is opened for it.

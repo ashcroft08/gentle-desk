@@ -23,3 +23,21 @@ pub use flow::{CloseFlow, CloseSteps, Deadlines};
 /// What a chat command answers once the close has stopped new work. One line,
 /// the same one the reducer's failed-open path carries.
 pub const CLOSING: &str = "the app is closing";
+
+/// The last step of the orderly close: leave, or start the app again when the
+/// run asked for a relaunch (a home chosen at the welcome question only applies
+/// to a new run). The flag is read when the step RUNS, after everything was
+/// flushed, so a relaunch asked for while the close was under way still counts.
+pub fn exit_step(
+    relaunch: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    restart: impl Fn() + Send + Sync + 'static,
+    exit: impl Fn() + Send + Sync + 'static,
+) -> Box<dyn Fn() + Send + Sync> {
+    Box::new(move || {
+        if relaunch.load(std::sync::atomic::Ordering::SeqCst) {
+            restart();
+        } else {
+            exit();
+        }
+    })
+}

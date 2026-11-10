@@ -128,6 +128,8 @@ export function eventModule(): {
 export function viewState(overrides: Partial<ViewState_Serialize> = {}): ViewState_Serialize {
   return {
     theme: 'system',
+    // No pi found, nothing chosen, nothing asked.
+    shell: { pi_path: null, choice: null, ask: false },
     foreground_chat: null,
     foreground_title: null,
     list_status: { type: 'Complete' },
