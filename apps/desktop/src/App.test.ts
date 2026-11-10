@@ -128,7 +128,7 @@ describe('App', () => {
   it('asks the welcome question instead of the app while a choice is due', async () => {
     serveSidebar({
       view: viewState({
-        shell: { pi_path: 'C:/Users/someone/.pi/agent', choice: null, ask: true, launcher_found: true, install: { type: 'Idle' } },
+        shell: { pi_path: 'C:/Users/someone/.pi/agent', choice: null, ask: true, launcher_found: true, install: { type: 'Idle' }, restart_needed: false },
       }),
     })
     render(App)
@@ -146,6 +146,7 @@ describe('App', () => {
           ask: true,
           launcher_found: false,
           install: { type: 'Idle' },
+          restart_needed: false,
         },
       }),
     })
@@ -159,7 +160,7 @@ describe('App', () => {
   it('draws the app and no question once a home is chosen', async () => {
     serveSidebar({
       view: viewState({
-        shell: { pi_path: 'C:/Users/someone/.pi/agent', choice: 'link', ask: false, launcher_found: true, install: { type: 'Idle' } },
+        shell: { pi_path: 'C:/Users/someone/.pi/agent', choice: 'link', ask: false, launcher_found: true, install: { type: 'Idle' }, restart_needed: false },
       }),
     })
     render(App)

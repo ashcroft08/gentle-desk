@@ -84,6 +84,7 @@ fn the_view_state_slice_has_no_invented_fields() {
                 // Nothing looked for the launcher, so none is claimed missing.
                 launcher_found: true,
                 install: InstallView::Idle,
+                restart_needed: false,
             },
             foreground_chat: None,
             // No chat is open, so no header title is drawn either.

@@ -86,6 +86,8 @@ pub struct AppStateHolder {
     launcher_missing: std::sync::atomic::AtomicBool,
     /// Where installing gentle-shell stands (`bridge::shell`).
     install: Mutex<crate::contract::InstallView>,
+    /// The home choice this run started with (`bridge::shell`).
+    started_with: Mutex<Option<gentle_backend::home::HomeChoice>>,
     /// The flattened tree of the last built revision, so a page of rows never
     /// regroups 50 000 sessions again (see [`TreeCache`]).
     tree: TreeCache,

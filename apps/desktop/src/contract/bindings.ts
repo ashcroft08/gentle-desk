@@ -639,6 +639,12 @@ export type ShellView_Deserialize = {
 	launcher_found: boolean,
 	/**  Where installing gentle-shell stands. */
 	install: InstallView,
+	/**
+	 *  Whether the home chosen differs from the one this run started with. A
+	 *  choice only applies to a new run, so while this is true the sidebar says
+	 *  "restart to apply" and offers the restart.
+	 */
+	restart_needed: boolean,
 };
 
 /**
@@ -666,6 +672,12 @@ export type ShellView_Serialize = {
 	launcher_found: boolean,
 	/**  Where installing gentle-shell stands. */
 	install: InstallView,
+	/**
+	 *  Whether the home chosen differs from the one this run started with. A
+	 *  choice only applies to a new run, so while this is true the sidebar says
+	 *  "restart to apply" and offers the restart.
+	 */
+	restart_needed: boolean,
 };
 
 /**

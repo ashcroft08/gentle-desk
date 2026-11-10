@@ -41,7 +41,7 @@ describe('chatOf', () => {
       helperThread: null,
       dialog: null,
       fatal: null,
-      shell: { pi_path: null, choice: null, ask: false, launcher_found: true, install: { type: 'Idle' } },
+      shell: { pi_path: null, choice: null, ask: false, launcher_found: true, install: { type: 'Idle' }, restart_needed: false },
     })
   })
 
@@ -90,7 +90,7 @@ describe('chatOf', () => {
       helperThread: null,
       dialog: null,
       fatal: null,
-      shell: { pi_path: null, choice: null, ask: false, launcher_found: true, install: { type: 'Idle' } },
+      shell: { pi_path: null, choice: null, ask: false, launcher_found: true, install: { type: 'Idle' }, restart_needed: false },
     })
     expect(chatOf(null).chat).toBeNull()
   })
@@ -112,9 +112,15 @@ describe('createChatView', () => {
   })
 
   it('follows a push whose only change is how the install is going', async () => {
-    const shell = { pi_path: null, choice: null, ask: false, launcher_found: false }
+    const shell = {
+      pi_path: null,
+      choice: null,
+      ask: false,
+      launcher_found: false,
+      restart_needed: false,
+    }
     setHandler('get_view_state', () =>
-      viewState({ sessions_revision: 1, shell: { ...shell, install: { type: 'Idle' } } }),
+      viewState({ sessions_revision: 1, shell: { ...shell, install: { type: 'Idle' }, restart_needed: false } }),
     )
     const view = createChatView()
     await view.ready
@@ -137,7 +143,7 @@ describe('createChatView', () => {
   it('follows a push whose only change is the answer to the welcome question', async () => {
     const pi = 'C:/Users/someone/.pi/agent'
     setHandler('get_view_state', () =>
-      viewState({ sessions_revision: 1, shell: { pi_path: pi, choice: null, ask: true, launcher_found: true, install: { type: 'Idle' } } }),
+      viewState({ sessions_revision: 1, shell: { pi_path: pi, choice: null, ask: true, launcher_found: true, install: { type: 'Idle' }, restart_needed: false } }),
     )
     const view = createChatView()
     await view.ready
@@ -146,7 +152,7 @@ describe('createChatView', () => {
     // Nothing else moved: no chat, no notice, no helper. Only the choice.
     pushEvent(
       'state-changed',
-      viewState({ sessions_revision: 2, shell: { pi_path: pi, choice: 'link', ask: false, launcher_found: true, install: { type: 'Idle' } } }),
+      viewState({ sessions_revision: 2, shell: { pi_path: pi, choice: 'link', ask: false, launcher_found: true, install: { type: 'Idle' }, restart_needed: false } }),
     )
 
     await vi.waitFor(() => expect(view.get().shell.ask).toBe(false))

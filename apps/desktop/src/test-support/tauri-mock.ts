@@ -135,6 +135,7 @@ export function viewState(overrides: Partial<ViewState_Serialize> = {}): ViewSta
       ask: false,
       launcher_found: true,
       install: { type: 'Idle' },
+      restart_needed: false,
     },
     foreground_chat: null,
     foreground_title: null,
