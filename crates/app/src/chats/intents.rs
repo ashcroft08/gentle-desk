@@ -39,8 +39,34 @@ pub(crate) fn apply(state: &mut AppState, intent: &Intent) -> Option<Effects> {
         }
         Intent::CopyMessage(id) => copy_message(state, id).map(for_shell),
         Intent::AnswerDialog { id, answer } => answer_dialog(state, id, answer).map(for_chat),
+        Intent::SelectHelper(id) => select_helper(state, id),
+        Intent::CloseHelper => close_helper(state),
         _ => None,
     }
+}
+
+/// Selects a helper of the FOREGROUND chat, named by the id the panel drew. A
+/// task of another chat is not a candidate, exactly as a helper that is not
+/// listed is not: an id that names no task leaves the selection as it was.
+/// `None` with no foreground chat, so the single-chat rule keeps the intent.
+fn select_helper(state: &mut AppState, id: &str) -> Option<Effects> {
+    let chat = state.chats.foreground()?;
+    let known = state
+        .chats
+        .state(chat)
+        .is_some_and(|chat| chat.helpers.tasks.iter().any(|task| task.id == id));
+    if known {
+        state.selected_helper = Some(id.to_owned());
+    }
+    Some(for_chat(Vec::new()))
+}
+
+/// Back to the list of the foreground chat; `None` with no foreground chat,
+/// like [`select_helper`].
+fn close_helper(state: &mut AppState) -> Option<Effects> {
+    state.chats.foreground()?;
+    state.selected_helper = None;
+    Some(for_chat(Vec::new()))
 }
 
 /// Effects on one chat's child and nothing of the single child.
@@ -74,6 +100,9 @@ fn open(state: &mut AppState, chat: ChatId) -> Vec<ChatCommand> {
     drop_restart_notice(state, &chat);
     state.chats.open(chat.clone());
     state.chats.mark_opening(&chat);
+    // The helper the panel had open was that chat's: another chat is on screen
+    // now, and a selection never names a task of a chat the user left.
+    state.selected_helper = None;
     vec![ChatCommand::OpenProcess { chat }]
 }
 
