@@ -676,6 +676,13 @@ fn closing_stops_every_child_even_the_one_in_a_turn_that_never_ends() {
     wait_for("the first child to log its start", || {
         start_pids(harness.log()).first().copied()
     });
+    // The child has started, but the chat is still OPENING until it answers its
+    // first request, and the reducer refuses a prompt for an opening chat: send
+    // the turn only once the opening phase is over (a slow runner reaches this
+    // line first; the other close test waits the same way).
+    wait_for("the first chat to finish opening", || {
+        bridge.holder.view().activity.is_empty().then_some(())
+    });
     bridge.dispatch(UiIntent::SendPrompt {
         text: "slow".to_owned(),
     });
