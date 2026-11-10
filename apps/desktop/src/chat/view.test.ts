@@ -12,6 +12,7 @@ import {
   setHandler,
   viewState,
 } from '../test-support/tauri-mock'
+import { helperRow, helpersPanel } from '../test-support/helpers'
 import { chatOf, createChatView } from './view'
 
 vi.mock('@tauri-apps/api/core', () => import('../test-support/tauri-mock').then((m) => m.coreModule()))
@@ -34,6 +35,8 @@ describe('chatOf', () => {
       title: 'Tauri skeleton: window and bridge',
       mark: 'Working',
       notices: [],
+      helpers: null,
+      selectedHelper: null,
       dialog: null,
       fatal: null,
     })
@@ -43,6 +46,14 @@ describe('chatOf', () => {
     const state = viewState({ foreground_chat: 'chat-1', foreground_title: 'Idle one' })
 
     expect(chatOf(state).mark).toBeNull()
+  })
+
+  it('carries the helpers panel and the selection the reducer keeps', () => {
+    const helpers = helpersPanel([helperRow('h1')], { running: 1 })
+    const state = viewState({ foreground_chat: 'chat-1', helpers, selected_helper: 'h1' })
+
+    expect(chatOf(state).helpers).toBe(helpers)
+    expect(chatOf(state).selectedHelper).toBe('h1')
   })
 
   it('carries every pushed notice, unchanged and in order', () => {
@@ -64,6 +75,8 @@ describe('chatOf', () => {
       title: null,
       mark: null,
       notices: [],
+      helpers: null,
+      selectedHelper: null,
       dialog: null,
       fatal: null,
     })

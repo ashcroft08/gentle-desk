@@ -8,6 +8,8 @@
 //   Send, Stop and the disabled composer's reason (S6: the rule itself lives in
 //   Rust, `crates/runtime`, and arrives here as plain data);
 // - the notices, unchanged and in the order Rust keeps them, every level drawn;
+// - the foreground chat's helpers: the counters line and the cards the panel
+//   draws, and the selection the reducer keeps for it;
 // - the first pending dialog of that chat, one at a time, which the dialogs
 //   slice draws as a modal;
 // - the run's one fatal failure, which belongs to no chat and outlives all of
@@ -20,6 +22,7 @@
 import type {
   ChatActivityMark,
   DialogView,
+  HelpersView_Serialize as HelpersView,
   NoticeView,
   ViewState_Serialize as ViewState,
 } from '../contract/bindings'
@@ -35,6 +38,10 @@ export type ChatViewState = {
   mark: ChatActivityMark | null
   /** Every notice Rust pushes, oldest first, with its level and its one action. */
   notices: NoticeView[]
+  /** The foreground chat's helpers panel, or `null` while no chat is open. */
+  helpers: HelpersView | null
+  /** The helper card the reducer selected, or `null` for the list itself. */
+  selectedHelper: string | null
   /** The first dialog that chat's extension is waiting on, or `null`. */
   dialog: DialogView | null
   /** The run's fatal launcher failure, or `null`; not about any one chat. */
@@ -60,13 +67,24 @@ export function chatOf(view: ViewState | null): ChatViewState {
   // The fatal bar is the run's, so it is read whatever chat is open.
   const fatal = view?.fatal ?? null
   if (chat === null) {
-    return { chat: null, title: null, mark: null, notices: NO_NOTICES, dialog: null, fatal }
+    return {
+      chat: null,
+      title: null,
+      mark: null,
+      notices: NO_NOTICES,
+      helpers: null,
+      selectedHelper: null,
+      dialog: null,
+      fatal,
+    }
   }
   return {
     chat,
     title: view?.foreground_title ?? null,
     mark: markOf(view, chat),
     notices: view?.notices ?? NO_NOTICES,
+    helpers: view?.helpers ?? null,
+    selectedHelper: view?.selected_helper ?? null,
     dialog: view?.dialog ?? null,
     fatal,
   }
@@ -92,6 +110,8 @@ export function createChatView(deps: ChatViewDeps = {}): ChatView {
     title: null,
     mark: null,
     notices: [],
+    helpers: null,
+    selectedHelper: null,
     dialog: null,
     fatal: null,
   }
@@ -111,6 +131,8 @@ export function createChatView(deps: ChatViewDeps = {}): ChatView {
       next.title === state.title &&
       next.mark === state.mark &&
       next.notices === state.notices &&
+      next.helpers === state.helpers &&
+      next.selectedHelper === state.selectedHelper &&
       next.dialog === state.dialog &&
       next.fatal === state.fatal
     ) {

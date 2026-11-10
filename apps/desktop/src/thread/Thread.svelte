@@ -13,11 +13,22 @@
   let {
     messages = [],
     foregroundChat = null,
+    visible = true,
+    scrollTop = $bindable(0),
   }: {
     /** The foreground chat's messages, oldest first, as Rust pushed them. */
     messages?: MessageView[]
     /** The foreground chat id: a change means the reader starts at the bottom. */
     foregroundChat?: string | null
+    /**
+     * Whether the Chat view is the one on screen. The thread stays mounted
+     * while the Helpers view covers it (T7b-1), so its scroll position and its
+     * render cache survive the trip; this only tells it when to put the reader
+     * back.
+     */
+    visible?: boolean
+    /** Where the reader was, kept by the shell across a trip to Helpers. */
+    scrollTop?: number
   } = $props()
 
   /** The one cache of this thread: per message id, only the growing tail renders. */
@@ -29,6 +40,8 @@
   let stick = true
   /** The chat the box was last laid out for. */
   let shown: string | null = null
+  /** Whether the Chat view was the one on screen last time this ran. */
+  let shownVisible: boolean | null = null
 
   const streaming = $derived(messages.some((message) => message.streaming))
 
@@ -68,8 +81,24 @@
     if (top !== null) box.scrollTop = top
   })
 
+  // The Helpers view covers the thread instead of replacing it: coming back puts
+  // the reader where they were, or at the bottom when they were following the
+  // reply (a box hidden with `hidden` may come back scrolled to the top).
+  $effect(() => {
+    const onScreen = visible
+    const returned = shownVisible === false && onScreen
+    shownVisible = onScreen
+    if (!returned || box === null) return
+    const top = nextScrollTop(
+      { scrollTop, scrollHeight: box.scrollHeight, clientHeight: box.clientHeight },
+      stick,
+    )
+    box.scrollTop = top ?? scrollTop
+  })
+
   function onScroll(): void {
     if (box === null) return
+    scrollTop = box.scrollTop
     stick = nearBottom(box.scrollTop, box.scrollHeight, box.clientHeight)
   }
 </script>

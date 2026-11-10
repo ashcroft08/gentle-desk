@@ -4,10 +4,10 @@
 //! Every field is a slice the state really holds, never the whole `AppState`:
 //! the foreground chat named as the app names it, the tail of its thread, the
 //! first dialog its extension waits on, the notices flattened, the chats that
-//! are not idle, and the session list as a status, a total and a revision
-//! instead of rows - the rows are served one window at a time (S3). The fatal
-//! launcher failure is the one shell-owned line here, because the app state has
-//! no process at all (`bridge::fatal`).
+//! are not idle, its helpers panel, and the session list as a status, a total
+//! and a revision instead of rows - the rows are served one window at a time
+//! (S3). The fatal launcher failure is the one shell-owned line here, because
+//! the app state has no process at all (`bridge::fatal`).
 
 use gentle_app::AppState;
 use gentle_runtime::badge::{Badge, BadgeMark};
@@ -15,7 +15,7 @@ use gentle_runtime::badge::{Badge, BadgeMark};
 use crate::contract::{
     ChatActivityMark, ChatActivityView, NoticeActionView, NoticeLevel, NoticeView, ViewState,
 };
-use crate::{dialogs, sessions, view};
+use crate::{dialogs, helpers, sessions, view};
 
 /// The slice of `state` as it stands now, carrying the revision the holder
 /// keeps for the session list - the web side compares it to know when the page
@@ -29,6 +29,7 @@ pub fn view_state(
     workspace_notice: Option<String>,
     fatal: Option<String>,
 ) -> ViewState {
+    let helpers_view = helpers::helpers(state);
     ViewState {
         foreground_chat: state
             .chats
@@ -44,6 +45,8 @@ pub fn view_state(
         messages: view::messages(state),
         notices: state.notices.iter().map(NoticeView::of).collect(),
         dialog: dialogs::dialog(state),
+        helpers: helpers_view,
+        selected_helper: state.selected_helper.clone(),
         activity: activity_view(state),
         config_notice,
         workspace_notice,
