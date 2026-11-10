@@ -33,6 +33,7 @@ pub(crate) use intents::apply as apply_intent;
 use gentle_core::rpc::RpcEvent;
 
 use crate::input::Effects;
+use crate::notices::{notice_from, push_notice};
 use crate::state::AppState;
 
 /// Applies the boot's working cap for every chat at once (S7).
@@ -50,7 +51,16 @@ pub(crate) fn opened(mut state: AppState, chat: &ChatId) -> AppState {
     state
 }
 
-/// Routes one chat's event to that chat and nothing else.
+/// Routes one chat's event to that chat and nothing else, and turns an
+/// extension `notify` into the same notice the one-child path builds: the same
+/// rule, the same levels, the same text and the same app-wide list.
+///
+/// The notice is not tied to the chat that raised it, deliberately: the app has
+/// one notice list and the only chat a notice can name is the Restart of a death
+/// (S3), so an extension's own words travel as the extension wrote them. A
+/// background chat's message therefore never claims to come from the foreground
+/// one (it carries no chat title at all), and two chats that announce the same
+/// text still share one row, exactly as in the one-child shell.
 pub(crate) fn apply_event(
     mut state: AppState,
     chat: ChatId,
@@ -58,6 +68,9 @@ pub(crate) fn apply_event(
     now_ms: Option<u64>,
 ) -> (AppState, Effects) {
     let (commands, chat_commands) = state.chats.apply(&chat, event, now_ms);
+    if let Some((level, text)) = notice_from(event) {
+        push_notice(&mut state, level, text);
+    }
     (
         state,
         Effects {

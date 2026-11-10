@@ -37,7 +37,8 @@ use gentle_backend::home::{with_home_flag, HomeEnv};
 use gentle_backend::launcher::{self, LauncherEnv};
 use gentle_desk_lib::bridge::AppStateHolder;
 use gentle_desk_lib::contract::{
-    ChatActivityMark, ChatActivityView, MessageRole, MessageView, NoticeLevel, UiIntent, ViewState,
+    ChatActivityMark, ChatActivityView, MessageRole, MessageView, NoticeLevel, NoticeView,
+    UiIntent, ViewState,
 };
 use gentle_desk_lib::effects::{self, ChatExecutor, RuntimeExecutor};
 use gentle_desk_lib::events::{EventPump, Push};
@@ -445,9 +446,9 @@ fn an_error_turn_ends_in_the_state_the_reducer_defines() {
 
     // What the reducer defines for `stopReason: "error"`: the provider's own
     // text is the message's text AND its error flag carries what the provider
-    // said, so the thread can draw it as a failure (T5a). The turn ends and no
-    // notice appears - the per-chat fold does not turn an extension `notify`
-    // into one.
+    // said, so the thread can draw it as a failure (T5a). The turn ends, and the
+    // extension's own `notify` that closes the stand-in's turn is a notice: the
+    // next test proves its level, text and action.
     let expected = vec![
         MessageView {
             id: "msg-0".to_owned(),
@@ -473,14 +474,64 @@ fn an_error_turn_ends_in_the_state_the_reducer_defines() {
     assert_eq!(view.foreground_chat.as_deref(), Some(chat.as_str()));
     assert_eq!(view.messages, expected);
     assert_eq!(
-        view.notices,
-        Vec::new(),
-        "the reducer leaves no notice here"
+        view.notices.len(),
+        1,
+        "the turn's notify is a notice, not a silent line: {:?}",
+        view.notices
     );
     assert_eq!(view.activity, Vec::new(), "the turn settled");
 
     // So what failed is the stand-in's model, not the bridge: its prompt did
     // reach the child.
+    let pid = wait_for("the child to log the prompt", || {
+        prompt_pid(harness.log(), "error")
+    });
+    assert_eq!(start_pids(harness.log()), vec![pid]);
+}
+
+#[test]
+fn an_error_turns_notify_reaches_the_notices_with_its_level() {
+    let Some(harness) = Harness::new() else {
+        return;
+    };
+    let bridge = Bridge::runtime_executor();
+
+    bridge.dispatch(UiIntent::OpenNewChat);
+    wait_for("the chat's child to answer its first request", || {
+        (bridge.holder.view().activity.is_empty()).then_some(())
+    });
+
+    bridge.dispatch(UiIntent::SendPrompt {
+        text: "error".to_owned(),
+    });
+
+    // The stand-in ends its failing turn with a `warning` notify: the pushed
+    // slice the web side renders carries it as a notice of that level, with the
+    // extension's own text and no action, so no button is drawn that does
+    // nothing.
+    let expected = NoticeView {
+        id: 0,
+        text: "rate limit reached (fake)".to_owned(),
+        level: NoticeLevel::Warning,
+        action: None,
+    };
+    wait_for("the extension's notify to become a notice", || {
+        last_where(&bridge.pushed, |view| {
+            view.notices == vec![expected.clone()]
+        })
+    });
+
+    // The notice outlives the turn that raised it: the settled slice, the one
+    // the window draws when nothing is working, still carries it.
+    let view = wait_for("the turn to settle with its notice on screen", || {
+        last_where(&bridge.pushed, |view| {
+            view.notices == vec![expected.clone()] && view.activity.is_empty()
+        })
+    });
+    assert_eq!(view.notices, vec![expected]);
+
+    // So the notice comes from the child's own line, not from a fault of the
+    // bridge: that child received the prompt.
     let pid = wait_for("the child to log the prompt", || {
         prompt_pid(harness.log(), "error")
     });
