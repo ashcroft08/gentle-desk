@@ -93,6 +93,15 @@ pub enum UiIntent {
         id: String,
         answer: DialogAnswer,
     },
+    /// Open the thread of one delegated helper (T7b-2). The id is the one
+    /// [`HelperRowView::id`] carried, and the reducer only selects a helper of
+    /// the foreground chat: an id that names no task changes nothing.
+    SelectHelper {
+        helper_id: String,
+    },
+    /// Back from a helper's thread to the helpers list: the same intent the
+    /// iced panel's Back sends (`crates/ui/src/app.rs`).
+    CloseHelper,
 }
 
 /// How complete the session list is, matching `gentle_app::ListStatus` one to
@@ -282,14 +291,77 @@ pub struct NoticeView {
     pub action: Option<NoticeActionView>,
 }
 
+/// The status of one delegated helper, matching `gentle_core`'s helper statuses
+/// one to one. The TEXT of a status is never built here: it is
+/// [`gentle_runtime::helper_text::status_label`]'s, carried beside the enum in
+/// [`HelperRowView::status_label`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub enum HelperStatusView {
+    Queued,
+    Running,
+    Waiting,
+    Done,
+    Failed,
+    Cancelled,
+}
+
+/// One card of the helpers panel, flattened for display: what the iced panel
+/// draws for a task (`crates/ui/src/view/helpers.rs`) and nothing more. The
+/// helper's thread is NOT here - the said/thought/ran view is T7b-2 - so the
+/// slice stays a handful of short lines per task, not a transcript.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub struct HelperRowView {
+    /// The id [`UiIntent::SelectHelper`] takes back.
+    pub id: String,
+    /// The card's headline, from [`gentle_runtime::helper_text::task_title`].
+    pub title: String,
+    pub agent: String,
+    pub status: HelperStatusView,
+    /// The status as text, from
+    /// [`gentle_runtime::helper_text::status_label`]: it is the card's
+    /// accessible name, so the text, not the colour, carries the state.
+    pub status_label: String,
+    pub turns: u32,
+    pub tool_calls: u32,
+    /// The step the helper is on or was last on, when it reported one.
+    pub last_step: Option<String>,
+    /// The failure the helper ended with, when it failed.
+    pub error: Option<String>,
+}
+
+/// The helpers panel of the foreground chat: the counters line both windows
+/// draw, the four counts the working badge is derived from, and one row per
+/// task.
+///
+/// The counters include tasks no longer listed (gentle-agents reports them
+/// that way), so the line and the rows never disagree about the counts. The
+/// line itself is [`gentle_runtime::helper_text::summary_line`]'s, computed
+/// once here; the counts travel beside it because the tab's badge depends on
+/// `running` and the web side never parses text.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub struct HelpersView {
+    /// The runtime's own counters line, four counts separated as that
+    /// rule separates them.
+    pub summary_line: String,
+    pub running: u32,
+    pub queued: u32,
+    pub waiting: u32,
+    pub finished: u32,
+    /// The tasks in the order the state keeps them: running, waiting, queued,
+    /// then the finished ones newest first (`gentle_core::helpers::merge_tasks`
+    /// orders them that way), so the panel draws what iced draws.
+    pub tasks: Vec<HelperRowView>,
+}
+
 /// The state the current views render: the foreground chat (as the app names
 /// it, the id the sidebar passes back) with its thread, the notices, the
 /// per-chat activity the list rows show, and the session list as a status plus
 /// a revision. The rows themselves are not here: the sidebar asks
 /// `sessions_window` for the page it draws (S3).
 ///
-/// The push size is the notices, the chats that are not idle and the tail of one
-/// thread, never the whole `AppState` and never the whole list (S2).
+/// The push size is the notices, the chats that are not idle, the tail of one
+/// thread and the foreground chat's helper cards, never the whole `AppState`
+/// and never the whole list (S2).
 ///
 /// A chat's stderr reason lines are not a slice of their own: the app keeps them
 /// in a bounded ring but exposes them only as the reason of the death notice, so
@@ -324,6 +396,16 @@ pub struct ViewState {
     /// waiting for an answer. `None` when no chat is foreground or nothing is
     /// pending, which is also what lets the composer work.
     pub dialog: Option<DialogView>,
+    /// The foreground chat's delegated helpers: the counters line a chat with no
+    /// helpers still shows, and one row per task. `None` only when no chat is
+    /// foreground (the window draws no Chat | Helpers tabs then).
+    pub helpers: Option<HelpersView>,
+    /// The helper whose thread is open in the panel, as the reducer remembers
+    /// it. It only ever names a card [`helpers`](Self::helpers) lists: the
+    /// reducer selects a task of the foreground chat and forgets the selection
+    /// when another chat becomes the foreground one. `None` for the list
+    /// itself, and always with no foreground chat.
+    pub selected_helper: Option<String>,
     pub activity: Vec<ChatActivityView>,
     /// The one failure that ends the whole run instead of one chat: the
     /// `gentle-shell` launcher could not be resolved, so no chat can ever

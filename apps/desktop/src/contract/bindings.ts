@@ -151,6 +151,147 @@ export type DialogView_Serialize =
 { kind: "Editor"; id: string; title: string; prefill: string | null };
 
 /**
+ *  One card of the helpers panel, flattened for display: what the iced panel
+ *  draws for a task (`crates/ui/src/view/helpers.rs`) and nothing more. The
+ *  helper's thread is NOT here - the said/thought/ran view is T7b-2 - so the
+ *  slice stays a handful of short lines per task, not a transcript.
+ */
+export type HelperRowView = HelperRowView_Serialize | HelperRowView_Deserialize;
+
+/**
+ *  One card of the helpers panel, flattened for display: what the iced panel
+ *  draws for a task (`crates/ui/src/view/helpers.rs`) and nothing more. The
+ *  helper's thread is NOT here - the said/thought/ran view is T7b-2 - so the
+ *  slice stays a handful of short lines per task, not a transcript.
+ */
+export type HelperRowView_Deserialize = {
+	/**  The id [`UiIntent::SelectHelper`] takes back. */
+	id: string,
+	/**  The card's headline, from [`gentle_runtime::helper_text::task_title`]. */
+	title: string,
+	agent: string,
+	status: HelperStatusView,
+	/**
+	 *  The status as text, from
+	 *  [`gentle_runtime::helper_text::status_label`]: it is the card's
+	 *  accessible name, so the text, not the colour, carries the state.
+	 */
+	status_label: string,
+	turns: number,
+	tool_calls: number,
+	/**  The step the helper is on or was last on, when it reported one. */
+	last_step?: string | null,
+	/**  The failure the helper ended with, when it failed. */
+	error?: string | null,
+};
+
+/**
+ *  One card of the helpers panel, flattened for display: what the iced panel
+ *  draws for a task (`crates/ui/src/view/helpers.rs`) and nothing more. The
+ *  helper's thread is NOT here - the said/thought/ran view is T7b-2 - so the
+ *  slice stays a handful of short lines per task, not a transcript.
+ */
+export type HelperRowView_Serialize = {
+	/**  The id [`UiIntent::SelectHelper`] takes back. */
+	id: string,
+	/**  The card's headline, from [`gentle_runtime::helper_text::task_title`]. */
+	title: string,
+	agent: string,
+	status: HelperStatusView,
+	/**
+	 *  The status as text, from
+	 *  [`gentle_runtime::helper_text::status_label`]: it is the card's
+	 *  accessible name, so the text, not the colour, carries the state.
+	 */
+	status_label: string,
+	turns: number,
+	tool_calls: number,
+	/**  The step the helper is on or was last on, when it reported one. */
+	last_step: string | null,
+	/**  The failure the helper ended with, when it failed. */
+	error: string | null,
+};
+
+/**
+ *  The status of one delegated helper, matching `gentle_core`'s helper statuses
+ *  one to one. The TEXT of a status is never built here: it is
+ *  [`gentle_runtime::helper_text::status_label`]'s, carried beside the enum in
+ *  [`HelperRowView::status_label`].
+ */
+export type HelperStatusView = "Queued" | "Running" | "Waiting" | "Done" | "Failed" | "Cancelled";
+
+/**
+ *  The helpers panel of the foreground chat: the counters line both windows
+ *  draw, the four counts the working badge is derived from, and one row per
+ *  task.
+ * 
+ *  The counters include tasks no longer listed (gentle-agents reports them
+ *  that way), so the line and the rows never disagree about the counts. The
+ *  line itself is [`gentle_runtime::helper_text::summary_line`]'s, computed
+ *  once here; the counts travel beside it because the tab's badge depends on
+ *  `running` and the web side never parses text.
+ */
+export type HelpersView = HelpersView_Serialize | HelpersView_Deserialize;
+
+/**
+ *  The helpers panel of the foreground chat: the counters line both windows
+ *  draw, the four counts the working badge is derived from, and one row per
+ *  task.
+ * 
+ *  The counters include tasks no longer listed (gentle-agents reports them
+ *  that way), so the line and the rows never disagree about the counts. The
+ *  line itself is [`gentle_runtime::helper_text::summary_line`]'s, computed
+ *  once here; the counts travel beside it because the tab's badge depends on
+ *  `running` and the web side never parses text.
+ */
+export type HelpersView_Deserialize = {
+	/**
+	 *  The runtime's own counters line, four counts separated as that
+	 *  rule separates them.
+	 */
+	summary_line: string,
+	running: number,
+	queued: number,
+	waiting: number,
+	finished: number,
+	/**
+	 *  The tasks in the order the state keeps them: running, waiting, queued,
+	 *  then the finished ones newest first (`gentle_core::helpers::merge_tasks`
+	 *  orders them that way), so the panel draws what iced draws.
+	 */
+	tasks: HelperRowView_Deserialize[],
+};
+
+/**
+ *  The helpers panel of the foreground chat: the counters line both windows
+ *  draw, the four counts the working badge is derived from, and one row per
+ *  task.
+ * 
+ *  The counters include tasks no longer listed (gentle-agents reports them
+ *  that way), so the line and the rows never disagree about the counts. The
+ *  line itself is [`gentle_runtime::helper_text::summary_line`]'s, computed
+ *  once here; the counts travel beside it because the tab's badge depends on
+ *  `running` and the web side never parses text.
+ */
+export type HelpersView_Serialize = {
+	/**
+	 *  The runtime's own counters line, four counts separated as that
+	 *  rule separates them.
+	 */
+	summary_line: string,
+	running: number,
+	queued: number,
+	waiting: number,
+	finished: number,
+	/**
+	 *  The tasks in the order the state keeps them: running, waiting, queued,
+	 *  then the finished ones newest first (`gentle_core::helpers::merge_tasks`
+	 *  orders them that way), so the panel draws what iced draws.
+	 */
+	tasks: HelperRowView_Serialize[],
+};
+
+/**
  *  How complete the session list is, matching `gentle_app::ListStatus` one to
  *  one. `Loading` carries how far the first pass got, so the sidebar can say it
  *  is still reading; only `Complete` lets an empty list call itself empty.
@@ -457,7 +598,20 @@ export type UiIntent = { type: "SendPrompt"; data: {
 { type: "AnswerDialog"; data: {
 	id: string,
 	answer: DialogAnswer,
-} };
+} } | 
+/**
+ *  Open the thread of one delegated helper (T7b-2). The id is the one
+ *  [`HelperRowView::id`] carried, and the reducer only selects a helper of
+ *  the foreground chat: an id that names no task changes nothing.
+ */
+{ type: "SelectHelper"; data: {
+	helper_id: string,
+} } | 
+/**
+ *  Back from a helper's thread to the helpers list: the same intent the
+ *  iced panel's Back sends (`crates/ui/src/app.rs`).
+ */
+{ type: "CloseHelper" };
 
 /**
  *  The state the current views render: the foreground chat (as the app names
@@ -466,8 +620,9 @@ export type UiIntent = { type: "SendPrompt"; data: {
  *  a revision. The rows themselves are not here: the sidebar asks
  *  `sessions_window` for the page it draws (S3).
  * 
- *  The push size is the notices, the chats that are not idle and the tail of one
- *  thread, never the whole `AppState` and never the whole list (S2).
+ *  The push size is the notices, the chats that are not idle, the tail of one
+ *  thread and the foreground chat's helper cards, never the whole `AppState`
+ *  and never the whole list (S2).
  * 
  *  A chat's stderr reason lines are not a slice of their own: the app keeps them
  *  in a bounded ring but exposes them only as the reason of the death notice, so
@@ -482,8 +637,9 @@ export type ViewState = ViewState_Serialize | ViewState_Deserialize;
  *  a revision. The rows themselves are not here: the sidebar asks
  *  `sessions_window` for the page it draws (S3).
  * 
- *  The push size is the notices, the chats that are not idle and the tail of one
- *  thread, never the whole `AppState` and never the whole list (S2).
+ *  The push size is the notices, the chats that are not idle, the tail of one
+ *  thread and the foreground chat's helper cards, never the whole `AppState`
+ *  and never the whole list (S2).
  * 
  *  A chat's stderr reason lines are not a slice of their own: the app keeps them
  *  in a bounded ring but exposes them only as the reason of the death notice, so
@@ -530,6 +686,20 @@ export type ViewState_Deserialize = {
 	 *  pending, which is also what lets the composer work.
 	 */
 	dialog?: DialogView_Deserialize | null,
+	/**
+	 *  The foreground chat's delegated helpers: the counters line a chat with no
+	 *  helpers still shows, and one row per task. `None` only when no chat is
+	 *  foreground (the window draws no Chat | Helpers tabs then).
+	 */
+	helpers?: HelpersView_Deserialize | null,
+	/**
+	 *  The helper whose thread is open in the panel, as the reducer remembers
+	 *  it. It only ever names a card [`helpers`](Self::helpers) lists: the
+	 *  reducer selects a task of the foreground chat and forgets the selection
+	 *  when another chat becomes the foreground one. `None` for the list
+	 *  itself, and always with no foreground chat.
+	 */
+	selected_helper?: string | null,
 	activity: ChatActivityView[],
 	/**
 	 *  The one failure that ends the whole run instead of one chat: the
@@ -565,8 +735,9 @@ export type ViewState_Deserialize = {
  *  a revision. The rows themselves are not here: the sidebar asks
  *  `sessions_window` for the page it draws (S3).
  * 
- *  The push size is the notices, the chats that are not idle and the tail of one
- *  thread, never the whole `AppState` and never the whole list (S2).
+ *  The push size is the notices, the chats that are not idle, the tail of one
+ *  thread and the foreground chat's helper cards, never the whole `AppState`
+ *  and never the whole list (S2).
  * 
  *  A chat's stderr reason lines are not a slice of their own: the app keeps them
  *  in a bounded ring but exposes them only as the reason of the death notice, so
@@ -613,6 +784,20 @@ export type ViewState_Serialize = {
 	 *  pending, which is also what lets the composer work.
 	 */
 	dialog: DialogView_Serialize | null,
+	/**
+	 *  The foreground chat's delegated helpers: the counters line a chat with no
+	 *  helpers still shows, and one row per task. `None` only when no chat is
+	 *  foreground (the window draws no Chat | Helpers tabs then).
+	 */
+	helpers: HelpersView_Serialize | null,
+	/**
+	 *  The helper whose thread is open in the panel, as the reducer remembers
+	 *  it. It only ever names a card [`helpers`](Self::helpers) lists: the
+	 *  reducer selects a task of the foreground chat and forgets the selection
+	 *  when another chat becomes the foreground one. `None` for the list
+	 *  itself, and always with no foreground chat.
+	 */
+	selected_helper: string | null,
 	activity: ChatActivityView[],
 	/**
 	 *  The one failure that ends the whole run instead of one chat: the

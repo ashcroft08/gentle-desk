@@ -38,6 +38,10 @@ pub fn to_intent(state: &gentle_app::AppState, intent: UiIntent) -> Option<gentl
             id,
             answer: ui_answer(answer),
         },
+        // The helper id belongs to the foreground chat's helpers, which the
+        // reducer checks, so an id that names no task selects nothing.
+        UiIntent::SelectHelper { helper_id } => gentle_app::Intent::SelectHelper(helper_id),
+        UiIntent::CloseHelper => gentle_app::Intent::CloseHelper,
     })
 }
 

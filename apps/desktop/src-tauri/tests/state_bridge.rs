@@ -82,6 +82,10 @@ fn the_view_state_slice_has_no_invented_fields() {
             notices: Vec::new(),
             // No chat is open, so no extension is waiting for an answer.
             dialog: None,
+            // No chat is open, so there is no helpers panel and nothing to
+            // select in one.
+            helpers: None,
+            selected_helper: None,
             activity: Vec::new(),
             config_notice: None,
             // The shell-owned line a refused workspace action sets: nothing was

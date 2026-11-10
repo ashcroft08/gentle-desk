@@ -135,6 +135,8 @@ export function viewState(overrides: Partial<ViewState_Serialize> = {}): ViewSta
     messages: [],
     notices: [],
     dialog: null,
+    helpers: null,
+    selected_helper: null,
     activity: [],
     fatal: null,
     config_notice: null,

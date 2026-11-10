@@ -1,9 +1,9 @@
 // The chat header, one test per rule: it names the open chat, the whole title is
 // there for whoever asks (a hover, a screen reader) even when CSS cuts it short,
-// and it draws nothing else.
+// and it carries the Chat | Helpers tablist with the tab's working badge.
 
-import { afterEach, describe, expect, it } from 'vitest'
-import { cleanup, render, screen } from '@testing-library/svelte'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { cleanup, fireEvent, render, screen } from '@testing-library/svelte'
 import Header from './Header.svelte'
 
 afterEach(cleanup)
@@ -26,10 +26,22 @@ describe('Header', () => {
     expect(heading.getAttribute('title')).toBe(title)
   })
 
-  it('draws no other control: the artboard menu and view tabs are not built yet', () => {
+  it('draws the view tabs beside the title, and no menu', () => {
     render(Header, { props: { title: 'Idle one' } })
 
+    expect(screen.getByRole('tablist', { name: 'View' })).toBeTruthy()
+    expect(screen.getAllByRole('tab')).toHaveLength(2)
+    // The artboard's "..." menu (Rename, Delete) is not built yet.
     expect(screen.queryByRole('button')).toBeNull()
-    expect(screen.queryByRole('tab')).toBeNull()
+  })
+
+  it('reports the tab the user picks and draws the working badge when told to', async () => {
+    const onSelect = vi.fn()
+    render(Header, { props: { title: 'Busy one', running: 2, onSelect } })
+
+    expect(screen.getByRole('img', { name: '2 helpers working' })).toBeTruthy()
+    await fireEvent.click(screen.getByRole('tab', { name: /Helpers/ }))
+
+    expect(onSelect).toHaveBeenCalledWith('helpers')
   })
 })

@@ -15,6 +15,7 @@ pub mod dialogs;
 pub mod effects;
 pub mod events;
 pub mod folder_name;
+pub mod helpers;
 pub mod intent;
 pub mod link;
 pub mod link_commands;
