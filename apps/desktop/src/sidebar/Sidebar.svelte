@@ -1,9 +1,9 @@
 <script lang="ts">
-  // The sidebar: New session (D2), the New workspace icon (D7), the two plain
+  // The sidebar: New session (D2), the New workspace control (D7), the two plain
   // notice lines, the reading line of the first pass, and the workspace tree.
   // It owns the only view-local selection this slice needs (P5): the workspace
   // row the user clicked last, and the chat row clicked while Rust catches up.
-  import { addWorkspace, dispatchIntent } from '../bridge'
+  import { dispatchIntent } from '../bridge'
   import { workspacePathOfChat, type ChatRow, type WorkspaceRow } from '../sessions/rows'
   import { createSessionsView } from '../sessions/view'
   import type { Viewport } from '../sessions/window'
@@ -23,6 +23,8 @@
 
   const sessions = createSessionsView()
 
+  /** Whether the header's New workspace menu is open (the empty prompt opens it). */
+  let newWorkspaceOpen = $state(false)
   /** The workspace row the user clicked last. */
   let clickedPath = $state<string | null>(null)
   /** The chat row the user clicked, until a push names the foreground chat. */
@@ -91,7 +93,7 @@
     describedBy={describedBy}
     onNewSession={newSession}
   />
-  <SidebarHeader onNewWorkspace={() => void addWorkspace()} />
+  <SidebarHeader bind:menuOpen={newWorkspaceOpen} />
   <SidebarNotices
     configNotice={model.view?.config_notice ?? null}
     workspaceNotice={model.view?.workspace_notice ?? null}
@@ -100,7 +102,12 @@
     <p class="gh" role="status">{reading}</p>
   {/if}
   {#if empty}
-    <EmptyState title={EMPTY_TITLE} reason={EMPTY_REASON} reasonId={EMPTY_WHY_ID} />
+    <EmptyState
+      title={EMPTY_TITLE}
+      reason={EMPTY_REASON}
+      reasonId={EMPTY_WHY_ID}
+      onNewWorkspace={() => (newWorkspaceOpen = true)}
+    />
   {:else}
     <WorkspaceTree
       rows={model.rows}

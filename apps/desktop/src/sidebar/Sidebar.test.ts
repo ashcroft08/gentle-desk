@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/svelte'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/svelte'
 import { handlerArgs, resetTauriMock, viewState, workspaceRow, chatRow } from '../test-support/tauri-mock'
 import { serveSidebar, type SidebarFixture } from '../test-support/sidebar'
 import Sidebar from './Sidebar.svelte'
@@ -91,7 +91,7 @@ describe('Sidebar', () => {
     })
   })
 
-  it('adds a workspace straight from the header button', async () => {
+  it('adds a workspace through the New workspace menu', async () => {
     fixture = serveSidebar({
       view: viewState({ total_sessions: 1 }),
       rows: [workspaceRow('repo')],
@@ -101,6 +101,10 @@ describe('Sidebar', () => {
 
     await screen.findByText('repo')
     await fireEvent.click(screen.getByRole('button', { name: 'New workspace' }))
+    const menu = await screen.findByRole('menu')
+    await fireEvent.click(
+      within(menu).getByRole('menuitem', { name: 'Choose an existing folder' }),
+    )
     await vi.waitFor(() => expect(handlerArgs('add_workspace').length).toBe(1))
   })
 })

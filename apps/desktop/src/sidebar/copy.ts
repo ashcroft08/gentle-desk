@@ -22,6 +22,23 @@ export const NO_WORKSPACE_REASON = 'Select a workspace to start a session.'
 export const WORKSPACE_TITLE = 'Workspace'
 
 /**
+ * The two items the New workspace menu draws (01a, and the states board's
+ * "New workspace: the menu" card).
+ */
+export const MENU_CHOOSE = 'Choose an existing folder'
+export const MENU_CREATE = 'Create a new folder'
+
+// The create-folder dialog. No artboard draws it, so these words are this
+// slice's own; the board's delete sample gives the shape (title, one line,
+// Cancel and the action).
+export const NEW_FOLDER_TITLE = MENU_CREATE
+export const NEW_FOLDER_HINT = 'Enter a name, then choose where the folder goes.'
+export const NEW_FOLDER_LABEL = 'Folder name'
+export const CREATE_IDLE = 'Create'
+export const CREATE_BUSY = 'Creating...'
+export const CANCEL = 'Cancel'
+
+/**
  * The first-pass line and its counter, mirroring the rule the iced sidebar
  * tests (`crates/ui/src/view/sidebar/status.rs`): no counter before a file has
  * been found, so a zero total never reads like a settled answer.
