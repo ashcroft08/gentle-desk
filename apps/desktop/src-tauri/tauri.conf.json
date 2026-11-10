@@ -1,6 +1,6 @@
 {
   "productName": "Gentle Shell Desktop",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "identifier": "dev.gentle.desk",
   "build": {
     "beforeDevCommand": "npm run dev",
