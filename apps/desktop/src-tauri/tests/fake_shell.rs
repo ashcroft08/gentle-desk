@@ -640,6 +640,7 @@ fn close_deadlines() -> Deadlines {
     Deadlines {
         children: Duration::from_secs(8),
         pump: Duration::from_secs(3),
+        watch: Duration::from_secs(3),
         cache: Duration::from_secs(3),
         config: Duration::from_secs(3),
     }

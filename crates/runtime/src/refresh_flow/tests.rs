@@ -217,3 +217,34 @@ fn a_watcher_is_retried_on_each_full_pass_and_the_restarted_one_asks_for_a_pass(
     assert_eq!(flow.pump(), Next::Run(Job::Full));
     assert_eq!(flow.tick_delay(), session_schedule::RECONCILE_BASE);
 }
+
+/// The bridge takes the watcher out of the flow so it can drop it with no lock
+/// held; the flow then polls, exactly as it does after losing the watcher.
+#[test]
+fn taking_the_watcher_out_leaves_the_list_polling() {
+    let (_dir, sessions) = home();
+    let (watcher, _batches) = startup::try_start_watcher(&sessions).expect("a watcher");
+    let shared = Shared::new(
+        Arc::new(Mutex::new(SessionIndex::new(sessions.clone()))),
+        None,
+    );
+    let mut flow = Flow::new(Some(shared), Some(sessions), Some(watcher), None);
+    assert!(flow.is_watching());
+
+    let taken = flow.take_watcher();
+    assert!(taken.is_some(), "the handle leaves the flow");
+    assert!(
+        !flow.is_watching(),
+        "and no watcher feeds the list any more"
+    );
+    assert_eq!(
+        flow.tick_delay(),
+        session_schedule::POLL_BASE,
+        "the fast poll"
+    );
+    // Dropping it here is the point: no lock is held, so its thread joins freely.
+    drop(taken);
+    assert!(flow.take_watcher().is_none(), "nothing left to take");
+    // The fallback pass is the caller's, as after any lost watcher.
+    assert_eq!(flow.on_watcher_lost(), Next::Run(Job::Full));
+}

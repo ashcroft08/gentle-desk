@@ -146,20 +146,21 @@ impl Bridge {
         }));
     }
 
-    /// Announces the list's emit step and asks for the first full pass. The
-    /// iced shell asks for that pass as its first task
-    /// (`crates/ui/src/app/boot.rs`), so the window opens with a list that is
-    /// reading rather than a list that claims to be empty.
+    /// Announces the list's emit step and boots the refresh of this run: the
+    /// watcher, the safety net and the first full pass. The iced shell booted
+    /// the same three (`crates/ui/src/app/boot.rs`: the watcher from
+    /// `backend::start`, then `flow.on_tick()`), so the window opens with a list
+    /// that is reading rather than a list that claims to be empty, and a session
+    /// file the terminal writes shows up without a restart.
     ///
     /// A push that lands before the webview listens is no longer lost: the
     /// sidebar's first read is `get_view_state`, a command that answers the
     /// slice the state holds and emits nothing, so it starts from the truth
-    /// whatever it missed. The pass is armed here because the setup step is the
+    /// whatever it missed. The boot is armed here because the setup step is the
     /// only place that has the handle, exactly as the child events are.
     pub fn start_sessions(&self, app: &AppHandle<tauri::Wry>) {
-        let push = push_to(app);
-        self.sessions.arm(push);
-        self.sessions.request();
+        self.sessions.arm(push_to(app));
+        self.sessions.boot();
     }
 
     /// The close of this run, armed once at startup. The exit is the app's own
@@ -177,7 +178,10 @@ impl Bridge {
                 let app = app.clone();
                 move || app.exit(0)
             }),
-        );
+        )
+        // The watcher and the safety net stop before the cache write: a batch
+        // must not ask for a pass after the last state was written.
+        .with_sessions(Arc::clone(&self.sessions));
         let flow = CloseFlow::new(Arc::new(steps), close::Deadlines::default());
         *lock(&self.close) = Some(Arc::new(flow));
     }

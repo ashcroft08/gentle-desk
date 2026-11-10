@@ -16,13 +16,16 @@ use gentle_desk_lib::close::{CloseFlow, CloseSteps, Deadlines};
 const LIMIT: Duration = Duration::from_secs(10);
 
 /// The step names, in the order the flow runs them.
-const ORDER: [&str; 6] = ["work", "children", "pump", "cache", "config", "exit"];
+const ORDER: [&str; 7] = [
+    "work", "children", "pump", "watch", "cache", "config", "exit",
+];
 
 /// Every deadline short: the tests never wait for a real one to run out.
 fn deadlines() -> Deadlines {
     Deadlines {
         children: Duration::from_secs(3),
         pump: Duration::from_secs(2),
+        watch: Duration::from_secs(2),
         cache: Duration::from_secs(2),
         config: Duration::from_secs(2),
     }
@@ -67,6 +70,10 @@ impl CloseSteps for Recorded {
 
     fn join_pump(&self, _budget: Duration) {
         self.record("pump");
+    }
+
+    fn stop_watch(&self, _budget: Duration) {
+        self.record("watch");
     }
 
     fn flush_cache(&self) {

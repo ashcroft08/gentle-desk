@@ -82,6 +82,17 @@ impl Flow {
         self.watcher.is_some()
     }
 
+    /// Forgets the running watcher and hands it to the caller, which is the only
+    /// way to drop it OUTSIDE this flow's lock: a `SessionWatcher`'s `Drop`
+    /// joins its own thread, and a join must never happen under a lock. The
+    /// caller that owns the lock (the Tauri bridge) takes it out first and drops
+    /// it after, then reports the end of the watch with
+    /// [`Flow::on_watcher_lost`]. The iced window keeps the handle inside the
+    /// flow for its whole life and never needs this.
+    pub fn take_watcher(&mut self) -> Option<SessionWatcher> {
+        self.watcher.take()
+    }
+
     /// The index a [`Next::Run`] pass runs on: the caller wraps it in whatever
     /// transport it has (an iced stream, an emitting thread).
     pub fn shared(&self) -> Option<Shared> {
@@ -129,7 +140,10 @@ impl Flow {
     }
 
     /// The watcher stopped: forget it, so the polling fallback takes over and
-    /// the next full pass tries to start one again.
+    /// the next full pass tries to start one again. A caller that must not join
+    /// a thread under its own lock takes the handle out first with
+    /// [`Flow::take_watcher`]; by the time this is called there is nothing left
+    /// to drop.
     pub fn on_watcher_lost(&mut self) -> Next {
         self.watcher = None;
         self.request_full();
