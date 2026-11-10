@@ -128,6 +128,14 @@ p {
   min-height: 0;
 }
 
+/* The widest the conversation gets: the messages and the box under them share
+   it, so a wide window is used and the box lines up with the thread. Past it the
+   lines would be too long to read comfortably, so the sides stay empty only on
+   a very large screen. */
+:root {
+  --chat-max: 1400px;
+}
+
 /* The thread and its messages: the artboard's rules for `.thread`, `.thread-in`
    and `.msg` (design/gentle-desk-v2/01a-tree-chat.html). Copy and the
    model-error box are not drawn there, so those two borrow the states board's
@@ -139,7 +147,7 @@ p {
 }
 
 .thread-in {
-  max-width: 720px;
+  max-width: var(--chat-max);
   margin: 0 auto;
   display: flex;
   flex-direction: column;
@@ -387,7 +395,7 @@ p {
 /* The composer: the artboard's rules for `.composer`, `.composer textarea` and
    `.composer .ic`, with the dock that also holds the disabled reason line. */
 .composer-dock {
-  width: min(760px, calc(100% - 48px));
+  width: min(var(--chat-max), calc(100% - 48px));
   margin: 0 auto 20px;
 }
 
