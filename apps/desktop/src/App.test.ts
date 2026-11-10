@@ -139,7 +139,10 @@ describe('App', () => {
     expect(screen.queryByRole('button', { name: 'New session' })).toBeNull()
   })
 
-  it('asks to install gentle-shell, before anything else, when the launcher is missing', async () => {
+  it('asks which home first when pi was found, even with no gentle-shell yet', async () => {
+    // Someone with pi but without gentle-shell must be recognised for what they
+    // have: the question about which home comes first, and only then the ask to
+    // install the agent.
     serveSidebar({
       view: viewState({
         shell: {
@@ -154,9 +157,45 @@ describe('App', () => {
     })
     render(App)
 
+    expect(await screen.findByRole('heading', { name: 'Welcome to gentle shell' })).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: 'gentle-shell is not installed' })).toBeNull()
+  })
+
+  it('asks to install gentle-shell when nothing at all was found', async () => {
+    serveSidebar({
+      view: viewState({
+        shell: {
+          pi_path: null,
+          choice: null,
+          ask: false,
+          launcher_found: false,
+          install: { type: 'Idle' },
+          restart_needed: false,
+        },
+      }),
+    })
+    render(App)
+
     expect(await screen.findByRole('heading', { name: 'gentle-shell is not installed' })).toBeTruthy()
-    expect(screen.queryByRole('heading', { name: 'Welcome to gentle shell' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'New session' })).toBeNull()
+  })
+
+  it('asks to install gentle-shell once the home is chosen and the agent is still missing', async () => {
+    serveSidebar({
+      view: viewState({
+        shell: {
+          pi_path: 'C:/Users/someone/.pi/agent',
+          choice: 'link',
+          ask: false,
+          launcher_found: false,
+          install: { type: 'Idle' },
+          restart_needed: false,
+        },
+      }),
+    })
+    render(App)
+
+    expect(await screen.findByRole('heading', { name: 'gentle-shell is not installed' })).toBeTruthy()
   })
 
   it('draws the app and no question once a home is chosen', async () => {
