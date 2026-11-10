@@ -87,7 +87,14 @@ describe('the Chat | Helpers views', () => {
     serveSidebar({
       view: open({
         messages: [
-          { id: 'm1', role: 'Assistant', text: 'a long answer', streaming: false, error: null },
+          {
+            id: 'm1',
+            role: 'Assistant',
+            text: 'a long answer',
+            streaming: false,
+            error: null,
+            images: [],
+          },
         ],
       }),
     })

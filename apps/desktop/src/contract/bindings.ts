@@ -56,6 +56,18 @@ export const commands = {
 	 *  accept is refused without asking the user for a place to put it.
 	 */
 	createWorkspace: (name: string) => typedError<ViewState_Serialize, string>(__TAURI_INVOKE("create_workspace", { name })),
+	/**
+	 *  The images a drop attached, as one command: the paths are the files the user
+	 *  dragged, and they come from Tauri's own drop event, because the webview's
+	 *  `File` has no path. Nothing but paths travel up: the shell reads the files,
+	 *  checks them, and answers the slice with a thumbnail's name and URL.
+	 */
+	attachImages: (paths: string[]) => typedError<ViewState_Serialize, string>(__TAURI_INVOKE("attach_images", { paths })),
+	/**
+	 *  Takes one attached image away before its send, named by the id
+	 *  [`crate::contract::ImageView`] carried. Nothing is sent.
+	 */
+	removeImage: (id: string) => typedError<ViewState_Serialize, string>(__TAURI_INVOKE("remove_image", { id })),
 };
 
 /** Events */
@@ -362,6 +374,25 @@ export type HomeChoiceView =
 "isolated";
 
 /**
+ *  One image a chat holds, as the composer and the thread draw it.
+ * 
+ *  It is a NAME and a URL, never a byte of the image: the shell reads the file
+ *  and serves its thumbnail from the drop's own path, so nothing but a path ever
+ *  travels up from the page (S4).
+ */
+export type ImageView = {
+	/**  The id the remove intent takes back. */
+	id: string,
+	/**  The file's own name, for the thumbnail's accessible text. */
+	name: string,
+	/**
+	 *  Where the webview loads this thumbnail from: the shell's own scheme,
+	 *  served from the file the user dropped.
+	 */
+	preview_url: string,
+};
+
+/**
  *  Where installing gentle-shell stands (shell-choice S4). It only leaves `Idle`
  *  when the user gave permission on the permission screen.
  */
@@ -422,6 +453,12 @@ export type MessageView_Deserialize = {
 	 *  error`. The text above is then the provider's message, never a reply.
 	 */
 	error?: string | null,
+	/**
+	 *  The images this message was sent with, drawn as the same thumbnails the
+	 *  composer showed (S2). Empty for every message that carried none, which
+	 *  is every assistant reply and every prompt typed without a drop.
+	 */
+	images: ImageView[],
 };
 
 /**
@@ -445,6 +482,12 @@ export type MessageView_Serialize = {
 	 *  error`. The text above is then the provider's message, never a reply.
 	 */
 	error: string | null,
+	/**
+	 *  The images this message was sent with, drawn as the same thumbnails the
+	 *  composer showed (S2). Empty for every message that carried none, which
+	 *  is every assistant reply and every prompt typed without a drop.
+	 */
+	images: ImageView[],
 };
 
 /**
@@ -935,6 +978,20 @@ export type ViewState_Deserialize = {
 	 */
 	config_notice?: string | null,
 	/**
+	 *  The foreground chat's images, waiting for its send: drawn in the composer
+	 *  as thumbnails with a remove button, and never sent by themselves (S2).
+	 *  `None`/empty for a chat with none, and for no chat at all.
+	 */
+	images: ImageView[],
+	/**
+	 *  Why the last drop was refused, as one line of plain text: a file that is
+	 *  not one of the four image types, one that is no longer there, or one that
+	 *  would pass the eight-image or 64 MB cap (S1). `None` when nothing was
+	 *  refused. A shell-owned line like [`ViewState::workspace_notice`]: the
+	 *  shell reads the files, so the shell is what says no.
+	 */
+	images_notice?: string | null,
+	/**
 	 *  Why the last workspace action was refused, as one line of plain text: a
 	 *  name Windows would not accept, a folder that is not there, a folder that
 	 *  already holds files (Q6). `None` when nothing was refused, and cleared by
@@ -1047,6 +1104,20 @@ export type ViewState_Serialize = {
 	 *  failed.
 	 */
 	config_notice: string | null,
+	/**
+	 *  The foreground chat's images, waiting for its send: drawn in the composer
+	 *  as thumbnails with a remove button, and never sent by themselves (S2).
+	 *  `None`/empty for a chat with none, and for no chat at all.
+	 */
+	images: ImageView[],
+	/**
+	 *  Why the last drop was refused, as one line of plain text: a file that is
+	 *  not one of the four image types, one that is no longer there, or one that
+	 *  would pass the eight-image or 64 MB cap (S1). `None` when nothing was
+	 *  refused. A shell-owned line like [`ViewState::workspace_notice`]: the
+	 *  shell reads the files, so the shell is what says no.
+	 */
+	images_notice: string | null,
 	/**
 	 *  Why the last workspace action was refused, as one line of plain text: a
 	 *  name Windows would not accept, a folder that is not there, a folder that

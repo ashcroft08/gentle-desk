@@ -66,3 +66,29 @@ export async function createWorkspace(name: string): Promise<void> {
     // Same as above: `workspace_notice` says why no folder was created.
   }
 }
+
+/**
+ * Attaches the images a drop named: the paths come from Tauri's own drop event,
+ * because a browser `File` has no path to give. Nothing but PATHS travel up: Rust
+ * reads the files, checks them, and answers with a thumbnail's name and URL in
+ * the next push, or with `images_notice` when it refused one.
+ */
+export async function attachImages(paths: string[]): Promise<void> {
+  try {
+    await commands.attachImages(paths)
+  } catch {
+    // The next push carries `images_notice`, the same reason the call carried.
+  }
+}
+
+/**
+ * Takes one attached image away before its send, named by the id the composer
+ * drew. Nothing is sent, and a chat that goes away first changes nothing.
+ */
+export async function removeImage(id: string): Promise<void> {
+  try {
+    await commands.removeImage(id)
+  } catch {
+    // The next push carries what the chat really holds.
+  }
+}

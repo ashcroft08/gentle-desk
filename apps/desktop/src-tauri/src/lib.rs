@@ -18,6 +18,7 @@ pub mod events;
 pub mod folder_name;
 pub mod helper_thread;
 pub mod helpers;
+pub mod images;
 pub mod intent;
 pub mod link;
 pub mod link_commands;
@@ -53,6 +54,8 @@ pub fn contract_builder() -> Builder<tauri::Wry> {
             link_commands::open_link,
             workspace_commands::add_workspace,
             workspace_commands::create_workspace,
+            commands::attach_images,
+            commands::remove_image,
         ])
         .events(tauri_specta::collect_events![contract::StateChanged,])
 }
@@ -74,6 +77,13 @@ pub fn run() {
 
     tauri::Builder::default()
         .manage(Bridge::new())
+        // The thumbnails the composer and the thread draw: the shell's own
+        // scheme, served from the files the user dropped. An `<img>` loads it
+        // like any URL, so not one byte of an image travels through the
+        // contract, and the request names an ID, never a path.
+        .register_uri_scheme_protocol(images::SCHEME, |ctx, request| {
+            preview(ctx.app_handle(), request.uri().path())
+        })
         .invoke_handler(builder.invoke_handler())
         // The close flow (T8a). The window's own close request - the OS close
         // button, Alt+F4 - is the same event iced's `window::close_requests()`
@@ -116,4 +126,29 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running the gentle-desk tauri application");
+}
+
+/// The reply of the preview scheme: the file the id names, with the type the
+/// browser needs, or a 404 for an id this run never attached.
+///
+/// Only IDs the user's own drops created are served (`images::Images::read`), so
+/// a page cannot name a file it was never given.
+fn preview(app: &tauri::AppHandle<tauri::Wry>, path: &str) -> tauri::http::Response<Vec<u8>> {
+    use tauri::http::{header::CONTENT_TYPE, HeaderValue, Response, StatusCode};
+
+    let served = app
+        .state::<Bridge>()
+        .holder
+        .images()
+        .read(path.trim_start_matches('/'));
+    let (status, mime, body) = match served {
+        Some((mime, bytes)) => (StatusCode::OK, mime, bytes),
+        None => (StatusCode::NOT_FOUND, "text/plain", Vec::new()),
+    };
+    let mut reply = Response::new(body);
+    *reply.status_mut() = status;
+    reply
+        .headers_mut()
+        .insert(CONTENT_TYPE, HeaderValue::from_static(mime));
+    reply
 }

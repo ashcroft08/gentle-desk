@@ -1,5 +1,6 @@
 //! pi's `--mode rpc` JSON-line protocol.
 
+pub mod base64;
 pub mod codec;
 pub mod types;
 

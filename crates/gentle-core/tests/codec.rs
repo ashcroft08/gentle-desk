@@ -24,6 +24,48 @@ mod encode {
         assert_eq!(line.matches('\n').count(), 1);
     }
 
+    /// One image in pi's own shape: the content block an attachment is.
+    fn image(mime: &str, data: &str) -> ImageContent {
+        ImageContent {
+            mime_type: mime.to_owned(),
+            data: data.to_owned(),
+        }
+    }
+
+    #[test]
+    fn a_prompt_with_images_carries_pis_images_field() {
+        let line = encode_command(&RpcCommand::prompt_with_images(
+            "look at this",
+            vec![image("image/png", "aGk="), image("image/jpeg", "AA==")],
+        ));
+
+        assert_eq!(
+            line,
+            concat!(
+                "{\"images\":[{\"data\":\"aGk=\",\"mimeType\":\"image/png\",\"type\":\"image\"},",
+                "{\"data\":\"AA==\",\"mimeType\":\"image/jpeg\",\"type\":\"image\"}],",
+                "\"message\":\"look at this\",\"type\":\"prompt\"}\n"
+            )
+        );
+        assert_eq!(line.matches('\n').count(), 1);
+    }
+
+    #[test]
+    fn a_prompt_with_no_images_is_byte_identical_to_the_old_line() {
+        let old = encode_command(&RpcCommand::Prompt {
+            message: "hi\nthere".into(),
+        });
+        let built = encode_command(&RpcCommand::prompt("hi\nthere"));
+        let empty = encode_command(&RpcCommand::prompt_with_images("hi\nthere", Vec::new()));
+
+        assert_eq!(built, old, "the constructor sends the old line");
+        assert_eq!(empty, old, "no images is the old line, byte for byte");
+        assert!(
+            !empty.contains("images"),
+            "the field is omitted, never sent empty: {empty}"
+        );
+    }
+
     #[test]
     fn simple_commands_carry_no_extra_fields() {
         assert_eq!(encode_command(&RpcCommand::Abort), "{\"type\":\"abort\"}\n");

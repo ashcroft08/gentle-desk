@@ -459,6 +459,73 @@ p {
   padding-left: 16px;
 }
 
+/* The images a chat holds and the images a sent message carried: the same
+   thumbnails in both places, drawn from the URL the shell serves, so not one
+   byte of an image travels through the push. */
+.shots {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 8px;
+  padding: 0;
+}
+
+.shot {
+  position: relative;
+}
+
+.thumb {
+  display: block;
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+/* The way out of one attachment: small, on the corner, and named for a reader. */
+.shot .take {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 20px;
+  height: 20px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.shot .take:hover {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+/* The composer takes a drag: the box says so while the files are in the air. */
+.composer.over {
+  border-color: var(--accent);
+}
+
+.composer-dock .drop {
+  margin: 0 0 8px;
+  padding-left: 16px;
+  color: var(--accent);
+  font-size: 12px;
+}
+
+/* Why the last drop attached nothing. */
+.composer-dock .refused {
+  margin: 6px 0 0;
+  padding-left: 16px;
+  color: var(--danger);
+  font-size: 12px;
+}
+
 /* The key hints under the box: quiet, left-aligned with the box's text, never
    competing with it. */
 .composer-dock .keys {

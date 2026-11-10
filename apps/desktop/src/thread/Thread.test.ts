@@ -21,11 +21,11 @@ const REPLYING = 'Assistant is replying'
 const MODEL_ERROR = 'Model error'
 
 function user(id: string, text: string): MessageView {
-  return { id, role: 'User', text, streaming: false, error: null }
+  return { id, role: 'User', text, streaming: false, error: null, images: [] }
 }
 
 function assistant(id: string, text: string, over: Partial<MessageView> = {}): MessageView {
-  return { id, role: 'Assistant', text, streaming: false, error: null, ...over }
+  return { id, role: 'Assistant', text, streaming: false, error: null, images: [], ...over }
 }
 
 /** Draws the thread and returns its scroll region. */

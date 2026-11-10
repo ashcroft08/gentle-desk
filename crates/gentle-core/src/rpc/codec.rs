@@ -8,6 +8,21 @@ use super::types::*;
 pub fn encode_command(command: &RpcCommand) -> String {
     let value = match command {
         RpcCommand::Prompt { message } => json!({ "type": "prompt", "message": message }),
+        // The `images` key is written only when there is something in it: a
+        // prompt with nothing attached must stay the line every earlier prompt
+        // was, byte for byte.
+        RpcCommand::PromptWithImages { message, images } => {
+            let mut map = Map::new();
+            map.insert("type".into(), json!("prompt"));
+            map.insert("message".into(), json!(message));
+            if !images.is_empty() {
+                map.insert(
+                    "images".into(),
+                    Value::Array(images.iter().map(image_content).collect()),
+                );
+            }
+            Value::Object(map)
+        }
         RpcCommand::Abort => json!({ "type": "abort" }),
         RpcCommand::NewSession => json!({ "type": "new_session" }),
         RpcCommand::SwitchSession { session_path } => {
@@ -29,6 +44,15 @@ pub fn encode_command(command: &RpcCommand) -> String {
         }
     };
     format!("{value}\n")
+}
+
+/// One image in pi's own content shape: an `image` content block.
+fn image_content(image: &ImageContent) -> Value {
+    json!({
+        "type": "image",
+        "data": image.data,
+        "mimeType": image.mime_type,
+    })
 }
 
 /// Splits raw output chunks into complete lines.

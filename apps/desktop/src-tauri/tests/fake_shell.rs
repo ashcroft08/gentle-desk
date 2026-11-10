@@ -409,6 +409,7 @@ fn an_opened_chat_reaches_the_child_and_its_echo_is_pushed() {
         text: "echo: hello".to_owned(),
         streaming: false,
         error: None,
+        images: Vec::new(),
     };
     let view = wait_for("the echo to be pushed and the turn to settle", || {
         last_where(&bridge.pushed, |view| {
@@ -422,6 +423,7 @@ fn an_opened_chat_reaches_the_child_and_its_echo_is_pushed() {
         text: "hello".to_owned(),
         streaming: false,
         error: None,
+        images: Vec::new(),
     };
     assert_eq!(view.foreground_chat.as_deref(), Some(chat.as_str()));
     assert_eq!(
@@ -490,6 +492,7 @@ fn an_error_turn_ends_in_the_state_the_reducer_defines() {
             text: "error".to_owned(),
             streaming: false,
             error: None,
+            images: Vec::new(),
         },
         MessageView {
             id: "msg-1".to_owned(),
@@ -497,6 +500,7 @@ fn an_error_turn_ends_in_the_state_the_reducer_defines() {
             text: "Provider says no.".to_owned(),
             streaming: false,
             error: Some("quota exceeded (fake)".to_owned()),
+            images: Vec::new(),
         },
     ];
     let view = wait_for("the failed turn to settle", || {

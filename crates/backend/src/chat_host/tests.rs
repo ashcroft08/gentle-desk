@@ -109,6 +109,26 @@ fn a_command_reaches_only_its_chats_child() {
 }
 
 #[test]
+fn a_prompt_with_images_reaches_its_chats_child_as_it_was_sent() {
+    let spawner = Arc::new(FakeSpawner::new());
+    let host = plain(&spawner);
+    host.open(saved("a")).unwrap();
+
+    // The host writes what the shell built, images and all: the encoding is the
+    // codec's (`crates/gentle-core/tests/codec.rs`), the routing is this.
+    let prompt = RpcCommand::prompt_with_images(
+        "look",
+        vec![gentle_core::rpc::ImageContent {
+            mime_type: "image/png".to_owned(),
+            data: "aGk=".to_owned(),
+        }],
+    );
+    host.send(&saved("a"), &prompt).unwrap();
+
+    assert_eq!(spawner.child(&saved("a")).commands(), vec![prompt]);
+}
+
+#[test]
 fn sending_to_a_chat_the_host_never_opened_is_refused() {
     let spawner = Arc::new(FakeSpawner::new());
     let host = plain(&spawner);

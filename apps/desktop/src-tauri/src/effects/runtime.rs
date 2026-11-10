@@ -27,6 +27,7 @@ use super::ChatExecutor;
 use crate::bridge::AppStateHolder;
 use crate::close::CLOSING;
 use crate::events::EventPump;
+use crate::images;
 use crate::pending::PendingFolders;
 
 /// The message every command of a run without a host answers with, the one the
@@ -137,6 +138,10 @@ impl ChatExecutor for RuntimeExecutor {
             ChatCommand::OpenProcess { chat } => self.folders.take(chat),
             ChatCommand::Send { .. } => None,
         };
+        // The chat's attached images are merged in HERE, beside the folder and
+        // never through `crates/app`: `ChatCommand` carries no image, and the
+        // prompt that was folded is the one this send is.
+        let command = self.with_images(command);
         match self.runtime() {
             Ok(runtime) => runtime.execute_in(command, folder),
             Err(message) => match command {
@@ -144,6 +149,34 @@ impl ChatExecutor for RuntimeExecutor {
                 ChatCommand::Send { chat, .. } => Outcome::SendFailed { chat, message },
             },
         }
+    }
+}
+
+impl RuntimeExecutor {
+    /// The send with the chat's attached images in it, and the same command when
+    /// the chat attached nothing.
+    ///
+    /// Only a PROMPT takes them: every other command to the child (a dialog's
+    /// answer) leaves the chat's images waiting for the prompt that follows.
+    fn with_images(&self, command: ChatCommand) -> ChatCommand {
+        let taken = match &command {
+            ChatCommand::Send { chat, rpc } if rpc.prompt_text().is_some() => {
+                let attachments = self.holder.take_images(chat);
+                if attachments.is_empty() {
+                    None
+                } else {
+                    Some((chat.clone(), attachments))
+                }
+            }
+            _ => None,
+        };
+        let Some((chat, attachments)) = taken else {
+            return command;
+        };
+        // Before the merged command is built: the thread draws them from now on,
+        // and the composer stops holding them.
+        self.holder.note_images_sent(&chat, &attachments);
+        images::with_attachments(command, attachments)
     }
 }
 

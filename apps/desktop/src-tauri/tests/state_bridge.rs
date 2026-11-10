@@ -103,6 +103,10 @@ fn the_view_state_slice_has_no_invented_fields() {
             // No helper is selected, so no thread is open either.
             helper_thread: None,
             activity: Vec::new(),
+            // Nothing was dropped, so the chat holds no image and nothing was
+            // refused.
+            images: Vec::new(),
+            images_notice: None,
             config_notice: None,
             // The shell-owned line a refused workspace action sets: nothing was
             // refused here, so it carries nothing.
