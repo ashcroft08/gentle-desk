@@ -8,6 +8,16 @@
          of the first frame: src/main.ts paints the stored theme on this element
          from the first read of the state, before the app mounts, so the window
          never shows another theme's colors first. -->
+    <!-- The first frame, before any stylesheet loads: the same dark surface the
+         native window is configured with (tauri.conf.json backgroundColor), so
+         opening the app never flashes white. src/main.ts repaints the chosen
+         theme before the app mounts. -->
+    <style>
+      html,
+      body {
+        background: #0e1116;
+      }
+    </style>
   </head>
   <body>
     <div id="app"></div>

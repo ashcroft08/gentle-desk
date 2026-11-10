@@ -1,8 +1,10 @@
 <script lang="ts">
   // One workspace header row: the open or closed folder icon (no chevron, D6),
   // the label, `aria-expanded` for the group, and the circle-plus new-chat icon
-  // (D3). The icon shows while any row of this workspace is hovered or while
-  // the row holds focus, and a folder that is gone keeps it `aria-disabled` with
+  // (D3). The icon shows while the workspace section is hovered, or while the
+  // button itself holds keyboard focus, and it goes away otherwise: a click on it
+  // used to pin it open, because any focus inside the row kept it drawn. A folder
+  // that is gone keeps it `aria-disabled` with
   // the reason as its description (states board, "a workspace whose folder is
   // gone"). There is no "..." menu on the row (D5).
   import Icon from '../icons/Icon.svelte'
@@ -32,10 +34,7 @@
     onKeydown: (event: KeyboardEvent) => void
   } = $props()
 
-  let focused = $state(false)
-
   const reasonId = $derived(`ws-reason-${row.key.replace(/[^a-zA-Z0-9]+/g, '-')}`)
-  const visible = $derived(revealed || focused)
   const reason = $derived(row.available ? null : row.reason)
 
   function newChat(): void {
@@ -44,7 +43,7 @@
   }
 </script>
 
-<div class="frow" onfocusin={() => (focused = true)} onfocusout={() => (focused = false)}>
+<div class="frow">
   <div
     class="row folder"
     role="treeitem"
@@ -72,7 +71,7 @@
     aria-disabled={row.available ? undefined : 'true'}
     aria-describedby={row.available ? undefined : reasonId}
     data-tip="New chat"
-    data-visible={visible ? 'true' : 'false'}
+    data-visible={revealed ? 'true' : 'false'}
     tabindex={active ? 0 : -1}
     onclick={newChat}
   >

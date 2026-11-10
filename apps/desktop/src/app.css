@@ -1062,7 +1062,8 @@ p {
   opacity: 0;
 }
 
-.frow .nc[data-visible='true'] {
+.frow .nc[data-visible='true'],
+.frow .nc:focus-visible {
   opacity: 1;
 }
 

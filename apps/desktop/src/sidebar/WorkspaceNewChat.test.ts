@@ -39,7 +39,10 @@ describe('workspace new-chat icon', () => {
     ])
   })
 
-  it('shows the icon on keyboard focus inside the workspace row', async () => {
+  it('keeps the icon away until the workspace is hovered, even with focus inside the row', async () => {
+    // It used to appear on any focus inside the row, so clicking it pinned it
+    // open for good. A keyboard user still reaches it: the row's own tab stop
+    // makes the button tabbable, and the stylesheet shows it on focus-visible.
     fixture = serveSidebar({
       view: viewState({ total_sessions: 1 }),
       rows: [workspaceRow('one')],
@@ -50,8 +53,12 @@ describe('workspace new-chat icon', () => {
     const row = await vi.waitFor(() => rowOf('one'))
     const plus = screen.getByRole('button', { name: 'New chat in one' })
     expect(plus.getAttribute('data-visible')).toBe('false')
+
     await fireEvent.focusIn(row)
-    expect(plus.getAttribute('data-visible')).toBe('true')
+
+    expect(plus.getAttribute('data-visible')).toBe('false')
+    expect(row.getAttribute('tabindex')).toBe('0')
+    expect(plus.getAttribute('tabindex')).toBe('0')
   })
 
   it('shows the reason of a folder that is gone and refuses to start a chat there', async () => {
