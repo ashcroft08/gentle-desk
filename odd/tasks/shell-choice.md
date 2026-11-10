@@ -33,7 +33,7 @@ Feature: at first start, detect an existing pi and let the user choose between u
 
 ### Slice boundary
 
-The branch holds seven work-unit commits (about 2 300 changed lines), too many for one review. Proposed chained PRs, each coherent on its own: (A) T1 + T2a, the back end and the contract, nothing visible; (B) T2b + T2c, the welcome and the relaunch; (C) T3, the missing gentle-shell and the install; (D) T4, the footer control and the docs. The user decides when and how they are opened.
+The branch holds eight work-unit commits (about 2 300 changed lines), too many for one review. It goes out as four chained PRs, each green on its own (a contract change and the web code that reads it travel together, because the web type check fails between them): (1) T1, the home choice in Rust, nothing visible; (2) T2a-c, the contract, the welcome and the relaunch; (3) T3, the missing gentle-shell and the install; (4) T4, the footer control and the docs. Merged in that order, each retargeted to main after the one below it.
 
 ## Log
 
