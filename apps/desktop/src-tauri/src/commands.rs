@@ -12,7 +12,7 @@
 //! [`Bridge::finish`] and the same worker threads, and a workspace added by hand
 //! behaves like one that was there.
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, MutexGuard};
 
 use gentle_app::Command;
 use tauri::{AppHandle, Manager};
@@ -20,6 +20,7 @@ use tauri_specta::Event;
 
 use crate::bridge::{AppStateHolder, CommandSink};
 use crate::clipboard::{self, Clipboard, SystemClipboard};
+use crate::close::{self, BridgeSteps, CloseFlow, CLOSING};
 use crate::config::{ConfigSnapshot, ConfigWriter};
 use crate::contract::{StateChanged, UiIntent, ViewState};
 use crate::effects::{self, Ran, RuntimeExecutor};
@@ -55,6 +56,9 @@ pub struct Bridge {
     picker: Arc<NativeFolderPicker>,
     /// The one writer of the config file: a save never runs on this thread.
     writer: ConfigWriter,
+    /// The close of this run, armed once at startup because only the setup step
+    /// has the handle that ends the process (`arm_close`).
+    close: Mutex<Option<Arc<CloseFlow>>>,
 }
 
 impl Bridge {
@@ -93,6 +97,7 @@ impl Bridge {
             opener,
             picker: Arc::new(NativeFolderPicker::new()),
             writer,
+            close: Mutex::new(None),
         };
         // The reducer doesn't refresh the list itself: it answers
         // `Command::RefreshSessions` and this is where that one is run. A copy
@@ -157,6 +162,32 @@ impl Bridge {
         self.sessions.request();
     }
 
+    /// The close of this run, armed once at startup. The exit is the app's own
+    /// (`AppHandle::exit`), kept behind a closure so `close` names no Tauri type
+    /// and a test can run the same steps with a flag. This is the only place the
+    /// close flow is built: it must be one per run, because its one-shot gate is
+    /// what ignores a second close request.
+    pub fn arm_close(&self, app: &AppHandle<tauri::Wry>) {
+        let steps = BridgeSteps::new(
+            Arc::clone(&self.executor),
+            Arc::clone(&self.pump),
+            self.sessions.shared(),
+            self.writer.clone(),
+            Box::new({
+                let app = app.clone();
+                move || app.exit(0)
+            }),
+        );
+        let flow = CloseFlow::new(Arc::new(steps), close::Deadlines::default());
+        *lock(&self.close) = Some(Arc::new(flow));
+    }
+
+    /// The close of this run, if the close handler is armed. Cloned out, so the
+    /// caller never holds the lock while the shutdown starts.
+    pub fn close_flow(&self) -> Option<Arc<CloseFlow>> {
+        lock(&self.close).clone()
+    }
+
     /// Folds one intent, pushes the slice it answers, and runs the per-chat
     /// commands on worker threads. Returns the slice the command answers with,
     /// the one the web side may render before any child has answered.
@@ -165,6 +196,7 @@ impl Bridge {
         intent: UiIntent,
         app: &AppHandle<tauri::Wry>,
     ) -> Result<ViewState, String> {
+        self.accepting_work()?;
         // The folder of a chat that starts in a workspace travels BESIDE the
         // command: the reducer names the chat and `crates/app` carries no folder
         // at all (S2). A blank path names none, so nothing is opened for it.
@@ -219,9 +251,21 @@ impl Bridge {
         action: WorkspaceAction,
         app: &AppHandle<tauri::Wry>,
     ) -> Result<ViewState, String> {
+        self.accepting_work()?;
         emit_state(app, &action.view)?;
         self.run_chat_commands(action.commands, app);
         Ok(action.view)
+    }
+
+    /// The gate of the two intent paths: while the close runs, nothing new is
+    /// folded or opened here either, so nothing queues behind a window that is
+    /// going away. The executor has the same gate for the commands it runs; this
+    /// one stops the work before it is even folded.
+    fn accepting_work(&self) -> Result<(), String> {
+        if self.executor.is_closed() {
+            return Err(CLOSING.to_owned());
+        }
+        Ok(())
     }
 }
 
@@ -230,6 +274,12 @@ impl Default for Bridge {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// A lock that survives a poisoned mutex: a thread that died must not leave the
+/// close unarmed or unreadable for the rest of the run.
+fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
+    mutex.lock().unwrap_or_else(|poison| poison.into_inner())
 }
 
 /// What runs the shared commands of the reducer: the session list's pass and

@@ -8,6 +8,7 @@
 
 pub mod bridge;
 pub mod clipboard;
+pub mod close;
 pub mod commands;
 pub mod config;
 pub mod contract;
@@ -33,7 +34,7 @@ pub mod workspace_commands;
 pub mod workspace_create;
 
 use commands::Bridge;
-use tauri::Manager;
+use tauri::{Manager, WindowEvent};
 use tauri_specta::Builder;
 
 /// The whole typed surface of the bridge: the commands and events the
@@ -72,6 +73,27 @@ pub fn run() {
     tauri::Builder::default()
         .manage(Bridge::new())
         .invoke_handler(builder.invoke_handler())
+        // The close flow (T8a). The window's own close request - the OS close
+        // button, Alt+F4 - is the same event iced's `window::close_requests()`
+        // delivered, and it is prevented here so the window stays up and
+        // repainting while the shutdown runs on a thread of its own; its last
+        // step exits the process. `RunEvent::ExitRequested` is not the hook: it
+        // arrives once the window is already gone, which is the freeze this slice
+        // avoids, and it cannot refuse the close.
+        .on_window_event(|window, event| {
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                // The close is prevented ONLY when there is a flow to finish it:
+                // a window that cannot be closed is worse than one that closes
+                // without the orderly shutdown, so an unarmed run (a request
+                // before the setup step armed it) keeps the default close. A
+                // second request while shutting down is ignored by the flow's
+                // own gate, so this needs no state of its own.
+                if let Some(close) = window.app_handle().state::<Bridge>().close_flow() {
+                    api.prevent_close();
+                    close.request();
+                }
+            }
+        })
         .setup(move |app| {
             // Typed events need their registry mounted, or emitting panics.
             builder.mount_events(app);
@@ -82,6 +104,9 @@ pub fn run() {
             // The session list is armed the same way, and its first pass asked
             // for here: the window opens with a list that says it is reading.
             app.state::<Bridge>().start_sessions(app.handle());
+            // The close is armed last and for the same reason: its exit step is
+            // the one thing here that needs the handle.
+            app.state::<Bridge>().arm_close(app.handle());
             Ok(())
         })
         .run(tauri::generate_context!())

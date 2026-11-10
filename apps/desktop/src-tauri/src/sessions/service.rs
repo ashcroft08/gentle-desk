@@ -23,7 +23,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use gentle_app::Input;
 use gentle_runtime::refresh_flow::{Flow, Next};
 use gentle_runtime::refresh_queue::Job;
-use gentle_runtime::session_refresh::Update;
+use gentle_runtime::session_refresh::{Shared, Update};
 
 use crate::bridge::AppStateHolder;
 use crate::events::Push;
@@ -68,6 +68,14 @@ impl SessionsService {
     /// slice into the holder, which the next push carries anyway.
     pub fn arm(&self, push: Push) {
         *lock(&self.inner.push) = Some(push);
+    }
+
+    /// The index cache of this run, cloned out from under the flow's lock: `None`
+    /// when the pi home is unknown. The close flow flushes it with
+    /// `session_refresh::flush`, so the write itself happens with no lock of this
+    /// service held.
+    pub fn shared(&self) -> Option<Shared> {
+        lock(&self.inner.flow).flow.shared()
     }
 
     /// `Command::RefreshSessions` from the reducer (a settled turn, boot, an

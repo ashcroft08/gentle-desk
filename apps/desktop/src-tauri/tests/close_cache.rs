@@ -1,0 +1,120 @@
+//! Windowless test of the close flow's cache step (T8a): the session index cache
+//! the throttle held back reaches the disk when the window closes, and the
+//! throttle is not weakened while the window runs.
+//!
+//! A temp pi home and a temp cache path; the user's own home is never read.
+
+mod session_seam;
+use session_seam::{flow_of, Home};
+
+use std::fs;
+use std::sync::{Arc, Mutex, MutexGuard};
+use std::time::{Duration, Instant};
+
+use gentle_backend::session_cache;
+use gentle_backend::session_index::SessionIndex;
+use gentle_desk_lib::bridge::AppStateHolder;
+use gentle_desk_lib::close::{BridgeSteps, CloseFlow, Deadlines};
+use gentle_desk_lib::config::ConfigWriter;
+use gentle_desk_lib::effects::RuntimeExecutor;
+use gentle_desk_lib::events::EventPump;
+use gentle_desk_lib::pending::PendingFolders;
+use gentle_desk_lib::sessions::startup;
+use gentle_runtime::refresh_queue::Job;
+use gentle_runtime::session_refresh::{self, Refreshed, Shared};
+
+/// How long a test waits for the close to exit.
+const LIMIT: Duration = Duration::from_secs(10);
+
+fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
+    mutex.lock().unwrap_or_else(|poison| poison.into_inner())
+}
+
+/// One pass, run to its end on this thread: a pass reports synchronously, so no
+/// wait is needed.
+fn pass(job: Job, shared: &Shared) -> Refreshed {
+    let mut settled = None;
+    session_refresh::work(&job, shared, &mut || shared.now(), &mut |update| {
+        if let session_refresh::Update::Refreshed(result) = update {
+            settled = Some(result);
+        }
+    });
+    settled
+        .expect("a pass answers a list")
+        .expect("the pass read the home")
+}
+
+#[test]
+fn the_cache_the_throttle_held_back_reaches_the_disk_when_the_close_runs() {
+    let home = Home::new();
+    home.session("p", "a.jsonl", "uno");
+    let file = home.sessions().join("p").join("a.jsonl");
+    let flow = flow_of(&home);
+    let run = startup::run_pass(flow.shared());
+    let (service, _holder, _recorder) = session_seam::build(flow, run);
+    let shared = service
+        .shared()
+        .expect("the home of this test has an index");
+    let cache = home.cache();
+
+    // The first pass is a change with nothing written before it, so it writes.
+    pass(Job::Full, &shared);
+    let written = fs::read_to_string(&cache).expect("the first change wrote the cache");
+
+    // A second change within the throttle's interval is held back, as it is
+    // while the window runs: the close must not weaken that rule.
+    home.session("p", "a.jsonl", "uno y dos");
+    pass(Job::Paths(vec![file]), &shared);
+    assert_eq!(
+        fs::read_to_string(&cache).unwrap(),
+        written,
+        "a change within the interval rewrote the cache before the close"
+    );
+
+    // The close: the real steps of the bridge over an executor that never
+    // opened a chat, with the flow's own cache as the step it flushes.
+    let holder = Arc::new(AppStateHolder::default());
+    let pump = Arc::new(EventPump::new(Arc::clone(&holder)));
+    let executor = Arc::new(RuntimeExecutor::new(
+        Arc::clone(&pump),
+        Arc::new(PendingFolders::default()),
+        Arc::clone(&holder),
+    ));
+    let exited = Arc::new(Mutex::new(false));
+    let steps = BridgeSteps::new(
+        executor,
+        pump,
+        service.shared(),
+        ConfigWriter::spawn(None),
+        Box::new({
+            let exited = Arc::clone(&exited);
+            move || *lock(&exited) = true
+        }),
+    );
+    let close = CloseFlow::new(Arc::new(steps), Deadlines::default());
+    assert!(close.request(), "the close starts");
+    let deadline = Instant::now() + LIMIT;
+    while !*lock(&exited) {
+        assert!(Instant::now() < deadline, "the close never exited");
+        std::thread::sleep(Duration::from_millis(5));
+    }
+
+    let flushed = fs::read_to_string(&cache).unwrap();
+    assert_ne!(
+        flushed, written,
+        "the close wrote nothing: the last state never reached the disk"
+    );
+
+    // And it is the LAST state: a fresh index restored from it has nothing left
+    // to read, which is what the next run needs.
+    let mut fresh = SessionIndex::new(home.sessions());
+    if let Some(snapshot) = session_cache::load(&cache) {
+        fresh.restore(snapshot);
+    }
+    let restored = Shared::new(Arc::new(Mutex::new(fresh)), None);
+    assert_eq!(
+        pass(Job::Full, &restored).stats.bytes_read,
+        0,
+        "the flushed cache was not in sync with the session files"
+    );
+}
