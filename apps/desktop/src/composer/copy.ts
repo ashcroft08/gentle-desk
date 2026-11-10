@@ -2,10 +2,10 @@
 // (design/gentle-desk-v2/01a-tree-chat.html for the box, 00-states-board.html for
 // what each state says), so the design and the app cannot drift apart silently.
 //
-// The three reasons are this slice's own words: the states board names the
-// composer's behaviour per state ("Send disabled until the chat is ready",
-// "says it is waiting for a slot") but draws no line, so the text below says the
-// same thing in the form the app can show, and nothing more.
+// The two reasons are this slice's own words: the states board names the
+// composer's behaviour per state ("Send disabled until the chat is ready") but
+// draws no line, so the text below says the same thing in the form the app can
+// show, and nothing more. A queued chat needs none: it shows Stop, as iced does.
 
 /** The prompt box's accessible name (the artboard's `aria-label`). */
 export const MESSAGE_LABEL = 'Message'
@@ -25,9 +25,6 @@ export const MAX_HEIGHT = 120
 
 /** Opening: the chat's process is coming up and cannot take a prompt yet. */
 export const OPENING_REASON = 'Send is available once the chat is ready.'
-
-/** Queued: the chat's own prompt waits for a free working slot. */
-export const QUEUED_REASON = 'Waiting for a free slot.'
 
 /** Ended: the chat's process is gone until it is restarted. */
 export const ENDED_REASON = "This chat's process exited. Restart it to keep talking."

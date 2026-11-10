@@ -12,7 +12,7 @@ import { tick } from 'svelte'
 import type { ChatActivityMark } from '../contract/bindings'
 import { handlerArgs, resetTauriMock, setHandler, viewState } from '../test-support/tauri-mock'
 import Composer from './Composer.svelte'
-import { ENDED_REASON, OPENING_REASON, QUEUED_REASON } from './copy'
+import { ENDED_REASON, OPENING_REASON } from './copy'
 
 vi.mock('@tauri-apps/api/core', () => import('../test-support/tauri-mock').then((m) => m.coreModule()))
 vi.mock('@tauri-apps/api/event', () => import('../test-support/tauri-mock').then((m) => m.eventModule()))
@@ -143,17 +143,14 @@ describe('Composer', () => {
     expect(box.value).toBe('a draft')
   })
 
-  it('disables Send while the chat waits for a slot, says why, and keeps the draft', async () => {
+  it('shows Stop for a chat that waits for a slot, and Stop cancels the queued prompt', async () => {
     const { box } = draw({ chat: 'chat-1', mark: 'Queued' })
     await type(box, 'a draft')
 
-    const send = screen.getByRole('button', { name: 'Send' })
-    expect(send.getAttribute('aria-disabled')).toBe('true')
-    expect(send.getAttribute('aria-describedby')).toBe(screen.getByText(QUEUED_REASON).id)
+    expect(screen.queryByRole('button', { name: 'Send' })).toBeNull()
+    await fireEvent.click(screen.getByRole('button', { name: 'Stop' }))
 
-    await fireEvent.click(send)
-
-    expect(intents()).toEqual([])
+    expect(intents()).toEqual([{ type: 'Abort' }])
     expect(box.value).toBe('a draft')
   })
 

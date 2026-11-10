@@ -1,9 +1,10 @@
 // The parity rule of the composer, one test per state: working turns Send into
-// Stop, opening, queued and ended disable Send and each say why, and a finished
-// reply or a pending dialog change nothing.
+// Stop (a queued chat shows the same Stop, as iced does: it cancels the queued
+// prompt), opening and ended disable Send and each say why, and a finished reply
+// or a pending dialog change nothing.
 
 import { describe, expect, it } from 'vitest'
-import { ENDED_REASON, OPENING_REASON, QUEUED_REASON } from './copy'
+import { ENDED_REASON, OPENING_REASON } from './copy'
 import { composerStateOf } from './state'
 
 describe('composerStateOf', () => {
@@ -23,12 +24,8 @@ describe('composerStateOf', () => {
     })
   })
 
-  it('disables Send while the chat waits for a working slot, and says so', () => {
-    expect(composerStateOf('Queued')).toEqual({
-      mode: 'send',
-      disabled: true,
-      reason: QUEUED_REASON,
-    })
+  it('shows the same Stop while the chat waits for a working slot', () => {
+    expect(composerStateOf('Queued')).toEqual({ mode: 'stop', disabled: false, reason: null })
   })
 
   it('disables Send once the chat process is gone, and points at the restart', () => {
