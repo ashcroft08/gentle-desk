@@ -26,6 +26,7 @@ pub mod new_folder;
 pub mod pending;
 pub mod picker;
 pub mod sessions;
+pub mod shell_install;
 pub mod state_view;
 pub mod theme;
 pub mod view;

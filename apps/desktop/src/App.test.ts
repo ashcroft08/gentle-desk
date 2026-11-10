@@ -128,7 +128,7 @@ describe('App', () => {
   it('asks the welcome question instead of the app while a choice is due', async () => {
     serveSidebar({
       view: viewState({
-        shell: { pi_path: 'C:/Users/someone/.pi/agent', choice: null, ask: true },
+        shell: { pi_path: 'C:/Users/someone/.pi/agent', choice: null, ask: true, launcher_found: true, install: { type: 'Idle' } },
       }),
     })
     render(App)
@@ -137,10 +137,29 @@ describe('App', () => {
     expect(screen.queryByRole('button', { name: 'New session' })).toBeNull()
   })
 
+  it('asks to install gentle-shell, before anything else, when the launcher is missing', async () => {
+    serveSidebar({
+      view: viewState({
+        shell: {
+          pi_path: 'C:/Users/someone/.pi/agent',
+          choice: null,
+          ask: true,
+          launcher_found: false,
+          install: { type: 'Idle' },
+        },
+      }),
+    })
+    render(App)
+
+    expect(await screen.findByRole('heading', { name: 'gentle-shell is not installed' })).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: 'Welcome to gentle shell' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'New session' })).toBeNull()
+  })
+
   it('draws the app and no question once a home is chosen', async () => {
     serveSidebar({
       view: viewState({
-        shell: { pi_path: 'C:/Users/someone/.pi/agent', choice: 'link', ask: false },
+        shell: { pi_path: 'C:/Users/someone/.pi/agent', choice: 'link', ask: false, launcher_found: true, install: { type: 'Idle' } },
       }),
     })
     render(App)

@@ -20,6 +20,7 @@
   import Sidebar from './sidebar/Sidebar.svelte'
   import Thread from './thread/Thread.svelte'
   import { createThreadView } from './thread/view'
+  import MissingShell from './install/MissingShell.svelte'
   import Welcome from './welcome/Welcome.svelte'
 
   const thread = createThreadView()
@@ -42,7 +43,11 @@
   })
 </script>
 
-{#if chat.shell.ask}
+{#if !chat.shell.launcher_found}
+  <!-- Nothing here works without gentle-shell: the permission to install it
+       comes before any other question (shell-choice S4). -->
+  <MissingShell install={chat.shell.install} />
+{:else if chat.shell.ask}
   <!-- The first-start question takes the whole window: nothing runs on a home
        the user has not chosen yet (shell-choice S2). -->
   <Welcome piPath={chat.shell.pi_path ?? ''} />

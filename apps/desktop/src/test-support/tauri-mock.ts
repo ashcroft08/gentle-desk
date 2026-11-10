@@ -129,7 +129,13 @@ export function viewState(overrides: Partial<ViewState_Serialize> = {}): ViewSta
   return {
     theme: 'system',
     // No pi found, nothing chosen, nothing asked.
-    shell: { pi_path: null, choice: null, ask: false },
+    shell: {
+      pi_path: null,
+      choice: null,
+      ask: false,
+      launcher_found: true,
+      install: { type: 'Idle' },
+    },
     foreground_chat: null,
     foreground_title: null,
     list_status: { type: 'Complete' },

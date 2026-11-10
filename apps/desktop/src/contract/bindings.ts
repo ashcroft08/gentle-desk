@@ -362,6 +362,19 @@ export type HomeChoiceView =
 "isolated";
 
 /**
+ *  Where installing gentle-shell stands (shell-choice S4). It only leaves `Idle`
+ *  when the user gave permission on the permission screen.
+ */
+export type InstallView = { type: "Idle" } | { type: "Running" } | { type: "Done" } | 
+/**
+ *  The install ended badly; `message` is its exit code and the last lines
+ *  of what it printed, bounded.
+ */
+{ type: "Failed"; data: {
+	message: string,
+} };
+
+/**
  *  How complete the session list is, matching `gentle_app::ListStatus` one to
  *  one. `Loading` carries how far the first pass got, so the sidebar can say it
  *  is still reading; only `Complete` lets an empty list call itself empty.
@@ -618,6 +631,14 @@ export type ShellView_Deserialize = {
 	 *  yet. With no pi there is nothing to choose between, so it is never due.
 	 */
 	ask: boolean,
+	/**
+	 *  Whether the `gentle-shell` launcher resolves on this machine. `true`
+	 *  until the app has looked, so a run that did not look never claims it is
+	 *  missing.
+	 */
+	launcher_found: boolean,
+	/**  Where installing gentle-shell stands. */
+	install: InstallView,
 };
 
 /**
@@ -637,6 +658,14 @@ export type ShellView_Serialize = {
 	 *  yet. With no pi there is nothing to choose between, so it is never due.
 	 */
 	ask: boolean,
+	/**
+	 *  Whether the `gentle-shell` launcher resolves on this machine. `true`
+	 *  until the app has looked, so a run that did not look never claims it is
+	 *  missing.
+	 */
+	launcher_found: boolean,
+	/**  Where installing gentle-shell stands. */
+	install: InstallView,
 };
 
 /**
@@ -730,6 +759,13 @@ export type UiIntent = { type: "SendPrompt"; data: {
  *  first): a home chosen at the welcome question applies to a new run.
  */
 { type: "RestartApp" } | 
+/**
+ *  The user gave permission to install gentle-shell (the button of the
+ *  permission screen). Nothing installs without this intent.
+ */
+{ type: "InstallShell" } | 
+/**  Look for the `gentle-shell` launcher once more ("Check again"). */
+{ type: "CheckShellAgain" } | 
 /**  Start the child of a chat that died again and reopen it (S3). */
 { type: "RestartChat"; data: {
 	chat_id: string,

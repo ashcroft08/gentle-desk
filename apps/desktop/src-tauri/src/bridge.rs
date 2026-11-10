@@ -81,6 +81,11 @@ pub struct AppStateHolder {
     window_theme: Mutex<Option<Arc<dyn WindowTheme>>>,
     /// The folder of the user's pi when it was found at startup (`bridge::shell`).
     pi_path: Mutex<Option<String>>,
+    /// Set when the launcher was looked for and not found (`bridge::shell`); a
+    /// run that never looked has it unset, so it never claims one is missing.
+    launcher_missing: std::sync::atomic::AtomicBool,
+    /// Where installing gentle-shell stands (`bridge::shell`).
+    install: Mutex<crate::contract::InstallView>,
     /// The flattened tree of the last built revision, so a page of rows never
     /// regroups 50 000 sessions again (see [`TreeCache`]).
     tree: TreeCache,
