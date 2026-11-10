@@ -12,6 +12,7 @@
 //! them into reducer inputs and pushes the slice. Nothing else reads it.
 
 use std::ffi::OsString;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, OnceLock};
 
 use gentle_app::ChatCommand;
@@ -24,6 +25,7 @@ use gentle_runtime::chat_runtime::{ChatRuntime, Outcome};
 
 use super::ChatExecutor;
 use crate::bridge::AppStateHolder;
+use crate::close::CLOSING;
 use crate::events::EventPump;
 use crate::pending::PendingFolders;
 
@@ -48,6 +50,9 @@ pub struct RuntimeExecutor {
     /// Where a launcher that cannot be resolved is reported: the run's one fatal
     /// bar (`bridge::fatal`), which the next push carries.
     holder: Arc<AppStateHolder>,
+    /// Set by the close before anything else: from then on no command resolves a
+    /// launcher, builds a host or starts a child.
+    closed: AtomicBool,
 }
 
 impl RuntimeExecutor {
@@ -61,6 +66,29 @@ impl RuntimeExecutor {
             pump,
             folders,
             holder,
+            closed: AtomicBool::new(false),
+        }
+    }
+
+    /// Stops accepting new work: the close flow's first step, and the reason a
+    /// command that arrives while shutting down starts nothing.
+    pub fn stop_work(&self) {
+        self.closed.store(true, Ordering::SeqCst);
+    }
+
+    /// Whether new work is refused.
+    pub fn is_closed(&self) -> bool {
+        self.closed.load(Ordering::SeqCst)
+    }
+
+    /// Stops every live child, through the host's own close path: stdin first,
+    /// then its 2 s grace, then the whole process tree. Blocking by design (one
+    /// grace period per child that lingers), so the close flow runs it off the
+    /// window's thread with its own deadline. A host that was never built has
+    /// nothing to stop, and one that failed to build has no children.
+    pub fn shutdown(&self) {
+        if let Some(Ok(runtime)) = self.runtime.get() {
+            runtime.shutdown();
         }
     }
 
@@ -89,6 +117,12 @@ impl RuntimeExecutor {
 
 impl ChatExecutor for RuntimeExecutor {
     fn execute(&self, command: ChatCommand) -> Outcome {
+        // The gate comes first: a command that arrives while the window is
+        // closing answers the closing line without resolving a launcher, building
+        // a host or starting a child.
+        if self.is_closed() {
+            return refuse(command);
+        }
         let folder = match &command {
             ChatCommand::OpenProcess { chat } => self.folders.take(chat),
             ChatCommand::Send { .. } => None,
@@ -100,6 +134,16 @@ impl ChatExecutor for RuntimeExecutor {
                 ChatCommand::Send { chat, .. } => Outcome::SendFailed { chat, message },
             },
         }
+    }
+}
+
+/// The outcome of a command that arrived after the close: the failed open or
+/// failed send the reducer already knows, carrying [`CLOSING`].
+fn refuse(command: ChatCommand) -> Outcome {
+    let message = CLOSING.to_owned();
+    match command {
+        ChatCommand::OpenProcess { chat } => Outcome::OpenFailed { chat, message },
+        ChatCommand::Send { chat, .. } => Outcome::SendFailed { chat, message },
     }
 }
 

@@ -15,11 +15,15 @@
 //! [`EventPump`] is where the two threads start, exactly once and lazily: the
 //! first of `arm` (the window's emit step, installed at startup) and `feed` (the
 //! tagged stream plus the runtime, handed over when `RuntimeExecutor` first
-//! builds its host) that finds the other one there starts them.
+//! builds its host) that finds the other one there starts them. [`EventPump`]
+//! also owns their end: `stop` and `join` are what the close flow runs between
+//! stopping the children and flushing the caches.
 
-use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::{channel, Receiver, RecvTimeoutError, Sender};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread::JoinHandle;
+use std::time::Duration;
 
 use gentle_app::Input;
 use gentle_backend::chat_host::TaggedEvent;
@@ -28,6 +32,12 @@ use gentle_runtime::clock;
 
 use crate::bridge::AppStateHolder;
 use crate::contract::ViewState;
+
+/// How long the translating thread waits for the next event before it looks at
+/// the stop signal. The host keeps its event channel open for its whole life, so
+/// a blocking receive could never be woken for the close; a tenth of a second
+/// costs nothing and bounds how long the close waits for this thread.
+const IDLE: Duration = Duration::from_millis(100);
 
 /// The one push of the pump: `state-changed` in the running app, a recorder in
 /// a test.
@@ -46,6 +56,12 @@ pub struct EventPump {
     push: Mutex<Option<Push>>,
     tagged: Mutex<Option<Tagged>>,
     started: Mutex<bool>,
+    /// Set by the close: the translating thread ends at its next look, and the
+    /// pump behind it ends when that thread's sender drops.
+    stop: Arc<AtomicBool>,
+    /// The two threads, kept so the close can wait for them. Taken out (under
+    /// this lock) by [`EventPump::join`], which joins them with no lock held.
+    threads: Mutex<Vec<JoinHandle<()>>>,
 }
 
 impl EventPump {
@@ -89,13 +105,52 @@ impl EventPump {
         };
         *started = true;
         let (into, from) = channel();
-        spawn_translator(tagged, into);
-        match spawn_pump(from, Arc::clone(&self.holder), push) {
-            Ok(_) => {}
+        let translator = spawn_translator(tagged, into, Arc::clone(&self.stop));
+        let pump = spawn_pump(from, Arc::clone(&self.holder), push);
+        let mut threads = lock(&self.threads);
+        threads.extend(translator);
+        match pump {
+            Ok(handle) => threads.push(handle),
             // Nothing can fall back: the executor keeps building children, so
             // the missing pump is a log line, never a panic. Its channel is
             // dropped here, and the translator ends on its first failed send.
             Err(error) => eprintln!("child event pump unavailable: {error}"),
+        }
+    }
+
+    /// Tells the translating thread to end. The pump behind it follows, and
+    /// [`EventPump::join`] waits for both.
+    pub fn stop(&self) {
+        self.stop.store(true, Ordering::SeqCst);
+    }
+
+    /// Waits at most `budget` for the two threads to end, and answers whether
+    /// they did. Their handles are taken out under the lock and joined with no
+    /// lock held, because a join blocks and nothing may hold this pump's lock
+    /// while it does. `true` when no thread ever started: a run that opened no
+    /// chat has nothing to wait for.
+    pub fn join(&self, budget: Duration) -> bool {
+        let threads: Vec<JoinHandle<()>> = std::mem::take(&mut *lock(&self.threads));
+        if threads.is_empty() {
+            return true;
+        }
+        let (done, wait) = channel();
+        let spawned = std::thread::Builder::new()
+            .name("chat-events-join".to_owned())
+            .spawn(move || {
+                for thread in threads {
+                    let _ = thread.join();
+                }
+                let _ = done.send(());
+            });
+        match spawned {
+            // A join thread that cannot start is a miss, exactly like a timeout:
+            // the caller's deadline decides, and the close goes on.
+            Err(error) => {
+                eprintln!("child event join unavailable: {error}");
+                false
+            }
+            Ok(_) => wait.recv_timeout(budget).is_ok(),
         }
     }
 }
@@ -110,15 +165,28 @@ fn tagged_of(tagged: &Mutex<Option<Tagged>>) -> Option<Tagged> {
     lock(tagged).take()
 }
 
-/// The translating thread: blocks on the tagged stream, converts each event and
-/// hands it to the pump. Ends when the stream disconnects - every child host is
-/// gone - so the pump behind it ends too, with no busy loop and no panic.
-fn spawn_translator(tagged: Tagged, into: Sender<Converted>) {
+/// The translating thread: waits for the tagged stream, converts each event and
+/// hands it to the pump. It ends when the stream disconnects - every child host
+/// is gone - or when the close sets the stop signal, which is why it waits with
+/// a timeout instead of blocking forever: the host holds the other end of that
+/// channel for its whole life. A stop can still drop one event that is in the
+/// channel at that moment, so the close need not fold the children's last
+/// `Closed`: that fold only clears marks of a window that is going away.
+fn spawn_translator(
+    tagged: Tagged,
+    into: Sender<Converted>,
+    stop: Arc<AtomicBool>,
+) -> Option<JoinHandle<()>> {
     let spawned = std::thread::Builder::new()
         .name("chat-events-translate".to_owned())
         .spawn(move || {
             let Tagged { runtime, events } = tagged;
-            for event in events {
+            while !stop.load(Ordering::SeqCst) {
+                let event = match events.recv_timeout(IDLE) {
+                    Ok(event) => event,
+                    Err(RecvTimeoutError::Timeout) => continue,
+                    Err(RecvTimeoutError::Disconnected) => break,
+                };
                 let Some(converted) = runtime.convert(event, clock::now_ms()) else {
                     continue; // a chat nobody knows, or a line we do not model
                 };
@@ -127,8 +195,12 @@ fn spawn_translator(tagged: Tagged, into: Sender<Converted>) {
                 }
             }
         });
-    if let Err(error) = spawned {
-        eprintln!("child event translator unavailable: {error}");
+    match spawned {
+        Ok(handle) => Some(handle),
+        Err(error) => {
+            eprintln!("child event translator unavailable: {error}");
+            None
+        }
     }
 }
 

@@ -36,6 +36,8 @@ use gentle_backend::chat_host::{
 use gentle_backend::home::{with_home_flag, HomeEnv};
 use gentle_backend::launcher::{self, LauncherEnv};
 use gentle_desk_lib::bridge::AppStateHolder;
+use gentle_desk_lib::close::{BridgeSteps, CloseFlow, Deadlines};
+use gentle_desk_lib::config::ConfigWriter;
 use gentle_desk_lib::contract::{
     ChatActivityMark, ChatActivityView, MessageRole, MessageView, NoticeLevel, NoticeView,
     UiIntent, ViewState,
@@ -164,6 +166,9 @@ struct Bridge {
     executor: Arc<dyn ChatExecutor>,
     pushed: Arc<Mutex<Vec<ViewState>>>,
     folders: Arc<PendingFolders>,
+    /// The concrete executor and the pump behind the `dyn` seam, for the close
+    /// tests: the close flow stops the run through them and nowhere else.
+    runtime: Option<(Arc<RuntimeExecutor>, Arc<EventPump>)>,
 }
 
 impl Bridge {
@@ -175,16 +180,28 @@ impl Bridge {
         let pushed = Arc::new(Mutex::new(Vec::new()));
         arm(&pump, Arc::clone(&pushed));
         let folders = Arc::new(PendingFolders::default());
+        let executor = Arc::new(RuntimeExecutor::new(
+            Arc::clone(&pump),
+            Arc::clone(&folders),
+            Arc::clone(&holder),
+        ));
         Self {
             holder: Arc::clone(&holder),
-            executor: Arc::new(RuntimeExecutor::new(
-                Arc::clone(&pump),
-                Arc::clone(&folders),
-                Arc::clone(&holder),
-            )),
+            executor: Arc::clone(&executor) as Arc<dyn ChatExecutor>,
             pushed,
             folders,
+            runtime: Some((executor, pump)),
         }
+    }
+
+    /// The executor and the pump of this bridge, both the concrete types the
+    /// close flow needs: a run built by `runtime_executor` has them.
+    fn runtime_parts(&self) -> (Arc<RuntimeExecutor>, Arc<EventPump>) {
+        let (executor, pump) = self
+            .runtime
+            .as_ref()
+            .expect("this bridge runs the real executor");
+        (Arc::clone(executor), Arc::clone(pump))
     }
 
     /// The same bridge over a host the test itself owns, so it can shut that
@@ -204,6 +221,7 @@ impl Bridge {
             executor: Arc::new(Direct(Arc::clone(&runtime))),
             pushed,
             folders: Arc::new(PendingFolders::default()),
+            runtime: None,
         };
         (bridge, runtime)
     }
@@ -335,6 +353,22 @@ fn prompt_pid(log: &Path, message: &str) -> Option<u64> {
             line["event"] == "command" && line["type"] == "prompt" && line["message"] == message
         })
         .and_then(|line| line["pid"].as_u64())
+}
+
+/// Whether the OS still has a process with this pid.
+fn alive(pid: u64) -> bool {
+    #[cfg(windows)]
+    {
+        let out = std::process::Command::new("tasklist")
+            .args(["/FI", &format!("PID eq {pid}"), "/NH"])
+            .output()
+            .expect("tasklist answers");
+        String::from_utf8_lossy(&out.stdout).contains(&pid.to_string())
+    }
+    #[cfg(not(windows))]
+    {
+        std::path::Path::new(&format!("/proc/{pid}")).exists()
+    }
 }
 
 /// Whether that child logged its own exit.
@@ -585,6 +619,115 @@ fn shutting_the_host_down_leaves_no_child_behind() {
         view.activity.is_empty(),
         "the chat is idle once its child stops: {:?}",
         view.activity
+    );
+}
+
+/// Waits until the OS has no process with this pid, failing instead of hanging.
+fn wait_until_gone(what: &str, pid: u64) {
+    let deadline = Instant::now() + WAIT;
+    while alive(pid) {
+        assert!(
+            Instant::now() < deadline,
+            "waited {WAIT:?} for {what} ({pid}) to be gone"
+        );
+        std::thread::sleep(Duration::from_millis(20));
+    }
+}
+
+/// A close that is bounded by short deadlines instead of the shipped ones: the
+/// stand-in leaves on its own, so a test never waits for a real grace period.
+fn close_deadlines() -> Deadlines {
+    Deadlines {
+        children: Duration::from_secs(8),
+        pump: Duration::from_secs(3),
+        cache: Duration::from_secs(3),
+        config: Duration::from_secs(3),
+    }
+}
+
+/// The close flow of this bridge, with a flag instead of the app exit.
+fn close_flow(bridge: &Bridge, exited: Arc<Mutex<bool>>) -> CloseFlow {
+    let (executor, pump) = bridge.runtime_parts();
+    let steps = BridgeSteps::new(
+        executor,
+        pump,
+        None,
+        ConfigWriter::spawn(None),
+        Box::new(move || *lock(&exited) = true),
+    );
+    CloseFlow::new(Arc::new(steps), close_deadlines())
+}
+
+/// Waits for the close flow to reach its last step.
+fn wait_until_exited(exited: &Arc<Mutex<bool>>) {
+    wait_for("the close to exit", || lock(exited).then_some(()));
+}
+
+#[test]
+fn closing_stops_every_child_even_the_one_in_a_turn_that_never_ends() {
+    let Some(harness) = Harness::new() else {
+        return;
+    };
+    let bridge = Bridge::runtime_executor();
+
+    // Two chats, so two live children: the first is on a `slow` turn, which
+    // streams until an abort and never ends by itself.
+    bridge.dispatch(UiIntent::OpenNewChat);
+    wait_for("the first child to log its start", || {
+        start_pids(harness.log()).first().copied()
+    });
+    bridge.dispatch(UiIntent::SendPrompt {
+        text: "slow".to_owned(),
+    });
+    wait_for("the slow turn's prompt to reach its child", || {
+        prompt_pid(harness.log(), "slow")
+    });
+    bridge.dispatch(UiIntent::OpenNewChat);
+    wait_for("the second child to log its start", || {
+        (start_pids(harness.log()).len() == 2).then_some(())
+    });
+    let pids = start_pids(harness.log());
+    assert_eq!(pids.len(), 2, "two chats started two children");
+
+    let exited = Arc::new(Mutex::new(false));
+    let flow = close_flow(&bridge, Arc::clone(&exited));
+    assert!(flow.request(), "the close request starts the shutdown");
+    wait_until_exited(&exited);
+
+    // Both children are gone before the process would exit: the graceful stop
+    // is the host's own (stdin first, then the process tree), and the close flow
+    // waits for it, so nothing is left running behind a closed window.
+    for pid in &pids {
+        wait_until_gone("a chat's child", *pid);
+    }
+    let still: Vec<u64> = pids.iter().copied().filter(|pid| alive(*pid)).collect();
+    assert!(still.is_empty(), "children left running: {still:?}");
+}
+
+#[test]
+fn the_event_pump_ends_when_it_is_told_to() {
+    let Some(harness) = Harness::new() else {
+        return;
+    };
+    let bridge = Bridge::runtime_executor();
+    bridge.dispatch(UiIntent::OpenNewChat);
+    wait_for("the child to log its start", || {
+        start_pids(harness.log()).first().copied()
+    });
+    wait_for("the chat's child to answer its first request", || {
+        (bridge.holder.view().activity.is_empty()).then_some(())
+    });
+
+    // The host keeps its event channel open for its whole life, so the pump ends
+    // only because the close tells it to: this is the step the close flow runs
+    // between the children and the caches.
+    let (executor, pump) = bridge.runtime_parts();
+    executor.stop_work();
+    executor.shutdown();
+    pump.stop();
+    assert!(
+        pump.join(Duration::from_secs(3)),
+        "the pump's threads outlived the stop signal"
     );
 }
 

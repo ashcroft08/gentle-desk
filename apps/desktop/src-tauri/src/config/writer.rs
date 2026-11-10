@@ -19,11 +19,17 @@
 //! A save that fails is not fatal. The run keeps the value it holds in memory
 //! and the failure goes to the handler installed at startup (the bridge arms it
 //! with the window's own push), which turns it into the view's config notice.
+//!
+//! The close flow ends the writer with [`ConfigWriter::flush_and_stop`]: taking
+//! the queue's sender is what lets the thread drain what is already queued and
+//! then finish, and the thread signals right before it returns, so a snapshot
+//! queued when the window closes is on the disk before the process goes away.
 
 use std::io;
 use std::path::{Path, PathBuf};
-use std::sync::mpsc::{self, Receiver, Sender};
+use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
 use std::sync::{Arc, Mutex, MutexGuard};
+use std::time::Duration;
 
 use gentle_runtime::app_config::{self, AppConfig};
 
@@ -38,12 +44,22 @@ struct Job {
     config: AppConfig,
 }
 
+/// What every clone of a writer shares: the queue of its thread, and the signal
+/// that thread sends as it finishes.
+#[derive(Default)]
+struct Shared {
+    /// `None` before the thread exists, and once the close took it: a save after
+    /// that is dropped, as it is in a run with no config path.
+    queue: Mutex<Option<Sender<Job>>>,
+    /// The other end of the thread's last signal. Taken by the close, once.
+    finished: Mutex<Option<Receiver<()>>>,
+}
+
 /// The one writer of the config file. Cloned where a save is asked for: every
 /// clone feeds the same thread.
 #[derive(Clone)]
 pub struct ConfigWriter {
-    /// The queue of the writer's thread, `None` for a run with no config file.
-    queue: Option<Sender<Job>>,
+    shared: Arc<Shared>,
     /// Where a failure goes, shared with the thread.
     failure: Arc<Mutex<Failure>>,
 }
@@ -62,43 +78,43 @@ impl ConfigWriter {
     /// is dropped and the run keeps its config in memory.
     pub fn spawn(path: Option<PathBuf>) -> Self {
         let failure = Arc::new(Mutex::new(Failure::default()));
+        let shared = Arc::new(Shared::default());
+        let writer = Self { shared, failure };
         let Some(path) = path else {
-            return Self {
-                queue: None,
-                failure,
-            };
+            return writer;
         };
         let (queue, jobs) = mpsc::channel();
-        let slot = Arc::clone(&failure);
+        let (finished, done) = mpsc::channel();
+        let slot = Arc::clone(&writer.failure);
         let spawned = std::thread::Builder::new()
             .name("config-save".to_owned())
-            .spawn(move || write_loop(jobs, &path, &slot));
+            .spawn(move || write_loop(jobs, &path, &slot, &finished));
         if let Err(error) = spawned {
             // A run without the writer keeps its config in memory, which is what
             // a run with no config path does: never a panic at startup.
             eprintln!("config writer unavailable: {error}");
-            return Self {
-                queue: None,
-                failure,
-            };
+            return writer;
         }
-        Self {
-            queue: Some(queue),
-            failure,
-        }
+        *lock(&writer.shared.queue) = Some(queue);
+        *lock(&writer.shared.finished) = Some(done);
+        writer
     }
 
     /// Asks for `config` to be written, as the snapshot the holder numbered
     /// `version`. Never waits for the disk, and never blocks on the writer
     /// either: the queue is unbounded and holds snapshots.
     pub fn save(&self, version: u64, config: &AppConfig) {
-        if let Some(queue) = self.queue.as_ref() {
-            // A closed queue means the thread is gone: the config then lives in
-            // memory only, as it does in a run with no config path.
-            let _ = queue.send(Job {
-                version,
-                config: config.clone(),
-            });
+        let job = Job {
+            version,
+            config: config.clone(),
+        };
+        // The snapshot is copied before the lock, so a 50-workspace config is
+        // never cloned while another caller waits for this one.
+        let queue = lock(&self.shared.queue).clone();
+        // A closed queue means the thread is gone, or the close took it: the
+        // config then lives in memory only, as it does with no config path.
+        if let Some(queue) = queue {
+            let _ = queue.send(job);
         }
     }
 
@@ -114,10 +130,42 @@ impl ConfigWriter {
             report(&self.failure, message);
         }
     }
+
+    /// Ends the writer: every queued snapshot is received, the channel closes
+    /// behind them, and the thread signals as it finishes. Answers at once for a
+    /// run with no config path (there is nothing to wait for) and, bounded by
+    /// `budget`, whether the last snapshot is on the disk. A thread that misses
+    /// its deadline is a line on stderr: the process still ends, and the failure
+    /// of a save that never ran is never reported as success.
+    pub fn flush_and_stop(&self, budget: Duration) -> bool {
+        // Taking the sender is what ends the thread: what is already queued is
+        // still received, and the channel disconnects behind it.
+        let queue = lock(&self.shared.queue).take();
+        let Some(queue) = queue else {
+            return true; // no path, or an earlier close already flushed it
+        };
+        drop(queue);
+        let Some(finished) = lock(&self.shared.finished).take() else {
+            return true;
+        };
+        match finished.recv_timeout(budget) {
+            Ok(()) => true,
+            // The thread ended without its last signal (it panicked): the file
+            // may be older than what the run held, so this is not a success.
+            Err(RecvTimeoutError::Disconnected) => {
+                eprintln!("close: the config writer stopped without finishing");
+                false
+            }
+            Err(RecvTimeoutError::Timeout) => {
+                eprintln!("close: the config writer did not finish within {budget:?}");
+                false
+            }
+        }
+    }
 }
 
 /// The writer's thread: one save at a time, always of the latest snapshot.
-fn write_loop(jobs: Receiver<Job>, path: &Path, failure: &Mutex<Failure>) {
+fn write_loop(jobs: Receiver<Job>, path: &Path, failure: &Mutex<Failure>, finished: &Sender<()>) {
     let mut written: u64 = 0;
     while let Ok(mut job) = jobs.recv() {
         // Everything that arrived while the last save was running is one more
@@ -135,9 +183,17 @@ fn write_loop(jobs: Receiver<Job>, path: &Path, failure: &Mutex<Failure>) {
         }
         written = job.version;
         if let Err(error) = app_config::save(path, &job.config) {
-            report(failure, message(&error));
+            let message = message(&error);
+            // stderr as well as the installed handler: a save that fails during
+            // the close has no window left to draw a notice in, and a lost save
+            // must never be silent.
+            eprintln!("{message}");
+            report(failure, message);
         }
     }
+    // Every queued snapshot was received and the channel closed behind them:
+    // whoever waits for the close now knows the file is as new as it can be.
+    let _ = finished.send(());
 }
 
 /// Hands one failure to the installed handler, or keeps it for one.
