@@ -6,6 +6,8 @@
 
 use serde::Serialize;
 
+use gentle_backend::home::HomeChoice;
+
 use super::super::config::{AppConfig, WorkspaceEntry, CONFIG_VERSION};
 use super::super::theme::Theme;
 use super::ConfigProblem;
@@ -16,6 +18,10 @@ use super::ConfigProblem;
 struct DocumentRef<'a> {
     version: u32,
     theme: Theme,
+    /// Written only once the user chose, so a file of a user who never saw the
+    /// welcome screen stays byte-for-byte what older builds wrote.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    shell_home: Option<HomeChoice>,
     workspaces: &'a [WorkspaceEntry],
 }
 
@@ -24,6 +30,7 @@ pub(super) fn bytes(config: &AppConfig) -> std::io::Result<Vec<u8>> {
     let document = DocumentRef {
         version: CONFIG_VERSION,
         theme: config.theme,
+        shell_home: config.shell_home,
         workspaces: &config.workspaces,
     };
     serde_json::to_vec(&document)

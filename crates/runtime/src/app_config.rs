@@ -21,6 +21,7 @@
 
 mod config;
 mod paths;
+mod shell_home;
 mod status;
 mod store;
 mod theme;

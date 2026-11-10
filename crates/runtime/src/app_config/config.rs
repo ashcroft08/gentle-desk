@@ -11,6 +11,9 @@
 
 use serde::{Deserialize, Serialize};
 
+use gentle_backend::home::HomeChoice;
+
+use super::shell_home;
 use super::theme::{self, Theme};
 
 /// The only document version this app writes. Any other version is not
@@ -28,6 +31,11 @@ pub struct AppConfig {
     /// file, so the workspaces below are never discarded for it.
     #[serde(default, deserialize_with = "theme::or_default")]
     pub theme: Theme,
+    /// Which home the user chose on the welcome screen, `None` until they do.
+    /// An ADDITIVE field like the theme, read leniently: a value this version
+    /// does not know is `None`, never a damaged file.
+    #[serde(default, deserialize_with = "shell_home::or_none")]
+    pub shell_home: Option<HomeChoice>,
     /// The added workspaces, in the order they were added.
     pub workspaces: Vec<WorkspaceEntry>,
 }
@@ -37,6 +45,7 @@ impl Default for AppConfig {
         Self {
             version: CONFIG_VERSION,
             theme: Theme::default(),
+            shell_home: None,
             workspaces: Vec::new(),
         }
     }
@@ -60,6 +69,16 @@ impl AppConfig {
             return false;
         }
         self.theme = theme;
+        true
+    }
+
+    /// Sets the chosen home. Answers whether it changed: the same choice again
+    /// changes nothing, so nothing is saved and no revision moves.
+    pub fn set_shell_home(&mut self, choice: HomeChoice) -> bool {
+        if self.shell_home == Some(choice) {
+            return false;
+        }
+        self.shell_home = Some(choice);
         true
     }
 
