@@ -138,6 +138,10 @@ fn run(stop: &AtomicBool, woken: &Receiver<()>, delay: &DelaySource, tick: &OnTi
         if Instant::now() < due {
             continue;
         }
+        // The close may have begun while the delay was read: no due tick now.
+        if stop.load(Ordering::SeqCst) {
+            return;
+        }
         tick();
         let Some(next) = (delay)() else {
             return;

@@ -97,12 +97,18 @@ fn on_batch(inner: &Arc<Inner>, batch: Batch) {
     start_pass(inner, next);
 }
 
-/// The watch ended on its own: drop it outside the flow's lock, let the polling
-/// fallback take over, and run the pass that covers what it may have missed.
+/// The watch ended on its own: forget it, let the polling fallback take over,
+/// and run the pass covering what it may have missed. The take and the flow's
+/// "lost" step are ONE acquisition of its lock, so no settle can install between
+/// them; the taken handle is dropped below, with no lock held.
 fn on_lost(inner: &Arc<Inner>) {
-    let watcher = lock(&inner.flow).flow.take_watcher();
+    let (watcher, next) = {
+        let mut part = lock(&inner.flow);
+        let watcher = part.flow.take_watcher();
+        let next = part.flow.on_watcher_lost();
+        (watcher, next)
+    };
     drop(watcher);
-    let next = lock(&inner.flow).flow.on_watcher_lost();
     start_pass(inner, next);
 }
 

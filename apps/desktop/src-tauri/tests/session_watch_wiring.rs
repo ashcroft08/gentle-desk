@@ -15,10 +15,18 @@
 mod session_seam;
 mod watch_seam;
 
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    mpsc::channel,
+    Arc, Mutex,
+};
 use std::time::Duration;
 
 use gentle_backend::session_schedule;
 use gentle_backend::session_watch::Batch;
+use gentle_desk_lib::sessions::timer::{DelaySource, OnTick, TickTimer};
+use gentle_desk_lib::sessions::watch::{OnBatch, OnLost, Watch};
+use session_seam::LIMIT;
 use watch_seam::{homeless, session_file, wired, wired_gated, SETTLE};
 
 /// A safety net that never fires: only the batch under test may run a pass.
@@ -272,4 +280,109 @@ fn a_run_driven_by_hand_starts_no_watcher_and_no_timer() {
         pushes.len(),
         "a run with no wiring started a timer"
     );
+}
+
+#[test]
+fn a_batch_delivered_after_the_stop_starts_no_pass() {
+    // The close sets the flag while the batch thread waits for its next batch:
+    // a batch already handed over must not ask for a pass the close skips.
+    let watch = Arc::new(Watch::new());
+    let (batches, of_batch) = channel();
+    let passes = Arc::new(AtomicUsize::new(0));
+    let counted = Arc::clone(&passes);
+    let on_batch: OnBatch = Arc::new(move |_batch| {
+        counted.fetch_add(1, Ordering::SeqCst);
+    });
+    let on_lost: OnLost = Arc::new(|| {});
+    watch
+        .adopt(of_batch, on_batch, on_lost)
+        .expect("a batch thread");
+    // The thread is in its blocking receive when the close arrives.
+    std::thread::sleep(Duration::from_millis(20));
+    watch.stop();
+    let _ = batches.send(Batch {
+        paths: Vec::new(),
+        rescan: true,
+    });
+    std::thread::sleep(Duration::from_millis(200));
+    assert_eq!(
+        passes.load(Ordering::SeqCst),
+        0,
+        "a batch after the stop was a pass"
+    );
+    assert!(watch.join(CLOSE), "the batch thread ended");
+}
+
+#[test]
+fn a_tick_due_at_the_close_starts_no_pass() {
+    // The safety net re-reads its delay after every wait, and a tick already due
+    // then must not fire once the close began: the delay holds the thread there.
+    const WINDOW: Duration = Duration::from_millis(10);
+    let timer = Arc::new(TickTimer::new());
+    let ticks = Arc::new(AtomicUsize::new(0));
+    let counted = Arc::clone(&ticks);
+    let tick: OnTick = Arc::new(move || {
+        counted.fetch_add(1, Ordering::SeqCst);
+    });
+    let calls = Arc::new(AtomicUsize::new(0));
+    let (reached, arrived) = channel();
+    let (release, waiting) = channel();
+    let waiting = Mutex::new(waiting);
+    let delay: DelaySource = Arc::new(move || {
+        // The first read sets the window; the second is the look after it
+        // closed, which is where the test holds the thread.
+        if calls.fetch_add(1, Ordering::SeqCst) == 1 {
+            let _ = reached.send(());
+            let _ = waiting.lock().expect("release").recv_timeout(LIMIT);
+        }
+        Some(WINDOW)
+    });
+    timer.start(delay, tick);
+    arrived
+        .recv_timeout(LIMIT)
+        .expect("the delay was read again");
+    timer.stop();
+    release.send(()).expect("the timer waits for its release");
+    assert!(timer.join(CLOSE), "the timer thread ended");
+    assert_eq!(ticks.load(Ordering::SeqCst), 0, "a tick at the close");
+}
+
+#[test]
+fn a_request_after_the_close_starts_no_pass() {
+    // After the close nothing starts: a request that arrives then runs no pass.
+    let home = session_seam::Home::new();
+    home.session("p", "a.jsonl", "first chat");
+    let wired = wired(&home, NEVER);
+    wired.service.boot();
+    wired.wait_passes(1);
+    assert!(wired.service.stop(CLOSE));
+    std::thread::sleep(SETTLE);
+    let closed = wired.passes();
+    wired.service.request();
+    std::thread::sleep(SETTLE);
+    assert_eq!(
+        wired.passes(),
+        closed,
+        "a request after the close was a pass"
+    );
+}
+
+#[test]
+fn a_watch_lost_as_the_fallback_retries_leaves_one_watch() {
+    // The watch ends on its own: the fallback asks for the watcher back, and
+    // handling the loss must not take that replacement away.
+    let home = session_seam::Home::new();
+    home.session("p", "a.jsonl", "first chat");
+    let wired = wired(&home, NEVER);
+    wired.service.boot();
+    wired.wait_starts(1);
+    wired.source().lose();
+    wired.wait_starts(2);
+    std::thread::sleep(SETTLE);
+    assert_eq!(
+        wired.source().starts(),
+        2,
+        "one replacement, not one per pass"
+    );
+    assert!(wired.service.stop(CLOSE));
 }

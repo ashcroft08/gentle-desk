@@ -142,7 +142,15 @@ fn apply(batches: Receiver<Batch>, stop: &AtomicBool, on_batch: &OnBatch, on_los
             return;
         }
         match batches.recv_timeout(IDLE) {
-            Ok(batch) => on_batch(batch),
+            Ok(batch) => {
+                // The close may have begun while this thread waited for that
+                // very batch: a pass started now is one the close does not wait
+                // for, and it would read the disk while the cache is flushed.
+                if stop.load(Ordering::SeqCst) {
+                    return;
+                }
+                on_batch(batch)
+            }
             Err(RecvTimeoutError::Timeout) => continue,
             Err(RecvTimeoutError::Disconnected) => break,
         }

@@ -16,12 +16,15 @@ use super::refresh::retry_watcher;
 use super::service::{lock, Inner};
 
 /// Starts the pass the flow said to run, if it said to run one. Nothing starts
-/// while another pass holds the index, which is what keeps two passes out of
-/// each other's way.
+/// while another pass holds the index, and nothing starts once the run stopped:
+/// the close does not wait for that pass. A hand-driven run never stops.
 pub(super) fn start_pass(inner: &Arc<Inner>, next: Next) {
     let Next::Run(job) = next else {
         return;
     };
+    if inner.watch.is_stopped() {
+        return;
+    }
     let inner = Arc::clone(inner);
     let spawned = std::thread::Builder::new()
         .name("session-refresh".to_owned())
