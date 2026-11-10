@@ -469,6 +469,56 @@ p {
   color: var(--muted);
 }
 
+/* The "Gentle Shell" lettering above New session: pixels typed in left to right
+   when the app opens, each flashing bright before it settles in the accent
+   colour, over a dimmer shadow cell one pixel down and to the right. The cells
+   are visible by default; the animation only describes how they arrive, so
+   reduced motion (the rule at the end of this file) shows them at once. */
+.wordmark {
+  flex: none;
+  padding: 2px 6px 14px;
+}
+
+.wordmark svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.wm-cell {
+  fill: var(--accent);
+  animation: wm-type 460ms ease-out var(--d) backwards;
+}
+
+.wm-shadow {
+  fill: color-mix(in srgb, var(--accent) 24%, transparent);
+  animation: wm-shadow 460ms ease-out var(--d) backwards;
+}
+
+@keyframes wm-type {
+  0% {
+    opacity: 0;
+    fill: #fff;
+  }
+  35% {
+    opacity: 1;
+    fill: color-mix(in srgb, var(--accent) 35%, #fff);
+  }
+  100% {
+    opacity: 1;
+    fill: var(--accent);
+  }
+}
+
+@keyframes wm-shadow {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
 /* New session: the states board's button, disabled through aria-disabled so the
    reason stays reachable. */
 .new {

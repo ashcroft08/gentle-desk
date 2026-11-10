@@ -21,3 +21,11 @@ of that project's `chatReducer.ts` (ported and checked against its tests).
     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
 
 The full license text is in that repository's `LICENSE` file.
+
+## Gentle Shell lettering (gentlemanprogramming.com)
+
+The pixel lettering above New session (`apps/desktop/src/brand/mask.ts`) was converted by
+`tools/wordmark/import-wordmark.py` from the Gentle Shell wordmark drawn on
+[gentlemanprogramming.com](https://gentlemanprogramming.com/), the site of the
+Gentleman Programming project that also publishes gentle-shell under the MIT license.
+The lettering is that project's artwork.

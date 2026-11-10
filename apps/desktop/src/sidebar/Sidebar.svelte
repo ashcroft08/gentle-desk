@@ -8,6 +8,7 @@
   import { workspacePathOfChat, type ChatRow, type WorkspaceRow } from '../sessions/rows'
   import { createSessionsView } from '../sessions/view'
   import type { Viewport } from '../sessions/window'
+  import WordMark from '../brand/WordMark.svelte'
   import EmptyState from './EmptyState.svelte'
   import NewSessionButton from './NewSessionButton.svelte'
   import SidebarHeader from './SidebarHeader.svelte'
@@ -89,6 +90,7 @@
 </script>
 
 <aside class="side" aria-label="Workspaces">
+  <WordMark />
   <NewSessionButton
     enabled={currentPath !== null}
     reason={reason}
