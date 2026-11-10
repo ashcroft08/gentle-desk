@@ -1,21 +1,16 @@
 // The six theme names, checked against the two places that must agree with them:
 // the stylesheet that paints them and the app's own rules. A drift here is a
 // window that keeps its old colors after the user picks a theme, so the names
-// are pinned as text instead of trusted. The stylesheets are read as files: a
-// `?raw` import of a stylesheet is empty under Vitest, and an empty stylesheet
-// would pass every check below.
+// are pinned as text instead of trusted. The stylesheets come in as `?raw`
+// text, which Vitest turns into an EMPTY module unless `test.css.include` lists
+// them (vitest.config.ts does): the first test below fails on an empty one, so
+// an unlisted stylesheet cannot make the others pass silently. No Node module is
+// imported here on purpose: svelte-check type-checks this file, and a clean
+// checkout has no `@types/node` for it.
 import { describe, expect, it } from 'vitest'
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import THEME_CSS from '../theme.css?raw'
+import APP_CSS from '../app.css?raw'
 import { THEMES } from './themes'
-
-/** A stylesheet of `src/`, read from the app's own folder. */
-function stylesheet(name: string): string {
-  return readFileSync(resolve('src', name), 'utf8')
-}
-
-const THEME_CSS = stylesheet('theme.css')
-const APP_CSS = stylesheet('app.css')
 
 /** The `[data-theme='<name>']` blocks a stylesheet declares. */
 function dataThemeNames(css: string): string[] {
@@ -33,6 +28,11 @@ function ruleBody(css: string, selector: string): string {
 }
 
 describe('the six theme names', () => {
+  it('read the real stylesheets, never an empty module', () => {
+    expect(THEME_CSS.length).toBeGreaterThan(500)
+    expect(APP_CSS.length).toBeGreaterThan(500)
+  })
+
   it('are the picker order the artboard draws', () => {
     expect(THEMES).toEqual([
       'system',
