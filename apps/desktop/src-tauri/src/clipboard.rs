@@ -11,6 +11,10 @@
 //! used: the folder picker's history (`odd/tasks/workspaces-design.md`, "Q4
 //! answer") is that a plugin's link cost cannot be kept out of a test binary.
 //!
+//! Being Windows-only is deliberate: Windows owns the text once it is written,
+//! while X11 and Wayland serve a selection only while the writing clipboard
+//! lives, so elsewhere a copy fails loudly in that one stderr line.
+//!
 //! A copy never blocks the thread that asked for it and never holds a lock: the
 //! write happens on a thread of its own, and a failure is one line on stderr -
 //! the notices component (T7) is where the user is told about such things.
@@ -44,12 +48,18 @@ impl Default for SystemClipboard {
 }
 
 impl Clipboard for SystemClipboard {
+    #[cfg(windows)]
     fn copy_text(&self, text: &str) -> Result<(), String> {
         let mut board = arboard::Clipboard::new()
             .map_err(|error| format!("the system clipboard is unavailable: {error}"))?;
         board
             .set_text(text.to_owned())
             .map_err(|error| format!("the text could not be written to the clipboard: {error}"))
+    }
+
+    #[cfg(not(windows))]
+    fn copy_text(&self, _text: &str) -> Result<(), String> {
+        Err("the system clipboard is only supported on Windows".to_owned())
     }
 }
 
