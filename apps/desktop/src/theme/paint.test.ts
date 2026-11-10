@@ -17,7 +17,6 @@ function rootTheme(): string | undefined {
 beforeEach(() => {
   resetTauriMock()
   document.documentElement.dataset.theme = 'system'
-  localStorage.clear()
 })
 
 describe('the page theme', () => {
@@ -55,8 +54,13 @@ describe('the page theme', () => {
   it('stores nothing of its own: no copy survives a restart', async () => {
     setHandler('get_view_state', () => viewState({ theme: 'Gentle' }))
 
+    // The spy sits on jsdom's own `Storage`: the runner's global `localStorage`
+    // differs between Node versions, so the test never reads that global.
+    const write = vi.spyOn(window.Storage.prototype, 'setItem')
+
     await startTheme()
 
-    expect(localStorage.length).toBe(0)
+    expect(write).not.toHaveBeenCalled()
+    write.mockRestore()
   })
 })
