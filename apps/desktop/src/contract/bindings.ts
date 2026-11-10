@@ -352,6 +352,16 @@ export type HelpersView_Serialize = {
 };
 
 /**
+ *  The two homes the welcome screen offers for `gentle-shell` (shell-choice S2),
+ *  spelled the way the app config stores them.
+ */
+export type HomeChoiceView = 
+/**  Use the user's own pi (`~/.pi/agent`). */
+"link" | 
+/**  Keep a space of its own (`~/.gentle-shell/agent`). */
+"isolated";
+
+/**
  *  How complete the session list is, matching `gentle_app::ListStatus` one to
  *  one. `Loading` carries how far the first pass got, so the sidebar can say it
  *  is still reading; only `Complete` lets an empty list call itself empty.
@@ -586,6 +596,50 @@ export type SessionsWindow_Serialize = {
 };
 
 /**
+ *  What the app knows about the shell and the home it runs on: what it found at
+ *  start and what the user chose (shell-choice S1-S3).
+ */
+export type ShellView = ShellView_Serialize | ShellView_Deserialize;
+
+/**
+ *  What the app knows about the shell and the home it runs on: what it found at
+ *  start and what the user chose (shell-choice S1-S3).
+ */
+export type ShellView_Deserialize = {
+	/**
+	 *  The folder of the user's pi, when it exists on this machine. Only its
+	 *  existence was checked, never its contents.
+	 */
+	pi_path?: string | null,
+	/**  The home the user chose, `None` until they do. */
+	choice?: HomeChoiceView | null,
+	/**
+	 *  Whether the welcome question is due: pi was found and nothing is chosen
+	 *  yet. With no pi there is nothing to choose between, so it is never due.
+	 */
+	ask: boolean,
+};
+
+/**
+ *  What the app knows about the shell and the home it runs on: what it found at
+ *  start and what the user chose (shell-choice S1-S3).
+ */
+export type ShellView_Serialize = {
+	/**
+	 *  The folder of the user's pi, when it exists on this machine. Only its
+	 *  existence was checked, never its contents.
+	 */
+	pi_path: string | null,
+	/**  The home the user chose, `None` until they do. */
+	choice: HomeChoiceView | null,
+	/**
+	 *  Whether the welcome question is due: pi was found and nothing is chosen
+	 *  yet. With no pi there is nothing to choose between, so it is never due.
+	 */
+	ask: boolean,
+};
+
+/**
  *  The state slice after each dispatch, emitted to the web side (typed
  *  tauri-specta event). The name on the wire is kebab-case by `NAME` below.
  */
@@ -663,6 +717,14 @@ export type UiIntent = { type: "SendPrompt"; data: {
 { type: "SetTheme"; data: {
 	theme: ThemeView,
 } } | 
+/**
+ *  Choose which home `gentle-shell` runs on (the welcome screen and the
+ *  sidebar footer). Remembered in the app config; it applies from the next
+ *  start of the app.
+ */
+{ type: "SetShellHome"; data: {
+	choice: HomeChoiceView,
+} } | 
 /**  Start the child of a chat that died again and reopen it (S3). */
 { type: "RestartChat"; data: {
 	chat_id: string,
@@ -739,6 +801,8 @@ export type ViewState_Deserialize = {
 	 *  window's own chrome follows it. `System` until the user chooses.
 	 */
 	theme: ThemeView,
+	/**  The shell and home this run sees (shell-choice). */
+	shell: ShellView_Deserialize,
 	foreground_chat?: string | null,
 	/**
 	 *  The title the chat header draws for the foreground chat: the stored
@@ -850,6 +914,8 @@ export type ViewState_Serialize = {
 	 *  window's own chrome follows it. `System` until the user chooses.
 	 */
 	theme: ThemeView,
+	/**  The shell and home this run sees (shell-choice). */
+	shell: ShellView_Serialize,
 	foreground_chat: string | null,
 	/**
 	 *  The title the chat header draws for the foreground chat: the stored

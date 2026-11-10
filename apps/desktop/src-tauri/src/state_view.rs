@@ -15,8 +15,8 @@ use gentle_runtime::app_config::Theme;
 use gentle_runtime::badge::{Badge, BadgeMark};
 
 use crate::contract::{
-    ChatActivityMark, ChatActivityView, NoticeActionView, NoticeLevel, NoticeView, ThemeView,
-    ViewState,
+    ChatActivityMark, ChatActivityView, NoticeActionView, NoticeLevel, NoticeView, ShellView,
+    ThemeView, ViewState,
 };
 use crate::{dialogs, helper_thread, helpers, sessions, view};
 
@@ -32,10 +32,12 @@ pub fn view_state(
     workspace_notice: Option<String>,
     fatal: Option<String>,
     theme: Theme,
+    shell: ShellView,
 ) -> ViewState {
     let helpers_view = helpers::helpers(state);
     ViewState {
         theme: view_theme(theme),
+        shell,
         foreground_chat: state
             .chats
             .foreground()

@@ -81,6 +81,14 @@ impl Bridge {
         // change made while the app runs waits for the next one.
         let home_choice = snapshot.config.shell_home;
         let holder = Arc::new(AppStateHolder::with_config(snapshot));
+        // Only the existence of pi's folder is asked, once, outside every lock.
+        holder.set_pi_path(
+            gentle_backend::home::detect_pi(
+                &gentle_backend::home::HomeEnv::from_process(),
+                |dir| dir.is_dir(),
+            )
+            .map(|dir| dir.to_string_lossy().into_owned()),
+        );
         let pump = Arc::new(EventPump::new(Arc::clone(&holder)));
         let sessions = Arc::new(startup::service(Arc::clone(&holder), home_choice));
         let writer = ConfigWriter::spawn(path);
