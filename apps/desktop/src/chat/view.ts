@@ -75,6 +75,7 @@ const NO_SHELL: ShellView = {
   ask: false,
   launcher_found: true,
   install: { type: 'Idle' },
+  restart_needed: false,
 }
 
 /** The slice of `view` the main area's chrome draws. */
@@ -123,6 +124,7 @@ function sameShell(a: ShellView, b: ShellView): boolean {
     a.choice === b.choice &&
     a.ask === b.ask &&
     a.launcher_found === b.launcher_found &&
+    a.restart_needed === b.restart_needed &&
     JSON.stringify(a.install) === JSON.stringify(b.install)
   )
 }

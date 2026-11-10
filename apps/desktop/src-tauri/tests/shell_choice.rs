@@ -127,6 +127,47 @@ fn a_choice_and_a_theme_change_do_not_overwrite_each_other() {
     });
 }
 
+#[test]
+fn a_change_of_home_after_the_start_asks_for_a_restart_and_changing_back_cancels_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("config.json");
+    let holder = holder_at(&path);
+    // This run started with no choice, which is the separate home.
+    holder.set_started_with(None);
+    assert!(!holder.view().shell.restart_needed);
+
+    let to_pi = holder.dispatch(UiIntent::SetShellHome {
+        choice: HomeChoiceView::Link,
+    });
+    assert!(to_pi.shell.restart_needed, "the run is on the other home");
+
+    let back = holder.dispatch(UiIntent::SetShellHome {
+        choice: HomeChoiceView::Isolated,
+    });
+    assert!(
+        !back.shell.restart_needed,
+        "asking for the home it runs on needs nothing"
+    );
+}
+
+#[test]
+fn a_run_started_on_the_choice_needs_no_restart() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("config.json");
+    let mut saved = AppConfig::default();
+    assert!(saved.set_shell_home(HomeChoice::Link));
+    app_config::save(&path, &saved).unwrap();
+    let holder = holder_at(&path);
+    holder.set_started_with(Some(HomeChoice::Link));
+
+    assert!(!holder.view().shell.restart_needed);
+
+    let away = holder.dispatch(UiIntent::SetShellHome {
+        choice: HomeChoiceView::Isolated,
+    });
+    assert!(away.shell.restart_needed);
+}
+
 fn holder_at(path: &Path) -> AppStateHolder {
     let holder = AppStateHolder::with_config(ConfigSnapshot::at(Some(path)));
     holder.arm_config_saves(ConfigWriter::spawn(Some(path.to_path_buf())));

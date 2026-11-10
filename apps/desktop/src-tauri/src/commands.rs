@@ -87,6 +87,7 @@ impl Bridge {
         // change made while the app runs waits for the next one.
         let home_choice = snapshot.config.shell_home;
         let holder = Arc::new(AppStateHolder::with_config(snapshot));
+        holder.set_started_with(home_choice);
         // Whether the launcher resolves is asked once here too, so a machine with
         // no gentle-shell is told at the first frame, not at the first chat.
         holder.set_launcher_found(launcher_resolves());

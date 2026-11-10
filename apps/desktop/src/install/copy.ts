@@ -16,3 +16,5 @@ export const CHECK_AGAIN = 'Check again'
 export const RUNNING = 'Installing gentle-shell. This can take a few minutes.'
 export const DONE = 'gentle-shell was installed. Check again to continue.'
 export const FAILED_TITLE = 'The install did not finish'
+export const FAILED_HINT =
+  'If npm could not be found, install Node.js (nodejs.org), then press Install again.'

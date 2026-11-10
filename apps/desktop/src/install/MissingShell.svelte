@@ -11,6 +11,7 @@
     COMMAND,
     COMMAND_INTRO,
     DONE,
+    FAILED_HINT,
     FAILED_TITLE,
     INSTALL,
     RUNNING,
@@ -59,6 +60,7 @@
       <div class="install-failed" role="alert">
         <strong>{FAILED_TITLE}</strong>
         <pre>{failure}</pre>
+        <p class="install-hint">{FAILED_HINT}</p>
       </div>
     {/if}
     {#if running}

@@ -31,6 +31,12 @@ impl AppStateHolder {
         self.view()
     }
 
+    /// Records the home choice this run started with, the one its children and
+    /// its session list are on, so a later change can be told from it.
+    pub fn set_started_with(&self, choice: Option<HomeChoice>) {
+        *lock(&self.started_with) = choice;
+    }
+
     /// Records whether the `gentle-shell` launcher resolves on this machine.
     pub fn set_launcher_found(&self, found: bool) {
         self.launcher_missing.store(!found, Ordering::SeqCst);
@@ -77,8 +83,16 @@ impl AppStateHolder {
             pi_path,
             launcher_found: !self.launcher_missing.load(Ordering::SeqCst),
             install: lock(&self.install).clone(),
+            // No choice is the separate home, so "none" and "isolated" are the
+            // same home and changing between them needs no restart.
+            restart_needed: effective(choice) != effective(*lock(&self.started_with)),
         }
     }
+}
+
+/// The home a choice puts a run on: no choice is the separate one.
+fn effective(choice: Option<HomeChoice>) -> HomeChoice {
+    choice.unwrap_or(HomeChoice::Isolated)
 }
 
 fn home_choice(choice: HomeChoiceView) -> HomeChoice {

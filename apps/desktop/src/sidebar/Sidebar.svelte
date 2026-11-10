@@ -13,6 +13,7 @@
   import NewSessionButton from './NewSessionButton.svelte'
   import SidebarHeader from './SidebarHeader.svelte'
   import SidebarNotices from './SidebarNotices.svelte'
+  import HomeSetting from './HomeSetting.svelte'
   import ThemePicker from './ThemePicker.svelte'
   import WorkspaceTree from './WorkspaceTree.svelte'
   import {
@@ -128,6 +129,9 @@
   <!-- The footer's theme control (01a): the v1 Appearance setting, drawn
        where the artboard puts it. -->
   <footer class="foot">
+    {#if model.view !== null}
+      <HomeSetting shell={model.view.shell} />
+    {/if}
     <ThemePicker theme={model.view?.theme ?? 'system'} />
   </footer>
 </aside>

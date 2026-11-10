@@ -108,6 +108,10 @@ pub struct ShellView {
     pub launcher_found: bool,
     /// Where installing gentle-shell stands.
     pub install: InstallView,
+    /// Whether the home chosen differs from the one this run started with. A
+    /// choice only applies to a new run, so while this is true the sidebar says
+    /// "restart to apply" and offers the restart.
+    pub restart_needed: bool,
 }
 
 /// What the user asked for, as the web side sends it. Only the intents the

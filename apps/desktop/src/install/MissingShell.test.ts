@@ -69,6 +69,12 @@ describe('the missing gentle-shell screen', () => {
     )
   })
 
+  it('tells the user what to do when npm itself could not run', () => {
+    draw({ type: 'Failed', data: { message: 'could not start npm.cmd: not found' } })
+
+    expect(screen.getByRole('alert').textContent).toContain('install Node.js')
+  })
+
   it('says it finished and offers to look again instead of installing again', () => {
     draw({ type: 'Done' })
 
