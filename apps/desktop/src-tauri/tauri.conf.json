@@ -1,5 +1,5 @@
 {
-  "productName": "gentle-desk",
+  "productName": "Gentle Shell Desktop",
   "version": "0.1.0",
   "identifier": "dev.gentle.desk",
   "build": {
@@ -11,7 +11,7 @@
   "app": {
     "windows": [
       {
-        "title": "gentle-desk",
+        "title": "Gentle Shell Desktop",
         "width": 1000,
         "height": 700
       }
