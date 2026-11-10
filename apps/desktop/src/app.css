@@ -1165,10 +1165,21 @@ p {
   filter: brightness(1.08);
 }
 
-.welcome-skip {
+.welcome-skip,
+.welcome-applying {
   margin: 18px 0 0;
   color: var(--faint);
   font-size: 13px;
+}
+
+.welcome-applying {
+  color: var(--muted);
+}
+
+.welcome-go:disabled {
+  opacity: 0.6;
+  cursor: default;
+  filter: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

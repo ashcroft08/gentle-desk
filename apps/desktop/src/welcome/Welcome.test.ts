@@ -43,20 +43,44 @@ describe('the welcome question', () => {
     expect(screen.getByText('creates ~/.gentle-shell/agent')).toBeTruthy()
   })
 
-  it('sends the link choice for Use my pi setup, once', async () => {
+  it('sends the link choice for Use my pi setup and then restarts the app, once', async () => {
     render(Welcome, { props: { piPath: PI } })
 
     await fireEvent.click(screen.getByRole('button', { name: 'Use my pi setup' }))
 
-    expect(intents()).toEqual([{ type: 'SetShellHome', data: { choice: 'link' } }])
+    await vi.waitFor(() =>
+      expect(intents()).toEqual([
+        { type: 'SetShellHome', data: { choice: 'link' } },
+        { type: 'RestartApp' },
+      ]),
+    )
   })
 
-  it('sends the isolated choice for Keep it separate, once', async () => {
+  it('sends the isolated choice for Keep it separate and then restarts the app, once', async () => {
     render(Welcome, { props: { piPath: PI } })
 
     await fireEvent.click(screen.getByRole('button', { name: 'Keep it separate' }))
 
-    expect(intents()).toEqual([{ type: 'SetShellHome', data: { choice: 'isolated' } }])
+    await vi.waitFor(() =>
+      expect(intents()).toEqual([
+        { type: 'SetShellHome', data: { choice: 'isolated' } },
+        { type: 'RestartApp' },
+      ]),
+    )
+  })
+
+  it('says it is applying the choice and takes both answers away, so nothing is sent twice', async () => {
+    render(Welcome, { props: { piPath: PI } })
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Use my pi setup' }))
+
+    expect(screen.getByRole('status').textContent).toContain('Applying your choice')
+    for (const name of ['Use my pi setup', 'Keep it separate']) {
+      expect((screen.getByRole('button', { name }) as HTMLButtonElement).disabled).toBe(true)
+    }
+    await fireEvent.click(screen.getByRole('button', { name: 'Keep it separate' }))
+    await vi.waitFor(() => expect(intents().length).toBe(2))
+    expect(intents().filter((intent) => (intent as { type: string }).type === 'SetShellHome')).toHaveLength(1)
   })
 
   it('puts the keyboard on the recommended answer when it opens', () => {

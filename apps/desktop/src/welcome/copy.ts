@@ -23,5 +23,8 @@ export const SEPARATE_POINTS = [
 ]
 export const SEPARATE_PATH = 'creates ~/.gentle-shell/agent'
 
+/** Shown from the click until the app starts again with the chosen home. */
+export const APPLYING = 'Applying your choice. The app will start again in a moment.'
+
 export const SKIP_NOTE =
   'No pi on the machine? This screen is skipped and gentle shell starts in its own space.'

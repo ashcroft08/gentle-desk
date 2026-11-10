@@ -29,6 +29,8 @@ pub fn to_intent(state: &gentle_app::AppState, intent: UiIntent) -> Option<gentl
         UiIntent::SetTheme { .. } => return None,
         // So is the chosen home (shell-choice): a field of the config.
         UiIntent::SetShellHome { .. } => return None,
+        // The relaunch is the bridge's: it needs the window handle.
+        UiIntent::RestartApp => return None,
         UiIntent::RestartChat { chat_id } => {
             gentle_app::Intent::RestartChat(chat_for(state, &chat_id))
         }

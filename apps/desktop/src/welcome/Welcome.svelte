@@ -1,10 +1,13 @@
 <script lang="ts">
   // The first-start question: the app found pi on this machine, so it asks
   // whether to run on it (the recommended answer) or to keep gentle shell in a
-  // space of its own. One click is one intent, and the answer is remembered, so
-  // this is asked once. The keyboard starts on the recommended answer.
+  // space of its own. The answer is remembered, so this is asked once, and it
+  // applies to a new run: the app saves it and starts again (the second intent),
+  // so the window says it is applying the choice and takes both answers away
+  // meanwhile. The keyboard starts on the recommended answer.
   import { dispatchIntent } from '../bridge'
   import {
+    APPLYING,
     FOUND_TITLE,
     INTRO,
     LINK_BADGE,
@@ -21,13 +24,19 @@
   let { piPath }: { piPath: string } = $props()
 
   let recommended: HTMLButtonElement | null = $state(null)
+  /** Set by the first click: the answer is on its way and cannot change. */
+  let applying = $state(false)
 
   $effect(() => {
     recommended?.focus()
   })
 
-  function choose(choice: 'link' | 'isolated'): void {
-    void dispatchIntent({ type: 'SetShellHome', data: { choice } })
+  async function choose(choice: 'link' | 'isolated'): Promise<void> {
+    if (applying) return
+    applying = true
+    // In this order: the restart flushes the config, so the choice is in it.
+    await dispatchIntent({ type: 'SetShellHome', data: { choice } })
+    await dispatchIntent({ type: 'RestartApp' })
   }
 </script>
 
@@ -52,7 +61,10 @@
           {/each}
         </ul>
         <p class="welcome-where">{LINK_PATH}</p>
-        <button type="button" class="welcome-go" bind:this={recommended} onclick={() => choose('link')}>
+        <button type="button" class="welcome-go" bind:this={recommended}
+          disabled={applying}
+          onclick={() => choose('link')}
+        >
           {LINK_TITLE}
         </button>
       </section>
@@ -65,12 +77,21 @@
           {/each}
         </ul>
         <p class="welcome-where">{SEPARATE_PATH}</p>
-        <button type="button" class="welcome-go welcome-quiet" onclick={() => choose('isolated')}>
+        <button
+          type="button"
+          class="welcome-go welcome-quiet"
+          disabled={applying}
+          onclick={() => choose('isolated')}
+        >
           {SEPARATE_TITLE}
         </button>
       </section>
     </div>
 
-    <p class="welcome-skip">{SKIP_NOTE}</p>
+    {#if applying}
+      <p class="welcome-applying" role="status">{APPLYING}</p>
+    {:else}
+      <p class="welcome-skip">{SKIP_NOTE}</p>
+    {/if}
   </div>
 </main>

@@ -132,6 +132,9 @@ pub enum UiIntent {
     SetShellHome {
         choice: HomeChoiceView,
     },
+    /// Start the app again after the orderly close (config and cache flushed
+    /// first): a home chosen at the welcome question applies to a new run.
+    RestartApp,
     /// Start the child of a chat that died again and reopen it (S3).
     RestartChat {
         chat_id: String,
