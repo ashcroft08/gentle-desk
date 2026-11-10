@@ -353,6 +353,73 @@ pub struct HelpersView {
     pub tasks: Vec<HelperRowView>,
 }
 
+/// How one tool call of a helper's thread stands. The two booleans the helper
+/// state carries are folded into these three by
+/// [`gentle_runtime::helper_text::format::tool_status`]; the WORD each state is
+/// drawn with stays the view's own, as it is in iced (`running`, `failed`,
+/// `ok`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub enum ToolStatusView {
+    Running,
+    Failed,
+    Ok,
+}
+
+/// One item of a helper's thread, flattened for display: what the helper said,
+/// what it thought, a note it left, or one tool call it ran. Every text is
+/// already built by `gentle_runtime::helper_text` and its `format` module, so no
+/// `serde_json::Value` crosses the contract.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(tag = "kind")]
+pub enum HelperThreadItemView {
+    /// A piece of the helper's own reply, drawn as markdown like the chat
+    /// thread's assistant messages.
+    Said { text: String },
+    /// The helper's reasoning, drawn as a muted block.
+    Thought { text: String },
+    /// A note the helper left, drawn as plain muted text.
+    Note { text: String },
+    /// One tool call: its name, how it stands, its arguments on one line and the
+    /// first lines of its output, both already truncated by the rules.
+    Ran {
+        name: String,
+        status: ToolStatusView,
+        args_line: String,
+        output_preview: String,
+    },
+}
+
+/// The open helper's thread: the header both windows draw and the items the
+/// thread scrolls through.
+///
+/// Only the SELECTED helper of the FOREGROUND chat is here, so this slice never
+/// carries another task's transcript. It is bounded too: the push carries the
+/// last [`THREAD_ITEMS_PUSHED`](crate::helper_thread::THREAD_ITEMS_PUSHED) items
+/// and [`dropped`](Self::dropped) counts the ones left out, so the thread's own
+/// "earlier items were dropped" line stays true.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub struct HelperThreadView {
+    /// The id [`HelperRowView::id`] carried and [`UiIntent::SelectHelper`] takes
+    /// back.
+    pub id: String,
+    /// The thread's headline, from [`gentle_runtime::helper_text::task_title`].
+    pub title: String,
+    pub agent: String,
+    pub status: HelperStatusView,
+    /// The status as text, from
+    /// [`gentle_runtime::helper_text::status_label`]: it is the thread's
+    /// accessible name for the status mark, so the text, not the colour, carries
+    /// the state.
+    pub status_label: String,
+    /// The task's prompt, truncated to the length iced echoes at the top.
+    pub prompt: String,
+    /// How many earlier items the thread does not show: the ones the helper
+    /// state itself dropped, plus the ones this push left out of a long thread.
+    pub dropped: u32,
+    /// The items the thread draws, oldest first.
+    pub items: Vec<HelperThreadItemView>,
+}
+
 /// The state the current views render: the foreground chat (as the app names
 /// it, the id the sidebar passes back) with its thread, the notices, the
 /// per-chat activity the list rows show, and the session list as a status plus
@@ -406,6 +473,11 @@ pub struct ViewState {
     /// when another chat becomes the foreground one. `None` for the list
     /// itself, and always with no foreground chat.
     pub selected_helper: Option<String>,
+    /// The open helper's thread, and only that one: the selected task of the
+    /// foreground chat, with the header iced draws and its items. `None` when no
+    /// helper is selected, when no chat is foreground, or when the selected id
+    /// names no task of that chat (a task the next frame no longer reports).
+    pub helper_thread: Option<HelperThreadView>,
     pub activity: Vec<ChatActivityView>,
     /// The one failure that ends the whole run instead of one chat: the
     /// `gentle-shell` launcher could not be resolved, so no chat can ever

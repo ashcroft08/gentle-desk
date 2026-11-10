@@ -86,6 +86,8 @@ fn the_view_state_slice_has_no_invented_fields() {
             // select in one.
             helpers: None,
             selected_helper: None,
+            // No helper is selected, so no thread is open either.
+            helper_thread: None,
             activity: Vec::new(),
             config_notice: None,
             // The shell-owned line a refused workspace action sets: nothing was

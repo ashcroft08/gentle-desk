@@ -5,8 +5,9 @@
   // names: the thread and its composer (T5b), or the helpers panel (T7b-1).
   // With none it stays the placeholder that names what to do next. Over all of
   // it sit the two T7a layers: the fatal launcher bar at the top, which belongs
-  // to no chat, and the blocking extension dialog as a modal. The helper's own
-  // thread is T7b-2.
+  // to no chat, and the blocking extension dialog as a modal. The Helpers view
+  // draws the list or, once a card is selected, that helper's own thread
+  // (T7b-2).
   import ChatHeader from './chat/Header.svelte'
   import FatalBanner from './chat/FatalBanner.svelte'
   import type { ViewTab } from './chat/tabs'
@@ -82,7 +83,11 @@
         </div>
         <div class="view" id="p-helpers" role="tabpanel" aria-labelledby="t-help" hidden={tab !== 'helpers'}>
           {#if chat.helpers !== null}
-            <HelpersPanel helpers={chat.helpers} selected={chat.selectedHelper} />
+            <HelpersPanel
+              helpers={chat.helpers}
+              selected={chat.selectedHelper}
+              thread={chat.helperThread}
+            />
           {/if}
         </div>
       </div>

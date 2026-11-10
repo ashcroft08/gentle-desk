@@ -1,22 +1,41 @@
 <script lang="ts">
-  // The helpers view of one chat (T7b-1): the counters line Rust spells, then
-  // one card per delegated helper. Selecting a card only MARKS it in this
-  // slice: opening the helper's said/thought/ran thread is T7b-2, and nothing
-  // here draws a control that would promise it today.
+  // The helpers view of one chat: the counters line Rust spells and one card per
+  // delegated helper, or - when a card is selected and its thread arrived - that
+  // helper's thread in place of the list (T7b-2). The thread is iced's drawer:
+  // Back sends CloseHelper and the panel is the list again.
+  //
+  // The panel owns the two focus moves the switch needs: opening the thread puts
+  // the focus on its Back control (the card is gone), and closing it puts the
+  // focus back on the card that was open.
   import { dispatchIntent } from '../bridge'
-  import type { HelpersView_Serialize as Helpers } from '../contract/bindings'
+  import type {
+    HelperThreadView as HelperThread,
+    HelpersView_Serialize as Helpers,
+  } from '../contract/bindings'
   import { HELPERS_LIST_LABEL, NO_HELPERS } from './copy'
   import HelperCard from './HelperCard.svelte'
+  import HelperThreadView from './HelperThread.svelte'
 
   let {
     helpers,
     selected = null,
+    thread = null,
   }: {
     /** The foreground chat's helpers, counters and cards alike. */
     helpers: Helpers
     /** The card the reducer selected, or `null` for the list itself. */
     selected?: string | null
+    /** The selected helper's thread, or `null` while there is none. */
+    thread?: HelperThread | null
   } = $props()
+
+  /**
+   * The thread the panel draws: only the selected card's own. A missing thread
+   * (the helper left the list, or the push has not caught up) or one that names
+   * another helper keeps the list, so the panel never draws a stranger's
+   * transcript under the selected card.
+   */
+  const open = $derived(thread !== null && selected !== null && thread.id === selected ? thread : null)
 
   /** The card the keyboard is on: the selected one, else the first. */
   let focused = $state<string | null>(null)
@@ -26,8 +45,27 @@
   /** The one card in the tab order: focus, else the selection, else the first. */
   const active = $derived(focused ?? selected ?? cards[0]?.id ?? null)
 
+  /** The card the open thread belongs to, kept to give it the focus back. */
+  let openCard: string | null = null
+
+  // Opening the thread hands the focus to its Back control (the thread does
+  // that when it mounts); closing it hands the focus back to the card that was
+  // open, which is what a reader who pressed Enter expects.
+  $effect(() => {
+    const now = open?.id ?? null
+    if (now === openCard) return
+    const left = openCard
+    openCard = now
+    if (now === null && left !== null) moveTo(left)
+  })
+
   function select(id: string): void {
     void dispatchIntent({ type: 'SelectHelper', data: { helper_id: id } })
+  }
+
+  /** Back from a helper's thread to the list, iced's only way out. */
+  function back(): void {
+    void dispatchIntent({ type: 'CloseHelper' })
   }
 
   /** Moves the roving tab stop and the focus to `id`. */
@@ -65,29 +103,36 @@
   }
 </script>
 
-<div class="panel">
-  <!-- The counters line is Rust's own text: no counter is spelled again here. -->
-  <p class="counters">{helpers.summary_line}</p>
-  {#if cards.length === 0}
-    <p class="empty">{NO_HELPERS}</p>
+<div class="panel" class:thread={open !== null}>
+  {#if open !== null}
+    <!-- The thread replaces the list and its counters: the bar names the helper
+         and the counters are the list's, as iced draws them. -->
+    <HelperThreadView thread={open} onBack={back} />
   {:else}
-    <div class="list" role="listbox" aria-label={HELPERS_LIST_LABEL} bind:this={list}>
-      {#each cards as card (card.id)}
-        <HelperCard
-          row={card}
-          selected={card.id === selected}
-          tabIndex={card.id === active ? 0 : -1}
-          onSelect={select}
-          onKey={keyed}
-        />
-      {/each}
-    </div>
+    <!-- The counters line is Rust's own text: no counter is spelled again here. -->
+    <p class="counters">{helpers.summary_line}</p>
+    {#if cards.length === 0}
+      <p class="empty">{NO_HELPERS}</p>
+    {:else}
+      <div class="list" role="listbox" aria-label={HELPERS_LIST_LABEL} bind:this={list}>
+        {#each cards as card (card.id)}
+          <HelperCard
+            row={card}
+            selected={card.id === selected}
+            tabIndex={card.id === active ? 0 : -1}
+            onSelect={select}
+            onKey={keyed}
+          />
+        {/each}
+      </div>
+    {/if}
   {/if}
 </div>
 
 <style>
   .panel {
     display: flex;
+    flex: 1 1 0;
     flex-direction: column;
     gap: 8px;
     min-height: 0;
@@ -95,6 +140,12 @@
     overflow: auto;
   }
 
+  /* The thread fills the panel and scrolls its own body; the list pads itself. */
+  .panel.thread {
+    gap: 0;
+    padding: 0;
+    overflow: hidden;
+  }
   .counters,
   .empty {
     margin: 0;

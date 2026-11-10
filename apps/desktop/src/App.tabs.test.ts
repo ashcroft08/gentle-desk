@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte'
 import { serveSidebar } from './test-support/sidebar'
 import { helperRow, helpersPanel } from './test-support/helpers'
+import { helperThread, saidItem } from './test-support/helper-thread'
 import { resetTauriMock, viewState } from './test-support/tauri-mock'
 import App from './App.svelte'
 
@@ -104,6 +105,23 @@ describe('the Chat | Helpers views', () => {
     await tab(/^Chat$/)
 
     expect(screen.getByRole('region', { name: 'Chat thread' }).scrollTop).toBe(120)
+  })
+
+  it('draws the open helper thread in the Helpers tabpanel when the state carries it', async () => {
+    serveSidebar({
+      view: open({
+        selected_helper: 'h1',
+        helper_thread: helperThread({ id: 'h1', items: [saidItem('Reading the crate.')] }),
+      }),
+    })
+    render(App)
+    await screen.findByRole('tablist', { name: 'View' })
+
+    await tab(/Helpers/)
+
+    expect(screen.getByRole('region', { name: 'Helper thread' })).toBeTruthy()
+    expect(screen.getByText('Reading the crate.')).toBeTruthy()
+    expect(screen.queryByRole('listbox', { name: 'Helpers' })).toBeNull()
   })
 
   it('draws the helpers the pushed state carries when it changes', async () => {

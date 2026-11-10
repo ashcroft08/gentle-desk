@@ -9,7 +9,8 @@
 //   Rust, `crates/runtime`, and arrives here as plain data);
 // - the notices, unchanged and in the order Rust keeps them, every level drawn;
 // - the foreground chat's helpers: the counters line and the cards the panel
-//   draws, and the selection the reducer keeps for it;
+//   draws, the selection the reducer keeps for it, and the thread that
+//   selection opens (T7b-2);
 // - the first pending dialog of that chat, one at a time, which the dialogs
 //   slice draws as a modal;
 // - the run's one fatal failure, which belongs to no chat and outlives all of
@@ -22,6 +23,7 @@
 import type {
   ChatActivityMark,
   DialogView,
+  HelperThreadView as HelperThreadView,
   HelpersView_Serialize as HelpersView,
   NoticeView,
   ViewState_Serialize as ViewState,
@@ -42,6 +44,8 @@ export type ChatViewState = {
   helpers: HelpersView | null
   /** The helper card the reducer selected, or `null` for the list itself. */
   selectedHelper: string | null
+  /** The selected helper's thread, or `null` while no thread is open. */
+  helperThread: HelperThreadView | null
   /** The first dialog that chat's extension is waiting on, or `null`. */
   dialog: DialogView | null
   /** The run's fatal launcher failure, or `null`; not about any one chat. */
@@ -74,6 +78,7 @@ export function chatOf(view: ViewState | null): ChatViewState {
       notices: NO_NOTICES,
       helpers: null,
       selectedHelper: null,
+      helperThread: null,
       dialog: null,
       fatal,
     }
@@ -85,6 +90,7 @@ export function chatOf(view: ViewState | null): ChatViewState {
     notices: view?.notices ?? NO_NOTICES,
     helpers: view?.helpers ?? null,
     selectedHelper: view?.selected_helper ?? null,
+    helperThread: view?.helper_thread ?? null,
     dialog: view?.dialog ?? null,
     fatal,
   }
@@ -112,6 +118,7 @@ export function createChatView(deps: ChatViewDeps = {}): ChatView {
     notices: [],
     helpers: null,
     selectedHelper: null,
+    helperThread: null,
     dialog: null,
     fatal: null,
   }
@@ -133,6 +140,7 @@ export function createChatView(deps: ChatViewDeps = {}): ChatView {
       next.notices === state.notices &&
       next.helpers === state.helpers &&
       next.selectedHelper === state.selectedHelper &&
+      next.helperThread === state.helperThread &&
       next.dialog === state.dialog &&
       next.fatal === state.fatal
     ) {
