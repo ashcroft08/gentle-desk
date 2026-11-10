@@ -159,3 +159,44 @@ fn the_canonical_spelling_is_what_a_workspace_is_stored_with() {
     assert_eq!(canonical_path(r"C:\"), r"C:\");
     assert_eq!(canonical_path("/"), "/");
 }
+
+#[test]
+fn a_default_config_has_the_system_theme() {
+    assert_eq!(AppConfig::default().theme, Theme::System);
+}
+
+#[test]
+fn setting_the_theme_reports_whether_it_changed() {
+    let mut config = AppConfig::default();
+    assert!(config.set_theme(Theme::Gentle));
+    assert_eq!(config.theme, Theme::Gentle);
+    assert!(
+        !config.set_theme(Theme::Gentle),
+        "the same theme changes nothing, so nothing is saved"
+    );
+    assert!(config.set_theme(Theme::System));
+    assert_eq!(config.theme, Theme::System);
+}
+
+#[test]
+fn the_six_themes_are_named_the_way_the_stylesheet_names_them() {
+    // The picker order, and the six `data-theme` values of
+    // `apps/desktop/src/theme.css`, are the same six names.
+    let names: Vec<&str> = Theme::ALL.iter().map(|theme| theme.as_str()).collect();
+    assert_eq!(
+        names,
+        [
+            "system",
+            "dark",
+            "Gentle",
+            "Gentleman-Cute",
+            "Gentleman-Sexy",
+            "light"
+        ]
+    );
+    for theme in Theme::ALL {
+        assert_eq!(Theme::from_name(theme.as_str()), Some(theme));
+    }
+    assert_eq!(Theme::from_name("Neon"), None);
+    assert_eq!(Theme::from_name("gentle"), None, "the names are exact");
+}

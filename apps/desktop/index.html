@@ -4,6 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>gentle-desk</title>
+    <!-- `system` is the theme of a run that chose none, and it is only the value
+         of the first frame: src/main.ts paints the stored theme on this element
+         from the first read of the state, before the app mounts, so the window
+         never shows another theme's colors first. -->
   </head>
   <body>
     <div id="app"></div>

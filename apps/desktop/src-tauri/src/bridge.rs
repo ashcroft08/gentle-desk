@@ -25,7 +25,7 @@ use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use gentle_app::{Command, SessionItem};
-use gentle_runtime::app_config::folder_key;
+use gentle_runtime::app_config::{self, folder_key};
 use gentle_runtime::clock::now_ms;
 
 use crate::config::{ConfigSnapshot, ConfigWriter};
@@ -35,11 +35,13 @@ use crate::sessions::revision;
 use crate::sessions::tree::Tree;
 use crate::sessions::window::{self, folder_status};
 use crate::state_view::view_state;
+use crate::theme::WindowTheme;
 use crate::workspace;
 
 mod config;
 mod fatal;
 mod notice;
+mod theme;
 
 /// What runs one shared command the reducer asked for. `Command::RefreshSessions`
 /// is the session list's in the app; the sink keeps the holder free of how it is
@@ -72,6 +74,10 @@ pub struct AppStateHolder {
     /// exists a config change is kept in memory and nothing is written, which is
     /// what a run with no config path does for its whole life.
     saver: Mutex<Option<ConfigWriter>>,
+    /// Installed once at startup: what makes the window's own chrome (the title
+    /// bar) follow the chosen theme. Before it exists the theme is still the
+    /// user's, and the page is colored by it either way.
+    window_theme: Mutex<Option<Arc<dyn WindowTheme>>>,
     /// The flattened tree of the last built revision, so a page of rows never
     /// regroups 50 000 sessions again (see [`TreeCache`]).
     tree: TreeCache,
@@ -112,9 +118,9 @@ impl AppStateHolder {
     /// slice either way: the commands are the shell's business, not the view's.
     pub fn dispatch_commands(&self, intent: UiIntent) -> (ViewState, Vec<gentle_app::ChatCommand>) {
         // The intents the reducer does not fold, answered first: folding a
-        // workspace is the config's (D8), and a workspace that names no folder
-        // starts nothing at all.
-        if let Some(view) = self.workspace_intent(&intent) {
+        // workspace and choosing the theme are the config's, and a workspace
+        // that names no folder starts nothing at all.
+        if let Some(view) = self.config_intent(&intent) {
             return (view, Vec::new());
         }
         let state = self.state();
@@ -148,12 +154,14 @@ impl AppStateHolder {
         let notice = self.config_notice();
         let workspace_notice = self.workspace_notice();
         let fatal = self.fatal();
+        let theme = self.theme_value();
         view_state(
             &self.state(),
             self.sessions_revision(),
             notice,
             workspace_notice,
             fatal,
+            theme,
         )
     }
 
@@ -187,6 +195,7 @@ impl AppStateHolder {
         let notice = self.config_notice();
         let workspace_notice = self.workspace_notice();
         let fatal = self.fatal();
+        let theme = self.theme_value();
         let (view, chat_commands, commands) = {
             let mut app = lock(&self.app);
             let previous = app.clone();
@@ -202,6 +211,7 @@ impl AppStateHolder {
                 notice,
                 workspace_notice,
                 fatal,
+                theme,
             );
             (view, effects.chat_commands, effects.commands)
         };
@@ -219,17 +229,26 @@ impl AppStateHolder {
         }
     }
 
-    /// The intents the reducer has no answer for: folding a workspace's chats
-    /// away is the config's (D8), and a workspace that names no folder starts
-    /// nothing. Answers the slice to push, `None` for the reducer's intents.
-    fn workspace_intent(&self, intent: &UiIntent) -> Option<ViewState> {
+    /// The intents the reducer has no answer for, answered here: folding a
+    /// workspace's chats away is the config's (D8), choosing the theme is the
+    /// config's (the v1 Appearance setting), and a workspace that names no
+    /// folder starts nothing. Answers the slice to push, `None` for the
+    /// reducer's intents.
+    fn config_intent(&self, intent: &UiIntent) -> Option<ViewState> {
         match intent {
             UiIntent::SetWorkspaceCollapsed { path, collapsed } => {
                 Some(workspace::collapse(self, path, *collapsed))
             }
+            UiIntent::SetTheme { theme } => Some(self.set_theme(*theme)),
             UiIntent::NewChatInWorkspace { path } if path.trim().is_empty() => Some(self.view()),
             _ => None,
         }
+    }
+
+    /// The theme this run holds, taken off the config lock before any state
+    /// lock is taken, as the config notice is.
+    fn theme_value(&self) -> app_config::Theme {
+        self.config_snapshot().config.theme
     }
 
     /// The flattened tree of the revision the state is at: built once per

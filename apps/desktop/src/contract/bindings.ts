@@ -604,6 +604,16 @@ export type StateChanged_Deserialize = ViewState_Deserialize;
 export type StateChanged_Serialize = ViewState_Serialize;
 
 /**
+ *  The six themes the whole window can be set to (the v1 Appearance setting),
+ *  named exactly as `design/system.md` and the artboard's picker name them: one
+ *  spelling for the config file, the `data-theme` attribute the page paints, and
+ *  the label the picker draws, so no side translates a name.
+ */
+export type ThemeView = 
+/**  The reader's own setting, and the theme of a run that chose none. */
+"system" | "dark" | "Gentle" | "Gentleman-Cute" | "Gentleman-Sexy" | "light";
+
+/**
  *  How one tool call of a helper's thread stands. The two booleans the helper
  *  state carries are folded into these three by
  *  [`gentle_runtime::helper_text::format::tool_status`]; the WORD each state is
@@ -644,6 +654,14 @@ export type UiIntent = { type: "SendPrompt"; data: {
 { type: "SetWorkspaceCollapsed"; data: {
 	path: string,
 	collapsed: boolean,
+} } | 
+/**
+ *  Choose the window's theme (the v1 Appearance setting). The choice is
+ *  remembered in the app config, so it survives the run, and the window's
+ *  own chrome follows it ([`gentle_runtime::app_config::Theme`]).
+ */
+{ type: "SetTheme"; data: {
+	theme: ThemeView,
 } } | 
 /**  Start the child of a chat that died again and reopen it (S3). */
 { type: "RestartChat"; data: {
@@ -715,6 +733,12 @@ export type ViewState = ViewState_Serialize | ViewState_Deserialize;
  *  they reach the web side inside [`NoticeView::text`] and nowhere else.
  */
 export type ViewState_Deserialize = {
+	/**
+	 *  The chosen appearance of the whole window, as the app config remembers
+	 *  it ([`ThemeView`]): the page paints its `data-theme` from it, and the
+	 *  window's own chrome follows it. `System` until the user chooses.
+	 */
+	theme: ThemeView,
 	foreground_chat?: string | null,
 	/**
 	 *  The title the chat header draws for the foreground chat: the stored
@@ -820,6 +844,12 @@ export type ViewState_Deserialize = {
  *  they reach the web side inside [`NoticeView::text`] and nowhere else.
  */
 export type ViewState_Serialize = {
+	/**
+	 *  The chosen appearance of the whole window, as the app config remembers
+	 *  it ([`ThemeView`]): the page paints its `data-theme` from it, and the
+	 *  window's own chrome follows it. `System` until the user chooses.
+	 */
+	theme: ThemeView,
 	foreground_chat: string | null,
 	/**
 	 *  The title the chat header draws for the foreground chat: the stored

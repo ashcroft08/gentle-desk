@@ -1,6 +1,7 @@
 <script lang="ts">
   // The sidebar: New session (D2), the New workspace control (D7), the two plain
-  // notice lines, the reading line of the first pass, and the workspace tree.
+  // notice lines, the reading line of the first pass, the workspace tree, and the
+  // footer's theme control (the v1 Appearance setting).
   // It owns the only view-local selection this slice needs (P5): the workspace
   // row the user clicked last, and the chat row clicked while Rust catches up.
   import { dispatchIntent } from '../bridge'
@@ -11,6 +12,7 @@
   import NewSessionButton from './NewSessionButton.svelte'
   import SidebarHeader from './SidebarHeader.svelte'
   import SidebarNotices from './SidebarNotices.svelte'
+  import ThemePicker from './ThemePicker.svelte'
   import WorkspaceTree from './WorkspaceTree.svelte'
   import {
     EMPTY_REASON,
@@ -121,4 +123,9 @@
       onOpen={open}
     />
   {/if}
+  <!-- The footer's theme control (01a): the v1 Appearance setting, drawn
+       where the artboard puts it. -->
+  <footer class="foot">
+    <ThemePicker theme={model.view?.theme ?? 'system'} />
+  </footer>
 </aside>

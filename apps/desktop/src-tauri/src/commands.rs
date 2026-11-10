@@ -29,6 +29,7 @@ use crate::link_opener::{LinkOpener, SystemLinkOpener};
 use crate::pending::PendingFolders;
 use crate::picker::{FolderPicker, NativeFolderPicker};
 use crate::sessions::{startup, SessionsService};
+use crate::theme::SystemWindowTheme;
 use crate::workspace::{self, WorkspaceAction};
 
 /// Everything the bridge owns and hands to the worker threads: the state, the
@@ -161,6 +162,19 @@ impl Bridge {
     pub fn start_sessions(&self, app: &AppHandle<tauri::Wry>) {
         self.sessions.arm(push_to(app));
         self.sessions.boot();
+    }
+
+    /// The window's own chrome follows the chosen theme from the first frame:
+    /// this installs the real sink (only the setup step has the window) and
+    /// applies the theme this run's config gave it, before the page is up. A run
+    /// with no window installs nothing and changes nothing: the page is colored
+    /// by the same theme either way.
+    pub fn arm_window_theme(&self, app: &AppHandle<tauri::Wry>) {
+        if let Some(window) = app.get_webview_window("main") {
+            self.holder
+                .arm_window_theme(Arc::new(SystemWindowTheme::new(window)));
+        }
+        self.holder.apply_window_theme();
     }
 
     /// The close of this run, armed once at startup. The exit is the app's own

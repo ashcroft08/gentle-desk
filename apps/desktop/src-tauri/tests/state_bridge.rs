@@ -8,7 +8,7 @@
 
 use gentle_app::{ChatId, Input, Intent};
 use gentle_desk_lib::bridge::AppStateHolder;
-use gentle_desk_lib::contract::{ListStatusView, NoticeLevel, UiIntent, ViewState};
+use gentle_desk_lib::contract::{ListStatusView, NoticeLevel, ThemeView, UiIntent, ViewState};
 
 #[test]
 fn new_chat_clears_the_foreground_chat() {
@@ -72,6 +72,8 @@ fn the_view_state_slice_has_no_invented_fields() {
     assert_eq!(
         holder.view(),
         ViewState {
+            // A run that chose no theme follows the reader's own setting.
+            theme: ThemeView::System,
             foreground_chat: None,
             // No chat is open, so no header title is drawn either.
             foreground_title: None,

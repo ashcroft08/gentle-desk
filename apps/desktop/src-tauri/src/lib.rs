@@ -27,6 +27,7 @@ pub mod pending;
 pub mod picker;
 pub mod sessions;
 pub mod state_view;
+pub mod theme;
 pub mod view;
 pub mod workspace;
 pub mod workspace_add;
@@ -101,6 +102,9 @@ pub fn run() {
             // has: this is the one place the child events are armed. The pump's
             // threads start the first time the executor builds its host.
             app.state::<Bridge>().arm_events(app.handle());
+            // The window's own chrome (the native title bar) follows the theme
+            // of this run from the first frame; only this step has the window.
+            app.state::<Bridge>().arm_window_theme(app.handle());
             // The session list is armed the same way, and its first pass asked
             // for here: the window opens with a list that says it is reading.
             app.state::<Bridge>().start_sessions(app.handle());

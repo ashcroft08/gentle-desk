@@ -1,8 +1,9 @@
 /* The six gentle-shell themes, as the design artboard spells them
    (design/gentle-desk-v2/01a-tree-chat.html; design/system.md records where
    each value comes from). One block per `data-theme` value on <html>, so the
-   same markup looks the same under every theme. No theme picker in this slice:
-   the attribute is `system` until the appearance settings arrive. */
+   same markup looks the same under every theme. The footer picker sets the
+   attribute from the state Rust pushes: `system` is only the default of a run
+   that has not chosen one. */
 
 :root,
 [data-theme='dark'] {

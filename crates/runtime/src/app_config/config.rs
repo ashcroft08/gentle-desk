@@ -1,11 +1,17 @@
-//! The config document: the version, the added workspaces and their collapse
-//! state, plus the folder identity two spellings share.
+//! The config document: the version, the chosen theme, the added workspaces and
+//! their collapse state, plus the folder identity two spellings share.
 //!
 //! Pure: no file system, no environment. A workspace is stored by its canonical
 //! path (the Windows verbatim prefix removed) and compared by its
 //! [`folder_key`], so the same folder added twice is one workspace.
+//!
+//! The theme is an ADDITIVE field of version 1: a file written before it existed
+//! loads with [`Theme::System`], and a value this version does not know loads the
+//! same way, so the document version does not move (`CONFIG_VERSION`).
 
 use serde::{Deserialize, Serialize};
+
+use super::theme::{self, Theme};
 
 /// The only document version this app writes. Any other version is not
 /// migrated: the file is kept aside and the app starts with an empty config.
@@ -17,6 +23,11 @@ pub struct AppConfig {
     /// [`CONFIG_VERSION`] as this app writes it ([`crate::app_config::save`]
     /// always writes this value).
     pub version: u32,
+    /// The chosen appearance ([`Theme`]), read leniently: absent, or a value
+    /// this version does not know, is [`Theme::System`] and never a damaged
+    /// file, so the workspaces below are never discarded for it.
+    #[serde(default, deserialize_with = "theme::or_default")]
+    pub theme: Theme,
     /// The added workspaces, in the order they were added.
     pub workspaces: Vec<WorkspaceEntry>,
 }
@@ -25,6 +36,7 @@ impl Default for AppConfig {
     fn default() -> Self {
         Self {
             version: CONFIG_VERSION,
+            theme: Theme::default(),
             workspaces: Vec::new(),
         }
     }
@@ -41,6 +53,16 @@ pub struct WorkspaceEntry {
 }
 
 impl AppConfig {
+    /// Sets the chosen theme. Answers whether it changed: the same theme again
+    /// changes nothing, so nothing is saved and no revision moves.
+    pub fn set_theme(&mut self, theme: Theme) -> bool {
+        if self.theme == theme {
+            return false;
+        }
+        self.theme = theme;
+        true
+    }
+
     /// The workspace of `path`, matched by [`folder_key`] so any spelling of the
     /// folder answers it.
     pub fn workspace(&self, path: &str) -> Option<&WorkspaceEntry> {
