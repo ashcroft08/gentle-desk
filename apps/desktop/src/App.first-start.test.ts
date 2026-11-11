@@ -41,16 +41,18 @@ describe('the first-start screens', () => {
     expect(screen.queryByRole('button', { name: 'New session' })).toBeNull()
   })
 
-  it('asks which home first when pi was found, even with no gentle-shell yet', async () => {
-    // Someone with pi but without gentle-shell must be recognised for what they
-    // have: the question about which home comes first, and only then the ask to
-    // install the agent.
+  it('asks nothing before the app can run: a missing gentle-shell shows the install screen, not the home question', async () => {
+    // Someone with pi but without gentle-shell has nothing to run yet, so no
+    // question is put to them: the install screen is what the window holds, and
+    // the question about which home only comes once the launcher resolves
+    // (shell-choice S2, S4). `shell_view()` never reports the ask with the
+    // launcher missing, so this state is the one a real run shows.
     serveSidebar({
       view: viewState({
         shell: {
           pi_path: 'C:/Users/someone/.pi/agent',
           choice: null,
-          ask: true,
+          ask: false,
           launcher_found: false,
           install: { type: 'Idle' },
           restart_needed: false,
@@ -59,8 +61,8 @@ describe('the first-start screens', () => {
     })
     render(App)
 
-    expect(await screen.findByRole('heading', { name: 'Welcome to gentle shell' })).toBeTruthy()
-    expect(screen.queryByRole('heading', { name: 'gentle-shell is not installed' })).toBeNull()
+    expect(await screen.findByRole('heading', { name: 'gentle-shell is not installed' })).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: 'Welcome to gentle shell' })).toBeNull()
   })
 
   it('asks to install gentle-shell when nothing at all was found', async () => {
