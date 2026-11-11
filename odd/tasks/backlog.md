@@ -7,7 +7,7 @@ Ordered by (1) shipped-but-unverified first, (2) risk of user-visible problems, 
 3. **DONE (refresh off the UI thread + persisted cache)** — **Session list performance, as one batch**: refresh off the UI thread, then persist the index cache across runs (the second depends on the first's shape).
 4. **DONE (no optimization needed; see perf-check-m11.md)** — **Long-thread performance check** (measure first; optimize only if it hurts).
 5. **Rename / delete sessions** (needs two decisions: how pi stores a name, and a confirmation step before deleting a file).
-6. **NARROWED** -- **Housekeeping** (chat search is DONE, see session-search-m12.md): tests for `gentle-term` argument parsing, markdown in helper thread items, bump the `actions/checkout` major version, project filter in the sidebar. Status 2026-11-11: kept only the actions/checkout major bump and the gentle-term argument-parsing tests; the project filter is covered by workspaces (item 13) and markdown in helper thread items is dropped.
+6. **DONE (already shipped)** -- **Housekeeping** (chat search is DONE, see session-search-m12.md): tests for `gentle-term` argument parsing, markdown in helper thread items, bump the `actions/checkout` major version, project filter in the sidebar. Status 2026-11-11: kept only the actions/checkout major bump and the gentle-term argument-parsing tests; the project filter is covered by workspaces (item 13) and markdown in helper thread items is dropped. Status 2026-11-11 (checked): checkout is already @v6 in ci.yml and release.yml, and crates/term/src/args/ carries 5 argument-parsing tests that all pass (cargo test -p gentle-term, 9 passed 0 failed); nothing left to do.
 
 ## Log
 
