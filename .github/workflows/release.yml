@@ -1,8 +1,7 @@
 name: release
 
-# Builds the Windows installer from this repository, so a release is reproducible
-# and the binary comes from an automated build (SignPath requires exactly that
-# before it will vouch for the package).
+# Builds the Windows installer from this repository. The build is automated,
+# so a release is reproducible and its binary is traceable to this repository.
 #
 #   - on a v* tag: builds the installer and attaches it to that tag's release.
 #   - by hand (workflow_dispatch): builds the installer and keeps it as a run
@@ -13,8 +12,10 @@ name: release
 # installer for the in-app updater and a latest.json manifest is produced next to
 # it. With no key the build is the plain unsigned installer, exactly as before.
 #
-# Windows code signing through SignPath is not wired yet: it needs the
-# application to be approved first and the identifiers it hands out.
+# Windows code signing: the Windows installer is NOT code signed. The SignPath
+# Foundation application was declined for lack of public visibility, so
+# SmartScreen may warn on install. The updater signature above is separate and
+# unaffected.
 
 on:
   push:
