@@ -1,7 +1,9 @@
 // The screen for a machine with no gentle-shell (shell-choice S4). It explains
-// that the app cannot work without it and asks for permission: nothing is
-// installed until the user presses the install button, and the screen follows
-// the install it started (running, done, failed) and offers to look again.
+// that the app cannot work without it, says what the command installs and that
+// where chats and sign-ins live is the choice after it, and asks for
+// permission: nothing is installed until the user presses the install button,
+// and the screen follows the install it started (running, done, failed) and
+// offers to look again.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/svelte'
@@ -33,6 +35,36 @@ describe('the missing gentle-shell screen', () => {
 
     expect(screen.getByRole('heading', { name: 'gentle-shell is not installed' })).toBeTruthy()
     expect(screen.getByText('npm install -g gentle-pi')).toBeTruthy()
+  })
+
+  it('says the command installs the program only, and how big it is', () => {
+    draw()
+
+    expect(
+      screen.getByText(
+        'This installs the gentle-shell program only, about 250 MB, in the npm global folder. It makes no place for chats or sign-ins.',
+      ),
+    ).toBeTruthy()
+  })
+
+  it('says where chats and sign-ins live is a separate choice, made next', () => {
+    draw()
+
+    expect(
+      screen.getByText(
+        'Where your chats and sign-ins live is a separate choice, made next: your own pi, or a space of its own.',
+      ),
+    ).toBeTruthy()
+  })
+
+  it('says it needs Node and npm, changes this computer and can take a few minutes', () => {
+    draw()
+
+    expect(
+      screen.getByText(
+        'The install changes this computer: it needs Node and npm, and it can take a few minutes.',
+      ),
+    ).toBeTruthy()
   })
 
   it('installs nothing until the user presses the button', () => {
