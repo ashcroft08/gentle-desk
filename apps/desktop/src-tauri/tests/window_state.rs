@@ -15,7 +15,9 @@ use std::time::{Duration, Instant};
 
 use gentle_desk_lib::close::flow::WINDOW_SAVE;
 use gentle_desk_lib::close::{CloseFlow, CloseSteps, Deadlines};
-use gentle_desk_lib::window::{screen_at, steps, stored_state, Readings, Step, WindowRecorder};
+use gentle_desk_lib::window::{
+    ends_minimized, run, screen_at, steps, stored_state, Readings, Step, WindowRecorder,
+};
 use gentle_runtime::app_config::{self, placement, AppConfig, Placement, Screen, WindowState};
 
 /// How long a test waits for a close that its own deadlines bound.
@@ -103,15 +105,20 @@ fn a_window_that_reports_no_position_or_no_size_stores_nothing() {
 #[test]
 fn nothing_stored_centres_the_window_and_touches_no_size() {
     // Tauri's own centring, and no `Size` call at all: an uncentred or resized
-    // window would be one this slice changed behind the user's back.
-    assert_eq!(steps(Placement::Center), [Step::Center]);
+    // window would be one this slice changed behind the user's back. The show is
+    // the last call, because the window is created hidden (`tauri.conf.json`) and
+    // is placed before it is ever seen.
+    assert_eq!(steps(Placement::Center), [Step::Center, Step::Show]);
 }
 
 #[test]
 fn a_restored_window_is_sized_then_positioned_then_flagged_last() {
-    // Fullscreen, then maximized, then minimized last: each flag can undo the
-    // one before it in the window manager, so it must not be able to undo the
-    // rectangle, and minimizing must not be undone by anything.
+    // Fullscreen, then maximized, then minimized last of the flags: each flag can
+    // undo the one before it in the window manager, so it must not be able to
+    // undo the rectangle, and minimizing must not be undone by anything. The one
+    // call after the last flag is the show: the window is created hidden, so
+    // minimizing it first and showing it after is what leaves it minimized and
+    // visible in the taskbar without a normal-size frame on screen.
     let stored = WindowState {
         maximized: true,
         fullscreen: true,
@@ -129,6 +136,7 @@ fn a_restored_window_is_sized_then_positioned_then_flagged_last() {
             Step::Fullscreen,
             Step::Maximized,
             Step::Minimized,
+            Step::Show,
         ]
     );
 }
@@ -143,15 +151,64 @@ fn a_plain_window_is_sized_and_positioned_and_flagged_nowhere() {
                 height: 800
             },
             Step::Position { x: 100, y: 80 },
+            Step::Show,
         ]
     );
 }
 
 #[test]
-fn a_minimized_restore_ends_minimized_and_names_no_focus_step() {
-    // The last call is the one that decides how the window appears, and nothing
-    // here focuses or raises it: a run closed minimized comes back minimized
-    // instead of pushing itself in front of what the user is reading.
+fn a_plain_restore_shows_the_window_last() {
+    // The window is created hidden, so every plan ends by showing it, after the
+    // rectangle and after any flag: nothing is drawn at the created position
+    // first, and nothing takes the shown window back.
+    assert_eq!(steps(Placement::Restore(PLAIN)).last(), Some(&Step::Show));
+}
+
+#[test]
+fn a_maximized_or_fullscreen_restore_shows_after_its_flag() {
+    for flag in [
+        WindowState {
+            maximized: true,
+            ..PLAIN
+        },
+        WindowState {
+            fullscreen: true,
+            ..PLAIN
+        },
+    ] {
+        let plan = steps(Placement::Restore(flag));
+        let last_two: Vec<Step> = plan.iter().rev().take(2).rev().copied().collect();
+        assert_eq!(
+            last_two.last(),
+            Some(&Step::Show),
+            "a stored {flag:?} ends shown, plan {plan:?}"
+        );
+        assert_eq!(
+            last_two, // the flag, then the show: the flag keeps the last word on the shape
+            [
+                if flag.maximized {
+                    Step::Maximized
+                } else {
+                    Step::Fullscreen
+                },
+                Step::Show
+            ],
+            "a stored {flag:?} is flagged before it is shown, plan {plan:?}"
+        );
+    }
+}
+
+#[test]
+fn a_minimized_restore_is_minimized_then_shown_and_names_no_focus_step() {
+    // Minimize first, show after: minimizing a hidden window does NOT show it (a
+    // real window stays invisible and off screen, so the run would have no window
+    // and no way back), which is why the show is here, last, for this plan too.
+    // The order is the point - the window never appears at a normal size and never
+    // in front of what the user is doing - and nothing here focuses or raises it.
+    //
+    // Whether `show()` on an already minimized window keeps it minimized (and only
+    // gives it the taskbar entry) is what the parent's real-window check measures
+    // next; this test pins the plan, which is the part that can be pinned here.
     for flags in [
         WindowState {
             minimized: true,
@@ -163,12 +220,121 @@ fn a_minimized_restore_ends_minimized_and_names_no_focus_step() {
             ..PLAIN
         },
     ] {
+        let plan = steps(Placement::Restore(flags));
+        let last_two: Vec<Step> = plan.iter().rev().take(2).rev().copied().collect();
         assert_eq!(
-            steps(Placement::Restore(flags)).last(),
-            Some(&Step::Minimized),
-            "a stored {flags:?} ends minimized"
+            last_two,
+            [Step::Minimized, Step::Show],
+            "a stored {flags:?} is minimized before it is shown, plan {plan:?}"
+        );
+        assert_eq!(
+            plan.last(),
+            Some(&Step::Show),
+            "a stored {flags:?} ends shown, plan {plan:?}"
+        );
+        assert!(
+            ends_minimized(&plan),
+            "and the plan still leaves the window minimized, plan {plan:?}"
+        );
+        assert_eq!(
+            plan.iter().filter(|step| **step == Step::Show).count(),
+            1,
+            "the plan {plan:?} shows once"
         );
     }
+}
+
+#[test]
+fn the_show_is_the_last_step_of_every_plan() {
+    // Every plan, the minimized one included: a window that is never shown has no
+    // window and no taskbar entry, so no plan is allowed to skip the show.
+    let plans = [
+        steps(Placement::Center),
+        steps(Placement::Restore(PLAIN)),
+        steps(Placement::Restore(WindowState {
+            maximized: true,
+            ..PLAIN
+        })),
+        steps(Placement::Restore(WindowState {
+            fullscreen: true,
+            ..PLAIN
+        })),
+        steps(Placement::Restore(WindowState {
+            fullscreen: true,
+            maximized: true,
+            ..PLAIN
+        })),
+        steps(Placement::Restore(WindowState {
+            minimized: true,
+            ..PLAIN
+        })),
+        steps(Placement::Restore(WindowState {
+            maximized: true,
+            minimized: true,
+            ..PLAIN
+        })),
+    ];
+    for plan in plans {
+        assert_eq!(
+            plan.last(),
+            Some(&Step::Show),
+            "the plan {plan:?} is shown last"
+        );
+        assert_eq!(
+            plan.iter().filter(|step| **step == Step::Show).count(),
+            1,
+            "the plan {plan:?} shows once"
+        );
+    }
+}
+
+#[test]
+fn a_step_that_fails_is_logged_and_left_behind_and_the_show_still_runs() {
+    // The dangerous half of creating the window hidden: a placement call the
+    // window manager refuses must cost the user the placement, never the window.
+    // `run` is that guarantee as a value a windowless test drives: every step is
+    // attempted in order, and the plan's last step (the show) runs whatever the
+    // earlier ones answered.
+    let plan = steps(Placement::Restore(WindowState {
+        maximized: true,
+        fullscreen: true,
+        ..PLAIN
+    }));
+    let mut ran = Vec::new();
+
+    run(&plan, |step| {
+        ran.push(step);
+        if matches!(step, Step::Size { .. }) {
+            Err("the window manager refused the size")
+        } else {
+            Ok(())
+        }
+    });
+
+    assert_eq!(ran, plan, "every step of {plan:?} was attempted, in order");
+    assert_eq!(
+        ran.last(),
+        Some(&Step::Show),
+        "the failing step did not stop the show, ran {ran:?}"
+    );
+}
+
+#[test]
+fn every_step_is_attempted_once_even_when_all_of_them_fail() {
+    // The net under a failing show is on the real window (`show_if_hidden`), which a
+    // windowless test cannot express; what it can pin is that `run` applies every
+    // step exactly once and in order, so the retry is the net's job and not the
+    // loop's, and no failure swallows a later step.
+    let plan = steps(Placement::Center);
+    let mut ran = Vec::new();
+
+    run(&plan, |step| {
+        ran.push(step);
+        Err("nothing can be applied")
+    });
+
+    assert_eq!(ran, plan, "a refused step is not retried, and not skipped");
+    assert_eq!(ran.len(), 2, "both steps of {plan:?} ran");
 }
 
 #[test]
@@ -184,7 +350,7 @@ fn a_rectangle_that_no_longer_lands_on_a_screen_centres_without_a_size() {
     };
     assert_eq!(
         steps(placement(Some(off_screen), &[screen])),
-        [Step::Center]
+        [Step::Center, Step::Show]
     );
     assert_eq!(
         steps(placement(Some(PLAIN), &[screen])),
@@ -194,6 +360,7 @@ fn a_rectangle_that_no_longer_lands_on_a_screen_centres_without_a_size() {
                 height: 800
             },
             Step::Position { x: 100, y: 80 },
+            Step::Show,
         ],
         "and one that still lands is restored"
     );

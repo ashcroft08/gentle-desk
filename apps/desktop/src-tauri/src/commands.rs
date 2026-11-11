@@ -203,6 +203,14 @@ impl Bridge {
     /// exist right now: slice 1's rule decides (`app_config::placement`), and the
     /// window module runs the calls that answer it. Only the setup step has the
     /// window, so it runs there, once, before the page is up.
+    ///
+    /// The window is created hidden (`tauri.conf.json`), so this is also the step
+    /// that shows it: `window::place` ends by showing a window that is still
+    /// hidden, whatever the config said or whichever step failed. A config that
+    /// could not be read is no stored state (`config_value` answers the document
+    /// the run holds, with no `window`), which centres and shows. A run with no
+    /// main window has nothing that could stay hidden, which is the one path that
+    /// returns before the show - and it has no window to show.
     pub fn place_window(&self, app: &AppHandle<tauri::Wry>) {
         let Some(main) = app.get_webview_window("main") else {
             return;
