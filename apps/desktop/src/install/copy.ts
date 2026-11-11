@@ -25,3 +25,17 @@ export const DONE = 'gentle-shell was installed. Check again to continue.'
 export const FAILED_TITLE = 'The install did not finish'
 export const FAILED_HINT =
   'If npm could not be found, install Node.js (nodejs.org), then press Install again.'
+
+export const PROGRESS = 'Installing gentle-shell'
+/**
+ * How long the wait has lasted, counted here because npm reports nothing while
+ * it works: a number the screen can stand behind, where a percentage would be a
+ * guess. Spoken the way the rest of the copy is, in a minute and its seconds.
+ */
+export function elapsed(seconds: number): string {
+  const minutes = Math.floor(seconds / 60)
+  const rest = seconds % 60
+  if (minutes === 0) return `${rest} s elapsed.`
+  if (rest === 0) return `${minutes} min elapsed.`
+  return `${minutes} min ${rest} s elapsed.`
+}
