@@ -41,6 +41,15 @@
         "headerImage": "installer/header.bmp",
         "sidebarImage": "installer/sidebar.bmp"
       }
+    },
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "PENDING_KEY",
+      "endpoints": [
+        "https://github.com/ashcroft08/gentle-desk/releases/latest/download/latest.json"
+      ]
     }
   }
 }

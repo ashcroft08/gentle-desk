@@ -1,6 +1,12 @@
 {
   "identifier": "default",
-  "description": "Default capability for the main window (core built-ins only).",
-  "windows": ["main"],
-  "permissions": ["core:default"]
+  "description": "Default capability for the main window: core built-ins, the updater it checks with, and the restart that follows an install.",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:default",
+    "updater:default",
+    "process:allow-restart"
+  ]
 }

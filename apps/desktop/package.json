@@ -30,6 +30,8 @@
   "dependencies": {
     "@internationalized/date": "^3.12.4",
     "@tauri-apps/api": "^2.12.4",
+    "@tauri-apps/plugin-process": "^2.4.0",
+    "@tauri-apps/plugin-updater": "^2.14.1",
     "bits-ui": "^2.20.6",
     "dompurify": "^3.4.17",
     "marked": "^18.2.0"
