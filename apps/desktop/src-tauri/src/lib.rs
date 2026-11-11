@@ -31,6 +31,7 @@ pub mod shell_install;
 pub mod state_view;
 pub mod theme;
 pub mod view;
+pub mod window;
 pub mod workspace;
 pub mod workspace_add;
 pub mod workspace_commands;
@@ -116,6 +117,11 @@ pub fn run() {
             // has: this is the one place the child events are armed. The pump's
             // threads start the first time the executor builds its host.
             app.state::<Bridge>().arm_events(app.handle());
+            // Where the window opens: the stored rectangle when it still lands on
+            // a screen the machine reports right now, the centre otherwise. Only
+            // this step has the window and its screens, so it runs here, before
+            // anything is drawn.
+            app.state::<Bridge>().place_window(app.handle());
             // The window's own chrome (the native title bar) follows the theme
             // of this run from the first frame; only this step has the window.
             app.state::<Bridge>().arm_window_theme(app.handle());

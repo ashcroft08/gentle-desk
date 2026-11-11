@@ -15,6 +15,8 @@ use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
+use crate::window::WindowRecorder;
+
 /// What each step of a close gets before the shutdown goes on without it.
 ///
 /// The numbers come from what the iced shell did, made finite: its child stop was
@@ -52,6 +54,17 @@ impl Default for Deadlines {
     }
 }
 
+/// What recording where and how big the window was gets before the shutdown goes
+/// on without it.
+///
+/// Its own budget, and the shortest of the steps: reading five numbers off a
+/// window that is still up is a handful of quick calls, and a window that is
+/// already gone answers with an error at once. A window manager that does not
+/// answer at all costs this, and the close then goes on without the state: the
+/// file keeps what it last held, which is worth more than an app that will not
+/// close.
+pub const WINDOW_SAVE: Duration = Duration::from_secs(2);
+
 /// The steps of a close, in the order [`CloseFlow`] runs them. The real ones are
 /// [`super::BridgeSteps`]; a test records them.
 pub trait CloseSteps: Send + Sync {
@@ -75,10 +88,15 @@ pub trait CloseSteps: Send + Sync {
     fn exit(&self);
 }
 
-/// The close of one run: the steps, their deadlines, and the one-shot gate.
+/// The close of one run: the steps, their deadlines, the window, and the
+/// one-shot gate.
 pub struct CloseFlow {
     steps: Arc<dyn CloseSteps>,
     deadlines: Deadlines,
+    /// The window of this run, when it has one. The record of it is a step of its
+    /// own ([`WINDOW_SAVE`]) and runs before the config flush, so the state on the
+    /// disk is the state of this close.
+    window: Option<Arc<dyn WindowRecorder>>,
     started: AtomicBool,
 }
 
@@ -87,7 +105,18 @@ impl CloseFlow {
         Self {
             steps,
             deadlines,
+            window: None,
             started: AtomicBool::new(false),
+        }
+    }
+
+    /// The same close with the window of this run, so where it was and how big it
+    /// was reaches the config before the flush writes it. A close that owns no
+    /// window (a test, or a run that could not get one) records nothing.
+    pub fn with_window(self, window: Arc<dyn WindowRecorder>) -> Self {
+        Self {
+            window: Some(window),
+            ..self
         }
     }
 
@@ -100,21 +129,26 @@ impl CloseFlow {
         }
         let steps = Arc::clone(&self.steps);
         let deadlines = self.deadlines;
+        let window = self.window.clone();
         let spawned = thread::Builder::new()
             .name("app-close".to_owned())
-            .spawn(move || shutdown(steps, deadlines));
+            .spawn(move || shutdown(steps, deadlines, window));
         if let Err(error) = spawned {
             // A window whose close is prevented must still be closeable: with no
             // thread to run them, the same steps run here, bounded as always.
             eprintln!("close: no thread for the shutdown ({error}); running it here");
-            shutdown(Arc::clone(&self.steps), self.deadlines);
+            shutdown(Arc::clone(&self.steps), self.deadlines, self.window.clone());
         }
         true
     }
 }
 
 /// The shutdown itself: every step in order, each bounded, then the exit.
-fn shutdown(steps: Arc<dyn CloseSteps>, deadlines: Deadlines) {
+fn shutdown(
+    steps: Arc<dyn CloseSteps>,
+    deadlines: Deadlines,
+    window: Option<Arc<dyn WindowRecorder>>,
+) {
     // First, so nothing new is started while the rest runs.
     steps.stop_work();
     let child_steps = Arc::clone(&steps);
@@ -133,6 +167,11 @@ fn shutdown(steps: Arc<dyn CloseSteps>, deadlines: Deadlines) {
     });
     let cache_steps = Arc::clone(&steps);
     bounded("cache", deadlines.cache, move || cache_steps.flush_cache());
+    // Before the config flush, so what it writes is on the disk before the
+    // process goes away. Skipped for a close that owns no window.
+    if let Some(window) = window {
+        bounded("window", WINDOW_SAVE, move || window.record());
+    }
     let config_steps = Arc::clone(&steps);
     let config_budget = deadlines.config;
     bounded("config", config_budget, move || {

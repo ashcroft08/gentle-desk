@@ -10,6 +10,7 @@ use gentle_backend::home::HomeChoice;
 
 use super::super::config::{AppConfig, WorkspaceEntry, CONFIG_VERSION};
 use super::super::theme::Theme;
+use super::super::window::WindowState;
 use super::ConfigProblem;
 
 /// The document as this app writes it: the version is always
@@ -22,6 +23,12 @@ struct DocumentRef<'a> {
     /// welcome screen stays byte-for-byte what older builds wrote.
     #[serde(skip_serializing_if = "Option::is_none")]
     shell_home: Option<HomeChoice>,
+    /// How the window was closed, written only once a close recorded it, for the
+    /// same reason: a run that never closed a window writes the document older
+    /// builds wrote. It reads back leniently through the field's own
+    /// deserializer, like the theme and the home.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    window: Option<WindowState>,
     workspaces: &'a [WorkspaceEntry],
 }
 
@@ -31,6 +38,7 @@ pub(super) fn bytes(config: &AppConfig) -> std::io::Result<Vec<u8>> {
         version: CONFIG_VERSION,
         theme: config.theme,
         shell_home: config.shell_home,
+        window: config.window,
         workspaces: &config.workspaces,
     };
     serde_json::to_vec(&document)

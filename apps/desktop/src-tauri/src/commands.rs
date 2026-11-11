@@ -31,6 +31,7 @@ use crate::picker::{FolderPicker, NativeFolderPicker};
 use crate::sessions::{startup, SessionsService};
 use crate::shell_install::{CommandInstaller, Installer};
 use crate::theme::SystemWindowTheme;
+use crate::window::{self, SystemWindowRecorder};
 use crate::workspace::{self, WorkspaceAction};
 
 /// Everything the bridge owns and hands to the worker threads: the state, the
@@ -198,6 +199,18 @@ impl Bridge {
         self.holder.apply_window_theme();
     }
 
+    /// Where the window opens, from the config of this run and the screens that
+    /// exist right now: slice 1's rule decides (`app_config::placement`), and the
+    /// window module runs the calls that answer it. Only the setup step has the
+    /// window, so it runs there, once, before the page is up.
+    pub fn place_window(&self, app: &AppHandle<tauri::Wry>) {
+        let Some(main) = app.get_webview_window("main") else {
+            return;
+        };
+        let stored = self.holder.config_value().window;
+        window::place(&main, stored, &window::screens(&main));
+    }
+
     /// The close of this run, armed once at startup. The exit is the app's own
     /// (`AppHandle::exit`), kept behind a closure so `close` names no Tauri type
     /// and a test can run the same steps with a flag. This is the only place the
@@ -224,7 +237,17 @@ impl Bridge {
         // The watcher and the safety net stop before the cache write: a batch
         // must not ask for a pass after the last state was written.
         .with_sessions(Arc::clone(&self.sessions));
+        // Where and how big the window was is a step of the close of its own,
+        // before the config flush: only this arm has the window, and a run
+        // without one closes without recording anything.
         let flow = CloseFlow::new(Arc::new(steps), close::Deadlines::default());
+        let flow = match app.get_webview_window("main") {
+            Some(main) => flow.with_window(Arc::new(SystemWindowRecorder::new(
+                main,
+                Arc::clone(&self.holder),
+            ))),
+            None => flow,
+        };
         *lock(&self.close) = Some(Arc::new(flow));
     }
 
