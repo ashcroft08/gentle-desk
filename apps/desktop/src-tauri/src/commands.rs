@@ -400,7 +400,7 @@ impl Bridge {
     /// folded or opened here either, so nothing queues behind a window that is
     /// going away. The executor has the same gate for the commands it runs; this
     /// one stops the work before it is even folded.
-    fn accepting_work(&self) -> Result<(), String> {
+    pub(crate) fn accepting_work(&self) -> Result<(), String> {
         if self.executor.is_closed() {
             return Err(CLOSING.to_owned());
         }
@@ -503,7 +503,7 @@ fn push_to(app: &AppHandle<tauri::Wry>) -> Push {
 
 /// The one push of the bridge: the typed event the web side listens on, the
 /// same payload type the command returns.
-fn emit_state(app: &AppHandle<tauri::Wry>, view: &ViewState) -> Result<(), String> {
+pub(crate) fn emit_state(app: &AppHandle<tauri::Wry>, view: &ViewState) -> Result<(), String> {
     StateChanged(view.clone())
         .emit(app)
         .map_err(|error| error.to_string())

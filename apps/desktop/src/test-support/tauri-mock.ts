@@ -153,6 +153,7 @@ export function viewState(overrides: Partial<ViewState_Serialize> = {}): ViewSta
     fatal: null,
     config_notice: null,
     workspace_notice: null,
+    sessions_notice: null,
     ...overrides,
   }
 }
@@ -253,9 +254,6 @@ export function workspaceRow(
 }
 
 /** One window page, as `sessions_window` answers it. */
-export function sessionsWindow(
-  total: number,
-  rows: SessionTreeRow_Serialize[],
-): SessionsWindow_Serialize {
+export function sessionsWindow(total: number, rows: SessionTreeRow_Serialize[]): SessionsWindow_Serialize {
   return { total, rows }
 }

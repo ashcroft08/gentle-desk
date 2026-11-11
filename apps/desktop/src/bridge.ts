@@ -54,6 +54,21 @@ export async function openLink(url: string): Promise<void> {
 }
 
 /**
+ * Renames one chat (T2): the row sends the session path it was given and the name
+ * the user typed in its title, and Rust appends it to the session file. A
+ * refused rename - a chat that is working, a blank name, a file the disk would
+ * not take - is not thrown back at the view: the next push carries the reason in
+ * `ViewState.sessions_notice`.
+ */
+export async function renameSession(sessionId: string, name: string): Promise<void> {
+  try {
+    await commands.renameSession(sessionId, name)
+  } catch {
+    // The push carries the reason; a failed call leaves the title as it was.
+  }
+}
+
+/**
  * "Create a new folder": Rust validates the name and then asks for the parent
  * folder, so the name can sit behind a picker for minutes; the caller shows a
  * busy state meanwhile. A refusal is not thrown back at the view either: the

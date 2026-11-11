@@ -4,7 +4,7 @@
   // footer's theme control (the v1 Appearance setting).
   // It owns the only view-local selection this slice needs (P5): the workspace
   // row the user clicked last, and the chat row clicked while Rust catches up.
-  import { dispatchIntent } from '../bridge'
+  import { dispatchIntent, renameSession } from '../bridge'
   import { workspacePathOfChat, type ChatRow, type WorkspaceRow } from '../sessions/rows'
   import { createSessionsView } from '../sessions/view'
   import type { Viewport } from '../sessions/window'
@@ -85,6 +85,17 @@
     void dispatchIntent({ type: 'NewChatInWorkspace', data: { path } })
   }
 
+  /**
+   * The name a row's inline input committed (T2): Rust appends it to the chat's
+   * session file and asks for the pass that reads it back, so the row and the
+   * header carry the new title on the next push. A refusal reaches the user as
+   * `sessions_notice`, drawn under the two lines above the tree.
+   */
+  function rename(row: ChatRow, name: string): void {
+    clickedChat = row.id
+    void renameSession(row.id, name)
+  }
+
   function newSession(): void {
     if (currentPath !== null) newChatAt(currentPath)
   }
@@ -102,6 +113,7 @@
   <SidebarNotices
     configNotice={model.view?.config_notice ?? null}
     workspaceNotice={model.view?.workspace_notice ?? null}
+    sessionsNotice={model.view?.sessions_notice ?? null}
   />
   {#if reading !== null}
     <p class="gh" role="status">{reading}</p>
@@ -124,6 +136,7 @@
       onToggle={toggle}
       onNewChat={newChatAt}
       onOpen={open}
+      onRename={rename}
     />
   {/if}
   <!-- The footer's theme control (01a): the v1 Appearance setting, drawn

@@ -11,6 +11,7 @@ const NAMES: IconName[] = [
   'folder-open',
   'folder-plus',
   'circle-plus',
+  'more',
 ]
 
 describe('Icon', () => {

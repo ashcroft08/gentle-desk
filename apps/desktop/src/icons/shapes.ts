@@ -39,6 +39,8 @@ export type IconName =
   | 'folder-open'
   | 'folder-plus'
   | 'circle-plus'
+  // The chat row's actions menu (T2), 01a's `i-more` symbol.
+  | 'more'
   | 'send'
   | 'stop'
   | 'restart'
@@ -61,6 +63,8 @@ export const ICON_SHAPES: Record<IconName, IconShape[]> = {
   'folder-open': [path(FOLDER_OPEN)],
   'folder-plus': [path('M12 10v6'), path('M9 13h6'), path(FOLDER)],
   'circle-plus': [circle(12, 12, 10), path('M8 12h8'), path('M12 8v8')],
+  // The row's "..." menu (T2): the artboard's `i-more` symbol, three dots.
+  more: [circle(12, 12, 1), circle(19, 12, 1), circle(5, 12, 1)],
   // The composer's two actions and the restart notice's: the artboard's own
   // paths (01a, the `i-send`, `i-stop`, `i-restart` and `i-x` symbols).
   send: [path('m5 12 7-7 7 7'), path('M12 19V5')],

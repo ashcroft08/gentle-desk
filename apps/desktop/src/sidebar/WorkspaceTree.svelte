@@ -32,6 +32,7 @@
     onToggle,
     onNewChat,
     onOpen,
+    onRename,
   }: {
     rows?: TreeRow[]
     /** How many rows the whole tree has, headers included. */
@@ -45,6 +46,8 @@
     onToggle: (row: WorkspaceRow) => void
     onNewChat: (path: string) => void
     onOpen: (row: ChatRowData) => void
+    /** The name a chat row's inline input committed, to send as the rename. */
+    onRename: (row: ChatRowData, name: string) => void
   } = $props()
 
   /** The scroll container: it is what the viewport is measured from. */
@@ -169,6 +172,7 @@
           onOpen={onOpen}
           onHover={(key) => (hoveredKey = key)}
           onKeydown={keydown}
+          onRename={onRename}
         />
       {/if}
     {/each}
