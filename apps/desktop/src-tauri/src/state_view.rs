@@ -34,6 +34,8 @@ pub struct ShellParts<'a> {
     pub config_notice: Option<String>,
     /// Why the last workspace action was refused.
     pub workspace_notice: Option<String>,
+    /// Why the last session action was refused (T2's rename).
+    pub sessions_notice: Option<String>,
     /// The run's one fatal launcher failure.
     pub fatal: Option<String>,
     /// The theme this run holds, as the app config remembers it.
@@ -51,6 +53,7 @@ pub fn view_state(state: &AppState, sessions_revision: u32, shell: ShellParts<'_
     let ShellParts {
         config_notice,
         workspace_notice,
+        sessions_notice,
         fatal,
         theme,
         shell,
@@ -91,6 +94,7 @@ pub fn view_state(state: &AppState, sessions_revision: u32, shell: ShellParts<'_
         images_notice: images.notice(),
         config_notice,
         workspace_notice,
+        sessions_notice,
         fatal,
     }
 }

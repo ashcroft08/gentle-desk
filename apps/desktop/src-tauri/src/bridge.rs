@@ -43,6 +43,7 @@ mod config;
 mod fatal;
 mod images;
 mod notice;
+mod session_notice;
 mod shell;
 mod theme;
 
@@ -97,6 +98,10 @@ pub struct AppStateHolder {
     /// carries it: a shell-owned line, because no reducer path records one
     /// (`bridge::notice`).
     workspace_notice: Mutex<Option<String>>,
+    /// What the last session action refused (a rename), as
+    /// `ViewState.sessions_notice` carries it: the same kind of shell-owned line
+    /// (`bridge::session_notice`).
+    sessions_notice: Mutex<Option<String>>,
     /// The images each chat holds: attached in the composer, read here, taken by
     /// that chat's send and served back as previews (`bridge::images`).
     images: Images,
@@ -165,9 +170,13 @@ impl AppStateHolder {
     /// The slice the web side holds right now, without folding anything: the
     /// answer of `get_view_state`, the first read a sidebar makes. Reading never
     /// emits, so a webview that missed the pushes still gets the whole slice.
+    ///
+    /// The two shell-owned notice lines are read before the state lock, as the
+    /// config notice is, so no path holds the state and a notice at once.
     pub fn view(&self) -> ViewState {
         let notice = self.config_notice();
         let workspace_notice = self.workspace_notice();
+        let sessions_notice = self.sessions_notice();
         let fatal = self.fatal();
         let theme = self.theme_value();
         let shell = self.shell_view();
@@ -177,12 +186,21 @@ impl AppStateHolder {
             ShellParts {
                 config_notice: notice,
                 workspace_notice,
+                sessions_notice,
                 fatal,
                 theme,
                 shell,
                 images: &self.images,
             },
         )
+    }
+
+    /// The activity the reducer holds for the chat stored at `session` (S4): the
+    /// chat of a session file it has never heard of is idle. Read by the rename
+    /// command, which must not append to a file whose child is mid-turn
+    /// (`chat_rename`).
+    pub fn session_activity(&self, session: &str) -> gentle_app::ChatActivity {
+        lock(&self.app).activity_of_session(session)
     }
 
     /// One window of the flattened workspace tree as the state holds it NOW:
@@ -214,6 +232,7 @@ impl AppStateHolder {
         // refresh pass folds back into this same holder.
         let notice = self.config_notice();
         let workspace_notice = self.workspace_notice();
+        let sessions_notice = self.sessions_notice();
         let fatal = self.fatal();
         let theme = self.theme_value();
         let shell = self.shell_view();
@@ -232,6 +251,7 @@ impl AppStateHolder {
                 ShellParts {
                     config_notice: notice,
                     workspace_notice,
+                    sessions_notice,
                     fatal,
                     theme,
                     shell,

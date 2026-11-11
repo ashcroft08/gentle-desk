@@ -631,6 +631,13 @@ pub struct ViewState {
     /// config's: the config notice says what became of the file, this one says
     /// what the user asked for that could not be done.
     pub workspace_notice: Option<String>,
+    /// Why the last session action was refused, as one line of plain text: a chat
+    /// that is working (its child is appending to the same session file), a name
+    /// that is empty or only spaces, or a session file the disk would not take.
+    /// `None` when nothing was refused, and cleared by the next session action
+    /// that works. A shell-owned line, like
+    /// [`workspace_notice`](Self::workspace_notice): no reducer path records one.
+    pub sessions_notice: Option<String>,
 }
 
 /// The state slice after each dispatch, emitted to the web side (typed

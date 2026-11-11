@@ -40,7 +40,7 @@ CHOSEN (2026-11-11): (a), the derived workspace row disappears with a notice.
 ## Tasks
 
 - [x] T1 (S2, D1) Live probe: append a `session_info` line to a chat's `.jsonl` while a child holds it open and check that pi keeps the chat usable and shows the new name -- route: design -- DONE 2026-11-11, PASS 5/5 (Log L4)
-- [ ] T2 (S2, D1, S4) Rename slice: intent, inline row title, the write chosen by D1, `bindings.ts` plus drift guard -- route: design
+- [x] T2 (S2, D1, S4) Rename slice: intent, inline row title, the write chosen by D1, `bindings.ts` plus drift guard -- route: design -- DONE 2026-11-11, PR pending (Log L5)
 - [ ] T3 (S3, D2, S4) Delete slice: row menu entry, confirm modal naming the real path, the live-child rule of D2, file removal -- route: design
 - [ ] T4 (S5, D3) Workspace side-effect and the notices it carries -- route: design
 
@@ -50,3 +50,4 @@ CHOSEN (2026-11-11): (a), the derived workspace row disappears with a notice.
 - L2: 2026-11-11, the user approved the design-first plan: "dale asi".
 - L3: 2026-11-11, the user chose D1(a), D2(b) and D3(a) (all three the RECOMMENDED options).
 - L4: 2026-11-11, T1 live probe PASSED 5/5 (`target/ui-check/probe-rename.ps1`, isolated home in target/probe-home, since deleted): a minimal synthetic session loaded by the real gentle-shell child with `--session` was appended externally with a `session_info` line while the child held it open; no file-sharing violation, the child stayed alive and answered `get_state` over RPC after the append, and the last `session_info.name` reads back exactly. Limits: the session carried no messages and no model turn ran, so "usable" here means the RPC child is alive and answering; pi also accepted a session file the app wrote, which is worth knowing.
+- L5: 2026-11-11, T2 implemented on feat/session-rename: the backend append (one write, no create, separator guard, JSON-escaped name), the `rename_session` tauri command refusing while the chat's activity is `Working` (mirroring D2(b)), the drawn per-row menu with inline rename (Enter commits, Escape and blur cancel; blur cancels instead of the board's commit so a stray click cannot rename), Delete drawn disabled, `ViewState.sessions_notice` added and bindings regenerated with the drift guard green. Residual window documented: the working check and the append are not atomic, a far smaller hazard than the turn-length one the rule removes.

@@ -111,6 +111,9 @@ fn the_view_state_slice_has_no_invented_fields() {
             // The shell-owned line a refused workspace action sets: nothing was
             // refused here, so it carries nothing.
             workspace_notice: None,
+            // The same kind of line for a refused session action (T2's rename):
+            // nothing was refused here either.
+            sessions_notice: None,
             // The launcher is resolved on the first command, so a run that has
             // asked for nothing yet has no fatal bar.
             fatal: None,

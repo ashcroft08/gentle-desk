@@ -57,6 +57,15 @@ export const commands = {
 	 */
 	createWorkspace: (name: string) => typedError<ViewState_Serialize, string>(__TAURI_INVOKE("create_workspace", { name })),
 	/**
+	 *  Renames one chat (S4): the row sends the session path it was given and the name
+	 *  typed in its title, and the answer is the slice the sidebar draws.
+	 * 
+	 *  The write happens off the window's thread. A rename that lands asks the session
+	 *  list for the pass that reads the name back, which is what moves the row and the
+	 *  header; a refusal asks for nothing, because no file changed.
+	 */
+	renameSession: (sessionId: string, name: string) => typedError<ViewState_Serialize, string>(__TAURI_INVOKE("rename_session", { sessionId, name })),
+	/**
 	 *  The images a drop attached, as one command: the paths are the files the user
 	 *  dragged, and they come from Tauri's own drop event, because the webview's
 	 *  `File` has no path. Nothing but paths travel up: the shell reads the files,
@@ -1008,6 +1017,15 @@ export type ViewState_Deserialize = {
 	 *  what the user asked for that could not be done.
 	 */
 	workspace_notice?: string | null,
+	/**
+	 *  Why the last session action was refused, as one line of plain text: a chat
+	 *  that is working (its child is appending to the same session file), a name
+	 *  that is empty or only spaces, or a session file the disk would not take.
+	 *  `None` when nothing was refused, and cleared by the next session action
+	 *  that works. A shell-owned line, like
+	 *  [`workspace_notice`](Self::workspace_notice): no reducer path records one.
+	 */
+	sessions_notice?: string | null,
 };
 
 /**
@@ -1135,6 +1153,15 @@ export type ViewState_Serialize = {
 	 *  what the user asked for that could not be done.
 	 */
 	workspace_notice: string | null,
+	/**
+	 *  Why the last session action was refused, as one line of plain text: a chat
+	 *  that is working (its child is appending to the same session file), a name
+	 *  that is empty or only spaces, or a session file the disk would not take.
+	 *  `None` when nothing was refused, and cleared by the next session action
+	 *  that works. A shell-owned line, like
+	 *  [`workspace_notice`](Self::workspace_notice): no reducer path records one.
+	 */
+	sessions_notice: string | null,
 };
 
 /**

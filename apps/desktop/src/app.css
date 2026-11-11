@@ -1091,6 +1091,34 @@ p {
   padding-left: 42px;
 }
 
+/* A chat row keeps room for its own actions icon (T2), as a folder row keeps
+   room for its new-chat icon. */
+.frow .row.chat {
+  padding-right: 30px;
+}
+
+/* The inline rename input (states board, the `.rn` field): the title's own box,
+   so nothing about the row moves while the name is typed. */
+.row .rn {
+  flex: 1;
+  min-width: 0;
+  height: 22px;
+  padding: 0 6px;
+  margin: 0 -6px;
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+}
+
+/* A chat row's actions icon shows while its own row is hovered or holds the
+   keyboard, the same reveal the workspace's new-chat icon has. */
+.frow.chat-row:hover .nc,
+.frow.chat-row:focus-within .nc {
+  opacity: 1;
+}
+
 .frow {
   position: relative;
 }
