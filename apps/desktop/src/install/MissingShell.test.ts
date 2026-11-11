@@ -123,3 +123,71 @@ describe('the missing gentle-shell screen', () => {
     await vi.waitFor(() => expect(intents()).toEqual([{ type: 'CheckShellAgain' }]))
   })
 })
+
+// The wait itself: npm prints nothing while it works, so the screen shows a bar
+// that moves and the seconds it has waited. Neither is a percentage, because
+// nobody here knows one.
+describe('the wait while the install runs', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('shows an indeterminate progress bar, with no value to read', () => {
+    draw({ type: 'Running' })
+
+    const bar = screen.getByRole('progressbar')
+    expect(bar.getAttribute('aria-valuenow')).toBeNull()
+    expect(bar.getAttribute('aria-valuetext')).toBeNull()
+  })
+
+  it('shows no progress bar when the install is not running', () => {
+    const views: InstallView[] = [
+      { type: 'Idle' },
+      { type: 'Done' },
+      { type: 'Failed', data: { message: 'the install ended with exit code 1' } },
+    ]
+
+    for (const view of views) {
+      const { unmount } = draw(view)
+      expect(screen.queryByRole('progressbar')).toBeNull()
+      unmount()
+    }
+  })
+
+  it('counts the seconds waited, so the screen is visibly alive', async () => {
+    draw({ type: 'Running' })
+
+    expect(screen.getByText('0 s elapsed.')).toBeTruthy()
+
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(screen.getByText('1 s elapsed.')).toBeTruthy()
+
+    await vi.advanceTimersByTimeAsync(71_000)
+    expect(screen.getByText('1 min 12 s elapsed.')).toBeTruthy()
+  })
+
+  it('stops counting when the install leaves Running', async () => {
+    const { rerender } = draw({ type: 'Running' })
+    await vi.advanceTimersByTimeAsync(2000)
+
+    await rerender({ install: { type: 'Done' } })
+    expect(screen.queryByText(/elapsed\./)).toBeNull()
+    await vi.advanceTimersByTimeAsync(5000)
+
+    expect(vi.getTimerCount()).toBe(0)
+    expect(screen.getByRole('status').textContent).toContain('gentle-shell was installed')
+  })
+
+  it('stops counting when the screen goes away', async () => {
+    const { unmount } = draw({ type: 'Running' })
+    await vi.advanceTimersByTimeAsync(1000)
+
+    unmount()
+
+    expect(vi.getTimerCount()).toBe(0)
+  })
+})
