@@ -15,7 +15,7 @@ Today every new version is: download the installer, run it. This feature lets th
 ## Tasks
 
 - [ ] T1 (S1, S5, S7) Release side: turn `createUpdaterArtifacts` on from the workflow only with the CI secrets, sign, and attach the `latest.json` manifest to the release.
-- [x] T2 (S1, S2) App side: the plugin, the endpoint in the config, and the check that stays silent while the key is still a placeholder. The real public key is still to come.
+- [x] T2 (S1, S2) App side: the plugin, the endpoint in the config, and the check that stays silent while the key is still a placeholder. The real public key is now in the config.
 - [x] T3 (S2, S3, S4) The notice: a pure state machine with 6 tests and its component with 6 more, wired into App.svelte.
 - [ ] T4 (S4) Real check: publish a version, install the previous one, and watch it offer and install the new one. Owner: the user, because it needs two published releases.
 
@@ -23,3 +23,4 @@ Today every new version is: download the installer, run it. This feature lets th
 
 - L1 (2026-11-11, user): "incluir el plugin de updater de Tauri lo podemos hacer?" and then "continuemos con el updater", after closing 0.1.1 first.
 - L2 (2026-11-11, verification the user asked for): three defects found and handled. A build without the private key failed (S7, createUpdaterArtifacts now off); the app's own relaunch was unreachable on Windows because the plugin exits the process before installing (S4 rewritten, relaunch and the process plugin removed); and the installer grew from about 2.4 MiB to 3.40 MiB with the updater plugin. The silent start with the placeholder key was checked in the built exe: it opens, stays alive and draws no update line.
+- L3 (2026-11-11, user authorized): the user authorized reading C:/Users/josep/.tauri/gentle-desk.key.pub, and that file already holds the base64 form Tauri v2 expects. Only that public value was pasted into the config; the private key and its password never enter the repository.
