@@ -83,7 +83,7 @@ Drag saved image files (png, jpg, jpeg, webp, gif; up to 8 and 64 MB per message
 At the first start the app looks, for existence only and never at the contents, for the folder of your pi (`PI_CODING_AGENT_DIR`, else `~/.pi/agent`) and for the `gentle-shell` launcher:
 
 - **No `gentle-shell` found:** a screen says it is required, shows the command it would run (`npm install -g gentle-pi`) and installs it **only when you press "Install gentle-shell"**. It needs Node and npm. If you close the app while it installs, the install keeps running to the end on its own.
-- **pi found and nothing chosen yet:** a welcome screen asks whether to use your pi ("Use my pi setup", `--link`) or keep gentle shell separate (`--isolated`, `~/.gentle-shell/agent`). The app saves the answer and starts again so it applies at once. The app never edits your pi files.
+- **pi found, nothing chosen yet and `gentle-shell` resolved:** a welcome screen asks whether to use your pi ("Use my pi setup", `--link`) or keep gentle shell separate (`--isolated`, `~/.gentle-shell/agent`). While the launcher is missing the install screen is what you see, and the question comes once it resolves. The app saves the answer and starts again so it applies at once. The app never edits your pi files.
 - **No pi:** the question is skipped and gentle shell runs in its own space.
 
 You can change the choice later with the **My pi / Separate** control in the sidebar footer; it applies after **Restart now**.
