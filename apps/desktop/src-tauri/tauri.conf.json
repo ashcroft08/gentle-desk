@@ -42,5 +42,13 @@
         "sidebarImage": "installer/sidebar.bmp"
       }
     }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDQ0QTY0QkYzNDNDMjY3RTYKUldUbVo4SkQ4MHVtUklzVFA4WnhFYWdNdVNUajZDV3ZjK2FpalQ4aytUWS9XL29MQkVTWWJBcmcK",
+      "endpoints": [
+        "https://github.com/ashcroft08/gentle-desk/releases/latest/download/latest.json"
+      ]
+    }
   }
 }

@@ -19,6 +19,10 @@
   import { visibleNotices } from './notices/visible'
   import Sidebar from './sidebar/Sidebar.svelte'
   import Thread from './thread/Thread.svelte'
+  import type { Update } from '@tauri-apps/plugin-updater'
+  import UpdateNotice from './update/UpdateNotice.svelte'
+  import { downloadAndInstall, findUpdate } from './update/plugin'
+  import { stillIdle, available, downloading, dismissed, failed, ready, type UpdateState } from './update/state'
   import { createThreadView } from './thread/view'
   import MissingShell from './install/MissingShell.svelte'
   import Welcome from './welcome/Welcome.svelte'
@@ -36,6 +40,46 @@
   // Helpers view covers it, so this is what puts them back in the same place.
   let threadScroll = $state(0)
 
+  // The update the plugin handed us, kept out of `$state`: the notice draws the
+  // plain data of `update` and the actions read the object.
+  let pending: Update | null = null
+  let update = $state<UpdateState>(stillIdle())
+
+  /** Asked once, when the window opens: a failure says nothing (S2). */
+  $effect(() => {
+    void (async () => {
+      const found = await findUpdate()
+      if (found === null) return
+      pending = found
+      update = available(found.version)
+    })()
+  })
+
+  async function install(): Promise<void> {
+    if (pending === null || update.kind !== 'available') return
+    update = downloading(update)
+    try {
+      await downloadAndInstall(pending, (done, total) => {
+        update = downloading(update, done, total ?? undefined)
+      })
+      // On Windows the plugin closes the app before this line is ever reached.
+      update = ready(update)
+    } catch (error) {
+      update = failed(update, error instanceof Error ? error.message : String(error))
+    }
+  }
+
+  async function retry(): Promise<void> {
+    const found = pending ?? (await findUpdate())
+    if (found === null) {
+      update = failed(update, 'no newer version was found')
+      return
+    }
+    pending = found
+    update = available(found.version)
+    await install()
+  }
+
   // One app, one pair of stores: leaving the shell ends the event listeners.
   $effect(() => () => {
     thread.dispose()
@@ -43,6 +87,12 @@
   })
 </script>
 
+<UpdateNotice
+  state={update}
+  onInstall={() => void install()}
+  onRetry={() => void retry()}
+  onDismiss={() => (update = dismissed(update))}
+/>
 {#if chat.shell.ask}
   <!-- The first-start question comes first: someone who already has pi must be
        recognised for what they have, not told that an agent is missing. The ask

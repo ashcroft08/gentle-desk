@@ -19,6 +19,48 @@ body {
   margin: 0;
 }
 
+/* The update line: one row above everything, quiet until there is something to
+   say, with its action and its progress. */
+.update {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  font-size: 13px;
+}
+
+.update-m {
+  flex: 1;
+}
+
+.update-bar {
+  width: 160px;
+  height: 6px;
+}
+
+.update-go,
+.update-quiet {
+  border-radius: 8px;
+  padding: 3px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.update-go {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--bg);
+}
+
+.update-quiet {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+}
+
 /* The mount point is the body's only child and the parent of the fatal bar and
    of `.app`: a column, so the two split the window between them instead of the
    bar pushing the composer out of it. The flex column has to be HERE, on the

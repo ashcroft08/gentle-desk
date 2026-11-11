@@ -76,6 +76,9 @@ pub fn run() {
         .expect("failed to export TypeScript bindings to ../src/contract");
 
     tauri::Builder::default()
+        // The updater, which the app side reads from the web (see `update/`). On
+        // Windows it closes the app itself to hand over to the installer.
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(Bridge::new())
         // The thumbnails the composer and the thread draw: the shell's own
         // scheme, served from the files the user dropped. An `<img>` loads it

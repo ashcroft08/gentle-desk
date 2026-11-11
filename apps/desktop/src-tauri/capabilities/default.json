@@ -1,6 +1,11 @@
 {
   "identifier": "default",
-  "description": "Default capability for the main window (core built-ins only).",
-  "windows": ["main"],
-  "permissions": ["core:default"]
+  "description": "Default capability for the main window: core built-ins and the updater it checks with.",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:default",
+    "updater:default"
+  ]
 }

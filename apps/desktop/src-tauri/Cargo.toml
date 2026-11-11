@@ -48,6 +48,7 @@ gentle-runtime = { path = "../../../crates/runtime" }
 # comctl32 v6's TaskDialogIndirect into a test binary, so neither is on.
 rfd = { version = "0.17", default-features = false }
 tauri = { version = "2", default-features = false, features = ["wry"] }
+tauri-plugin-updater = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 specta = { version = "2.0.0-rc.26", features = ["derive"] }
