@@ -80,9 +80,9 @@ Drag saved image files (png, jpg, jpeg, webp, gif; up to 8 and 64 MB per message
   </tr>
 </table>
 
-At the first start the app looks, for existence only and never at the contents, for the folder of your pi (`PI_CODING_AGENT_DIR`, else `~/.pi/agent`) and for the `gentle-shell` launcher:
+At the first start the app looks, for existence only and never at the contents, for the folder of your pi (`PI_CODING_AGENT_DIR`, else `~/.pi/agent`) and for the `gentle-shell` launcher. The launcher is looked for in this order: `GENTLE_SHELL_BIN` when it is set, then the folders of `PATH`, then the npm global folder (`%APPDATA%\npm` on Windows, where `npm install -g` puts `gentle-shell.cmd`).
 
-- **No `gentle-shell` found:** a screen says it is required, shows the command it would run (`npm install -g gentle-pi`) and installs it **only when you press "Install gentle-shell"**. It needs Node and npm. If you close the app while it installs, the install keeps running to the end on its own.
+- **No `gentle-shell` found:** a screen says it is required, says where it looked (the folders of `PATH` and the npm global folder, `%APPDATA%\npm`), shows the command it would run (`npm install -g gentle-pi`) and installs it **only when you press "Install gentle-shell"**. It needs Node and npm. If you close the app while it installs, the install keeps running to the end on its own.
 - **pi found, nothing chosen yet and `gentle-shell` resolved:** a welcome screen asks whether to use your pi ("Use my pi setup", `--link`) or keep gentle shell separate (`--isolated`, `~/.gentle-shell/agent`). While the launcher is missing the install screen is what you see, and the question comes once it resolves. The app saves the answer and starts again so it applies at once. The app never edits your pi files.
 - **No pi:** the question is skipped and gentle shell runs in its own space.
 
@@ -141,7 +141,8 @@ The icon set under `apps/desktop/src-tauri/icons/` is generated from `apps/deskt
 with `npx tauri icon app-icon.png -o src-tauri/icons`.
 
 To run the app against the stand-in shell instead of a real gentle-shell, set
-`GENTLE_SHELL_BIN` to `tools/fake-gentle-shell/fake.mjs`.
+`GENTLE_SHELL_BIN` to `tools/fake-gentle-shell/fake.mjs`. It wins over both the
+`PATH` folders and the npm global folder.
 
 The fixtures under `crates/gentle-core/tests/fixtures/` are recorded RPC streams copied from the reference TypeScript app (`gentle-shell-desktop`).
 

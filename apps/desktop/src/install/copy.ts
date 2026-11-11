@@ -9,6 +9,8 @@ export const TITLE = 'gentle-shell is not installed'
 export const WHY =
   'This app talks to your models through gentle-shell, and it was not found on this machine. Without it nothing here can work.'
 export const COMMAND_INTRO = 'Installing it runs this command:'
+export const LOOKED_IN =
+  'It looked for gentle-shell in the folders of PATH and in the npm global folder (%APPDATA%\\npm). GENTLE_SHELL_BIN can point at it where it lives.'
 export const COMMAND = 'npm install -g gentle-pi'
 export const INSTALLS =
   'This installs the gentle-shell program only, about 250 MB, in the npm global folder. It makes no place for chats or sign-ins.'
