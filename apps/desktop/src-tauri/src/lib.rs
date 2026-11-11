@@ -120,7 +120,8 @@ pub fn run() {
             // Where the window opens: the stored rectangle when it still lands on
             // a screen the machine reports right now, the centre otherwise. Only
             // this step has the window and its screens, so it runs here, before
-            // anything is drawn.
+            // anything is drawn. The window is created hidden (`tauri.conf.json`),
+            // so this is also the step that shows it - last, once it is placed.
             app.state::<Bridge>().place_window(app.handle());
             // The window's own chrome (the native title bar) follows the theme
             // of this run from the first frame; only this step has the window.
