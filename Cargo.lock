@@ -1005,10 +1005,12 @@ name = "gentle-desk-app"
 version = "0.1.6"
 dependencies = [
  "arboard",
+ "base64 0.21.7",
  "gentle-app",
  "gentle-backend",
  "gentle-core",
  "gentle-runtime",
+ "minisign-verify",
  "opener",
  "rfd",
  "serde",
