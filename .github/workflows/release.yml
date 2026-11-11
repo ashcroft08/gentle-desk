@@ -8,9 +8,13 @@ name: release
 #   - by hand (workflow_dispatch): builds the installer and keeps it as a run
 #     artifact only. Nothing is published.
 #
-# Signing is not wired yet: it needs the SignPath application to be approved
-# first, and the org, project and policy identifiers it hands out. Until then the
-# installer is unsigned and Windows shows its warning, as the README says.
+# Update signing (the Tauri updater's own key pair, not Windows code signing):
+# when the TAURI_SIGNING_PRIVATE_KEY secret has content, the build also signs the
+# installer for the in-app updater and a latest.json manifest is produced next to
+# it. With no key the build is the plain unsigned installer, exactly as before.
+#
+# Windows code signing through SignPath is not wired yet: it needs the
+# application to be approved first and the identifiers it hands out.
 
 on:
   push:
@@ -23,6 +27,10 @@ permissions:
 jobs:
   windows-installer:
     runs-on: windows-latest
+    env:
+      # Empty when the secret is missing or empty: that is how "no key" is told.
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
     steps:
       - uses: actions/checkout@v6
 
@@ -35,33 +43,81 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
-      - name: Build the frontend and the installer
-        working-directory: apps/desktop
-        run: |
-          npm ci
-          npx tauri build
-
-      - name: Name the installer
-        id: artifact
+      - name: Check the tag names the version of the app
+        if: startsWith(github.ref, 'refs/tags/')
         shell: pwsh
         run: |
-          $file = Get-ChildItem -Path target/release/bundle/nsis/*.exe | Select-Object -First 1
-          if (-not $file) { throw "no installer was produced" }
-          "path=$($file.FullName)" >> $env:GITHUB_OUTPUT
-          "name=$($file.Name)" >> $env:GITHUB_OUTPUT
-          $hash = (Get-FileHash -Algorithm SHA256 $file.FullName).Hash.ToLower()
-          "$hash  $($file.Name)" | Set-Content -Path "$($file.FullName).sha256" -Encoding ascii
+          $version = (Get-Content apps/desktop/src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
+          if ("${{ github.ref_name }}" -ne "v$version") {
+            throw "the tag is ${{ github.ref_name }} but the app version is $version"
+          }
+
+      # The updater artifacts need the private key, so asking for them without
+      # one would fail the build. The setting goes in through a config FILE:
+      # PowerShell mangles inline JSON when it hands it to npx.
+      - name: Build the frontend and the installer
+        working-directory: apps/desktop
+        shell: pwsh
+        run: |
+          npm ci
+          if ($env:TAURI_SIGNING_PRIVATE_KEY) {
+            Write-Host "update signing: ON"
+            $config = Join-Path $env:RUNNER_TEMP "updater.json"
+            '{"bundle":{"createUpdaterArtifacts":true}}' | Set-Content -Path $config -Encoding ascii
+            npx tauri build --config $config
+          } else {
+            Write-Host "update signing: OFF (no TAURI_SIGNING_PRIVATE_KEY)"
+            npx tauri build
+          }
+          if ($LASTEXITCODE -ne 0) { throw "tauri build failed ($LASTEXITCODE)" }
+
+      # GitHub renames spaces in an asset's name to dots, so the files are staged
+      # with the dotted name here and the manifest points at exactly that name.
+      - name: Stage the release files
+        id: stage
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem -Path target/release/bundle/nsis/*.exe | Select-Object -First 1
+          if (-not $exe) { throw "no installer was produced" }
+          $dotted = $exe.Name -replace ' ', '.'
+          $stage = Join-Path $env:RUNNER_TEMP "stage"
+          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+          Copy-Item $exe.FullName (Join-Path $stage $dotted)
+
+          $hash = (Get-FileHash -Algorithm SHA256 (Join-Path $stage $dotted)).Hash.ToLower()
+          "$hash  $dotted" | Set-Content -Path (Join-Path $stage "$dotted.sha256") -Encoding ascii
           "sha256=$hash" >> $env:GITHUB_OUTPUT
+
+          $sigSource = "$($exe.FullName).sig"
+          if (Test-Path $sigSource) {
+            Copy-Item $sigSource (Join-Path $stage "$dotted.sig")
+            $version = (Get-Content apps/desktop/src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
+            $manifest = [ordered]@{
+              version  = $version
+              notes    = "Gentle Shell Desktop $version"
+              pub_date = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+              platforms = [ordered]@{
+                'windows-x86_64' = [ordered]@{
+                  signature = (Get-Content $sigSource -Raw).Trim()
+                  url       = "https://github.com/${{ github.repository }}/releases/download/v$version/$dotted"
+                }
+              }
+            }
+            $manifest | ConvertTo-Json -Depth 5 | Set-Content -Path (Join-Path $stage "latest.json") -Encoding utf8
+            "signed=true" >> $env:GITHUB_OUTPUT
+          } else {
+            "signed=false" >> $env:GITHUB_OUTPUT
+          }
+          "dir=$stage" >> $env:GITHUB_OUTPUT
+          Get-ChildItem $stage | ForEach-Object { Write-Host "$($_.Name)  $($_.Length) bytes" }
 
       - uses: actions/upload-artifact@v4
         with:
           name: installer-${{ github.sha }}
-          path: |
-            target/release/bundle/nsis/*.exe
-            target/release/bundle/nsis/*.exe.sha256
+          path: ${{ steps.stage.outputs.dir }}
           if-no-files-found: error
 
-      # Only a tag publishes, and only the asset built here for it.
+      # Only a tag publishes, and only the files built here for it.
       - name: Attach the installer to the release
         if: startsWith(github.ref, 'refs/tags/')
         env:
@@ -69,8 +125,9 @@ jobs:
         shell: pwsh
         run: |
           $tag = "${{ github.ref_name }}"
-          $exe = "${{ steps.artifact.outputs.path }}"
-          if (-not (gh release view $tag)) {
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -ne 0) {
             gh release create $tag --title "Gentle Shell Desktop $tag" --notes "Built from ${{ github.sha }} by the release workflow."
           }
-          gh release upload $tag $exe "$exe.sha256" --clobber
+          $files = Get-ChildItem "${{ steps.stage.outputs.dir }}" | ForEach-Object { $_.FullName }
+          gh release upload $tag @files --clobber
