@@ -1,9 +1,12 @@
 <script lang="ts">
   // The screen for a machine with no gentle-shell. It replaces the app, because
   // nothing here can work without it, and it asks for permission: the install
-  // command runs only after the user presses the install button. It follows the
-  // install the button started - running, done or failed - and offers to look
-  // for gentle-shell again, which is how it moves on once it is there.
+  // command runs only after the user presses the install button. It says what
+  // the command installs (the program, with its size) and that where chats and
+  // sign-ins live is the question after it, so the install is not mistaken for
+  // the whole of gentle-shell. It follows the install the button started -
+  // running, done or failed - and offers to look for gentle-shell again, which
+  // is how it moves on once it is there.
   import { dispatchIntent } from '../bridge'
   import type { InstallView } from '../contract/bindings'
   import {
@@ -13,7 +16,9 @@
     DONE,
     FAILED_HINT,
     FAILED_TITLE,
+    HOME,
     INSTALL,
+    INSTALLS,
     RUNNING,
     TITLE,
     WARNING,
@@ -54,6 +59,8 @@
       <h2>{COMMAND_INTRO}</h2>
       <p class="welcome-path">{COMMAND}</p>
     </section>
+    <p class="welcome-intro">{INSTALLS}</p>
+    <p class="welcome-intro">{HOME}</p>
     <p class="welcome-skip">{WARNING}</p>
 
     {#if failure !== null}
