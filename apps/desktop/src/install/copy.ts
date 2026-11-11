@@ -28,6 +28,12 @@ export const FAILED_HINT =
 
 export const PROGRESS = 'Installing gentle-shell'
 /**
+ * The label before npm's own last line, shown while the install runs. What
+ * follows it is npm's text, unchanged: it says what the command is doing, and
+ * nothing here turns it into a percentage or an estimate of how far it is.
+ */
+export const LAST_LINE = 'What npm last printed:'
+/**
  * How long the wait has lasted, counted here because npm reports nothing while
  * it works: a number the screen can stand behind, where a percentage would be a
  * guess. Spoken the way the rest of the copy is, in a minute and its seconds.

@@ -396,7 +396,46 @@ export type ImageView = {
  *  Where installing gentle-shell stands (shell-choice S4). It only leaves `Idle`
  *  when the user gave permission on the permission screen.
  */
-export type InstallView = { type: "Idle" } | { type: "Running" } | { type: "Done" } | 
+export type InstallView = InstallView_Serialize | InstallView_Deserialize;
+
+/**
+ *  Where installing gentle-shell stands (shell-choice S4). It only leaves `Idle`
+ *  when the user gave permission on the permission screen.
+ */
+export type InstallView_Deserialize = { type: "Idle" } | 
+/**
+ *  The install is running. `line` is the last line the command printed, as
+ *  the command printed it (normalised only where npm redraws a line), so the
+ *  screen can say what is happening. `None` until it says anything: nothing
+ *  here turns that line into a percentage or an estimate, because nobody
+ *  knows one.
+ */
+{ type: "Running"; data: {
+	line?: string | null,
+} } | { type: "Done" } | 
+/**
+ *  The install ended badly; `message` is its exit code and the last lines
+ *  of what it printed, bounded.
+ */
+{ type: "Failed"; data: {
+	message: string,
+} };
+
+/**
+ *  Where installing gentle-shell stands (shell-choice S4). It only leaves `Idle`
+ *  when the user gave permission on the permission screen.
+ */
+export type InstallView_Serialize = { type: "Idle" } | 
+/**
+ *  The install is running. `line` is the last line the command printed, as
+ *  the command printed it (normalised only where npm redraws a line), so the
+ *  screen can say what is happening. `None` until it says anything: nothing
+ *  here turns that line into a percentage or an estimate, because nobody
+ *  knows one.
+ */
+{ type: "Running"; data: {
+	line: string | null,
+} } | { type: "Done" } | 
 /**
  *  The install ended badly; `message` is its exit code and the last lines
  *  of what it printed, bounded.
@@ -685,7 +724,7 @@ export type ShellView_Deserialize = {
 	 */
 	launcher_found: boolean,
 	/**  Where installing gentle-shell stands. */
-	install: InstallView,
+	install: InstallView_Deserialize,
 	/**
 	 *  Whether the home chosen differs from the one this run started with. A
 	 *  choice only applies to a new run, so while this is true the sidebar says
@@ -722,7 +761,7 @@ export type ShellView_Serialize = {
 	 */
 	launcher_found: boolean,
 	/**  Where installing gentle-shell stands. */
-	install: InstallView,
+	install: InstallView_Serialize,
 	/**
 	 *  Whether the home chosen differs from the one this run started with. A
 	 *  choice only applies to a new run, so while this is true the sidebar says

@@ -84,7 +84,7 @@ describe('the missing gentle-shell screen', () => {
   })
 
   it('shows progress while it runs and takes both buttons away', () => {
-    draw({ type: 'Running' })
+    draw({ type: 'Running', data: { line: null } })
 
     expect(screen.getByRole('status').textContent).toContain('Installing gentle-shell')
     for (const name of ['Install gentle-shell', 'Check again']) {
@@ -137,7 +137,7 @@ describe('the wait while the install runs', () => {
   })
 
   it('shows an indeterminate progress bar, with no value to read', () => {
-    draw({ type: 'Running' })
+    draw({ type: 'Running', data: { line: null } })
 
     const bar = screen.getByRole('progressbar')
     expect(bar.getAttribute('aria-valuenow')).toBeNull()
@@ -158,8 +158,25 @@ describe('the wait while the install runs', () => {
     }
   })
 
+  // npm's own line, as it printed it: the screen says what the command is
+  // doing instead of only that it is running, and turns it into no percentage.
+  it('shows the last line npm printed while it runs', () => {
+    draw({ type: 'Running', data: { line: 'npm WARN deprecated gentle-pi@0.0.1' } })
+
+    expect(
+      screen.getByText(/^What npm last printed: npm WARN deprecated gentle-pi@0\.0\.1$/),
+    ).toBeTruthy()
+    expect(screen.queryByText(/\d+%/)).toBeNull()
+  })
+
+  it('shows no line before npm has printed one', () => {
+    draw({ type: 'Running', data: { line: null } })
+
+    expect(screen.queryByText(/^What npm last printed:/)).toBeNull()
+  })
+
   it('counts the seconds waited, so the screen is visibly alive', async () => {
-    draw({ type: 'Running' })
+    draw({ type: 'Running', data: { line: null } })
 
     expect(screen.getByText('0 s elapsed.')).toBeTruthy()
 
@@ -171,7 +188,7 @@ describe('the wait while the install runs', () => {
   })
 
   it('stops counting when the install leaves Running', async () => {
-    const { rerender } = draw({ type: 'Running' })
+    const { rerender } = draw({ type: 'Running', data: { line: null } })
     await vi.advanceTimersByTimeAsync(2000)
 
     await rerender({ install: { type: 'Done' } })
@@ -183,7 +200,7 @@ describe('the wait while the install runs', () => {
   })
 
   it('stops counting when the screen goes away', async () => {
-    const { unmount } = draw({ type: 'Running' })
+    const { unmount } = draw({ type: 'Running', data: { line: null } })
     await vi.advanceTimersByTimeAsync(1000)
 
     unmount()

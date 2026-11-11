@@ -13,6 +13,7 @@
 //! behaves like one that was there.
 
 use std::sync::{Arc, Mutex, MutexGuard};
+use std::time::{Duration, Instant};
 
 use gentle_app::Command;
 use tauri::{AppHandle, Manager};
@@ -22,7 +23,7 @@ use crate::bridge::{AppStateHolder, CommandSink};
 use crate::clipboard::{self, Clipboard, SystemClipboard};
 use crate::close::{self, BridgeSteps, CloseFlow, CLOSING};
 use crate::config::{ConfigSnapshot, ConfigWriter};
-use crate::contract::{StateChanged, UiIntent, ViewState};
+use crate::contract::{InstallView, StateChanged, UiIntent, ViewState};
 use crate::effects::{self, Ran, RuntimeExecutor};
 use crate::events::{EventPump, Push};
 use crate::link_opener::{LinkOpener, SystemLinkOpener};
@@ -254,7 +255,21 @@ impl Bridge {
                 let started = std::thread::Builder::new()
                     .name("shell-install".to_owned())
                     .spawn(move || {
-                        let view = after_install(&holder, installer.install(), &launcher_resolves);
+                        // Every line the command prints reaches this closure as
+                        // it prints it; `gate` lets at most one push per
+                        // [`LINE_PUSH_INTERVAL`] through, so the screen follows
+                        // npm without a whole slice and a repaint per line.
+                        let gate = Mutex::new(LineGate::new());
+                        let lines = |line: &str| {
+                            let mut gate = lock(&gate);
+                            if !gate.due(line) {
+                                return;
+                            }
+                            drop(gate);
+                            push(&app, with_install_line(&holder, line));
+                        };
+                        let view =
+                            after_install(&holder, installer.install(&lines), &launcher_resolves);
                         push(&app, view);
                     });
                 if started.is_err() {
@@ -401,6 +416,57 @@ pub fn after_install(
         holder.recheck_launcher(probe);
     }
     holder.view()
+}
+
+/// The slice that shows what npm last printed: the holder's own view, with the
+/// running line laid over it. Nothing else moves, so the screen keeps the
+/// indeterminate bar and the seconds it already shows, and the line is npm's
+/// own text rather than a percentage or an estimate of how far it is.
+pub fn with_install_line(holder: &AppStateHolder, line: &str) -> ViewState {
+    let mut view = holder.view();
+    view.shell.install = InstallView::Running {
+        line: Some(line.to_owned()),
+    };
+    view
+}
+
+/// How often the running line may reach the window: four times a second. npm can
+/// print a line per package, and a push per line would be a whole slice on the
+/// wire and a repaint each; four a second is enough to read, and far from a
+/// flood.
+const LINE_PUSH_INTERVAL: Duration = Duration::from_millis(250);
+
+/// The gate between the command's lines and the window: one push per
+/// [`LINE_PUSH_INTERVAL`] at most, and never a second one for the same line.
+struct LineGate {
+    last_line: Option<String>,
+    last_push: Option<Instant>,
+}
+
+impl LineGate {
+    fn new() -> Self {
+        Self {
+            last_line: None,
+            last_push: None,
+        }
+    }
+
+    /// Whether this line is worth a push. The line is remembered either way, so
+    /// a line held back in one window is not pushed in the next: only a line the
+    /// screen does not show yet is.
+    fn due(&mut self, line: &str) -> bool {
+        if self.last_line.as_deref() == Some(line) {
+            return false;
+        }
+        self.last_line = Some(line.to_owned());
+        let due = self
+            .last_push
+            .is_none_or(|last| last.elapsed() >= LINE_PUSH_INTERVAL);
+        if due {
+            self.last_push = Some(Instant::now());
+        }
+        due
+    }
 }
 
 /// A bridge with nothing run yet: the same one [`Bridge::new`] builds.

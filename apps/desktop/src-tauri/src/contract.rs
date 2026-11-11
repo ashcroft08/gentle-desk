@@ -81,7 +81,14 @@ pub enum HomeChoiceView {
 pub enum InstallView {
     #[default]
     Idle,
-    Running,
+    /// The install is running. `line` is the last line the command printed, as
+    /// the command printed it (normalised only where npm redraws a line), so the
+    /// screen can say what is happening. `None` until it says anything: nothing
+    /// here turns that line into a percentage or an estimate, because nobody
+    /// knows one.
+    Running {
+        line: Option<String>,
+    },
     Done,
     /// The install ended badly; `message` is its exit code and the last lines
     /// of what it printed, bounded.

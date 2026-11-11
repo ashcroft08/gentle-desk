@@ -131,9 +131,9 @@ describe('createChatView', () => {
 
     pushEvent(
       'state-changed',
-      viewState({ sessions_revision: 2, shell: { ...shell, install: { type: 'Running' } } }),
+      viewState({ sessions_revision: 2, shell: { ...shell, install: { type: 'Running', data: { line: null } } } }),
     )
-    await vi.waitFor(() => expect(view.get().shell.install).toEqual({ type: 'Running' }))
+    await vi.waitFor(() => expect(view.get().shell.install).toEqual({ type: 'Running', data: { line: null } }))
 
     pushEvent(
       'state-changed',

@@ -61,10 +61,10 @@ impl AppStateHolder {
         let mut install = lock(&self.install);
         match *install {
             InstallView::Idle | InstallView::Failed { .. } => {
-                *install = InstallView::Running;
+                *install = InstallView::Running { line: None };
                 true
             }
-            InstallView::Running | InstallView::Done => false,
+            InstallView::Running { .. } | InstallView::Done => false,
         }
     }
 

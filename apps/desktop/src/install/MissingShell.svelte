@@ -20,6 +20,7 @@
     HOME,
     INSTALL,
     INSTALLS,
+    LAST_LINE,
     PROGRESS,
     RUNNING,
     TITLE,
@@ -40,6 +41,10 @@
   const running = $derived(install.type === 'Running')
   const done = $derived(install.type === 'Done')
   const failure = $derived(install.type === 'Failed' ? install.data.message : null)
+  // What npm is doing, in npm's own words: the last line it printed, and
+  // nothing this screen worked out. `null` before it says anything, which is
+  // its whole first minute.
+  const line = $derived(install.type === 'Running' ? (install.data.line ?? null) : null)
 
   // The count runs only while the install does. The interval is taken down with
   // the Running state, so nothing ticks once the install ends, and the effect's
@@ -95,6 +100,11 @@
         <span class="install-progress-bar"></span>
       </div>
       <p class="welcome-elapsed">{elapsed(seconds)}</p>
+      {#if line !== null}
+        <!-- npm's own line, in the monospace the command is shown in, so the
+             wait says what the command is doing and never a percentage. -->
+        <p class="welcome-elapsed welcome-path">{LAST_LINE} {line}</p>
+      {/if}
     {:else if done}
       <p class="welcome-applying" role="status">{DONE}</p>
     {/if}

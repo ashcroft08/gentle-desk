@@ -31,7 +31,10 @@ fn an_install_starts_once_and_says_how_it_ended() {
     let holder = AppStateHolder::default();
 
     assert!(holder.begin_install(), "the first request starts it");
-    assert_eq!(holder.view().shell.install, InstallView::Running);
+    assert_eq!(
+        holder.view().shell.install,
+        InstallView::Running { line: None }
+    );
     assert!(
         !holder.begin_install(),
         "a second one while it runs does not"
@@ -129,7 +132,7 @@ fn a_failed_install_never_claims_the_launcher_is_there() {
 fn the_installer_reports_success_of_the_command() {
     let installer = CommandInstaller::new("node", ["-e", "process.exit(0)"]);
 
-    assert_eq!(installer.install(), Ok(()));
+    assert_eq!(installer.install(&|_| {}), Ok(()));
 }
 
 #[test]
@@ -142,7 +145,7 @@ fn the_installer_reports_the_last_lines_of_a_failed_command() {
         ],
     );
 
-    let error = installer.install().unwrap_err();
+    let error = installer.install(&|_| {}).unwrap_err();
 
     assert!(error.contains("npm ERR! code E404"), "{error}");
     assert!(error.contains('3'), "the exit code is named: {error}");
@@ -152,7 +155,7 @@ fn the_installer_reports_the_last_lines_of_a_failed_command() {
 fn a_command_that_cannot_start_says_so() {
     let installer = CommandInstaller::new("definitely-not-a-real-program-xyz", ["install"]);
 
-    let error = installer.install().unwrap_err();
+    let error = installer.install(&|_| {}).unwrap_err();
 
     assert!(error.contains("could not start"), "{error}");
 }
@@ -164,7 +167,7 @@ fn a_failure_message_stays_small_whatever_the_command_prints() {
         ["-e", "for (let i = 0; i < 5000; i++) console.error('line ' + i + ' ' + 'x'.repeat(80)); process.exit(1)"],
     );
 
-    let error = installer.install().unwrap_err();
+    let error = installer.install(&|_| {}).unwrap_err();
 
     assert!(error.len() <= 2_100, "{} bytes", error.len());
     assert!(error.contains("line 4999"), "the end of the output is kept");
