@@ -725,10 +725,13 @@ p {
 /* The footer theme control (01a, `.foot`, `.tp` and `.tpl`): the panel is drawn
    above the button, in the page's own colors, so the list follows the theme it
    offers. No native popup is involved. */
+/* Bottom-anchored, so the footer stays put when the middle of the sidebar is
+   short, such as the empty state before any workspace exists. */
 .foot {
   display: flex;
   padding-top: 8px;
   border-top: 1px solid var(--border);
+  margin-top: auto;
 }
 
 .tp {
