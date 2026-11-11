@@ -1353,6 +1353,44 @@ p {
   color: var(--muted);
 }
 
+/* The wait while npm works: a bar that travels its track, because npm reports
+   nothing and a percentage would be a guess. Reduced motion stops the travel
+   (the rule at the end of this file) and leaves a still, full track. */
+.install-progress {
+  position: relative;
+  height: 4px;
+  margin-top: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--border);
+}
+
+.install-progress-bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 32%;
+  border-radius: inherit;
+  background: var(--accent);
+  animation: install-progress-travel 1.6s ease-in-out infinite;
+}
+
+@keyframes install-progress-travel {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(340%);
+  }
+}
+
+.welcome-elapsed {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .install-actions {
   display: flex;
   gap: 12px;
@@ -1390,5 +1428,13 @@ p {
   * {
     transition: none !important;
     animation: none !important;
+  }
+
+  /* The install bar keeps its meaning without moving: a still bar across the
+     whole track, so the row still reads as a wait in progress. */
+  .install-progress-bar {
+    width: 100%;
+    transform: none;
+    opacity: 0.6;
   }
 }

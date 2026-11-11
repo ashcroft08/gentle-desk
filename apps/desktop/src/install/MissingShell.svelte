@@ -14,11 +14,13 @@
     COMMAND,
     COMMAND_INTRO,
     DONE,
+    elapsed,
     FAILED_HINT,
     FAILED_TITLE,
     HOME,
     INSTALL,
     INSTALLS,
+    PROGRESS,
     RUNNING,
     TITLE,
     WARNING,
@@ -30,9 +32,26 @@
   /** Set by the first press: until the push says Running, no second one goes out. */
   let asked = $state(false)
 
+  // Seconds waited since the push said Running. npm prints nothing while it
+  // works, so this count is what shows the screen is alive; it is never turned
+  // into a percentage.
+  let seconds = $state(0)
+
   const running = $derived(install.type === 'Running')
   const done = $derived(install.type === 'Done')
   const failure = $derived(install.type === 'Failed' ? install.data.message : null)
+
+  // The count runs only while the install does. The interval is taken down with
+  // the Running state, so nothing ticks once the install ends, and the effect's
+  // own cleanup takes it down again if the screen goes away mid-install.
+  $effect(() => {
+    if (install.type !== 'Running') return
+    seconds = 0
+    const tick = setInterval(() => {
+      seconds += 1
+    }, 1000)
+    return () => clearInterval(tick)
+  })
 
   // A failure ends the wait, so the button works again.
   $effect(() => {
@@ -72,6 +91,10 @@
     {/if}
     {#if running}
       <p class="welcome-applying" role="status">{RUNNING}</p>
+      <div class="install-progress" role="progressbar" aria-label={PROGRESS}>
+        <span class="install-progress-bar"></span>
+      </div>
+      <p class="welcome-elapsed">{elapsed(seconds)}</p>
     {:else if done}
       <p class="welcome-applying" role="status">{DONE}</p>
     {/if}
