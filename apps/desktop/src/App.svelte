@@ -20,7 +20,6 @@
   import Sidebar from './sidebar/Sidebar.svelte'
   import Thread from './thread/Thread.svelte'
   import type { Update } from '@tauri-apps/plugin-updater'
-  import { relaunch } from '@tauri-apps/plugin-process'
   import UpdateNotice from './update/UpdateNotice.svelte'
   import { downloadAndInstall, findUpdate } from './update/plugin'
   import { stillIdle, available, downloading, dismissed, failed, ready, type UpdateState } from './update/state'
@@ -63,8 +62,8 @@
       await downloadAndInstall(pending, (done, total) => {
         update = downloading(update, done, total ?? undefined)
       })
+      // On Windows the plugin closes the app before this line is ever reached.
       update = ready(update)
-      await relaunch()
     } catch (error) {
       update = failed(update, error instanceof Error ? error.message : String(error))
     }

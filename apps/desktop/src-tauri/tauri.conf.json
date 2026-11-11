@@ -41,8 +41,7 @@
         "headerImage": "installer/header.bmp",
         "sidebarImage": "installer/sidebar.bmp"
       }
-    },
-    "createUpdaterArtifacts": true
+    }
   },
   "plugins": {
     "updater": {
