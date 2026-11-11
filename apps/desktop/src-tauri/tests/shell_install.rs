@@ -169,3 +169,96 @@ fn a_failure_message_stays_small_whatever_the_command_prints() {
     assert!(error.len() <= 2_100, "{} bytes", error.len());
     assert!(error.contains("line 4999"), "the end of the output is kept");
 }
+
+/// A timed-out install takes the whole tree with it (backlog 30). The install is
+/// `npm`, which starts `node` children of its own, and killing the direct child
+/// alone left them running on Windows for the rest of the app's life. The
+/// command here is a `node` that starts a child of its own and stays alive:
+/// after the timeout both pids are gone, asked of the OS the way the chat host
+/// asks it (`crates/backend/src/process/tests.rs`).
+#[cfg(windows)]
+mod a_timed_out_install_stops_the_whole_tree {
+    use std::path::Path;
+    use std::process::Command;
+    use std::time::{Duration, Instant};
+
+    use gentle_desk_lib::shell_install::{CommandInstaller, Installer};
+
+    /// The stop this test waits for, instead of the app's twenty minutes.
+    const TIMEOUT: Duration = Duration::from_secs(2);
+    /// How long a check waits for the script's pids, or for a process to go.
+    const WAIT: Duration = Duration::from_secs(10);
+
+    /// Starts a grandchild that outlives its parent unless the tree is killed,
+    /// writes both pids to a file (`install` hands nothing back when it times
+    /// out), then stays alive: only a tree kill stops it. `detached` is what an
+    /// `npm` child looks like from the outside.
+    const STUBBORN_TREE: &str = r#"
+import { spawn } from 'node:child_process';
+import { writeFileSync } from 'node:fs';
+const grandchild = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore', detached: true });
+writeFileSync(PIDS_FILE, JSON.stringify({ child: process.pid, grandchild: grandchild.pid }));
+setInterval(() => {}, 1000);
+"#;
+
+    /// The pids the script wrote, once it has written them: the install has
+    /// already timed out, so this waits only for a loaded machine.
+    fn pids(file: &Path) -> (u32, u32) {
+        let deadline = Instant::now() + WAIT;
+        loop {
+            if let Ok(text) = std::fs::read_to_string(file) {
+                if let Ok(value) = serde_json::from_str::<serde_json::Value>(&text) {
+                    return (
+                        value["child"].as_u64().unwrap() as u32,
+                        value["grandchild"].as_u64().unwrap() as u32,
+                    );
+                }
+            }
+            assert!(
+                Instant::now() < deadline,
+                "the script never wrote its pids to {}",
+                file.display()
+            );
+            std::thread::sleep(Duration::from_millis(100));
+        }
+    }
+
+    /// Whether the OS still has a process with this pid.
+    fn alive(pid: u32) -> bool {
+        let out = Command::new("tasklist")
+            .args(["/FI", &format!("PID eq {pid}"), "/NH"])
+            .output()
+            .expect("tasklist answers");
+        String::from_utf8_lossy(&out.stdout).contains(&pid.to_string())
+    }
+
+    fn assert_gone(pid: u32) {
+        let deadline = Instant::now() + WAIT;
+        while alive(pid) {
+            assert!(Instant::now() < deadline, "process {pid} is still running");
+            std::thread::sleep(Duration::from_millis(100));
+        }
+    }
+
+    #[test]
+    fn installer_timeout_kills_the_tree() {
+        let dir = tempfile::tempdir().unwrap();
+        let pids_file = dir.path().join("pids.json");
+        let script = dir.path().join("stubborn-tree.mjs");
+        std::fs::write(
+            &script,
+            STUBBORN_TREE.replace("PIDS_FILE", &format!("{:?}", pids_file.to_string_lossy())),
+        )
+        .unwrap();
+        let installer =
+            CommandInstaller::new("node", [script.into_os_string()]).with_timeout(TIMEOUT);
+
+        let error = installer.install().unwrap_err();
+
+        assert!(error.contains("was stopped"), "{error}");
+        let (child, grandchild) = pids(&pids_file);
+        assert_ne!(child, grandchild, "the script starts a child of its own");
+        assert_gone(child);
+        assert_gone(grandchild);
+    }
+}
