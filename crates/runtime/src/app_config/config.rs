@@ -15,6 +15,7 @@ use gentle_backend::home::HomeChoice;
 
 use super::shell_home;
 use super::theme::{self, Theme};
+use super::window::{self, WindowState};
 
 /// The only document version this app writes. Any other version is not
 /// migrated: the file is kept aside and the app starts with an empty config.
@@ -36,6 +37,12 @@ pub struct AppConfig {
     /// does not know is `None`, never a damaged file.
     #[serde(default, deserialize_with = "shell_home::or_none")]
     pub shell_home: Option<HomeChoice>,
+    /// How the window was closed, `None` until it is known: where and how big it
+    /// was, and whether it was maximized, fullscreen or minimized. An ADDITIVE
+    /// field like the theme, read leniently: an absent, unknown-shaped or
+    /// mistyped value is `None`, never a damaged file.
+    #[serde(default, deserialize_with = "window::or_none")]
+    pub window: Option<WindowState>,
     /// The added workspaces, in the order they were added.
     pub workspaces: Vec<WorkspaceEntry>,
 }
@@ -46,6 +53,7 @@ impl Default for AppConfig {
             version: CONFIG_VERSION,
             theme: Theme::default(),
             shell_home: None,
+            window: None,
             workspaces: Vec::new(),
         }
     }

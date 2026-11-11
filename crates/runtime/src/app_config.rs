@@ -6,7 +6,7 @@
 //! The session index cache stays a speedup that can be deleted
 //! (`crate::cache_path`).
 //!
-//! Four separate responsibilities, so none of them mixes I/O with a rule:
+//! Five separate responsibilities, so none of them mixes I/O with a rule:
 //!
 //! - [`config_path`]: where the file lives, from the environment value.
 //! - [`AppConfig`]: the document and its pure edits (`set_theme`,
@@ -18,6 +18,8 @@
 //! - [`workspace_status`]: whether the folder of a workspace is there right
 //!   now. It touches the file system, so it is called outside any lock and is
 //!   never part of a load or a save.
+//! - The window's remembered rectangle ([`WindowState`]) and the pure decision
+//!   of where it opens ([`placement`]), from the screens that exist right now.
 
 mod config;
 mod paths;
@@ -25,6 +27,7 @@ mod shell_home;
 mod status;
 mod store;
 mod theme;
+mod window;
 
 pub(crate) use config::canonical_path;
 pub use config::{folder_key, AppConfig, WorkspaceEntry, CONFIG_VERSION};
@@ -32,3 +35,4 @@ pub use paths::config_path;
 pub use status::{workspace_status, WorkspaceStatus};
 pub use store::{load, save, ConfigNotice, ConfigProblem, Loaded};
 pub use theme::Theme;
+pub use window::{placement, Placement, Screen, WindowState};
