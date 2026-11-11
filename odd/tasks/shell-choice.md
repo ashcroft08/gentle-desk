@@ -27,7 +27,7 @@ Feature: at first start, detect an existing pi and let the user choose between u
 ### Known limits (from the independent verification)
 
 - Closing the app during an install leaves `npm install -g` running to its end: it is not killed on purpose, because a half-killed global install can leave a broken package (verifier finding 1, decision L4).
-- On Windows the 20-minute timeout kills `npm.cmd` (a `cmd.exe`) and may leave its `node` child (finding 5).
+- On Windows the 20-minute timeout kills the whole tree (`taskkill /T /F`, PR 112; finding 5).
 - Install progress is one static line; the output is shown only if it fails (finding 8).
 - The wiring of the startup launcher probe, `RestartApp` and `ask` reaching the web has no windowless test (they need a window handle); they were checked by hand in a real window (findings 4 and 10).
 
