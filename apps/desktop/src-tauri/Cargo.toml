@@ -17,6 +17,12 @@ gentle-backend = { path = "../../../crates/backend" }
 gentle-runtime = { path = "../../../crates/runtime" }
 # The session list tests read a temporary pi home, never the user's.
 tempfile = "3"
+# The updater signature guard verifies a committed fixture the way
+# `tauri-plugin-updater` does at run time. `minisign-verify` is the verifier that
+# plugin already locks, and `base64` 0.21 is already in `Cargo.lock`, so both add
+# no new package; they are dev-only and nothing links them into the app.
+base64 = "0.21"
+minisign-verify = "0.3"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

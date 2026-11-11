@@ -1,0 +1,1 @@
+gentle-desk update signature guard: the release key signs this file and the embedded updater public key verifies it
