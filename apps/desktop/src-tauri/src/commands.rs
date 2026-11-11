@@ -254,8 +254,8 @@ impl Bridge {
                 let started = std::thread::Builder::new()
                     .name("shell-install".to_owned())
                     .spawn(move || {
-                        holder.finish_install(installer.install());
-                        push(&app, holder.view());
+                        let view = after_install(&holder, installer.install(), &launcher_resolves);
+                        push(&app, view);
                     });
                 if started.is_err() {
                     self.holder
@@ -381,6 +381,26 @@ impl Bridge {
 fn launcher_resolves() -> bool {
     gentle_backend::launcher::resolve(&gentle_backend::launcher::LauncherEnv::from_process())
         .is_ok()
+}
+
+/// What follows an install, whoever ran it: the outcome reaches the install state
+/// machine as it stands, and only a SUCCESSFUL one re-probes the launcher, because
+/// that is the one case where the launcher may now be there. The install screen
+/// would otherwise stay up until the user pressed "Check again", right after an
+/// install that had just worked (S4). A failure says nothing about the machine, so
+/// nothing is probed and the view keeps claiming what it knew. Answers the slice to
+/// push.
+pub fn after_install(
+    holder: &AppStateHolder,
+    outcome: Result<(), String>,
+    probe: &dyn Fn() -> bool,
+) -> ViewState {
+    let installed = outcome.is_ok();
+    holder.finish_install(outcome);
+    if installed {
+        holder.recheck_launcher(probe);
+    }
+    holder.view()
 }
 
 /// A bridge with nothing run yet: the same one [`Bridge::new`] builds.

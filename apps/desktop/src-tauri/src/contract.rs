@@ -99,8 +99,12 @@ pub struct ShellView {
     pub pi_path: Option<String>,
     /// The home the user chose, `None` until they do.
     pub choice: Option<HomeChoiceView>,
-    /// Whether the welcome question is due: pi was found and nothing is chosen
-    /// yet. With no pi there is nothing to choose between, so it is never due.
+    /// Whether the welcome question is due: pi was found, nothing is chosen
+    /// yet, and the `gentle-shell` launcher resolves. All three must hold, so
+    /// the question is only ever asked of a run that can start: with no pi there
+    /// is nothing to choose between, and with no launcher there is nothing to
+    /// run, so a machine still missing gentle-shell sees the install screen and
+    /// is asked nothing.
     pub ask: bool,
     /// Whether the `gentle-shell` launcher resolves on this machine. `true`
     /// until the app has looked, so a run that did not look never claims it is

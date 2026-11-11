@@ -1,11 +1,15 @@
 //! The shell home choice as the holder keeps it (shell-choice S1-S3).
 //!
-//! Two facts reach the view: the folder of the user's pi that the app found at
-//! start (set once, outside every lock), and the choice, a field of the app
-//! config that is edited through the one step every config change takes
-//! ([`AppStateHolder::update_config`]) and saved by the same writer. Choosing
-//! what the config already holds changes nothing, moves no revision and asks for
-//! no save.
+//! Three facts reach the view: the folder of the user's pi that the app found at
+//! start (set once, outside every lock), whether the `gentle-shell` launcher
+//! resolves, and the choice, a field of the app config that is edited through the
+//! one step every config change takes ([`AppStateHolder::update_config`]) and
+//! saved by the same writer. Choosing what the config already holds changes
+//! nothing, moves no revision and asks for no save.
+//!
+//! The question is asked only when this run can run: pi found, no choice yet, and
+//! the launcher there. A machine without gentle-shell sees the install screen
+//! first, and the question comes once the launcher is found.
 //!
 //! The choice applies from the next start: the children and the session index
 //! of this run already took the home they started with.
@@ -77,11 +81,15 @@ impl AppStateHolder {
     pub(super) fn shell_view(&self) -> ShellView {
         let pi_path = lock(&self.pi_path).clone();
         let choice = self.config_snapshot().config.shell_home;
+        // One read of the launcher fact, reported as it stands and used as it
+        // stands: nothing runs before the launcher resolves, so the home
+        // question waits for it instead of being asked on the install screen.
+        let launcher_found = !self.launcher_missing.load(Ordering::SeqCst);
         ShellView {
-            ask: pi_path.is_some() && choice.is_none(),
+            ask: pi_path.is_some() && choice.is_none() && launcher_found,
             choice: choice.map(view_choice),
             pi_path,
-            launcher_found: !self.launcher_missing.load(Ordering::SeqCst),
+            launcher_found,
             install: lock(&self.install).clone(),
             // No choice is the separate home, so "none" and "isolated" are the
             // same home and changing between them needs no restart.

@@ -1,10 +1,12 @@
 //! Windowless tests of the missing-gentle-shell path (shell-choice S4): the view
 //! knows whether the launcher resolves, the install is a small state machine
-//! that never starts twice, "Check again" re-reads the machine, and the real
+//! that never starts twice, "Check again" re-reads the machine, a successful
+//! install re-reads it too (a failed one never claims anything), and the real
 //! installer runs a command and says what went wrong in a bounded message.
 //! Nothing here installs anything: the command under test is `node`.
 
 use gentle_desk_lib::bridge::AppStateHolder;
+use gentle_desk_lib::commands::after_install;
 use gentle_desk_lib::contract::InstallView;
 use gentle_desk_lib::shell_install::{CommandInstaller, Installer};
 
@@ -69,6 +71,58 @@ fn checking_again_reads_the_launcher_and_keeps_the_install_outcome() {
 
     let still_missing = holder.recheck_launcher(&|| false);
     assert!(!still_missing.shell.launcher_found);
+}
+
+/// A successful install leaves the user on a screen that says it worked: the
+/// launcher is there now, so the run looks for it once more instead of asking
+/// for another "Check again", and the home question follows (S2, S4).
+#[test]
+fn a_successful_install_re_probes_the_launcher_and_unlocks_the_home_question() {
+    const PI: &str = "C:/Users/someone/.pi/agent";
+    let holder = AppStateHolder::default();
+    holder.set_launcher_found(false);
+    holder.set_pi_path(Some(PI.to_owned()));
+    assert!(
+        !holder.view().shell.ask,
+        "the install screen asks nothing of someone who cannot run yet"
+    );
+    assert!(holder.begin_install());
+
+    let view = after_install(&holder, Ok(()), &|| true);
+
+    assert!(
+        view.shell.launcher_found,
+        "the install put the launcher there"
+    );
+    assert_eq!(view.shell.install, InstallView::Done);
+    assert!(
+        view.shell.ask,
+        "pi is there, nothing is chosen and gentle-shell can run"
+    );
+}
+
+/// The other half of the same rule: a failed install says nothing about the
+/// machine, so it never probes and never claims the launcher is there.
+#[test]
+fn a_failed_install_never_claims_the_launcher_is_there() {
+    const PI: &str = "C:/Users/someone/.pi/agent";
+    let holder = AppStateHolder::default();
+    holder.set_launcher_found(false);
+    holder.set_pi_path(Some(PI.to_owned()));
+    assert!(holder.begin_install());
+
+    let view = after_install(&holder, Err("npm is not installed".to_owned()), &|| {
+        panic!("a failed install is no reason to look for the launcher")
+    });
+
+    assert!(!view.shell.launcher_found);
+    assert_eq!(
+        view.shell.install,
+        InstallView::Failed {
+            message: "npm is not installed".to_owned()
+        }
+    );
+    assert!(!view.shell.ask);
 }
 
 #[test]

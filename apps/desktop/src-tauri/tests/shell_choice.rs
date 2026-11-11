@@ -37,12 +37,31 @@ fn a_run_that_found_no_pi_asks_nothing_and_has_no_choice() {
 fn a_run_that_found_pi_and_has_no_choice_asks() {
     let holder = AppStateHolder::default();
     holder.set_pi_path(Some(PI.to_owned()));
+    holder.set_launcher_found(true);
 
     let shell = holder.view().shell;
 
     assert_eq!(shell.pi_path.as_deref(), Some(PI));
     assert_eq!(shell.choice, None);
-    assert!(shell.ask);
+    assert!(shell.launcher_found);
+    assert!(shell.ask, "pi is there and gentle-shell can run");
+}
+
+#[test]
+fn a_missing_launcher_asks_no_home_question() {
+    let holder = AppStateHolder::default();
+    holder.set_pi_path(Some(PI.to_owned()));
+    holder.set_launcher_found(false);
+
+    let shell = holder.view().shell;
+
+    assert_eq!(shell.pi_path.as_deref(), Some(PI));
+    assert_eq!(shell.choice, None);
+    assert!(!shell.launcher_found);
+    assert!(
+        !shell.ask,
+        "nothing runs before gentle-shell is there, so nothing is asked"
+    );
 }
 
 #[test]
