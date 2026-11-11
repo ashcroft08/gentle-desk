@@ -7,12 +7,16 @@
   // The keyboard is the artboard's: arrows, Home and End move the focus, Enter
   // and Space choose, Escape closes back to the button, and the focus stays
   // inside the open list. The current theme is the button's NAME, because the
-  // button only draws an icon and silence is not a value.
+  // button only draws an icon and silence is not a value. That name, and each
+  // option's text, is the theme's LABEL: the identifiers are lowercase in three
+  // cases (`system`, `dark`, `light`) and stay that way in the config, the
+  // intent and the `data-theme` attribute, so the drawn word is a display name
+  // kept beside `THEMES` and never a renamed theme.
   import { tick } from 'svelte'
   import type { ThemeView } from '../contract/bindings'
   import { dispatchIntent } from '../bridge'
   import Icon from '../icons/Icon.svelte'
-  import { THEMES } from '../theme/themes'
+  import { THEMES, themeLabel } from '../theme/themes'
   import { movedIndex, trappedIndex } from './theme-keys'
 
   let { theme }: { theme: ThemeView } = $props()
@@ -24,7 +28,7 @@
   /** The list itself, so the focus code reads the options it drew. */
   let list = $state<HTMLUListElement | null>(null)
 
-  const name = $derived(`Theme: ${theme}`)
+  const name = $derived(`Theme: ${themeLabel(theme)}`)
   const selected = $derived(Math.max(THEMES.indexOf(theme), 0))
 
   /** The drawn options, in the order `THEMES` names them. */
@@ -147,7 +151,7 @@
     >
       {#each THEMES as option (option)}
         <li role="option" tabindex="-1" aria-selected={option === theme} data-value={option}>
-          {option}
+          {themeLabel(option)}
         </li>
       {/each}
     </ul>

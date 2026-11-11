@@ -14,3 +14,24 @@ export const THEMES: readonly ThemeView[] = [
   'Gentleman-Sexy',
   'light',
 ]
+
+/**
+ * The label the picker draws for each theme. A theme name is an identifier the
+ * config stores, the contract carries and `theme.css` selects, so it is never
+ * renamed to read well; the label is only the capitalised form of it, drawn in
+ * the footer and in the button's name. Exhaustive by type, so a theme added to
+ * `ThemeView` cannot ship without the word the picker shows for it.
+ */
+export const THEME_LABELS: Record<ThemeView, string> = {
+  system: 'System',
+  dark: 'Dark',
+  Gentle: 'Gentle',
+  'Gentleman-Cute': 'Gentleman-Cute',
+  'Gentleman-Sexy': 'Gentleman-Sexy',
+  light: 'Light',
+}
+
+/** The label one theme is drawn with: its identifier, capitalised. */
+export function themeLabel(theme: ThemeView): string {
+  return THEME_LABELS[theme]
+}
