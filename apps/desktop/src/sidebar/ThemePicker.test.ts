@@ -12,8 +12,29 @@ import Sidebar from './Sidebar.svelte'
 vi.mock('@tauri-apps/api/core', () => import('../test-support/tauri-mock').then((m) => m.coreModule()))
 vi.mock('@tauri-apps/api/event', () => import('../test-support/tauri-mock').then((m) => m.eventModule()))
 
-/** The six labels 01a draws, quoted so a change of copy is a change here. */
-const NAMES = ['system', 'dark', 'Gentle', 'Gentleman-Cute', 'Gentleman-Sexy', 'light']
+/**
+ * The six options 01a draws, each label beside the theme identifier it stands
+ * for: quoted so a change of copy, or a label leaking into an intent, is a
+ * change here.
+ */
+const OPTIONS: readonly (readonly [ThemeView, string])[] = [
+  ['system', 'System'],
+  ['dark', 'Dark'],
+  ['Gentle', 'Gentle'],
+  ['Gentleman-Cute', 'Gentleman-Cute'],
+  ['Gentleman-Sexy', 'Gentleman-Sexy'],
+  ['light', 'Light'],
+]
+
+/** The six labels the list draws, in the drawn order. */
+const NAMES = OPTIONS.map(([, label]) => label)
+
+/** The label the control names one theme with. */
+function labelFor(theme: ThemeView): string {
+  const option = OPTIONS.find(([id]) => id === theme)
+  if (option === undefined) throw new Error(`no label for the theme ${theme}`)
+  return option[1]
+}
 
 afterEach(cleanup)
 
@@ -30,7 +51,7 @@ async function mountSidebar(theme: ThemeView = 'system') {
   const fixture = serveSidebar({ view: viewState({ theme, total_sessions: 1 }) })
   render(Sidebar)
   await vi.waitFor(() =>
-    expect(themeButton().getAttribute('aria-label')).toBe(`Theme: ${theme}`),
+    expect(themeButton().getAttribute('aria-label')).toBe(`Theme: ${labelFor(theme)}`),
   )
   return fixture
 }
@@ -81,6 +102,29 @@ describe('the theme picker', () => {
     expect(screen.getByRole('listbox', { name: 'Theme' })).not.toBeNull()
   })
 
+  it('draws each theme as its label over the identifier it keeps', async () => {
+    await mountSidebar('dark')
+
+    // The button names the LABEL, so the control is not mute in lowercase.
+    expect(screen.getByRole('button', { name: 'Theme: Dark' })).not.toBeNull()
+    expect(screen.queryByRole('button', { name: 'Theme: dark' })).toBeNull()
+
+    const list = await openList()
+
+    expect(within(list).getAllByRole('option').map((option) => option.textContent?.trim())).toEqual(
+      NAMES,
+    )
+    // The label is drawn, never sent: the value each option carries is the
+    // theme identifier the config, the contract and the stylesheet use.
+    expect(
+      within(list).getAllByRole('option').map((option) => option.getAttribute('data-value')),
+    ).toEqual(OPTIONS.map(([theme]) => theme))
+
+    await fireEvent.click(screen.getByRole('option', { name: 'Dark' }))
+
+    expect(themeIntents()).toEqual(['dark'])
+  })
+
   it('opens exactly the six drawn names, in the drawn order, on the current one', async () => {
     await mountSidebar('Gentle')
     const list = await openList()
@@ -89,7 +133,7 @@ describe('the theme picker', () => {
       NAMES,
     )
     expect(screen.getByRole('option', { name: 'Gentle' }).getAttribute('aria-selected')).toBe('true')
-    expect(screen.getByRole('option', { name: 'dark' }).getAttribute('aria-selected')).toBe('false')
+    expect(screen.getByRole('option', { name: 'Dark' }).getAttribute('aria-selected')).toBe('false')
     await vi.waitFor(() => focusedOption('Gentle'))
   })
 
@@ -98,34 +142,34 @@ describe('the theme picker', () => {
     const list = await openList()
 
     await keydown(list, 'ArrowDown')
-    focusedOption('dark')
+    focusedOption('Dark')
     await keydown(list, 'ArrowDown')
     focusedOption('Gentle')
     await keydown(list, 'ArrowUp')
-    focusedOption('dark')
+    focusedOption('Dark')
     await keydown(list, 'Home')
-    focusedOption('system')
+    focusedOption('System')
     await keydown(list, 'ArrowUp')
-    focusedOption('system')
+    focusedOption('System')
     await keydown(list, 'End')
-    focusedOption('light')
+    focusedOption('Light')
     await keydown(list, 'ArrowDown')
-    focusedOption('light')
+    focusedOption('Light')
   })
 
   it('keeps the focus inside the list while it is open', async () => {
     await mountSidebar('system')
     const list = await openList()
-    focusedOption('system')
+    focusedOption('System')
 
     await keydown(list, 'Tab')
-    focusedOption('dark')
+    focusedOption('Dark')
     await keydown(list, 'Tab', { shiftKey: true })
-    focusedOption('system')
+    focusedOption('System')
     // Tab never leaves the list: from the first option it walks to the last and
     // stops there, as the arrow keys do.
     for (let step = 0; step < 6; step += 1) await keydown(list, 'Tab')
-    focusedOption('light')
+    focusedOption('Light')
     expect(list.contains(document.activeElement)).toBe(true)
   })
 
