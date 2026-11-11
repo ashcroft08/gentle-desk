@@ -11,7 +11,7 @@
 
 use std::ffi::OsString;
 use std::io::Read;
-use std::process::{Command, Stdio};
+use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
 
 /// What runs the install. `Err` is the sentence the permission screen shows.
@@ -30,6 +30,9 @@ const TIMEOUT: Duration = Duration::from_secs(20 * 60);
 pub struct CommandInstaller {
     program: OsString,
     args: Vec<OsString>,
+    /// [`TIMEOUT`] for the app; a test makes it shorter so it reaches the stop
+    /// without waiting twenty minutes for it.
+    timeout: Duration,
 }
 
 impl CommandInstaller {
@@ -40,7 +43,15 @@ impl CommandInstaller {
         Self {
             program: program.into(),
             args: args.into_iter().map(Into::into).collect(),
+            timeout: TIMEOUT,
         }
+    }
+
+    /// The same command, stopped after `timeout` instead of twenty minutes: the
+    /// app never calls this, the timeout test does.
+    pub fn with_timeout(mut self, timeout: Duration) -> Self {
+        self.timeout = timeout;
+        self
     }
 
     /// `npm install -g gentle-pi`, or the stand-in `GENTLE_DESK_NPM` names (a
@@ -88,7 +99,7 @@ impl Installer for CommandInstaller {
         let out = child.stdout.take().map(drain);
         let err = child.stderr.take().map(drain);
 
-        let deadline = Instant::now() + TIMEOUT;
+        let deadline = Instant::now() + self.timeout;
         let status = loop {
             match child.try_wait() {
                 Ok(Some(status)) => break status,
@@ -96,7 +107,7 @@ impl Installer for CommandInstaller {
                     std::thread::sleep(Duration::from_millis(50))
                 }
                 Ok(None) => {
-                    let _ = child.kill();
+                    kill_tree(&mut child);
                     let _ = child.wait();
                     return Err(
                         "the install did not finish in 20 minutes and was stopped".to_owned()
@@ -122,6 +133,30 @@ impl Installer for CommandInstaller {
             tail_of(&output)
         ))
     }
+}
+
+/// Stops the command and everything it started. `Child::kill` alone reaches the
+/// direct child only, so a timed-out `npm` left the `node` children it had
+/// started running for the rest of the app's life on Windows. `taskkill /T`
+/// walks the tree, and it can only do that while the child it walks from is
+/// still there, which it is here. The direct kill stays as a fallback for what
+/// `taskkill` cannot reach (a machine where it refuses, say). The same shape as
+/// the chat host's tree kill (`crates/backend/src/process/tree.rs`).
+fn kill_tree(child: &mut Child) {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        let mut taskkill = Command::new("taskkill");
+        taskkill
+            .args(["/T", "/F", "/PID", &child.id().to_string()])
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null());
+        // No console window flashing over the app.
+        taskkill.creation_flags(0x0800_0000);
+        let _ = taskkill.status();
+    }
+    let _ = child.kill(); // no-op if taskkill already did it
 }
 
 /// Reads a stream to its end on its own thread, keeping only the last bytes.
