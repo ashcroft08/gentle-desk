@@ -67,6 +67,16 @@ describe('the missing gentle-shell screen', () => {
     ).toBeTruthy()
   })
 
+  it('says what was looked for: the PATH folders, the npm global folder and GENTLE_SHELL_BIN', () => {
+    draw()
+
+    expect(
+      screen.getByText(
+        'It looked for gentle-shell in the folders of PATH and in the npm global folder (%APPDATA%\\npm). GENTLE_SHELL_BIN can point at it where it lives.',
+      ),
+    ).toBeTruthy()
+  })
+
   it('installs nothing until the user presses the button', () => {
     draw()
 

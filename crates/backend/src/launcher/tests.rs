@@ -21,6 +21,7 @@ fn on_path(dirs: &[&Path]) -> LauncherEnv {
     LauncherEnv {
         gentle_shell_bin: None,
         path: Some(std::env::join_paths(dirs).unwrap()),
+        extra_dirs: Vec::new(),
     }
 }
 
@@ -28,6 +29,15 @@ fn with_bin(bin: &Path) -> LauncherEnv {
     LauncherEnv {
         gentle_shell_bin: Some(bin.into()),
         path: None,
+        extra_dirs: Vec::new(),
+    }
+}
+
+fn searching(path: &[&Path], extra: &[&Path]) -> LauncherEnv {
+    LauncherEnv {
+        gentle_shell_bin: None,
+        path: Some(std::env::join_paths(path).unwrap()),
+        extra_dirs: extra.iter().map(|d| d.to_path_buf()).collect(),
     }
 }
 
@@ -113,6 +123,84 @@ fn nothing_found_explains_both_options() {
     assert_eq!(err, LauncherError::NotFound);
     let text = err.to_string();
     assert!(text.contains("npm install -g gentle-pi") && text.contains("GENTLE_SHELL_BIN"));
+}
+
+// The npm global folder is where `npm install -g gentle-pi` puts the shim, and
+// on Windows it is not usually on PATH, so it is searched after PATH.
+#[test]
+fn npm_global_folder_is_searched_after_path() {
+    let empty = tempfile::tempdir().unwrap();
+    let npm = npm_dir(true);
+
+    let launcher = resolve_for(&searching(&[empty.path()], &[npm.path()]), true).unwrap();
+
+    assert_eq!(launcher.program, PathBuf::from("node"));
+    assert_eq!(launcher.args, vec![OsString::from(npm.path().join(ENTRY))]);
+}
+
+// The extra folders are an injectable field, filled from APPDATA on Windows
+// only, so no test has to touch the process environment.
+#[test]
+fn extra_dirs_hold_the_npm_global_folder_on_windows_only() {
+    let appdata = Path::new(r"C:\Users\someone\AppData\Roaming");
+
+    assert_eq!(
+        extra_dirs_from(Some(appdata.as_os_str()), true),
+        vec![appdata.join("npm")]
+    );
+    assert!(extra_dirs_from(Some(OsStr::new("")), true).is_empty());
+    assert!(extra_dirs_from(None, true).is_empty());
+    assert!(extra_dirs_from(Some(appdata.as_os_str()), false).is_empty());
+    assert!(LauncherEnv::default().extra_dirs.is_empty());
+}
+
+// The message names every place that was looked in, not just PATH.
+#[test]
+fn nothing_found_names_the_npm_global_folder_too() {
+    let empty = tempfile::tempdir().unwrap();
+    let err = resolve_for(&searching(&[empty.path()], &[empty.path()]), true).unwrap_err();
+
+    assert_eq!(err, LauncherError::NotFound);
+    let text = err.to_string();
+    assert!(text.contains("%APPDATA%\\npm"), "{text}");
+    assert!(text.contains("PATH"), "{text}");
+}
+
+// Preserved: a hit on PATH still comes before the extra folders, and
+// GENTLE_SHELL_BIN still comes before both.
+#[test]
+fn path_hit_still_wins_over_the_extra_folders() {
+    let on_path_dir = npm_dir(true);
+    let extra = npm_dir(true);
+
+    let launcher = resolve_for(&searching(&[on_path_dir.path()], &[extra.path()]), true).unwrap();
+
+    assert_eq!(
+        launcher.args,
+        vec![OsString::from(on_path_dir.path().join(ENTRY))]
+    );
+}
+
+#[test]
+fn the_env_override_still_wins_over_path_and_extra_folders() {
+    let dir = tempfile::tempdir().unwrap();
+    let entry = dir.path().join("gentle-shell.mjs");
+    fs::write(&entry, "").unwrap();
+    let on_path_dir = npm_dir(true);
+    let extra = npm_dir(true);
+    let env = LauncherEnv {
+        gentle_shell_bin: Some(entry.clone().into_os_string()),
+        path: Some(std::env::join_paths([on_path_dir.path()]).unwrap()),
+        extra_dirs: vec![extra.path().to_path_buf()],
+    };
+
+    assert_eq!(
+        resolve_for(&env, true).unwrap(),
+        Launcher {
+            program: PathBuf::from("node"),
+            args: vec![entry.into()]
+        }
+    );
 }
 
 #[test]

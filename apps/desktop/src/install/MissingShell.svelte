@@ -20,6 +20,7 @@
     HOME,
     INSTALL,
     INSTALLS,
+    LOOKED_IN,
     PROGRESS,
     RUNNING,
     TITLE,
@@ -73,6 +74,7 @@
   <div class="welcome-card">
     <h1 id="missing-title">{TITLE}</h1>
     <p class="welcome-intro">{WHY}</p>
+    <p class="welcome-intro">{LOOKED_IN}</p>
 
     <section class="welcome-found" aria-label={COMMAND_INTRO}>
       <h2>{COMMAND_INTRO}</h2>

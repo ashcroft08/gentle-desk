@@ -26,6 +26,10 @@ pub struct LauncherEnv {
     pub gentle_shell_bin: Option<OsString>,
     /// The `PATH` variable.
     pub path: Option<OsString>,
+    /// Folders searched after `PATH`, in order: on Windows the npm global
+    /// folder, which is where `npm install -g` puts the shim and which is not
+    /// usually on `PATH`.
+    pub extra_dirs: Vec<PathBuf>,
 }
 
 impl LauncherEnv {
@@ -33,15 +37,30 @@ impl LauncherEnv {
         Self {
             gentle_shell_bin: std::env::var_os("GENTLE_SHELL_BIN").filter(|v| !v.is_empty()),
             path: std::env::var_os("PATH"),
+            extra_dirs: extra_dirs_from(std::env::var_os("APPDATA").as_deref(), cfg!(windows)),
         }
     }
+}
+
+/// The folders searched after `PATH`. On Windows that is the npm global folder
+/// (`%APPDATA%\npm`), where npm puts `gentle-shell.cmd`; elsewhere there is no
+/// such folder, so the list stays empty.
+fn extra_dirs_from(appdata: Option<&OsStr>, windows: bool) -> Vec<PathBuf> {
+    if !windows {
+        return Vec::new();
+    }
+    appdata
+        .map(Path::new)
+        .filter(|dir| !dir.as_os_str().is_empty())
+        .map(|dir| vec![dir.join("npm")])
+        .unwrap_or_default()
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LauncherError {
     /// `GENTLE_SHELL_BIN` names a file that does not exist.
     BinMissing(PathBuf),
-    /// Nothing on `PATH` and no `GENTLE_SHELL_BIN`.
+    /// Nothing on `PATH`, in the extra folders, and no `GENTLE_SHELL_BIN`.
     NotFound,
 }
 
@@ -55,8 +74,9 @@ impl fmt::Display for LauncherError {
             ),
             Self::NotFound => write!(
                 f,
-                "gentle-shell launcher not found: install it with `npm install -g gentle-pi` \
-                 so `gentle-shell` is on PATH, or set GENTLE_SHELL_BIN to its full path"
+                "gentle-shell launcher not found: looked in the folders of PATH and in the \
+                 npm global folder (%APPDATA%\\npm on Windows). Install it with \
+                 `npm install -g gentle-pi`, or set GENTLE_SHELL_BIN to its full path"
             ),
         }
     }
@@ -78,17 +98,25 @@ pub fn resolve_for(env: &LauncherEnv, windows: bool) -> Result<Launcher, Launche
         }
         return Ok(launcher_for_file(&bin, env, windows));
     }
-    find_on_path(env, windows).ok_or(LauncherError::NotFound)
+    find_launcher(env, windows).ok_or(LauncherError::NotFound)
 }
 
-fn find_on_path(env: &LauncherEnv, windows: bool) -> Option<Launcher> {
+/// `PATH` first, then the extra folders, each looked in for the platform's
+/// launcher names. A hit goes through the same shim handling either way.
+fn find_launcher(env: &LauncherEnv, windows: bool) -> Option<Launcher> {
     let names: &[&str] = if windows {
         &["gentle-shell.cmd", "gentle-shell.exe"]
     } else {
         &["gentle-shell"]
     };
-    let path = env.path.as_deref()?;
-    for dir in std::env::split_paths(path).filter(|d| !d.as_os_str().is_empty()) {
+    let on_path = env
+        .path
+        .as_deref()
+        .map(std::env::split_paths)
+        .into_iter()
+        .flatten();
+    let extra = env.extra_dirs.iter().cloned();
+    for dir in on_path.chain(extra).filter(|d| !d.as_os_str().is_empty()) {
         for name in names {
             let candidate = dir.join(name);
             if candidate.is_file() {
