@@ -39,7 +39,7 @@ CHOSEN (2026-11-11): (a), the derived workspace row disappears with a notice.
 
 ## Tasks
 
-- [ ] T1 (S2, D1) Live probe: append a `session_info` line to a chat's `.jsonl` while a child holds it open and check that pi keeps the chat usable and shows the new name -- route: design
+- [x] T1 (S2, D1) Live probe: append a `session_info` line to a chat's `.jsonl` while a child holds it open and check that pi keeps the chat usable and shows the new name -- route: design -- DONE 2026-11-11, PASS 5/5 (Log L4)
 - [ ] T2 (S2, D1, S4) Rename slice: intent, inline row title, the write chosen by D1, `bindings.ts` plus drift guard -- route: design
 - [ ] T3 (S3, D2, S4) Delete slice: row menu entry, confirm modal naming the real path, the live-child rule of D2, file removal -- route: design
 - [ ] T4 (S5, D3) Workspace side-effect and the notices it carries -- route: design
@@ -49,3 +49,4 @@ CHOSEN (2026-11-11): (a), the derived workspace row disappears with a notice.
 - L1: "Rename / delete sessions (needs two decisions: how pi stores a name, and a confirmation step before deleting a file)."
 - L2: 2026-11-11, the user approved the design-first plan: "dale asi".
 - L3: 2026-11-11, the user chose D1(a), D2(b) and D3(a) (all three the RECOMMENDED options).
+- L4: 2026-11-11, T1 live probe PASSED 5/5 (`target/ui-check/probe-rename.ps1`, isolated home in target/probe-home, since deleted): a minimal synthetic session loaded by the real gentle-shell child with `--session` was appended externally with a `session_info` line while the child held it open; no file-sharing violation, the child stayed alive and answered `get_state` over RPC after the append, and the last `session_info.name` reads back exactly. Limits: the session carried no messages and no model turn ran, so "usable" here means the RPC child is alive and answering; pi also accepted a session file the app wrote, which is worth knowing.
