@@ -88,9 +88,36 @@ jobs:
           "$hash  $dotted" | Set-Content -Path (Join-Path $stage "$dotted.sha256") -Encoding ascii
           "sha256=$hash" >> $env:GITHUB_OUTPUT
 
-          $sigSource = "$($exe.FullName).sig"
-          if (Test-Path $sigSource) {
-            Copy-Item $sigSource (Join-Path $stage "$dotted.sig")
+          # latest.json must point at the updater artifact and carry the content
+          # of its signature. With createUpdaterArtifacts true the NSIS installer
+          # is re-used by the updater, so its signature sits next to it as
+          # <installer>.exe.sig; the v1-compatible shape is a .nsis.zip with a
+          # .nsis.zip.sig. Only a signature for a file that is uploaded is
+          # usable, so both shapes are looked for, and a key without a signed
+          # artifact fails the build instead of publishing a release no app can
+          # update from.
+          $sigSource = $null
+          $updateName = $null
+          if (Test-Path "$($exe.FullName).sig") {
+            $sigSource = "$($exe.FullName).sig"
+            $updateName = $dotted
+          } else {
+            $zip = Get-ChildItem -Path target/release/bundle/nsis/*.nsis.zip -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($zip -and (Test-Path "$($zip.FullName).sig")) {
+              $sigSource = "$($zip.FullName).sig"
+              $updateName = $zip.Name -replace ' ', '.'
+            }
+          }
+          if (-not $sigSource) {
+            if ($env:TAURI_SIGNING_PRIVATE_KEY) {
+              throw "a signing key was set but no signed updater artifact was produced"
+            }
+            "signed=false" >> $env:GITHUB_OUTPUT
+          } else {
+            if ($updateName -ne $dotted) {
+              Copy-Item $zip.FullName (Join-Path $stage $updateName)
+            }
+            Copy-Item $sigSource (Join-Path $stage "$updateName.sig")
             $version = (Get-Content apps/desktop/src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
             $manifest = [ordered]@{
               version  = $version
@@ -99,14 +126,12 @@ jobs:
               platforms = [ordered]@{
                 'windows-x86_64' = [ordered]@{
                   signature = (Get-Content $sigSource -Raw).Trim()
-                  url       = "https://github.com/${{ github.repository }}/releases/download/v$version/$dotted"
+                  url       = "https://github.com/${{ github.repository }}/releases/download/v$version/$updateName"
                 }
               }
             }
             $manifest | ConvertTo-Json -Depth 5 | Set-Content -Path (Join-Path $stage "latest.json") -Encoding utf8
             "signed=true" >> $env:GITHUB_OUTPUT
-          } else {
-            "signed=false" >> $env:GITHUB_OUTPUT
           }
           "dir=$stage" >> $env:GITHUB_OUTPUT
           Get-ChildItem $stage | ForEach-Object { Write-Host "$($_.Name)  $($_.Length) bytes" }
