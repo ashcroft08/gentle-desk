@@ -12,7 +12,7 @@ use crate::chats::push_death_notice;
 use crate::input::{ChatCommand, Command, Effects, Intent};
 use crate::intents::dialog_id;
 use crate::notices::drop_restart_notice;
-use crate::state::{push_user_message, AppState};
+use crate::state::{push_user_message, AppState, ModelsStatus};
 
 /// Applies `intent` if it belongs to the per-chat model, answering the effects
 /// for one chat's child (and the shared ones it asks for). Answers `None` when
@@ -103,6 +103,13 @@ fn open(state: &mut AppState, chat: ChatId) -> Vec<ChatCommand> {
     // The helper the panel had open was that chat's: another chat is on screen
     // now, and a selection never names a task of a chat the user left.
     state.selected_helper = None;
+    // The chip's data belongs to the previous chat's child; the new one
+    // answers `get_state` / `get_available_models` when it opens.
+    state.models = Vec::new();
+    state.models_status = ModelsStatus::Unknown;
+    state.model = None;
+    state.thinking_level = None;
+    state.thinking_levels = Vec::new();
     vec![ChatCommand::OpenProcess { chat }]
 }
 

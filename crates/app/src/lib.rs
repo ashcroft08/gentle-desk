@@ -31,7 +31,9 @@ pub use chats::{ChatActivity, ChatId, Chats};
 pub use input::{ChatCommand, Command, Effects, Input, Intent};
 pub use list_status::ListStatus;
 pub use session_prepare::{prepare_sessions, PreparedSessions};
-pub use state::{AppState, Notice, NoticeAction, NoticeLevel, SessionItem};
+pub use state::{
+    AppState, ModelChoice, ModelsStatus, Notice, NoticeAction, NoticeLevel, SessionItem,
+};
 
 /// [`update`] with both halves of the answer.
 ///

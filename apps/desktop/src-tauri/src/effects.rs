@@ -61,7 +61,7 @@ fn run_into(command: ChatCommand, executor: &dyn ChatExecutor, ran: &mut Ran) {
             // A fresh child: the host confirmed the process only. The chat is
             // asked for what the window has to show, and stays opening.
             Opened::Started => {
-                if let Some(next) = request_after_open(&chat, how) {
+                for next in request_after_open(&chat, how) {
                     run_into(next, executor, ran);
                 }
                 ran.confirm_after = Some(chat);

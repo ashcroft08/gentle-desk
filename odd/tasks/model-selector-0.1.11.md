@@ -28,9 +28,10 @@ is written. Backed by the verified facts in the roadmap (2026-11-12 section).
 
 ## Tasks
 
-- [ ] T1 (S3, S4) gentle-core: add `GetAvailableModels`, `SetModel{provider,modelId}`,
+- [x] T1 (S3, S4) gentle-core: add `GetAvailableModels`, `SetModel{provider,modelId}`,
       `SetThinkingLevel{level}`, `GetAvailableThinkingLevels` to `RpcCommand`
-      (crates/gentle-core/src/rpc/types.rs, codec.rs) + codec tests.
+      (crates/gentle-core/src/rpc/types.rs, codec.rs) + codec tests — RED observed
+      (4 E0599); GREEN 23/23 in tests/codec.rs. Commit 6af6296.
 - [ ] T2 (S3, S4, S5) app layer: intents to request list/apply/set-level; parse
       responses in events.rs (models list, Model object, thinking success); keep the
       current model/level in state (crates/app/src/{intents,input,chats/intents,
