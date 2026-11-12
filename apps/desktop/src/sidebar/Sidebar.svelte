@@ -4,11 +4,12 @@
   // footer's theme control (the v1 Appearance setting).
   // It owns the only view-local selection this slice needs (P5): the workspace
   // row the user clicked last, and the chat row clicked while Rust catches up.
-  import { dispatchIntent, renameSession } from '../bridge'
+  import { dispatchIntent, renameSession, deleteSession } from '../bridge'
   import { workspacePathOfChat, type ChatRow, type WorkspaceRow } from '../sessions/rows'
   import { createSessionsView } from '../sessions/view'
   import type { Viewport } from '../sessions/window'
   import WordMark from '../brand/WordMark.svelte'
+  import DeleteChatDialog from './DeleteChatDialog.svelte'
   import EmptyState from './EmptyState.svelte'
   import NewSessionButton from './NewSessionButton.svelte'
   import SidebarHeader from './SidebarHeader.svelte'
@@ -33,6 +34,10 @@
   let clickedPath = $state<string | null>(null)
   /** The chat row the user clicked, until a push names the foreground chat. */
   let clickedChat = $state<string | null>(null)
+  /** Whether the delete confirm dialog is open. */
+  let deleteOpen = $state(false)
+  /** The chat row that dialog is about: the one whose Delete the user picked. */
+  let deleting = $state<ChatRow | null>(null)
 
   // `model`, not `state`: a binding named `state` would shadow the `$state` rune.
   const model = $derived($sessions)
@@ -96,6 +101,25 @@
     void renameSession(row.id, name)
   }
 
+  /**
+   * A row's Delete (T3): the confirm dialog opens on that chat, so the user reads
+   * the real file before anything is removed. Nothing is sent until Delete in the
+   * dialog is pressed.
+   */
+  function askDelete(row: ChatRow): void {
+    deleting = row
+    deleteOpen = true
+  }
+
+  /**
+   * The dialog's Delete: Rust removes that one file and asks for the pass that
+   * heals the list. A refusal (a chat that is working asks to be stopped first)
+   * reaches the user as `sessions_notice`, drawn under the lines above the tree.
+   */
+  async function confirmDelete(path: string): Promise<void> {
+    await deleteSession(path)
+  }
+
   function newSession(): void {
     if (currentPath !== null) newChatAt(currentPath)
   }
@@ -137,8 +161,16 @@
       onNewChat={newChatAt}
       onOpen={open}
       onRename={rename}
+      onDelete={askDelete}
     />
   {/if}
+  <!-- The delete's confirm dialog, over everything: it names the real file of
+       the chat the user picked, and only its Delete sends the command (S4). -->
+  <DeleteChatDialog
+    bind:open={deleteOpen}
+    path={deleting?.id ?? ''}
+    onDelete={confirmDelete}
+  />
   <!-- The footer's theme control (01a): the v1 Appearance setting, drawn
        where the artboard puts it. -->
   <footer class="foot">

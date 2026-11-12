@@ -877,8 +877,16 @@ p {
   border: 1px solid var(--border);
   border-radius: 10px;
   box-shadow: var(--shadow);
-  padding: 4px;
+  padding: 6px;
   z-index: 15;
+}
+
+/* A chat row's actions menu (design fix, T3): the card above, anchored so it
+   opens fully INSIDE the sidebar - right-aligned to the button, pulled a little
+   further in from the edge - with every label on one readable line. */
+.chat-menu {
+  min-width: 190px;
+  max-width: calc(280px - 24px);
 }
 
 .menu [role='menuitem'] {
@@ -888,8 +896,10 @@ p {
   background: transparent;
   border: 0;
   border-radius: 6px;
-  padding: 6px 10px;
+  padding: 7px 12px;
   font-size: 13px;
+  line-height: 1.4;
+  white-space: nowrap;
   cursor: pointer;
 }
 
@@ -897,6 +907,12 @@ p {
 .menu [role='menuitem'][data-highlighted] {
   background: var(--surface2);
   box-shadow: inset 0 0 0 1px var(--border);
+}
+
+/* The delete item of a chat row's menu, and the dialog's delete button: the
+   artboard's danger treatment (01a `.menu button.d`, `.btn.d`). */
+.menu [role='menuitem'].d {
+  color: var(--danger);
 }
 
 /* The create-folder dialog: the states board's dialog shape (the `dialog`
@@ -951,6 +967,27 @@ p {
   justify-content: flex-end;
   gap: 8px;
   margin-top: 16px;
+}
+
+/* The real file the delete dialog names: the states board's `code` line, the one
+   thing that tells the user which file goes. */
+.dlg code {
+  display: block;
+  margin: 10px 0 4px;
+  padding: 8px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  font-size: 12.5px;
+  word-break: break-all;
+  color: var(--muted);
+}
+
+.dlg .btn.d {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: var(--bg);
 }
 
 /* The dialog's own field and its options: the box the user types in, and one
@@ -1077,6 +1114,16 @@ p {
   color: var(--muted);
   font-size: 12px;
   flex: none;
+  transition: opacity 120ms ease;
+}
+
+/* The timestamp and the actions icon share the row's right end, so the one that
+   is not being used steps aside: while the actions are visible the timestamp
+   fades out, in the slot it keeps, and the two never read as one word. */
+.frow.chat-row:hover .ago,
+.frow.chat-row:focus-within .ago,
+.frow.chat-row.menu-open .ago {
+  opacity: 0;
 }
 
 .row > .icon {
@@ -1091,10 +1138,11 @@ p {
   padding-left: 42px;
 }
 
-/* A chat row keeps room for its own actions icon (T2), as a folder row keeps
-   room for its new-chat icon. */
+/* A chat row keeps a REAL slot for its own actions icon (T2): the icon is 32px
+   wide and sits 6px from the row's edge, so 44px of padding leaves it room of
+   its own instead of letting it print over the timestamp (design fix, T3). */
 .frow .row.chat {
-  padding-right: 30px;
+  padding-right: 44px;
 }
 
 /* The inline rename input (states board, the `.rn` field): the title's own box,
@@ -1113,9 +1161,12 @@ p {
 }
 
 /* A chat row's actions icon shows while its own row is hovered or holds the
-   keyboard, the same reveal the workspace's new-chat icon has. */
+   keyboard, the same reveal the workspace's new-chat icon has. It keeps showing
+   while the menu it opened is still open, so the button never blinks out under
+   its own menu. */
 .frow.chat-row:hover .nc,
-.frow.chat-row:focus-within .nc {
+.frow.chat-row:focus-within .nc,
+.frow.chat-row.menu-open .nc {
   opacity: 1;
 }
 

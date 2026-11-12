@@ -33,6 +33,7 @@
     onNewChat,
     onOpen,
     onRename,
+    onDelete,
   }: {
     rows?: TreeRow[]
     /** How many rows the whole tree has, headers included. */
@@ -48,6 +49,8 @@
     onOpen: (row: ChatRowData) => void
     /** The name a chat row's inline input committed, to send as the rename. */
     onRename: (row: ChatRowData, name: string) => void
+    /** A chat row's Delete: the sidebar opens the confirm dialog that names it. */
+    onDelete: (row: ChatRowData) => void
   } = $props()
 
   /** The scroll container: it is what the viewport is measured from. */
@@ -173,6 +176,7 @@
           onHover={(key) => (hoveredKey = key)}
           onKeydown={keydown}
           onRename={onRename}
+          onDelete={onDelete}
         />
       {/if}
     {/each}
