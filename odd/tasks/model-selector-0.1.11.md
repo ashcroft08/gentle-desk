@@ -69,6 +69,30 @@ is written. Backed by the verified facts in the roadmap (2026-11-12 section).
   contract and the component alone.
 - L6: A node_modules cache file slipped into the T3 commit; it was untracked from
   the index and the commit amended (ed4b0e4), and node_modules/ went to .gitignore.
+- L7: The native review (lineage review-4488bf5658032c09, medium tier, lenses
+  reliability + resilience + refuter) returned five deterministic CRITICAL
+  findings, all introduced by this candidate: nothing ever dispatches
+  get_available_thinking_levels (the level dropdown could never render);
+  OpenSession cleared the chip without refetching; returning to an
+  already-running chat asked nothing, leaving the chip on a loading line
+  forever. All three explain the user's window report. Bounded correction
+  committed as 9976f29 (149/150 planned diff lines, budget 200): every open
+  path and the switch_session reply now ask get_state, get_available_models
+  and get_available_thinking_levels; full suite green again (91 binaries).
+- L8: The provider stop corrected_candidate_unavailable offered a recovery to
+  successor lineage review-99ac896bdebadaa0 (disposition scope_changed). The
+  gentle_review recover invocation fails its input type check ("Review
+  controller input must be a string") across eight submissions, including the
+  exact six provider inputs plus the envelope-required actor/reason; the
+  facade cannot currently accept the serialized input. Authority stays parked
+  in correction_required with the recovery authorized; no further recover
+  attempts without a user decision.
+- L9 (user requests after the window test, verbatim): "se quedo en Loading
+  models... o no se si demora" — diagnosed as L7/L8 findings, fix in 9976f29;
+  "quiero el diseño de esta forma" (screenshot: the chip inline in the composer
+  bar, right-aligned next to the send button, model name bold, level faint,
+  chevron) — NEW scope, pending task; the textarea stays expanded after sending
+  long text (height never resets) — NEW scope, pending task.
 
 - L1 (user request, verbatim): "Quiero hacer investigaciones, para ver si a futuro se
   puede hacer ciertas implementaciones en la app, Los comandos /login, /logout,
