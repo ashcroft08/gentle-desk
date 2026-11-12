@@ -125,7 +125,13 @@ impl Tree {
     /// ([`gentle_runtime::app_config::folder_key`]): the folders the config
     /// holds and the ones the sessions name, exactly as the sidebar shows them.
     pub fn knows(&self, key: &str) -> bool {
-        self.headers.iter().any(|header| header.key == key)
+        self.header_of(key).is_some()
+    }
+
+    /// The header of the workspace `key` names, when the tree carries one: the
+    /// label it draws is the naming rule's, never a second one (`T4`'s notice).
+    pub fn header_of(&self, key: &str) -> Option<&Header> {
+        self.headers.iter().find(|header| header.key == key)
     }
 }
 

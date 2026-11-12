@@ -8,6 +8,7 @@ pub mod home;
 pub mod launcher;
 pub mod process;
 pub mod session_cache;
+pub mod session_delete;
 pub mod session_index;
 pub mod session_rename;
 pub mod session_schedule;

@@ -69,6 +69,23 @@ export async function renameSession(sessionId: string, name: string): Promise<vo
 }
 
 /**
+ * Deletes one chat (T3): the row's confirm dialog sends the session path it named,
+ * and this is the only caller, so `confirmed` is always the user's answer in that
+ * dialog and never a default. Rust removes that one file and asks for the pass
+ * that heals the list. A refusal - a chat that is working, a file that is already
+ * gone - is not thrown back at the view: the next push carries the reason in
+ * `ViewState.sessions_notice`, and a workspace the delete empties says so in
+ * `ViewState.workspace_notice`.
+ */
+export async function deleteSession(sessionId: string): Promise<void> {
+  try {
+    await commands.deleteSession(sessionId, true)
+  } catch {
+    // The push carries the reason; a failed call leaves the file where it is.
+  }
+}
+
+/**
  * "Create a new folder": Rust validates the name and then asks for the parent
  * folder, so the name can sit behind a picker for minutes; the caller shows a
  * busy state meanwhile. A refusal is not thrown back at the view either: the

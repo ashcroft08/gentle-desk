@@ -203,6 +203,33 @@ impl AppStateHolder {
         lock(&self.app).activity_of_session(session)
     }
 
+    /// The session list as the state holds it right now. Read by the delete
+    /// command (`chat_delete`): deciding whether the folder of the deleted chat
+    /// was the last chat of a workspace the config does not name needs the whole
+    /// list (T4).
+    pub fn listed_sessions(&self) -> Vec<SessionItem> {
+        self.sessions_snapshot()
+    }
+
+    /// The session file of the chat the app holds as the foreground one: the
+    /// current workspace is the one that file lives in (T4, D3(a)). `None` for
+    /// no foreground chat, and for a chat that has no session file yet.
+    pub fn foreground_session(&self) -> Option<String> {
+        lock(&self.app)
+            .chats
+            .foreground()
+            .and_then(|chat| chat.session_path().map(str::to_owned))
+    }
+
+    /// The label the sidebar draws for the workspace `key` names, when the tree
+    /// of the current revision carries it: the delete's notice names the
+    /// workspace that vanished, and the naming rule is the tree's (T4).
+    pub fn workspace_label(&self, key: &str) -> Option<String> {
+        self.tree()
+            .header_of(key)
+            .map(|header| header.label.clone())
+    }
+
     /// One window of the flattened workspace tree as the state holds it NOW:
     /// the rows `[offset, offset + length)` of the tree, and how many rows the
     /// tree has in total. The tree is built once per revision, from snapshots

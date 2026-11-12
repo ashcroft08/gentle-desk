@@ -7,6 +7,7 @@
 //! from the command layer in `commands`.
 
 pub mod bridge;
+pub mod chat_delete;
 pub mod chat_rename;
 pub mod clipboard;
 pub mod close;
@@ -57,6 +58,7 @@ pub fn contract_builder() -> Builder<tauri::Wry> {
             workspace_commands::add_workspace,
             workspace_commands::create_workspace,
             chat_rename::rename_session,
+            chat_delete::delete_session,
             commands::attach_images,
             commands::remove_image,
         ])

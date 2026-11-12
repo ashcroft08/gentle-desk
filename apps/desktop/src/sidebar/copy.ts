@@ -46,3 +46,10 @@ export const CANCEL = 'Cancel'
 export function readingLine(done: number, total: number): string {
   return total === 0 ? 'Reading chats...' : `Reading chats... ${done} / ${total}`
 }
+
+// The delete confirm dialog, quoted from the states board's own card ("Delete:
+// confirm, names the real file"). The board draws the chat's real path in a
+// `code` line between these two texts; the app fills it from the row it deletes.
+export const DELETE_TITLE = 'Delete this chat?'
+export const DELETE_BODY = 'The chat file is removed from disk and cannot be restored.'
+export const DELETE_CONFIRM = 'Delete'

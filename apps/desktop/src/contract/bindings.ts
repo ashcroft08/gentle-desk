@@ -66,6 +66,16 @@ export const commands = {
 	 */
 	renameSession: (sessionId: string, name: string) => typedError<ViewState_Serialize, string>(__TAURI_INVOKE("rename_session", { sessionId, name })),
 	/**
+	 *  Deletes one chat (S4): the row sends the session path the confirm dialog
+	 *  showed, and the web side sends `confirmed` only from that dialog's Delete.
+	 * 
+	 *  The removal happens off the window's thread. A delete that lands asks the
+	 *  session list for the pass that heals it, which is what takes the chat's row -
+	 *  and the row of a workspace it leaves empty - off the tree; a refusal asks for
+	 *  nothing, because no file changed.
+	 */
+	deleteSession: (sessionId: string, confirmed: boolean) => typedError<ViewState_Serialize, string>(__TAURI_INVOKE("delete_session", { sessionId, confirmed })),
+	/**
 	 *  The images a drop attached, as one command: the paths are the files the user
 	 *  dragged, and they come from Tauri's own drop event, because the webview's
 	 *  `File` has no path. Nothing but paths travel up: the shell reads the files,
@@ -1014,16 +1024,19 @@ export type ViewState_Deserialize = {
 	 *  already holds files (Q6). `None` when nothing was refused, and cleared by
 	 *  the next workspace action that works. A shell-owned line, never the
 	 *  config's: the config notice says what became of the file, this one says
-	 *  what the user asked for that could not be done.
+	 *  what the user asked for that could not be done. It also carries the one
+	 *  report a delete leaves: the current workspace had its last chat removed,
+	 *  so its row is gone from the tree (T4, D3(a)).
 	 */
 	workspace_notice?: string | null,
 	/**
 	 *  Why the last session action was refused, as one line of plain text: a chat
-	 *  that is working (its child is appending to the same session file), a name
-	 *  that is empty or only spaces, or a session file the disk would not take.
-	 *  `None` when nothing was refused, and cleared by the next session action
-	 *  that works. A shell-owned line, like
-	 *  [`workspace_notice`](Self::workspace_notice): no reducer path records one.
+	 *  that is working (its child is appending to the same session file) on a
+	 *  rename or a delete, a name that is empty or only spaces, or a session file
+	 *  the disk would not take or no longer holds. `None` when nothing was
+	 *  refused, and cleared by the next session action that works. A shell-owned
+	 *  line, like [`workspace_notice`](Self::workspace_notice): no reducer path
+	 *  records one.
 	 */
 	sessions_notice?: string | null,
 };
@@ -1150,16 +1163,19 @@ export type ViewState_Serialize = {
 	 *  already holds files (Q6). `None` when nothing was refused, and cleared by
 	 *  the next workspace action that works. A shell-owned line, never the
 	 *  config's: the config notice says what became of the file, this one says
-	 *  what the user asked for that could not be done.
+	 *  what the user asked for that could not be done. It also carries the one
+	 *  report a delete leaves: the current workspace had its last chat removed,
+	 *  so its row is gone from the tree (T4, D3(a)).
 	 */
 	workspace_notice: string | null,
 	/**
 	 *  Why the last session action was refused, as one line of plain text: a chat
-	 *  that is working (its child is appending to the same session file), a name
-	 *  that is empty or only spaces, or a session file the disk would not take.
-	 *  `None` when nothing was refused, and cleared by the next session action
-	 *  that works. A shell-owned line, like
-	 *  [`workspace_notice`](Self::workspace_notice): no reducer path records one.
+	 *  that is working (its child is appending to the same session file) on a
+	 *  rename or a delete, a name that is empty or only spaces, or a session file
+	 *  the disk would not take or no longer holds. `None` when nothing was
+	 *  refused, and cleared by the next session action that works. A shell-owned
+	 *  line, like [`workspace_notice`](Self::workspace_notice): no reducer path
+	 *  records one.
 	 */
 	sessions_notice: string | null,
 };

@@ -7,7 +7,10 @@
   // title into an input, like the states board's inline rename: Enter commits,
   // Escape cancels, and the typed name goes to Rust as the rename command (the
   // title the state carries moves on the next push, when the session list reads
-  // the appended name back). Delete is drawn but wired to nothing until T3.
+  // the appended name back). Delete opens the sidebar's confirm dialog, which
+  // names the real file before the delete command runs (T3); the item stays
+  // enabled always, because only the chat's WORKING state refuses a delete, and
+  // that refusal is the command's to say.
   import { DropdownMenu } from 'bits-ui'
   import Icon from '../icons/Icon.svelte'
   import Mark from '../icons/Mark.svelte'
@@ -25,6 +28,7 @@
     onHover,
     onKeydown,
     onRename,
+    onDelete,
   }: {
     row: ChatRow
     /** The row's place in the drawn page, the key the tree uses to activate it. */
@@ -41,6 +45,8 @@
     onKeydown: (event: KeyboardEvent) => void
     /** The name the user typed for this chat, once they pressed Enter. */
     onRename: (row: ChatRow, name: string) => void
+    /** This chat's Delete: the sidebar opens the confirm dialog that names it. */
+    onDelete: (row: ChatRow) => void
   } = $props()
 
   /** Whether the title is an input right now. */
@@ -49,6 +55,8 @@
   let draft = $state('')
   /** The input, so starting a rename can focus it. */
   let field = $state<HTMLInputElement | null>(null)
+  /** Whether the actions menu is open, so its button keeps the slot it holds. */
+  let menuOpen = $state(false)
 
   const actions = $derived(`Chat actions for ${row.title}`)
 
@@ -94,7 +102,7 @@
   }
 </script>
 
-<div class="frow chat-row">
+<div class="frow chat-row" class:menu-open={menuOpen}>
   <div
     class="row chat"
     role="treeitem"
@@ -125,7 +133,7 @@
       <Mark kind={mark} />
     {/if}
   </div>
-  <DropdownMenu.Root>
+  <DropdownMenu.Root bind:open={menuOpen}>
     <DropdownMenu.Trigger
       class="ic nc tip-l"
       aria-label={actions}
@@ -135,10 +143,21 @@
       <Icon name="more" size={16} />
     </DropdownMenu.Trigger>
     <DropdownMenu.Portal>
-      <DropdownMenu.Content class="menu" aria-label={actions} side="bottom" align="end" sideOffset={6}>
+      <!-- The menu opens inside the sidebar and away from its edge: right-aligned
+           to this button, pulled a little further in, and kept off the window by
+           the collision padding. The card (padding, radius, shadow, item hit
+           areas) is `.menu`'s, shared with the New workspace menu. -->
+      <DropdownMenu.Content
+        class="menu chat-menu"
+        aria-label={actions}
+        side="bottom"
+        align="end"
+        alignOffset={-10}
+        sideOffset={6}
+        collisionPadding={12}
+      >
         <DropdownMenu.Item onSelect={startRename}>Rename</DropdownMenu.Item>
-        <!-- The confirm modal that names the real path is T3: drawn, not wired. -->
-        <DropdownMenu.Item disabled>Delete</DropdownMenu.Item>
+        <DropdownMenu.Item class="d" onSelect={() => onDelete(row)}>Delete</DropdownMenu.Item>
       </DropdownMenu.Content>
     </DropdownMenu.Portal>
   </DropdownMenu.Root>

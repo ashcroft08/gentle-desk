@@ -46,6 +46,7 @@ export function serveSidebar(
   setHandler('add_workspace', () => fixture.view)
   setHandler('create_workspace', () => fixture.view)
   setHandler('rename_session', () => fixture.view)
+  setHandler('delete_session', () => fixture.view)
   return fixture
 }
 

@@ -57,18 +57,16 @@ async function titleInput(): Promise<HTMLElement> {
 }
 
 describe('Renaming a chat', () => {
-  it('offers Rename and Delete on the row, and Delete does nothing yet', async () => {
+  it('offers Rename and Delete on the row, both ready to use', async () => {
     serve()
     const menu = await openRowMenu()
 
     const rename = within(menu).getByRole('menuitem', { name: RENAME })
     const remove = within(menu).getByRole('menuitem', { name: DELETE })
-    expect(rename).toBeTruthy()
-    expect(remove.getAttribute('aria-disabled')).toBe('true')
-
-    // The stub is DRAWN but wired to nothing: no command leaves the view.
-    await fireEvent.click(remove)
-    expect(handlerArgs('rename_session')).toEqual([])
+    expect(rename.getAttribute('aria-disabled')).not.toBe('true')
+    // Delete is the delete slice's own (T3, `ChatDelete.test.ts`): enabled here,
+    // not a stub any more.
+    expect(remove.getAttribute('aria-disabled')).not.toBe('true')
     expect(screen.getByText(TITLE)).toBeTruthy()
   })
 
