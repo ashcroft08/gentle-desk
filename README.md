@@ -6,6 +6,8 @@
 
 <h1 align="center">Gentle Shell Desktop</h1>
 
+<p align="center"><em>Preview: under active development; features and behavior change between releases.</em></p>
+
 <p align="center"><strong>Your gentle-shell coding agent, in a window of its own.</strong></p>
 
 <p align="center">
