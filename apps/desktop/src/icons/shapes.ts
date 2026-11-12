@@ -50,6 +50,10 @@ export type IconName =
   // The footer's gear, which opens the Settings dialog (settings-dialog S5):
   // Lucide's `settings` icon, one outline around the hub.
   | 'settings'
+  // The Settings dialog's rail (settings-dialog L4): Lucide's `house` for Shell
+  // home and its `info` for About and updates, in the gear's own stroke.
+  | 'house'
+  | 'info'
 
 const FOLDER = 'M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z'
 const FOLDER_OPEN =
@@ -84,6 +88,14 @@ export const ICON_SHAPES: Record<IconName, IconShape[]> = {
     path('M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z'),
     circle(12, 12, 3),
   ],
+  // The rail's Shell home entry: Lucide's `house`, the door and the roof wall.
+  house: [
+    path('M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8'),
+    path('M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z'),
+  ],
+  // The rail's About and updates entry: Lucide's `info`, the ring, the stem and
+  // the dot. The same three-shape style as the two above.
+  info: [circle(12, 12, 10), path('M12 16v-4'), path('M12 8h.01')],
 }
 
 /** The six chat states a session row can mark, as the contract names them. */

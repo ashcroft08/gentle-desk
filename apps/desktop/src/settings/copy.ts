@@ -7,8 +7,15 @@
 /** The gear's name and the dialog's title: the same word for both (S5, S2). */
 export const SETTINGS = 'Settings'
 
-/** The dialog's one line under its title: what the two sections are about. */
-export const HINT = 'The look of this window, and the home gentle shell runs on.'
+/**
+ * Each section's one-line hint (L4): the stacked dialog said what the two
+ * sections were about once, above all of them, and the rail replaces that. Each
+ * line now stands over the section it is about, so nothing has to be guessed
+ * from a shared line.
+ */
+export const APPEARANCE_HINT = 'The look of this window.'
+export const HOME_HINT = 'Which pi this shell runs on.'
+export const ABOUT_HINT = 'Which build this is, and whether a newer one exists.'
 
 export const APPEARANCE_TITLE = 'Appearance'
 export const HOME_TITLE = 'Shell home'

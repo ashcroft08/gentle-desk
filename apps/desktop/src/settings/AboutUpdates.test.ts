@@ -43,13 +43,18 @@ function shell(): ShellView {
   }
 }
 
-/** The dialog drawn on its own, with the check the test answers. */
+/**
+ * The dialog drawn on its own, with the check the test answers, its rail entry
+ * for About and updates picked: the section lives in the dialog's pane now, one
+ * section at a time (L4).
+ */
 async function draw(checkUpdate: () => Promise<CheckResult>): Promise<HTMLElement> {
   render(SettingsDialog, {
     props: { open: true, theme: 'system' as const, shell: shell(), version: VERSION, checkUpdate },
   })
   const dialog = await screen.findByRole('dialog')
-  return within(dialog).getByRole('region', { name: ABOUT })
+  await fireEvent.click(within(dialog).getByRole('tab', { name: ABOUT }))
+  return within(dialog).getByRole('tabpanel', { name: ABOUT })
 }
 
 describe('the Updates check', () => {

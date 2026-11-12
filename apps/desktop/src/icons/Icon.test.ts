@@ -13,6 +13,8 @@ const NAMES: IconName[] = [
   'circle-plus',
   'more',
   'settings',
+  'house',
+  'info',
 ]
 
 describe('Icon', () => {
@@ -51,5 +53,29 @@ describe('Icon', () => {
     expect(hub?.getAttribute('cy')).toBe('12')
     expect(hub?.getAttribute('r')).toBe('3')
     expect(container.querySelector('rect')).toBeNull()
+  })
+
+  it('draws the Settings rail icons in the same Lucide style: a house and an info', () => {
+    // The rail's Shell home and About and updates entries (settings-dialog L4):
+    // Lucide's `house` and `info`, outline-only like the gear above, so the
+    // three entries share one stroke and one 24x24 grid.
+    const house = render(Icon, { props: { name: 'house' } })
+    const housePaths = [...house.container.querySelectorAll('path')].map((path) =>
+      path.getAttribute('d'),
+    )
+    expect(housePaths).toEqual([
+      'M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8',
+      'M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z',
+    ])
+    expect(house.container.querySelector('rect')).toBeNull()
+    house.unmount()
+
+    const info = render(Icon, { props: { name: 'info' } })
+    const ring = info.container.querySelector('circle')
+    expect([...info.container.querySelectorAll('path')].map((path) => path.getAttribute('d'))).toEqual(
+      ['M12 16v-4', 'M12 8h.01'],
+    )
+    expect(ring?.getAttribute('r')).toBe('10')
+    expect(info.container.querySelector('rect')).toBeNull()
   })
 })

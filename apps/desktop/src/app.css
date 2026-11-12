@@ -1015,33 +1015,89 @@ p {
   color: var(--bg);
 }
 
-/* The Settings dialog (settings-dialog S2): the footer's two controls, one
-   section each, in the order the design names them. */
+/* The Settings dialog (settings-dialog S2, L4): a rail of the three sections on
+   the left and the selected section's content in the pane on the right. The card
+   is wider than the other dialogs' 440px to hold both, about 680px. */
 .dlg.settings {
-  width: min(520px, calc(100vw - 32px));
+  width: min(680px, calc(100vw - 32px));
   display: flex;
   flex-direction: column;
   gap: 14px;
 }
 
-.dlg .setting {
-  border-top: 1px solid var(--border);
-  padding-top: 12px;
+/* The rail and the pane, side by side: the rail is fixed and the pane takes the
+   rest, with the one section drawn there. */
+.settings-body {
+  display: flex;
+  gap: 16px;
+  min-height: 240px;
 }
 
-/* The first section follows the title and its hint, which already separate it. */
-.dlg .setting:first-of-type {
-  border-top: 0;
-  padding-top: 0;
+.settings-rail {
+  flex: none;
+  width: 176px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-right: 14px;
+  border-right: 1px solid var(--border);
 }
 
-.dlg .setting h3 {
+/* One rail entry: its glyph and its word, quiet until it is the selected one or
+   the pointer is over it. */
+.settings-rail [role='tab'] {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.settings-rail [role='tab']:hover {
+  background: var(--surface2);
+  color: var(--text);
+}
+
+.settings-rail [role='tab'][aria-selected='true'] {
+  background: var(--tint);
+  color: var(--text);
+}
+
+.settings-rail [role='tab']:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+
+/* The pane: breathing room from the rail, then the section's heading, its one
+   short hint and the content the section already drew. */
+.settings-pane {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 2px 2px 0 4px;
+}
+
+.settings-pane h3 {
   margin: 0 0 8px;
   font-size: 13px;
   font-weight: 600;
 }
 
-.dlg .setting .why {
+.settings-pane .hint {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.settings-pane .why {
   margin: 0 0 10px;
 }
 

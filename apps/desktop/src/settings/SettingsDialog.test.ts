@@ -1,8 +1,9 @@
-// The Settings dialog (settings-dialog S2-S6): the two controls that left the
-// footer - the theme picker and the home setting - one section each, with the
-// explanation the welcome screen gives for the two homes, and the About and
-// updates section: the app's name and the version this run runs as, which reach
-// the dialog from the pushed view (the check itself is AboutUpdates.test.ts's).
+// The Settings dialog (settings-dialog S2-S6, L4): a rail of three sections on
+// the left and the selected section's content in the pane on the right - the two
+// controls that left the footer (the theme picker and the home setting), each
+// with its own short line, with the welcome screen's explanation of the two
+// homes, and About and updates: the app's name, the version this run runs as,
+// and the manual check (the check itself is AboutUpdates.test.ts's).
 // Dismiss, Escape and the backdrop close it, and closing sends nothing: each
 // section persists through its own command.
 import '../test-support/dom-env'
@@ -23,6 +24,13 @@ const TITLE = 'Settings'
 const APPEARANCE = 'Appearance'
 const HOME = 'Shell home'
 const ABOUT = 'About and updates'
+/** The rail's three entries, in the order the dialog draws them. */
+const RAIL = [APPEARANCE, HOME, ABOUT]
+const APPEARANCE_HINT = 'The look of this window.'
+const HOME_HINT = 'Which pi this shell runs on.'
+const ABOUT_HINT = 'Which build this is, and whether a newer one exists.'
+/** The generic line the stacked dialog drew under its title: it is gone now. */
+const OLD_HINT = 'The look of this window, and the home gentle shell runs on.'
 const EXPLAIN =
   'My pi uses the pi installation already on the machine: sign-ins, local models and chats appear in the terminal. Separate creates a clean space at ~/.gentle-shell/agent and touches nothing else.'
 /** About and updates (S5): the name, and the version this run runs as. */
@@ -63,9 +71,19 @@ async function openSettings(
   return await screen.findByRole('dialog')
 }
 
-/** One of the dialog's sections, found by the title it draws. */
-function section(dialog: HTMLElement, name: string): HTMLElement {
-  return within(dialog).getByRole('region', { name })
+/** The rail's entries, in the order the dialog draws them. */
+function rail(dialog: HTMLElement): HTMLElement[] {
+  return within(dialog).getAllByRole('tab')
+}
+
+/** The one section drawn in the pane: only the selected one is there. */
+function pane(dialog: HTMLElement): HTMLElement {
+  return within(dialog).getByRole('tabpanel')
+}
+
+/** Picks a section in the rail, the way the user does. */
+async function pick(dialog: HTMLElement, name: string): Promise<void> {
+  await fireEvent.click(within(dialog).getByRole('tab', { name }))
 }
 
 /** The intents the bridge received, oldest first. */
@@ -74,44 +92,70 @@ function intents(): unknown[] {
 }
 
 describe('the Settings dialog', () => {
-  it('opens from the footer gear with Appearance, Shell home and About and updates in order', async () => {
+  it('opens from the footer gear with the three sections in its rail and Appearance first', async () => {
     const dialog = await openSettings()
 
     expect(within(dialog).getByRole('heading', { level: 2, name: TITLE })).toBeTruthy()
+    expect(rail(dialog).map((entry) => entry.textContent?.trim())).toEqual(RAIL)
     expect(
-      within(dialog)
-        .getAllByRole('region')
-        .map((drawn) => drawn.querySelector('h3')?.textContent?.trim()),
-    ).toEqual([APPEARANCE, HOME, ABOUT])
+      rail(dialog).map((entry) => entry.getAttribute('aria-selected')),
+    ).toEqual(['true', 'false', 'false'])
+    expect(within(dialog).getAllByRole('tabpanel')).toHaveLength(1)
+    expect(within(dialog).getByRole('tabpanel', { name: APPEARANCE })).toBeTruthy()
+  })
+
+  it('draws one short hint per section and drops the old generic line', async () => {
+    const dialog = await openSettings()
+
+    expect(within(pane(dialog)).getByText(APPEARANCE_HINT)).toBeTruthy()
+    expect(within(dialog).queryByText(OLD_HINT)).toBeNull()
+
+    await pick(dialog, HOME)
+    expect(within(pane(dialog)).getByText(HOME_HINT)).toBeTruthy()
+
+    await pick(dialog, ABOUT)
+    expect(within(pane(dialog)).getByText(ABOUT_HINT)).toBeTruthy()
+    expect(within(dialog).queryByText(APPEARANCE_HINT)).toBeNull()
   })
 
   it('draws the theme picker in Appearance, named with the current theme', async () => {
     const dialog = await openSettings()
-    const appearance = section(dialog, APPEARANCE)
-    const button = within(appearance).getByRole('button', { name: 'Theme: System' })
+    const button = within(pane(dialog)).getByRole('button', { name: 'Theme: System' })
 
     expect(button.getAttribute('aria-haspopup')).toBe('listbox')
     await fireEvent.click(button)
-    expect(within(appearance).getByRole('listbox', { name: 'Theme' })).toBeTruthy()
+    expect(within(pane(dialog)).getByRole('listbox', { name: 'Theme' })).toBeTruthy()
   })
 
-  it('draws the home setting and the two-home explanation in Shell home', async () => {
+  it('switches the pane to Shell home when its rail entry is picked', async () => {
     const dialog = await openSettings({ choice: 'link' })
-    const home = section(dialog, HOME)
+
+    await pick(dialog, HOME)
+    const home = pane(dialog)
 
     expect(within(home).getByText(EXPLAIN)).toBeTruthy()
-    expect(
-      within(home).getByRole('button', { name: 'My pi' }).getAttribute('aria-pressed'),
-    ).toBe('true')
+    expect(within(home).getByRole('button', { name: 'My pi' }).getAttribute('aria-pressed')).toBe(
+      'true',
+    )
     expect(
       within(home).getByRole('button', { name: 'Separate' }).getAttribute('aria-pressed'),
+    ).toBe('false')
+    // Appearance left the pane, and the rail says which section is drawn.
+    expect(within(dialog).queryByRole('button', { name: 'Theme: System' })).toBeNull()
+    expect(within(dialog).getByRole('tab', { name: HOME }).getAttribute('aria-selected')).toBe(
+      'true',
+    )
+    expect(
+      within(dialog).getByRole('tab', { name: APPEARANCE }).getAttribute('aria-selected'),
     ).toBe('false')
   })
 
   it('keeps the restart line while a home change waits for a restart', async () => {
     const dialog = await openSettings({ choice: 'link', restart_needed: true })
 
-    expect(section(dialog, HOME).querySelector('[role="status"]')?.textContent).toContain(
+    await pick(dialog, HOME)
+
+    expect(pane(dialog).querySelector('[role="status"]')?.textContent).toContain(
       'Restart to use this home.',
     )
   })
@@ -119,24 +163,66 @@ describe('the Settings dialog', () => {
   it('sends the home the user picks in the dialog, once', async () => {
     const dialog = await openSettings({ choice: 'isolated' })
 
-    await fireEvent.click(within(section(dialog, HOME)).getByRole('button', { name: 'My pi' }))
+    await pick(dialog, HOME)
+    await fireEvent.click(within(pane(dialog)).getByRole('button', { name: 'My pi' }))
 
     expect(intents()).toEqual([{ type: 'SetShellHome', data: { choice: 'link' } }])
   })
 
-  it('names the app and the version this run runs as in About and updates', async () => {
+  it('switches to About and updates: the name, the version and Check now', async () => {
     const dialog = await openSettings()
-    const about = section(dialog, ABOUT)
+
+    await pick(dialog, ABOUT)
+    const about = pane(dialog)
 
     expect(within(about).getByText(APP_NAME)).toBeTruthy()
     expect(within(about).getByText(VERSION_LINE)).toBeTruthy()
     expect(within(about).getByRole('button', { name: 'Check now' })).toBeTruthy()
+    // One section at a time: the other two are not drawn.
+    expect(within(dialog).queryByText(EXPLAIN)).toBeNull()
+    expect(within(dialog).queryByRole('button', { name: 'Theme: System' })).toBeNull()
   })
 
   it('says it does not know the version when the bridge named none', async () => {
     const dialog = await openSettings({}, null)
 
-    expect(within(section(dialog, ABOUT)).getByText(VERSION_UNKNOWN)).toBeTruthy()
+    await pick(dialog, ABOUT)
+
+    expect(within(pane(dialog)).getByText(VERSION_UNKNOWN)).toBeTruthy()
+  })
+
+  it('walks the rail with the arrow keys and Home and End, one tab stop', async () => {
+    const dialog = await openSettings()
+
+    // Only the selected entry takes the tab: the rest are reached by key.
+    expect(rail(dialog).map((entry) => entry.getAttribute('tabindex'))).toEqual(['0', '-1', '-1'])
+
+    await fireEvent.keyDown(within(dialog).getByRole('tab', { name: APPEARANCE }), {
+      key: 'ArrowDown',
+    })
+    expect(within(dialog).getByRole('tab', { name: HOME }).getAttribute('aria-selected')).toBe(
+      'true',
+    )
+    expect(document.activeElement).toBe(within(dialog).getByRole('tab', { name: HOME }))
+    expect(within(pane(dialog)).getByText(EXPLAIN)).toBeTruthy()
+
+    await fireEvent.keyDown(within(dialog).getByRole('tab', { name: HOME }), { key: 'End' })
+    expect(within(dialog).getByRole('tab', { name: ABOUT }).getAttribute('aria-selected')).toBe(
+      'true',
+    )
+
+    await fireEvent.keyDown(within(dialog).getByRole('tab', { name: ABOUT }), { key: 'Home' })
+    expect(
+      within(dialog).getByRole('tab', { name: APPEARANCE }).getAttribute('aria-selected'),
+    ).toBe('true')
+
+    // The rail wraps at both ends, as the chat header's tablist does.
+    await fireEvent.keyDown(within(dialog).getByRole('tab', { name: APPEARANCE }), {
+      key: 'ArrowUp',
+    })
+    expect(within(dialog).getByRole('tab', { name: ABOUT }).getAttribute('aria-selected')).toBe(
+      'true',
+    )
   })
 
   it('closes on Escape and sends nothing: the sections keep their own paths', async () => {
@@ -177,15 +263,15 @@ describe('the Settings dialog', () => {
     expect(intents()).toEqual([])
   })
 
-  it('starts the focus on the first control and keeps it in the dialog', async () => {
+  it('starts the focus on the selected rail entry and keeps it in the dialog', async () => {
     const dialog = await openSettings()
-    const theme = within(dialog).getByRole('button', { name: 'Theme: System' })
-    await vi.waitFor(() => expect(document.activeElement).toBe(theme))
+    const entry = within(dialog).getByRole('tab', { name: APPEARANCE })
+    await vi.waitFor(() => expect(document.activeElement).toBe(entry))
 
     const close = within(dialog).getByRole('button', { name: 'Close' })
     close.focus()
     await fireEvent.keyDown(close, { key: 'Tab' })
 
-    expect(document.activeElement).toBe(theme)
+    expect(document.activeElement).toBe(entry)
   })
 })
