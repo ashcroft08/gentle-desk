@@ -66,16 +66,58 @@ fn a_config_file_that_reads_carries_no_notice_and_its_workspaces() {
 }
 
 #[test]
-fn a_run_with_no_config_path_holds_an_empty_config_without_a_notice() {
+fn a_run_with_no_config_path_is_told_once_that_its_settings_will_not_persist() {
+    // The settings folder could not be found (no `APPDATA`): the run says so
+    // instead of silently starting empty, and it says it in one plain line.
     let snapshot = ConfigSnapshot::at(None);
-
-    assert_eq!(snapshot, ConfigSnapshot::default());
-    assert_eq!(snapshot.notice, None);
+    let notice = snapshot
+        .notice
+        .clone()
+        .expect("a run with no config path is told");
+    assert!(notice.is_ascii(), "got {notice:?}");
+    assert!(!notice.contains('\n'), "one line, got {notice:?}");
+    assert!(
+        notice.contains("settings folder could not be found"),
+        "the line names the folder, got {notice:?}"
+    );
+    assert!(
+        notice.contains("will not persist"),
+        "the line says settings are memory-only this run, got {notice:?}"
+    );
+    // The notice changes what the user is told, never what the run holds: the
+    // config is still the empty one, kept in memory.
     assert!(snapshot.config.workspaces.is_empty());
 
     let holder = AppStateHolder::with_config(snapshot);
-    assert_eq!(holder.view().config_notice, None);
+    assert_eq!(
+        holder.view().config_notice.as_deref(),
+        Some(notice.as_str())
+    );
+    // A later slice of the same run carries the same one line, never a second
+    // copy of it added by the rebuild.
+    let folded = holder.dispatch(gentle_desk_lib::contract::UiIntent::NewChat);
+    assert_eq!(folded.config_notice.as_deref(), Some(notice.as_str()));
+    assert_eq!(folded.config_notice, holder.view().config_notice);
     assert_eq!(holder.sessions_window(0, MAX_WINDOW).total, 0);
+}
+
+#[test]
+fn a_config_path_that_holds_no_file_yet_carries_no_notice() {
+    // The notice belongs to a run with no path. A real path is a first run whose
+    // file is simply not written yet, and it is told nothing.
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("config.json");
+
+    let snapshot = ConfigSnapshot::at(Some(&path));
+
+    assert_eq!(
+        snapshot.notice, None,
+        "a settings folder that was found says nothing"
+    );
+    assert!(snapshot.config.workspaces.is_empty());
+    let holder = AppStateHolder::with_config(snapshot);
+    assert_eq!(holder.view().config_notice, None);
+    assert!(!path.exists(), "reading writes nothing");
 }
 
 #[test]

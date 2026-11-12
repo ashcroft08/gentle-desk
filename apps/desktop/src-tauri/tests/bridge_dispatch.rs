@@ -70,6 +70,13 @@ impl Harness {
         &self.root
     }
 
+    /// The same world with no `APPDATA` at all: there is nowhere to write a
+    /// config, which is the one fact the run below differs by.
+    fn without_appdata(self) -> Self {
+        std::env::remove_var("APPDATA");
+        self
+    }
+
     /// The path of the pi folder as the view carries it, compared by its text.
     fn pi_text(&self) -> String {
         self.pi.to_string_lossy().into_owned()
@@ -359,6 +366,48 @@ fn restarting_the_app_raises_the_relaunch_flag_the_close_reads() {
     assert!(
         bridge.relaunch_requested(),
         "the close flow's last step restarts the app because of this flag"
+    );
+}
+
+#[test]
+fn a_run_with_no_settings_folder_is_told_once_and_keeps_working() {
+    // With no `APPDATA` there is no config path at all: the real bridge starts
+    // on the empty config in memory and says so in one line, instead of starting
+    // silent. It never refuses to work either.
+    let harness = Harness::new().without_appdata();
+    let (emit, views) = recorder();
+    let bridge = Bridge::new().with_emit(emit);
+
+    let notice = bridge
+        .holder
+        .view()
+        .config_notice
+        .expect("a run with no settings folder is told");
+    assert!(notice.is_ascii(), "got {notice:?}");
+    assert!(!notice.contains('\n'), "one line, got {notice:?}");
+    assert!(
+        notice.contains("settings folder could not be found"),
+        "the line names the folder, got {notice:?}"
+    );
+
+    // The run works: an ordinary intent still folds and pushes, the slice it
+    // pushes carries the same one line, and the notice is no push of its own.
+    bridge
+        .dispatch(UiIntent::DismissNotice { id: 0 })
+        .expect("dismissing an id nothing holds changes nothing");
+    assert_eq!(lock(&views).len(), 1, "one fold, one push");
+    let pushed = last(&views);
+    assert_eq!(pushed.config_notice.as_deref(), Some(notice.as_str()));
+    assert_eq!(
+        pushed.config_notice,
+        bridge.holder.view().config_notice,
+        "the same one line, not a second copy of it"
+    );
+
+    // Nothing was written where a settings folder would have been.
+    assert!(
+        !harness.root().join("appdata").join("gentle-desk").exists(),
+        "a run with no settings folder writes nothing"
     );
 }
 
