@@ -537,6 +537,20 @@ pub struct HelperThreadView {
     pub items: Vec<HelperThreadItemView>,
 }
 
+/// The notes of the version this run follows (what's-new S3b): the version the run
+/// runs as and the plain text its release carried. It is pushed once, through the
+/// same `state-changed` step the notices travel on, and cleared when the modal's
+/// dismiss stores the version (S5), so the web side draws it for exactly the run
+/// that follows an update.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub struct WhatsNewView {
+    /// The version this run runs as, never the manifest's (S5).
+    pub version: String,
+    /// The release notes as plain text: no markup and no locale, so the modal
+    /// decides how it lays them out (T2).
+    pub notes: String,
+}
+
 /// The state the current views render: the foreground chat (as the app names
 /// it, the id the sidebar passes back) with its thread, the notices, the
 /// per-chat activity the list rows show, and the session list as a status plus
@@ -642,6 +656,12 @@ pub struct ViewState {
     /// line, like [`workspace_notice`](Self::workspace_notice): no reducer path
     /// records one.
     pub sessions_notice: Option<String>,
+    /// The notes of the version this run follows (what's-new S3b), pushed once the
+    /// fetch of `latest.json` came back with this version. `None` for every run
+    /// that follows no update, for one whose notes could not be read, and once the
+    /// modal is dismissed: the dismiss is what stores the version and clears it
+    /// (S5), which is what makes the modal show once per version.
+    pub whats_new: Option<WhatsNewView>,
 }
 
 /// The state slice after each dispatch, emitted to the web side (typed

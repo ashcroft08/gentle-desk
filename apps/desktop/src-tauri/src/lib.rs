@@ -28,6 +28,7 @@ pub mod link_opener;
 pub mod new_folder;
 pub mod pending;
 pub mod picker;
+pub mod release;
 pub mod sessions;
 pub mod shell_install;
 pub mod state_view;
@@ -61,6 +62,7 @@ pub fn contract_builder() -> Builder<tauri::Wry> {
             chat_delete::delete_session,
             commands::attach_images,
             commands::remove_image,
+            commands::store_last_run_version,
         ])
         .events(tauri_specta::collect_events![contract::StateChanged,])
 }
@@ -143,6 +145,17 @@ pub fn run() {
             // The close is armed last and for the same reason: its exit step is
             // the one thing here that needs the handle.
             app.state::<Bridge>().arm_close(app.handle());
+            // The what's-new step of this run (what's-new S6): last, once the
+            // window is placed and armed, and never on this thread - it reads the
+            // config and, only when this run follows an update, asks the release
+            // server for the notes on a thread of its own, pushing what it
+            // answers through the emit step above. Nothing here waits for the
+            // network, so the first frame never depends on it.
+            app.state::<Bridge>().start_whats_new(
+                &app.package_info().version.to_string(),
+                release::endpoint(app.handle()).as_deref(),
+                release::fetcher(),
+            );
             Ok(())
         })
         .run(tauri::generate_context!())

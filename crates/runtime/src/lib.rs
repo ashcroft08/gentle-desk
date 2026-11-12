@@ -20,4 +20,5 @@ pub mod sessions;
 pub mod startup;
 pub mod text;
 pub mod time_ago;
+pub mod whats_new;
 pub mod workspaces;

@@ -55,6 +55,13 @@ gentle-runtime = { path = "../../../crates/runtime" }
 rfd = { version = "0.17", default-features = false }
 tauri = { version = "2", default-features = false, features = ["wry"] }
 tauri-plugin-updater = "2"
+# The what's-new notes are read from the updater's own `latest.json` (what's-new
+# S3): one GET with a bounded timeout. The client rides the SAME TLS stack the
+# updater plugin already brings - reqwest with rustls and the ring provider - so
+# no second TLS backend, and no new package, enters the build. `blocking` is the
+# one shape that needs no runtime: the step runs on a thread of its own.
+reqwest = { version = "0.13", default-features = false, features = ["blocking", "json", "rustls-no-provider"] }
+rustls = { version = "0.23", default-features = false, features = ["ring"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 specta = { version = "2.0.0-rc.26", features = ["derive"] }

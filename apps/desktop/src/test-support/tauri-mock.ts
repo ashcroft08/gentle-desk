@@ -154,6 +154,7 @@ export function viewState(overrides: Partial<ViewState_Serialize> = {}): ViewSta
     config_notice: null,
     workspace_notice: null,
     sessions_notice: null,
+    whats_new: null,
     ...overrides,
   }
 }

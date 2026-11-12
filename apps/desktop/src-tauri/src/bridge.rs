@@ -46,6 +46,7 @@ mod notice;
 mod session_notice;
 mod shell;
 mod theme;
+mod whats_new;
 
 /// What runs one shared command the reducer asked for. `Command::RefreshSessions`
 /// is the session list's in the app; the sink keeps the holder free of how it is
@@ -102,6 +103,13 @@ pub struct AppStateHolder {
     /// `ViewState.sessions_notice` carries it: the same kind of shell-owned line
     /// (`bridge::session_notice`).
     sessions_notice: Mutex<Option<String>>,
+    /// The notes of the version this run follows, as `ViewState.whats_new`
+    /// carries them: pushed by the what's-new step of the run and cleared by the
+    /// dismiss that stores the version (`bridge::whats_new`).
+    whats_new: Mutex<Option<crate::contract::WhatsNewView>>,
+    /// The version this run runs as, `None` until the what's-new step names it:
+    /// what the dismiss stores, never the manifest's version (S5).
+    app_version: Mutex<Option<String>>,
     /// The images each chat holds: attached in the composer, read here, taken by
     /// that chat's send and served back as previews (`bridge::images`).
     images: Images,
@@ -177,6 +185,7 @@ impl AppStateHolder {
         let notice = self.config_notice();
         let workspace_notice = self.workspace_notice();
         let sessions_notice = self.sessions_notice();
+        let whats_new = self.whats_new();
         let fatal = self.fatal();
         let theme = self.theme_value();
         let shell = self.shell_view();
@@ -187,6 +196,7 @@ impl AppStateHolder {
                 config_notice: notice,
                 workspace_notice,
                 sessions_notice,
+                whats_new,
                 fatal,
                 theme,
                 shell,
@@ -260,6 +270,7 @@ impl AppStateHolder {
         let notice = self.config_notice();
         let workspace_notice = self.workspace_notice();
         let sessions_notice = self.sessions_notice();
+        let whats_new = self.whats_new();
         let fatal = self.fatal();
         let theme = self.theme_value();
         let shell = self.shell_view();
@@ -279,6 +290,7 @@ impl AppStateHolder {
                     config_notice: notice,
                     workspace_notice,
                     sessions_notice,
+                    whats_new,
                     fatal,
                     theme,
                     shell,

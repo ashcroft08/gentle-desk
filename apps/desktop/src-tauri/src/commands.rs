@@ -21,6 +21,7 @@
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use gentle_app::Command;
+use gentle_runtime::whats_new::{self, Decision, Latest, UpdateRun};
 use tauri::{AppHandle, Manager};
 use tauri_specta::Event;
 
@@ -44,6 +45,12 @@ use crate::workspace::{self, WorkspaceAction};
 /// running app, a recorder in a test. `Send + Sync` because the install pushes
 /// from a thread of its own and the pump pushes from its two.
 pub type Emit = Arc<dyn Fn(&ViewState) -> Result<(), String> + Send + Sync>;
+
+/// What reads `latest.json` for the what's-new step (S3): the endpoint the
+/// updater config names, and the manifest it answers, or the reason it could not
+/// be read. The real one is the shell's own fetch of that URL; a test gives a
+/// closure, so no test here ever reaches the network.
+pub type Fetcher = Arc<dyn Fn(&str) -> Result<Latest, String> + Send + Sync>;
 
 /// Whether the `gentle-shell` launcher resolves on this machine right now: the
 /// real probe for the app ([`launcher_resolves`]), a flag in a test. Asked at
@@ -478,6 +485,65 @@ impl Bridge {
         }
         Ok(())
     }
+
+    /// The what's-new step of this run (what's-new S1, S3, S5, S6): the version
+    /// this run runs as, what the config stored, and - only when this run follows
+    /// an update - one fetch of `latest.json` through the seam.
+    ///
+    /// Nothing here waits for the network: the fetch runs on a thread of its own
+    /// and pushes the slice it answers through the same emit step every other
+    /// step uses, so the first frame never depends on it. A run that follows no
+    /// update - the first one, or one of the stored version - asks nothing and
+    /// pushes nothing at all.
+    pub fn start_whats_new(&self, app_version: &str, endpoint: Option<&str>, fetch: Fetcher) {
+        self.holder.set_app_version(app_version);
+        if self.holder.update_run() != UpdateRun::Updated {
+            return;
+        }
+        let emit = self.emitter();
+        let Some(endpoint) = endpoint.map(str::to_owned) else {
+            // No endpoint in the config to read the notes from: the modal is best
+            // effort, the bookkeeping is not, so the version is stored now (S5).
+            if let Some(view) = self.holder.store_last_run_version() {
+                push(&emit, view);
+            }
+            return;
+        };
+        let holder = Arc::clone(&self.holder);
+        let version = app_version.to_owned();
+        let thread_emit = Arc::clone(&emit);
+        let spawned = std::thread::Builder::new()
+            .name("whats-new".to_owned())
+            .spawn(move || {
+                let decision = whats_new::decide(fetch(&endpoint), &version);
+                if let Some(view) = after_fetch(&holder, decision) {
+                    push(&thread_emit, view);
+                }
+            });
+        if spawned.is_err() {
+            // No thread to fetch on: the fetch is skipped rather than delayed onto
+            // the thread that draws, and the version is stored now (S5).
+            if let Some(view) = self.holder.store_last_run_version() {
+                push(&emit, view);
+            }
+        }
+    }
+
+    /// The dismiss of the what's-new modal (S5): this run's own version is stored
+    /// as the version the last run was, the notes are cleared and the slice that
+    /// carries neither is pushed. A run that never named its version has nothing
+    /// to store, and answers the slice it holds.
+    pub fn store_last_run_version(&self) -> Result<ViewState, String> {
+        self.accepting_work()?;
+        let emit = self.emitter();
+        match self.holder.store_last_run_version() {
+            Some(view) => {
+                emit_view(&emit, &view)?;
+                Ok(view)
+            }
+            None => Ok(self.holder.view()),
+        }
+    }
 }
 
 /// Whether the `gentle-shell` launcher resolves on this machine right now.
@@ -504,6 +570,16 @@ pub fn after_install(
         holder.recheck_launcher(probe);
     }
     holder.view()
+}
+
+/// What follows the fetch: the notes to push, or this run's version stored and the
+/// slice that carries no notes (S3, S5). `None` only for a run that never named
+/// its version, which the step does before it fetches anything.
+fn after_fetch(holder: &AppStateHolder, decision: Decision) -> Option<ViewState> {
+    match decision {
+        Decision::Show { version, notes } => Some(holder.note_whats_new(version, notes)),
+        Decision::Store => holder.store_last_run_version(),
+    }
 }
 
 /// A bridge with nothing run yet: the same one [`Bridge::new`] builds.
@@ -627,4 +703,17 @@ pub fn remove_image(
     _app: AppHandle<tauri::Wry>,
 ) -> Result<ViewState, String> {
     bridge.inner().remove_image(&id)
+}
+
+/// The dismiss of the what's-new modal (what's-new S5): store the version this run
+/// runs as and clear the notes it pushed. The version is the run's own, never the
+/// manifest's. It takes no argument: the page says it put the modal away, and the
+/// shell is the one that knows which version it is.
+#[tauri::command]
+#[specta::specta]
+pub fn store_last_run_version(
+    bridge: tauri::State<'_, Bridge>,
+    _app: AppHandle<tauri::Wry>,
+) -> Result<ViewState, String> {
+    bridge.inner().store_last_run_version()
 }

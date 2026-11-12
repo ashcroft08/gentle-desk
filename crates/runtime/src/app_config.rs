@@ -22,6 +22,7 @@
 //!   of where it opens ([`placement`]), from the screens that exist right now.
 
 mod config;
+mod last_run;
 mod paths;
 mod shell_home;
 mod status;

@@ -87,6 +87,13 @@ export const commands = {
 	 *  [`crate::contract::ImageView`] carried. Nothing is sent.
 	 */
 	removeImage: (id: string) => typedError<ViewState_Serialize, string>(__TAURI_INVOKE("remove_image", { id })),
+	/**
+	 *  The dismiss of the what's-new modal (what's-new S5): store the version this run
+	 *  runs as and clear the notes it pushed. The version is the run's own, never the
+	 *  manifest's. It takes no argument: the page says it put the modal away, and the
+	 *  shell is the one that knows which version it is.
+	 */
+	storeLastRunVersion: () => typedError<ViewState_Serialize, string>(__TAURI_INVOKE("store_last_run_version")),
 };
 
 /** Events */
@@ -1040,6 +1047,14 @@ export type ViewState_Deserialize = {
 	 *  records one.
 	 */
 	sessions_notice?: string | null,
+	/**
+	 *  The notes of the version this run follows (what's-new S3b), pushed once the
+	 *  fetch of `latest.json` came back with this version. `None` for every run
+	 *  that follows no update, for one whose notes could not be read, and once the
+	 *  modal is dismissed: the dismiss is what stores the version and clears it
+	 *  (S5), which is what makes the modal show once per version.
+	 */
+	whats_new?: WhatsNewView | null,
 };
 
 /**
@@ -1180,6 +1195,31 @@ export type ViewState_Serialize = {
 	 *  records one.
 	 */
 	sessions_notice: string | null,
+	/**
+	 *  The notes of the version this run follows (what's-new S3b), pushed once the
+	 *  fetch of `latest.json` came back with this version. `None` for every run
+	 *  that follows no update, for one whose notes could not be read, and once the
+	 *  modal is dismissed: the dismiss is what stores the version and clears it
+	 *  (S5), which is what makes the modal show once per version.
+	 */
+	whats_new: WhatsNewView | null,
+};
+
+/**
+ *  The notes of the version this run follows (what's-new S3b): the version the run
+ *  runs as and the plain text its release carried. It is pushed once, through the
+ *  same `state-changed` step the notices travel on, and cleared when the modal's
+ *  dismiss stores the version (S5), so the web side draws it for exactly the run
+ *  that follows an update.
+ */
+export type WhatsNewView = {
+	/**  The version this run runs as, never the manifest's (S5). */
+	version: string,
+	/**
+	 *  The release notes as plain text: no markup and no locale, so the modal
+	 *  decides how it lays them out (T2).
+	 */
+	notes: string,
 };
 
 /**
