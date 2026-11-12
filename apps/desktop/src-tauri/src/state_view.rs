@@ -9,8 +9,9 @@
 //! served one window at a time (S3). What the app state does NOT carry comes in
 //! beside it ([`ShellParts`]): the config's notice, the fatal launcher failure
 //! (the state has no process at all, `bridge::fatal`), the line a refused
-//! workspace action left (`bridge::notice`), and the images a chat holds or sent,
-//! which the shell reads and the reducer never sees (`bridge::images`).
+//! workspace action left (`bridge::notice`), the images a chat holds or sent,
+//! which the shell reads and the reducer never sees (`bridge::images`), the
+//! version this run runs as, and the notes it follows (`bridge::whats_new`).
 
 use gentle_app::AppState;
 use gentle_runtime::app_config::Theme;
@@ -39,6 +40,10 @@ pub struct ShellParts<'a> {
     /// The notes of the version this run follows (what's-new S3b), `None` until
     /// the fetch answers with this version and after the modal is dismissed.
     pub whats_new: Option<WhatsNewView>,
+    /// The version this run runs as (settings-dialog S5), `None` until the
+    /// bridge names it at startup: the About section draws it, and it is what
+    /// the dismiss stores as the last run's.
+    pub app_version: Option<String>,
     /// The run's one fatal launcher failure.
     pub fatal: Option<String>,
     /// The theme this run holds, as the app config remembers it.
@@ -58,6 +63,7 @@ pub fn view_state(state: &AppState, sessions_revision: u32, shell: ShellParts<'_
         workspace_notice,
         sessions_notice,
         whats_new,
+        app_version,
         fatal,
         theme,
         shell,
@@ -100,6 +106,7 @@ pub fn view_state(state: &AppState, sessions_revision: u32, shell: ShellParts<'_
         workspace_notice,
         sessions_notice,
         whats_new,
+        app_version,
         fatal,
     }
 }

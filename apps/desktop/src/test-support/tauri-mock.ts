@@ -155,6 +155,8 @@ export function viewState(overrides: Partial<ViewState_Serialize> = {}): ViewSta
     workspace_notice: null,
     sessions_notice: null,
     whats_new: null,
+    // A run whose bridge named no version: the About section says so (S5).
+    app_version: null,
     ...overrides,
   }
 }

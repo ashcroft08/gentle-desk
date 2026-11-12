@@ -36,7 +36,8 @@ the theme moves too (Appearance section).
   and Shell home moved and their explanations - route: delegated writer, commit:
   see git log (feat/settings-t1)
 - T2 (S5, S6) About (app version to the web) + the Updates section with check-now
-  over the existing updater wiring - route: delegated writer, commit: pending
+  over the existing updater wiring - route: delegated writer, commit: see git log
+  (feat/settings-t2)
 - T3 (S4 copy audit) The welcome screen and the Settings dialog say the same thing
   about the two homes - route: delegated writer, commit: pending
 
