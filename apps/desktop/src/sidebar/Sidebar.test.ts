@@ -117,4 +117,34 @@ describe('Sidebar', () => {
       'Preview: under active development - fixes ship fast',
     )
   })
+
+  it('keeps the footer to the Preview chip and the Settings gear', async () => {
+    // A pi is on the machine, so the home setting would be drawn if it still
+    // lived here: the footer draws the chip and the gear and nothing else (S1).
+    fixture = serveSidebar({
+      view: viewState({
+        total_sessions: 0,
+        shell: {
+          pi_path: 'C:/Users/someone/.pi/agent',
+          choice: 'link',
+          ask: false,
+          launcher_found: true,
+          install: { type: 'Idle' },
+          restart_needed: false,
+        },
+      }),
+    })
+    const { container } = render(Sidebar)
+
+    const gear = await screen.findByRole('button', { name: 'Settings' })
+    const chip = screen.getByText('Preview')
+    const foot = container.querySelector('.foot')
+    expect(foot).not.toBeNull()
+    expect(foot?.contains(chip)).toBe(true)
+    expect(foot?.contains(gear)).toBe(true)
+    // The two controls that live in the Settings dialog now are not drawn until
+    // the user opens it.
+    expect(screen.queryByRole('button', { name: /^Theme: / })).toBeNull()
+    expect(screen.queryByRole('group', { name: 'Home' })).toBeNull()
+  })
 })

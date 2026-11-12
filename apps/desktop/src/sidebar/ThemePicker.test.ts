@@ -1,6 +1,9 @@
-// The footer theme control as 01a draws it: a button named with the current
-// theme that opens a listbox of the six themes, drawn in the page's own colors
-// (the native select's popup ignored the page theme, which is why 01a has none).
+// The theme control as 01a draws it: a button named with the current theme that
+// opens a listbox of the six themes, drawn in the page's own colors (the native
+// select's popup ignored the page theme, which is why 01a has none). The control
+// lives in the Settings dialog's Appearance section now (settings-dialog S3), so
+// every test here opens that dialog first and then behaves as it always did.
+import '../test-support/dom-env'
 import '../test-support/dom-env'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/svelte'
@@ -50,13 +53,20 @@ beforeEach(() => {
 async function mountSidebar(theme: ThemeView = 'system') {
   const fixture = serveSidebar({ view: viewState({ theme, total_sessions: 1 }) })
   render(Sidebar)
+  await openSettings()
   await vi.waitFor(() =>
     expect(themeButton().getAttribute('aria-label')).toBe(`Theme: ${labelFor(theme)}`),
   )
   return fixture
 }
 
-/** The footer's control, whatever theme it names. */
+/** The picker's only home now: the Settings dialog the footer's gear opens. */
+async function openSettings(): Promise<void> {
+  await fireEvent.click(await screen.findByRole('button', { name: 'Settings' }))
+  await screen.findByRole('dialog')
+}
+
+/** The control in the dialog's Appearance section, whatever theme it names. */
 function themeButton(): HTMLElement {
   return screen.getByRole('button', { name: /^Theme: / })
 }
@@ -217,13 +227,18 @@ describe('the theme picker', () => {
     expect(themeIntents()).toEqual([])
   })
 
-  it('closes when the user clicks outside it', async () => {
+  it('closes when the user clicks outside it, and keeps the focus in the dialog', async () => {
     await mountSidebar('system')
+    const dialog = screen.getByRole('dialog')
     await openList()
 
-    await fireEvent.click(screen.getByRole('complementary', { name: 'Workspaces' }))
+    // With the picker in the dialog, the page behind it is out of reach: the
+    // rest of the card is what "outside the list" means now.
+    await fireEvent.click(within(dialog).getByRole('heading', { name: 'Settings' }))
 
     expect(screen.queryByRole('listbox')).toBeNull()
-    expect(document.activeElement).not.toBe(themeButton())
+    // The dialog traps the focus (settings-dialog S6), so it never reaches the
+    // page behind the card.
+    expect(dialog.contains(document.activeElement)).toBe(true)
   })
 })

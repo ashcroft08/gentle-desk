@@ -764,21 +764,23 @@ p {
   transform: none;
 }
 
-/* The footer theme control (01a, `.foot`, `.tp` and `.tpl`): the panel is drawn
-   above the button, in the page's own colors, so the list follows the theme it
-   offers. No native popup is involved. */
+/* The theme control (01a's `#theme-btn` and `#theme-list`, `.tp` and `.tpl`): it
+   lives in the Settings dialog's Appearance section now (settings-dialog S3), and
+   the list is drawn in the page's own colors, so it follows the theme it offers.
+   No native popup is involved. */
 /* Bottom-anchored, so the footer stays put when the middle of the sidebar is
    short, such as the empty state before any workspace exists. */
 .foot {
   display: flex;
   align-items: center;
+  gap: 6px;
   padding-top: 8px;
   border-top: 1px solid var(--border);
   margin-top: auto;
 }
 
 /* The Preview chip (README's Preview label, in the app): a quiet rounded chip
-   beside the theme picker, with the promise in its tooltip. */
+   beside the Settings gear, with the promise in its tooltip. */
 .preview-chip {
   margin-left: auto;
   font-size: 11px;
@@ -795,9 +797,9 @@ p {
   position: relative;
 }
 
-/* The home setting in the footer: two small answers side by side with the
-   current one filled, and, while a change waits for a restart, one line that
-   says so with its button. */
+/* The home setting (shell-choice S5), drawn in the Settings dialog's Shell home
+   section: two small answers side by side with the current one filled, and,
+   while a change waits for a restart, one line that says so with its button. */
 .home-setting {
   flex: 1;
   min-width: 0;
@@ -1003,6 +1005,43 @@ p {
   background: var(--danger);
   border-color: var(--danger);
   color: var(--bg);
+}
+
+/* The Settings dialog (settings-dialog S2): the footer's two controls, one
+   section each, in the order the design names them. */
+.dlg.settings {
+  width: min(520px, calc(100vw - 32px));
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.dlg .setting {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+/* The first section follows the title and its hint, which already separate it. */
+.dlg .setting:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.dlg .setting h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.dlg .setting .why {
+  margin: 0 0 10px;
+}
+
+/* The theme list opens DOWN from its button inside the dialog: the footer's own
+   rule draws it above, which in a card would leave it over the backdrop. */
+.dlg .tpl {
+  bottom: auto;
+  top: 38px;
 }
 
 /* The dialog's own field and its options: the box the user types in, and one
