@@ -39,14 +39,20 @@ is written. Backed by the verified facts in the roadmap (2026-11-12 section).
       notice on level failure, stale chip on chat open); GREEN: gentle-app 9 model
       tests + whole crate, gentle-runtime open_chat rewritten for the multi-request
       open (get_messages, get_state, get_available_models). Commit 4e99e83.
-- [ ] T3 (S1, S3, S4, S5) tauri + web: expose the chip state through the contract,
+- [x] T3 (S1, S3, S4, S5) tauri + web: expose the chip state through the contract,
       a ModelChip with two dropdowns in the composer, copy, and a bridge test
       (apps/desktop/src-tauri/src/contract.rs, intent.rs, state_view.rs;
-      apps/desktop/src/composer/ModelChip.svelte, bridge/dispatch).
-- [ ] T4 (S5) empty/failed-list states: the chip renders a "no models" state and the
-      send box is untouched + test.
+      apps/desktop/src/composer/ModelChip.svelte, bridge/dispatch) — bindings
+      regenerated via GENTLE_DESK_REGEN_BINDINGS; 7 chip tests. Commit ed4b0e4.
+- [x] T4 (S5) empty/failed-list states: the chip renders a "no models" state and the
+      send box is untouched + test — covered by ModelChip tests (loading, empty,
+      failed, no chip) and app tests (Empty/Failed/notice); the send box is a
+      separate component and the chip adds no disabled rule to it.
 - [ ] T5 (S6) final verification: focused tests, full suite, clippy/fmt, and a note
-      in the roadmap that 0.1.11 shipped.
+      in the roadmap that 0.1.11 shipped — automated: full cargo workspace (91
+      binaries, 0 failed), web vitest 392, svelte-check 0, clippy -D warnings 0,
+      fmt applied, contract drift guard ok. Pending: the manual window check
+      against a stand-in shell, and the version bump commit.
 
 ## Verification plan
 
@@ -61,6 +67,8 @@ is written. Backed by the verified facts in the roadmap (2026-11-12 section).
 - L5: Slice boundary: T1 commit 6af6296 (~225 lines) and T2 commit 4e99e83 (~480
   lines, most of it tests). T3 stays its own commit so native review can take the
   contract and the component alone.
+- L6: A node_modules cache file slipped into the T3 commit; it was untracked from
+  the index and the commit amended (ed4b0e4), and node_modules/ went to .gitignore.
 
 - L1 (user request, verbatim): "Quiero hacer investigaciones, para ver si a futuro se
   puede hacer ciertas implementaciones en la app, Los comandos /login, /logout,
