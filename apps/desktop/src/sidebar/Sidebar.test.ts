@@ -107,4 +107,14 @@ describe('Sidebar', () => {
     )
     await vi.waitFor(() => expect(handlerArgs('add_workspace').length).toBe(1))
   })
+
+  it('marks the run Preview in the footer, with the promise in its tooltip', async () => {
+    fixture = serveSidebar({ view: viewState({ total_sessions: 0 }) })
+    render(Sidebar)
+
+    const chip = await screen.findByText('Preview')
+    expect(chip.getAttribute('title')).toBe(
+      'Preview: under active development - fixes ship fast',
+    )
+  })
 })
