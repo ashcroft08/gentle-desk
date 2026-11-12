@@ -199,6 +199,56 @@ pub enum UiIntent {
     /// Back from a helper's thread to the helpers list: the same intent the
     /// iced panel's Back sends (`crates/ui/src/app.rs`).
     CloseHelper,
+    /// Ask the child what models it offers: what the chip's dropdown shows
+    /// (0.1.11). The answer travels back on
+    /// [`ViewState::model_chip`].
+    RequestModels,
+    /// Make a model the session's model (RPC `set_model`). The chip updates
+    /// from the reply's Model object, never from the choice alone.
+    SelectModel {
+        provider: String,
+        model_id: String,
+    },
+    /// Set the session's thinking level (RPC `set_thinking_level`).
+    SelectThinkingLevel {
+        level: String,
+    },
+}
+
+/// One model pi offers, flattened for the chip's dropdown.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+pub struct ModelChoiceView {
+    pub provider: String,
+    pub model_id: String,
+    pub name: String,
+    /// Whether the model does reasoning, pi's own `reasoning` flag.
+    pub reasoning: bool,
+}
+
+/// Where the model list stands, matching `gentle_app::ModelsStatus` one to one.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+#[serde(tag = "type", content = "data")]
+pub enum ModelListStatusView {
+    Unknown,
+    Loading,
+    Ready,
+    Empty,
+    Failed(String),
+}
+
+/// What the composer's model chip shows: the models the child offers, the
+/// session's current model and thinking level, and the levels it supports.
+/// All of it is the child's truth, never the page's guess: the chip renders a
+/// state, it does not invent one.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+pub struct ModelChipView {
+    pub status: ModelListStatusView,
+    pub models: Vec<ModelChoiceView>,
+    pub current: Option<ModelChoiceView>,
+    /// The session's thinking level; `None` is unknown, not off.
+    pub thinking_level: Option<String>,
+    /// The levels the current model supports, in pi's order.
+    pub thinking_levels: Vec<String>,
 }
 
 /// How complete the session list is, matching `gentle_app::ListStatus` one to
@@ -639,6 +689,10 @@ pub struct ViewState {
     /// refused. A shell-owned line like [`ViewState::workspace_notice`]: the
     /// shell reads the files, so the shell is what says no.
     pub images_notice: Option<String>,
+    /// What the composer's model chip shows, for the foreground chat's child
+    /// (0.1.11). A no-foreground-chat run shows nothing, so the chip is part of
+    /// the chat panel, not the window.
+    pub model_chip: ModelChipView,
     /// Why the last workspace action was refused, as one line of plain text: a
     /// name Windows would not accept, a folder that is not there, a folder that
     /// already holds files (Q6). `None` when nothing was refused, and cleared by

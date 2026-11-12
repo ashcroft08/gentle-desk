@@ -9,7 +9,8 @@
 use gentle_app::{ChatId, Input, Intent};
 use gentle_desk_lib::bridge::AppStateHolder;
 use gentle_desk_lib::contract::{
-    InstallView, ListStatusView, NoticeLevel, ShellView, ThemeView, UiIntent, ViewState,
+    InstallView, ListStatusView, ModelChipView, ModelListStatusView, NoticeLevel, ShellView,
+    ThemeView, UiIntent, ViewState,
 };
 
 #[test]
@@ -107,6 +108,14 @@ fn the_view_state_slice_has_no_invented_fields() {
             // refused.
             images: Vec::new(),
             images_notice: None,
+            // No child has answered anything yet, so the chip starts unknown.
+            model_chip: ModelChipView {
+                status: ModelListStatusView::Unknown,
+                models: Vec::new(),
+                current: None,
+                thinking_level: None,
+                thinking_levels: Vec::new(),
+            },
             config_notice: None,
             // The shell-owned line a refused workspace action sets: nothing was
             // refused here, so it carries nothing.

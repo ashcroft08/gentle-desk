@@ -42,6 +42,14 @@ describe('chatOf', () => {
       dialog: null,
       images: [],
       imagesNotice: null,
+      // The mock's default chip: the child's truth before it answers.
+      modelChip: {
+        status: { type: 'Unknown' },
+        models: [],
+        current: null,
+        thinking_level: null,
+        thinking_levels: [],
+      },
       fatal: null,
       whatsNew: null,
       shell: { pi_path: null, choice: null, ask: false, launcher_found: true, install: { type: 'Idle' }, restart_needed: false },
@@ -94,6 +102,7 @@ describe('chatOf', () => {
       dialog: null,
       images: [],
       imagesNotice: null,
+      modelChip: null,
       fatal: null,
       whatsNew: null,
       shell: { pi_path: null, choice: null, ask: false, launcher_found: true, install: { type: 'Idle' }, restart_needed: false },

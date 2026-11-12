@@ -39,3 +39,12 @@ export const REMOVE_IMAGE = 'Remove'
 
 /** Ended: the chat's process is gone until it is restarted. */
 export const ENDED_REASON = "This chat's process exited. Restart it to keep talking."
+
+/** The model chip's two accessible names (0.1.11). */
+export const MODEL_LABEL = 'Model'
+export const LEVEL_LABEL = 'Thinking level'
+
+/** The chip's states, in the words the child's own truth takes. */
+export const MODELS_LOADING = 'Loading models...'
+export const MODELS_EMPTY = 'No models are available for this chat.'
+export const MODELS_UNAVAILABLE = 'Models unavailable:'

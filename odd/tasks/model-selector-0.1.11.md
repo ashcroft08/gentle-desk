@@ -32,10 +32,13 @@ is written. Backed by the verified facts in the roadmap (2026-11-12 section).
       `SetThinkingLevel{level}`, `GetAvailableThinkingLevels` to `RpcCommand`
       (crates/gentle-core/src/rpc/types.rs, codec.rs) + codec tests — RED observed
       (4 E0599); GREEN 23/23 in tests/codec.rs. Commit 6af6296.
-- [ ] T2 (S3, S4, S5) app layer: intents to request list/apply/set-level; parse
+- [x] T2 (S3, S4, S5) app layer: intents to request list/apply/set-level; parse
       responses in events.rs (models list, Model object, thinking success); keep the
       current model/level in state (crates/app/src/{intents,input,chats/intents,
-      events,state}.rs) + tests.
+      events,state}.rs) + tests — RED observed (missing types, Loading, Failed,
+      notice on level failure, stale chip on chat open); GREEN: gentle-app 9 model
+      tests + whole crate, gentle-runtime open_chat rewritten for the multi-request
+      open (get_messages, get_state, get_available_models). Commit 4e99e83.
 - [ ] T3 (S1, S3, S4, S5) tauri + web: expose the chip state through the contract,
       a ModelChip with two dropdowns in the composer, copy, and a bridge test
       (apps/desktop/src-tauri/src/contract.rs, intent.rs, state_view.rs;
@@ -54,6 +57,10 @@ is written. Backed by the verified facts in the roadmap (2026-11-12 section).
   the chosen model.
 
 ## Log
+
+- L5: Slice boundary: T1 commit 6af6296 (~225 lines) and T2 commit 4e99e83 (~480
+  lines, most of it tests). T3 stays its own commit so native review can take the
+  contract and the component alone.
 
 - L1 (user request, verbatim): "Quiero hacer investigaciones, para ver si a futuro se
   puede hacer ciertas implementaciones en la app, Los comandos /login, /logout,

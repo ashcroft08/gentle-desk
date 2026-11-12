@@ -502,6 +502,36 @@ p {
   padding-left: 16px;
 }
 
+/* The model chip (0.1.11): a quiet row above the box, the way the screenshot
+   shows it, with the two dropdowns the child's own answers fill. */
+.chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 6px;
+  padding-left: 16px;
+}
+
+.chip select {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--fg, inherit);
+  font: inherit;
+  font-size: 12px;
+  padding: 3px 8px;
+}
+
+.chip .level {
+  color: var(--faint);
+}
+
+.chip .state {
+  margin: 0;
+  font-size: 12px;
+  color: var(--faint);
+}
+
 /* The images a chat holds and the images a sent message carried: the same
    thumbnails in both places, drawn from the URL the shell serves, so not one
    byte of an image travels through the push. */

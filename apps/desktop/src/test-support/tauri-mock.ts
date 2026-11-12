@@ -150,6 +150,13 @@ export function viewState(overrides: Partial<ViewState_Serialize> = {}): ViewSta
     activity: [],
     images: [],
     images_notice: null,
+    model_chip: {
+      status: { type: 'Unknown' },
+      models: [],
+      current: null,
+      thinking_level: null,
+      thinking_levels: [],
+    },
     fatal: null,
     config_notice: null,
     workspace_notice: null,

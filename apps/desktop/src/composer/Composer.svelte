@@ -15,8 +15,9 @@
   //   a thumbnail is drawn from the URL Rust answers with, never from a byte the
   //   page holds.
   import { attachImages, dispatchIntent, removeImage } from '../bridge'
-  import type { ChatActivityMark, ImageView } from '../contract/bindings'
+  import type { ChatActivityMark, ImageView, ModelChipView } from '../contract/bindings'
   import Icon from '../icons/Icon.svelte'
+  import ModelChip from './ModelChip.svelte'
   import {
     DROP_HINT,
     KEYS_HINT,
@@ -36,6 +37,7 @@
     mark = null,
     images = [],
     imagesNotice = null,
+    chip = null,
   }: {
     /** The foreground chat: which draft is shown, and where a send goes. */
     chat: string | null
@@ -46,6 +48,8 @@
     images?: ImageView[]
     /** Why the last drop was refused, as one plain line, or `null`. */
     imagesNotice?: string | null
+    /** What the model chip shows, as Rust pushes it, or `null`. */
+    chip?: ModelChipView | null
   } = $props()
 
   /** The drafts, one per chat id, kept for as long as the box is on screen. */
@@ -146,6 +150,7 @@
 </script>
 
 <div class="composer-dock">
+  <ModelChip {chip} />
   {#if dropping}
     <!-- Where the files go while they are still in the air. -->
     <p class="drop">{DROP_HINT}</p>
