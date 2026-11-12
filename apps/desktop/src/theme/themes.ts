@@ -31,7 +31,27 @@ export const THEME_LABELS: Record<ThemeView, string> = {
   light: 'Light',
 }
 
+/**
+ * The small dot the picker draws beside each theme's name: the theme's own
+ * accent, copied from `theme.css` so the list reads at a glance. `system` has no
+ * accent of its own, so its dot is the two themes it follows, dark over light.
+ * Exhaustive by type, like the labels above.
+ */
+export const THEME_SWATCHES: Record<ThemeView, string> = {
+  system: 'linear-gradient(135deg, #0e1116 0 49%, #f2f4f7 50% 100%)',
+  dark: '#7aa2f7',
+  Gentle: '#7fb4ca',
+  'Gentleman-Cute': '#f095c8',
+  'Gentleman-Sexy': '#f43888',
+  light: '#2e5bd7',
+}
+
 /** The label one theme is drawn with: its identifier, capitalised. */
 export function themeLabel(theme: ThemeView): string {
   return THEME_LABELS[theme]
+}
+
+/** The fill of one theme's dot: its accent, or the split for `system`. */
+export function themeSwatch(theme: ThemeView): string {
+  return THEME_SWATCHES[theme]
 }

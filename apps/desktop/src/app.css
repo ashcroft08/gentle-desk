@@ -871,12 +871,30 @@ p {
 }
 
 .tpl li {
-  padding: 6px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
   border-radius: 6px;
   font-size: 13px;
   color: var(--text);
   background: transparent;
   cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+/* The theme's accent as a small dot beside its name. The dot is decoration:
+   the option's name is still its word, and `system` draws the two halves it
+   follows (the component fills it in). */
+.tpl .swatch {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--swatch, var(--accent));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
 }
 
 .tpl li:hover {
@@ -886,6 +904,7 @@ p {
 
 .tpl li[aria-selected='true'] {
   background: var(--tint);
+  color: var(--accent);
 }
 
 .tpl li[aria-selected='true']:hover {
@@ -1029,34 +1048,39 @@ p {
    rest, with the one section drawn there. */
 .settings-body {
   display: flex;
-  gap: 16px;
+  gap: 18px;
   min-height: 240px;
 }
 
 .settings-rail {
   flex: none;
-  width: 176px;
+  width: 184px;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding-right: 14px;
+  padding: 2px 14px 0 0;
   border-right: 1px solid var(--border);
 }
 
 /* One rail entry: its glyph and its word, quiet until it is the selected one or
-   the pointer is over it. */
+   the pointer is over it. The selected entry wears the accent on its tint, the
+   house's own selected look (the picker list and the chat rows). */
 .settings-rail [role='tab'] {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 9px;
+  height: 32px;
+  padding: 0 10px;
   border: 0;
   background: transparent;
   color: var(--muted);
   border-radius: 8px;
-  padding: 7px 10px;
   font-size: 13px;
   text-align: left;
   cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
 }
 
 .settings-rail [role='tab']:hover {
@@ -1066,7 +1090,7 @@ p {
 
 .settings-rail [role='tab'][aria-selected='true'] {
   background: var(--tint);
-  color: var(--text);
+  color: var(--accent);
 }
 
 .settings-rail [role='tab']:focus-visible {
@@ -1075,30 +1099,53 @@ p {
 }
 
 /* The pane: breathing room from the rail, then the section's heading, its one
-   short hint and the content the section already drew. */
+   short hint and the content the section already drew. The body fades in when
+   the rail switches sections, so the swap reads as one calm step. */
 .settings-pane {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  padding: 2px 2px 0 4px;
+  padding: 2px 2px 0 2px;
 }
 
+.settings-pane .pane-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  animation: pane-in 120ms ease both;
+}
+
+@keyframes pane-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+/* The section's title at the dialog's own title size, so the two read as one
+   scale; the hint sits under it in the muted small text the house uses. */
 .settings-pane h3 {
-  margin: 0 0 8px;
-  font-size: 13px;
+  margin: 0 0 4px;
+  font-size: 15px;
   font-weight: 600;
 }
 
 .settings-pane .hint {
-  margin: 0 0 12px;
+  margin: 0 0 14px;
   color: var(--muted);
   font-size: 12px;
+  line-height: 1.5;
 }
 
 .settings-pane .why {
-  margin: 0 0 10px;
+  margin: 0 0 12px;
+  line-height: 1.5;
 }
 
 /* The theme list opens DOWN from its button inside the dialog: the footer's own
@@ -1129,6 +1176,14 @@ p {
 
 .dlg .check .why {
   margin: 8px 0 0;
+}
+
+/* The dialog's buttons keep the house button look with the same quiet
+   transition as the rail: border and fill, never a jump. */
+.dlg.settings .btn {
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease;
 }
 
 /* The dialog's own field and its options: the box the user types in, and one

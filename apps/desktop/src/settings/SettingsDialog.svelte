@@ -140,41 +140,49 @@
         <!-- The pane: the selected section only. Its hint is also the dialog's
              description, so the card is described by what it is showing. -->
         <div class="settings-pane" role="tabpanel" id={PANEL_ID} aria-labelledby={TAB_IDS[selected]}>
-          <h3>{title}</h3>
-          <Dialog.Description class="hint">{SECTION_HINTS[selected]}</Dialog.Description>
+          <!-- Keyed on the section, so the body fades in on each switch: the
+               swap is a calm step, never a jump. That fade is all the wrapper
+               does - the section's content is the same component as before. -->
+          {#key selected}
+            <div class="pane-body">
+              <h3>{title}</h3>
+              <Dialog.Description class="hint">{SECTION_HINTS[selected]}</Dialog.Description>
 
-          {#if selected === 'appearance'}
-            <ThemePicker {theme} />
-          {:else if selected === 'home'}
-            <p class="why">{HOME_EXPLAIN}</p>
-            {#if shell !== null}
-              <HomeSetting {shell} />
-            {/if}
-          {:else}
-            <!-- About and updates (S5, S6): the name, the version this run runs
-                 as, and the one check button with its answer drawn under it. The
-                 check only reports: installing stays the update notice's own
-                 flow, so a found release never installs itself here. -->
-            <p class="about">
-              <span class="about-name">{APP_NAME}</span>
-              <span class="about-version">
-                {version === null ? VERSION_UNKNOWN : VERSION(version)}
-              </span>
-            </p>
-            <div class="check">
-              <button
-                type="button"
-                class="btn"
-                disabled={check.kind === 'checking'}
-                onclick={() => void checkNow()}
-              >
-                {CHECK_NOW}
-              </button>
-              {#if check.kind !== 'idle'}
-                <p class="why" role="status">{result}</p>
+              {#if selected === 'appearance'}
+                <ThemePicker {theme} />
+              {:else if selected === 'home'}
+                <p class="why">{HOME_EXPLAIN}</p>
+                {#if shell !== null}
+                  <HomeSetting {shell} />
+                {/if}
+              {:else}
+                <!-- About and updates (S5, S6): the name, the version this run
+                     runs as, and the one check button with its answer drawn
+                     under it. The check only reports: installing stays the
+                     update notice's own flow, so a found release never
+                     installs itself here. -->
+                <p class="about">
+                  <span class="about-name">{APP_NAME}</span>
+                  <span class="about-version">
+                    {version === null ? VERSION_UNKNOWN : VERSION(version)}
+                  </span>
+                </p>
+                <div class="check">
+                  <button
+                    type="button"
+                    class="btn"
+                    disabled={check.kind === 'checking'}
+                    onclick={() => void checkNow()}
+                  >
+                    {CHECK_NOW}
+                  </button>
+                  {#if check.kind !== 'idle'}
+                    <p class="why" role="status">{result}</p>
+                  {/if}
+                </div>
               {/if}
             </div>
-          {/if}
+          {/key}
         </div>
       </div>
 

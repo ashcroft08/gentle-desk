@@ -135,6 +135,21 @@ describe('the theme picker', () => {
     expect(themeIntents()).toEqual(['dark'])
   })
 
+  it('draws a quiet color swatch beside every row', async () => {
+    await mountSidebar('system')
+    const list = await openList()
+
+    const dots = within(list)
+      .getAllByRole('option')
+      .map((option) => option.querySelector('.swatch'))
+    expect(dots).toHaveLength(OPTIONS.length)
+    for (const dot of dots) {
+      // The dot is decoration: the option's name is still its word.
+      expect(dot?.getAttribute('aria-hidden')).toBe('true')
+      expect((dot as HTMLElement).style.getPropertyValue('--swatch').trim()).not.toBe('')
+    }
+  })
+
   it('opens exactly the six drawn names, in the drawn order, on the current one', async () => {
     await mountSidebar('Gentle')
     const list = await openList()
