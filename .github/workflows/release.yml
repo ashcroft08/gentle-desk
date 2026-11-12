@@ -159,6 +159,10 @@ jobs:
                 }
               }
             }
+            # The expected probe failure above leaves $LASTEXITCODE set: the
+            # fallback handled it, and the step must not inherit the poisoned
+            # code at its end (the 0.1.9 first run failed exactly there).
+            $global:LASTEXITCODE = 0
 
             $manifest = [ordered]@{
               version  = $version
