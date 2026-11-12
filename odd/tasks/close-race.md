@@ -28,7 +28,7 @@ the goal is that the close flow's guarantees hold by construction, not by commen
   batch thread escapes the join - route: delegated writer, commit: see git log (fix/close-race-t1)
 - T2 (S2) Last-writer rule: the close's flush must not race an in-flight pass - route: delegated
   writer, commit: see git log (fix/close-race-t2)
-- T3 (S3) One shared budget for `SessionsService::stop` - route: delegated writer, commit: pending
+- T3 (S3) One shared budget for `SessionsService::stop` - route: delegated writer, commit: see git log (fix/close-race-t3)
 - T4 (S4) The fallback shutdown leaves the caller thread - route: delegated writer, commit: pending
 
 ## Log
