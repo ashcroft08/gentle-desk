@@ -18,7 +18,7 @@ pub mod bridge;
 pub mod flow;
 
 pub use bridge::BridgeSteps;
-pub use flow::{CloseFlow, CloseSteps, Deadlines};
+pub use flow::{CloseFlow, CloseSteps, Deadlines, SPAWN_ATTEMPTS};
 
 /// What a chat command answers once the close has stopped new work. One line,
 /// the same one the reducer's failed-open path carries.

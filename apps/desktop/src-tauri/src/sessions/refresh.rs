@@ -16,7 +16,7 @@
 //! lock but calls the flow outside it.
 
 use std::sync::{Arc, Weak};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use gentle_backend::session_watch::Batch;
 
@@ -36,10 +36,13 @@ impl SessionsService {
         self.request();
     }
 
-    /// Stops the watcher and the safety net, waiting at most `budget` for each
-    /// of their threads, and answers whether every one of them ended. The close
-    /// flow calls this before it flushes the session cache, so no batch asks for
-    /// a pass after the last state reached the disk.
+    /// Stops the watcher and the safety net, waiting at most `budget` for the
+    /// two of them TOGETHER, and answers whether every one of their threads
+    /// ended. The close flow calls this before it flushes the session cache, so
+    /// no batch asks for a pass after the last state reached the disk, and it
+    /// gives this whole call one step's deadline (`Deadlines::watch` in
+    /// `close::flow`): the joins share it, so the timer and the watcher can
+    /// never cost the close twice what it allowed this step.
     pub fn stop(&self, budget: Duration) -> bool {
         let inner = &self.inner;
         inner.timer.stop();
@@ -49,10 +52,36 @@ impl SessionsService {
         // lock, dropped outside it.
         let watcher = lock(&inner.flow).flow.take_watcher();
         drop(watcher);
-        let timer = inner.timer.join(budget);
-        let watch = inner.watch.join(budget);
-        timer && watch
+        join_both(
+            budget,
+            Instant::now,
+            |left| inner.timer.join(left),
+            |left| inner.watch.join(left),
+        )
     }
+}
+
+/// Joins the two parts of a stop against ONE deadline, and answers whether both
+/// ended. The shape is the seam a unit test drives with fake joins and a clock
+/// of its own: the budget is the budget of the JOINTS, never one per join,
+/// because the close gives this step one deadline and abandons the step when
+/// that deadline passes. Whatever the timer join spends is therefore gone from
+/// what the batch threads may wait: a stop whose timer used the whole budget
+/// hands the watcher nothing, and that join answers at once - reporting what it
+/// could not join, which is the truth the close logs.
+fn join_both(
+    budget: Duration,
+    now: impl Fn() -> Instant,
+    timer: impl FnOnce(Duration) -> bool,
+    watch: impl FnOnce(Duration) -> bool,
+) -> bool {
+    let deadline = now() + budget;
+    // The timer first, because it ends at its next look and so answers the
+    // quick way in a healthy run: the batch threads keep the rest of the
+    // budget, and a join with nothing left of it waits for nothing.
+    let timer_ended = timer(deadline.saturating_duration_since(now()));
+    let watch_ended = watch(deadline.saturating_duration_since(now()));
+    timer_ended && watch_ended
 }
 
 /// Starts the watcher a settled full pass asked for (and the first one at boot).
@@ -162,4 +191,146 @@ fn wiring_delay(inner: &Arc<Inner>, policy: TickDelay) -> DelaySource {
         let part = lock(&inner.flow);
         Some(policy(&part.flow))
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::cell::Cell;
+
+    /// The budget these tests give a stop: no join waits it out, they answer in
+    /// virtual time.
+    const BUDGET: Duration = Duration::from_secs(5);
+
+    /// A clock the fake joins move. Everything a stop models happens here, so a
+    /// test reads the elapsed of a whole stop without sleeping for it.
+    struct Clock(Cell<Instant>);
+
+    impl Clock {
+        fn new() -> Self {
+            Self(Cell::new(Instant::now()))
+        }
+
+        fn now(&self) -> Instant {
+            self.0.get()
+        }
+
+        /// A join that spends `spent` before it answers.
+        fn spend(&self, spent: Duration) {
+            self.0.set(self.0.get() + spent);
+        }
+    }
+
+    /// The timer join of a stop takes the whole budget and never ends: the
+    /// watch join must then be handed nothing at all, and the stop must still
+    /// say that it did not join everything. The whole stop costs one budget,
+    /// not two, which is the one deadline the close gives the step.
+    #[test]
+    fn a_timer_join_that_spends_the_budget_leaves_the_watch_none() {
+        let clock = Clock::new();
+        let began = clock.now();
+        let asked_of_timer = Cell::new(None);
+        let asked_of_watch = Cell::new(None);
+
+        let ended = join_both(
+            BUDGET,
+            || clock.now(),
+            |left| {
+                asked_of_timer.set(Some(left));
+                // A wedged timer: the close's whole budget goes here.
+                clock.spend(BUDGET);
+                false
+            },
+            |left| {
+                asked_of_watch.set(Some(left));
+                // Nothing to wait with: the batch threads may still be alive,
+                // so a join handed no budget reports what it could not join.
+                false
+            },
+        );
+
+        assert_eq!(
+            asked_of_timer.get(),
+            Some(BUDGET),
+            "the first join is handed the whole budget"
+        );
+        assert_eq!(
+            asked_of_watch.get(),
+            Some(Duration::ZERO),
+            "the watch join was handed the budget the timer had already spent"
+        );
+        assert!(
+            !ended,
+            "a stop that joined one of its two parts reported every thread ended"
+        );
+        assert_eq!(
+            clock.now() - began,
+            BUDGET,
+            "the stop modeled more than the one budget the close gives it"
+        );
+    }
+
+    /// What the timer leaves is what the watch may wait: the two shares add up
+    /// to one budget, and both can still end inside it.
+    #[test]
+    fn the_watch_join_waits_what_the_timer_join_left() {
+        let clock = Clock::new();
+        let began = clock.now();
+        let spent_by_timer = BUDGET / 3;
+        let asked_of_watch = Cell::new(None);
+
+        let ended = join_both(
+            BUDGET,
+            || clock.now(),
+            |_left| {
+                clock.spend(spent_by_timer);
+                true
+            },
+            |left| {
+                asked_of_watch.set(Some(left));
+                // It ends exactly as its share runs out: inside the budget.
+                clock.spend(left);
+                true
+            },
+        );
+
+        assert_eq!(
+            asked_of_watch.get(),
+            Some(BUDGET - spent_by_timer),
+            "the watch join was not handed the rest of the budget"
+        );
+        assert!(ended, "both joins ended inside the budget");
+        assert_eq!(
+            clock.now() - began,
+            BUDGET,
+            "the two shares do not add up to one budget"
+        );
+    }
+
+    /// A stop whose threads end at once answers at once, `true`, and leaves the
+    /// watch the whole budget: the case every close of a healthy run takes.
+    #[test]
+    fn a_stop_with_nothing_to_wait_for_costs_no_time_and_reports_it() {
+        let clock = Clock::new();
+        let began = clock.now();
+        let asked_of_watch = Cell::new(None);
+
+        let ended = join_both(
+            BUDGET,
+            || clock.now(),
+            |_left| true,
+            |left| {
+                asked_of_watch.set(Some(left));
+                true
+            },
+        );
+
+        assert!(ended, "a stop of ended threads reported a miss");
+        assert_eq!(
+            asked_of_watch.get(),
+            Some(BUDGET),
+            "a timer that spent nothing took budget from the watch"
+        );
+        assert_eq!(clock.now() - began, Duration::ZERO, "the stop waited");
+    }
 }

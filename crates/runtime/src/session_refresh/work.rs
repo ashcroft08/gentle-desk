@@ -81,7 +81,7 @@ fn work_pass(
     // The folding is O(N) and pure: it happens here, not in `update`.
     let sessions = prepared(&index);
     drop(index);
-    shared.save_if_due(&stats);
+    shared.save_if_due(&stats, now());
     Ok(Refreshed {
         sessions,
         took,
