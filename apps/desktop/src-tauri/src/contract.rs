@@ -610,9 +610,10 @@ pub struct ViewState {
     pub fatal: Option<String>,
     /// What the user should be told about the app config file: a file that
     /// could not be used at startup is kept aside and the app starts with an
-    /// empty config, and a file that could not be written leaves the change in
-    /// memory only. `None` when the file was read, or was not there, and nothing
-    /// failed.
+    /// empty config, a file that could not be written leaves the change in
+    /// memory only, and a run whose settings folder could not be found says so
+    /// because nothing will be written at all. `None` when the file was read, or
+    /// was not there, and every save worked.
     pub config_notice: Option<String>,
     /// The foreground chat's images, waiting for its send: drawn in the composer
     /// as thumbnails with a remove button, and never sent by themselves (S2).

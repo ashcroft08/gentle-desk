@@ -8,7 +8,9 @@
 //! changes.
 //!
 //! A run with no config path holds the empty config in memory: nothing is read
-//! and nothing is ever saved back.
+//! and nothing is ever saved back, and the run says so once
+//! (`NO_PATH_NOTICE`), because a user whose settings folder was not found must
+//! never be left thinking their settings are being kept.
 
 use std::path::{Path, PathBuf};
 
@@ -17,6 +19,14 @@ use gentle_runtime::app_config::{self, AppConfig, Loaded};
 mod writer;
 
 pub use writer::{ConfigWriter, SaveFailure};
+
+/// The one line a run with no config path shows the user: the settings folder
+/// could not be found, so nothing is read and nothing is written this run. It
+/// stays for the whole run, because the condition does, and it is a notice
+/// (`ViewState::config_notice`), never a failure of what the user asked for.
+const NO_PATH_NOTICE: &str =
+    "The settings folder could not be found, so gentle-desk started with an empty \
+     config and your settings will not persist this run.";
 
 /// The config of this run, and what the user should be told about the file it
 /// came from.
@@ -34,11 +44,19 @@ pub struct ConfigSnapshot {
 
 impl ConfigSnapshot {
     /// The snapshot of the config file at `path` as it was read, or the empty
-    /// config when there is no file to use.
+    /// config when this run has no config path at all.
+    ///
+    /// The two cases are told apart: a path whose file is not there yet is the
+    /// normal first run and says nothing, while no path means the settings
+    /// folder could not be found, which the run reports once
+    /// ([`NO_PATH_NOTICE`]) and never by failing.
     pub fn at(path: Option<&Path>) -> Self {
         match path {
             Some(path) => Self::of(app_config::load(path)),
-            None => Self::default(),
+            None => Self {
+                config: AppConfig::default(),
+                notice: Some(NO_PATH_NOTICE.to_owned()),
+            },
         }
     }
 

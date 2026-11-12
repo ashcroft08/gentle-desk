@@ -363,10 +363,12 @@ fn a_workspace_the_tree_does_not_know_changes_nothing() {
 }
 
 #[test]
-fn a_run_with_no_config_path_keeps_the_fold_in_memory() {
+fn a_run_with_no_config_path_keeps_the_fold_in_memory_and_says_so() {
     let dir = tempfile::tempdir().unwrap();
     let repo = folder(dir.path(), "repo");
-    let holder = AppStateHolder::default();
+    // The run whose settings folder was not found: no path at all, the same
+    // snapshot `Bridge::new` builds when `APPDATA` resolves to none.
+    let holder = AppStateHolder::with_config(ConfigSnapshot::at(None));
     holder.arm_config_saves(ConfigWriter::spawn(None));
     let mut saved = AppConfig::default();
     assert!(saved.add_workspace(&repo));
@@ -379,9 +381,13 @@ fn a_run_with_no_config_path_keeps_the_fold_in_memory() {
     });
 
     assert!(after.sessions_revision > before.sessions_revision);
+    assert!(
+        after.config_notice.is_some(),
+        "a run with no config path tells the user instead of staying silent"
+    );
     assert_eq!(
-        after.config_notice, None,
-        "a run with no config path has nothing to fail at"
+        after.config_notice, before.config_notice,
+        "the fold leaves the one line it started with alone"
     );
     assert!(header(&holder.sessions_window(0, MAX_WINDOW).rows[0]).collapsed);
 }
