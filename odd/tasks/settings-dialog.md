@@ -39,7 +39,9 @@ the theme moves too (Appearance section).
   over the existing updater wiring - route: delegated writer, commit: see git log
   (feat/settings-t2)
 - T3 (S4 copy audit) The welcome screen and the Settings dialog say the same thing
-  about the two homes - route: delegated writer, commit: pending
+  about the two homes - route: inline, commit: see git log (feat/settings-t2; the audit found the
+  welcome screen pointing the two-homes change at the sidebar footer, now at
+  Settings; substance matches shell-choice S2's law)
 
 ## Log
 
@@ -54,3 +56,5 @@ the theme moves too (Appearance section).
   stray clicks. Decisions by the user: updates automatic + manual check in Settings;
   the home switch moves completely; the footer keeps only the Preview chip and the
   gear; the theme moves into Settings too.
+
+- L3 (2026-11-12): T3 audit result: no contradiction between Settings' HOME_EXPLAIN and the welcome law (sign-ins/local models/chats in the terminal; clean space at ~/.gentle-shell/agent, nothing touched); the one drift found and fixed was the welcome screen's pointer to the sidebar footer, now pointing at Settings.
