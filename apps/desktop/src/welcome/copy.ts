@@ -19,7 +19,7 @@ export const SEPARATE_TITLE = 'Keep it separate'
 export const SEPARATE_POINTS = [
   'A clean space with its own sign-ins and chats',
   'Nothing on this machine is touched',
-  'You can change this later from the sidebar footer',
+  'You can change this later from Settings',
 ]
 export const SEPARATE_PATH = 'creates ~/.gentle-shell/agent'
 
