@@ -18,7 +18,7 @@ use gentle_runtime::badge::{Badge, BadgeMark};
 
 use crate::contract::{
     ChatActivityMark, ChatActivityView, ImageView, NoticeActionView, NoticeLevel, NoticeView,
-    ShellView, ThemeView, ViewState,
+    ShellView, ThemeView, ViewState, WhatsNewView,
 };
 use crate::images::Images;
 use crate::{dialogs, helper_thread, helpers, sessions, view};
@@ -36,6 +36,9 @@ pub struct ShellParts<'a> {
     pub workspace_notice: Option<String>,
     /// Why the last session action was refused (T2's rename).
     pub sessions_notice: Option<String>,
+    /// The notes of the version this run follows (what's-new S3b), `None` until
+    /// the fetch answers with this version and after the modal is dismissed.
+    pub whats_new: Option<WhatsNewView>,
     /// The run's one fatal launcher failure.
     pub fatal: Option<String>,
     /// The theme this run holds, as the app config remembers it.
@@ -54,6 +57,7 @@ pub fn view_state(state: &AppState, sessions_revision: u32, shell: ShellParts<'_
         config_notice,
         workspace_notice,
         sessions_notice,
+        whats_new,
         fatal,
         theme,
         shell,
@@ -95,6 +99,7 @@ pub fn view_state(state: &AppState, sessions_revision: u32, shell: ShellParts<'_
         config_notice,
         workspace_notice,
         sessions_notice,
+        whats_new,
         fatal,
     }
 }

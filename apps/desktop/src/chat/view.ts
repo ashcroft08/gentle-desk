@@ -17,7 +17,9 @@
 //   which are the shell's own: it reads the files, so it is what answers with a
 //   thumbnail's URL or with a refusal (S1, S4);
 // - the run's one fatal failure, which belongs to no chat and outlives all of
-//   them: a launcher that cannot be resolved means no chat can start at all.
+//   them: a launcher that cannot be resolved means no chat can start at all;
+// - the notes of the version this run follows, which the what's-new modal draws
+//   (S4): they belong to the run too, so they are read whatever chat is open.
 //
 // No chat open draws no chat chrome at all: a push that carries a title, a
 // notice or a dialog for a chat that is already gone must not leave a header
@@ -32,6 +34,7 @@ import type {
   NoticeView,
   ShellView_Serialize as ShellView,
   ViewState_Serialize as ViewState,
+  WhatsNewView,
 } from '../contract/bindings'
 import { createSessionsStore, type SessionsStore } from '../sessions/store'
 
@@ -59,6 +62,8 @@ export type ChatViewState = {
   imagesNotice: string | null
   /** The run's fatal launcher failure, or `null`; not about any one chat. */
   fatal: string | null
+  /** The notes of the version this run follows, or `null`; not about a chat. */
+  whatsNew: WhatsNewView | null
   /** What the app found about pi and what was chosen; not about any one chat. */
   shell: ShellView
 }
@@ -96,6 +101,8 @@ export function chatOf(view: ViewState | null): ChatViewState {
   const fatal = view?.fatal ?? null
   // So is what the app found about the shell: it is not about a chat either.
   const shell = view?.shell ?? NO_SHELL
+  // And so are the notes of the version this run follows, which the modal draws.
+  const whatsNew = view?.whats_new ?? null
   if (chat === null) {
     return {
       chat: null,
@@ -109,6 +116,7 @@ export function chatOf(view: ViewState | null): ChatViewState {
       images: NO_IMAGES,
       imagesNotice: null,
       fatal,
+      whatsNew,
       shell,
     }
   }
@@ -124,6 +132,7 @@ export function chatOf(view: ViewState | null): ChatViewState {
     images: view?.images ?? NO_IMAGES,
     imagesNotice: view?.images_notice ?? null,
     fatal,
+    whatsNew,
     shell,
   }
 }
@@ -171,6 +180,7 @@ export function createChatView(deps: ChatViewDeps = {}): ChatView {
     images: [],
     imagesNotice: null,
     fatal: null,
+    whatsNew: null,
     shell: NO_SHELL,
   }
   const listeners = new Set<(state: ChatViewState) => void>()
@@ -196,6 +206,7 @@ export function createChatView(deps: ChatViewDeps = {}): ChatView {
       next.images === state.images &&
       next.imagesNotice === state.imagesNotice &&
       next.fatal === state.fatal &&
+      next.whatsNew === state.whatsNew &&
       sameShell(next.shell, state.shell)
     ) {
       return

@@ -29,6 +29,11 @@ struct DocumentRef<'a> {
     /// deserializer, like the theme and the home.
     #[serde(skip_serializing_if = "Option::is_none")]
     window: Option<WindowState>,
+    /// The version the last run of the app was, written only once a run stored
+    /// one, for the same reason: a run that never stored one writes the document
+    /// older builds wrote.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    last_run_version: Option<&'a str>,
     workspaces: &'a [WorkspaceEntry],
 }
 
@@ -39,6 +44,7 @@ pub(super) fn bytes(config: &AppConfig) -> std::io::Result<Vec<u8>> {
         theme: config.theme,
         shell_home: config.shell_home,
         window: config.window,
+        last_run_version: config.last_run_version.as_deref(),
         workspaces: &config.workspaces,
     };
     serde_json::to_vec(&document)

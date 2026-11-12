@@ -26,6 +26,7 @@
   import { createThreadView } from './thread/view'
   import MissingShell from './install/MissingShell.svelte'
   import Welcome from './welcome/Welcome.svelte'
+  import WhatsNewDialog from './whats-new/WhatsNewDialog.svelte'
 
   const thread = createThreadView()
   const chrome = createChatView()
@@ -167,4 +168,7 @@
   </main>
 </div>
 <Dialogs dialog={chat.dialog} />
+<!-- The run's own notes (S4): the slice decides WHETHER it stands, so it is a
+     modal of its own, not a notice and not a dialog of any chat. -->
+<WhatsNewDialog whatsNew={chat.whatsNew} />
 {/if}

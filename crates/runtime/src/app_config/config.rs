@@ -7,12 +7,15 @@
 //!
 //! The theme is an ADDITIVE field of version 1: a file written before it existed
 //! loads with [`Theme::System`], and a value this version does not know loads the
-//! same way, so the document version does not move (`CONFIG_VERSION`).
+//! same way, so the document version does not move (`CONFIG_VERSION`). The version
+//! the last run of the app was ([`AppConfig::last_run_version`]) is additive the
+//! same way.
 
 use serde::{Deserialize, Serialize};
 
 use gentle_backend::home::HomeChoice;
 
+use super::last_run;
 use super::shell_home;
 use super::theme::{self, Theme};
 use super::window::{self, WindowState};
@@ -43,6 +46,17 @@ pub struct AppConfig {
     /// mistyped value is `None`, never a damaged file.
     #[serde(default, deserialize_with = "window::or_none")]
     pub window: Option<WindowState>,
+    /// The version of the app the last run of it was, `None` until a run stores
+    /// one: written when the what's-new modal is dismissed, or at startup when
+    /// the notes could not be shown. An ADDITIVE field like the window state, read
+    /// leniently: an absent or mistyped value is `None` - the first run of a build
+    /// that predates this field - never a damaged file.
+    #[serde(
+        default,
+        deserialize_with = "last_run::or_none",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub last_run_version: Option<String>,
     /// The added workspaces, in the order they were added.
     pub workspaces: Vec<WorkspaceEntry>,
 }
@@ -54,6 +68,7 @@ impl Default for AppConfig {
             theme: Theme::default(),
             shell_home: None,
             window: None,
+            last_run_version: None,
             workspaces: Vec::new(),
         }
     }
@@ -87,6 +102,17 @@ impl AppConfig {
             return false;
         }
         self.shell_home = Some(choice);
+        true
+    }
+
+    /// Stores `version` as the version the last run of the app was. Answers
+    /// whether it changed: the same version again changes nothing, so nothing is
+    /// saved and no revision moves.
+    pub fn set_last_run_version(&mut self, version: &str) -> bool {
+        if self.last_run_version.as_deref() == Some(version) {
+            return false;
+        }
+        self.last_run_version = Some(version.to_owned());
         true
     }
 

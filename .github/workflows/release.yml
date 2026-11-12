@@ -16,6 +16,17 @@ name: release
 # Foundation application was declined for lack of public visibility, so
 # SmartScreen may warn on install. The updater signature above is separate and
 # unaffected.
+#
+# What's-new notes (S2 of odd/tasks/whats-new-modal.md): latest.json's `notes`
+# field carries the BODY of this tag's release, so the app can show what the
+# update brings. The body is read from the release at the moment latest.json is
+# written, and that is the ordering that matters: the text the maintainer wants
+# shown has to be on the release by then. Either create the release (a draft is
+# enough) with its body BEFORE the tag is pushed, or edit the release body after
+# the fact and re-run this workflow on the same tag - the upload below overwrites
+# latest.json with --clobber, so the re-run embeds the edited body. With no
+# release, an empty body, or a run that is not a tag, the notes keep the generic
+# "Gentle Shell Desktop <version>" line.
 
 on:
   push:
@@ -74,9 +85,14 @@ jobs:
 
       # GitHub renames spaces in an asset's name to dots, so the files are staged
       # with the dotted name here and the manifest points at exactly that name.
+      # RELEASE_TAG is empty on workflow_dispatch: a by-hand run publishes
+      # nothing, so it also reads no release body.
       - name: Stage the release files
         id: stage
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
         run: |
           $exe = Get-ChildItem -Path target/release/bundle/nsis/*.exe | Select-Object -First 1
           if (-not $exe) { throw "no installer was produced" }
@@ -120,9 +136,33 @@ jobs:
             }
             Copy-Item $sigSource (Join-Path $stage "$updateName.sig")
             $version = (Get-Content apps/desktop/src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
+
+            # The notes are the release body the maintainer wrote, read here
+            # because this step is where latest.json is written (see the note at
+            # the top of this file about that ordering). Anything short of a
+            # readable, non-empty body - no release yet, no token, gh failing,
+            # a body of whitespace - keeps the generic line, so a manifest that
+            # carries the updater fields never fails over its text. ConvertTo-Json
+            # below escapes the body's own quotes and newlines, and the app reads
+            # `notes` as plain text: the paragraphs stay paragraphs.
+            $notes = "Gentle Shell Desktop $version"
+            if ($env:RELEASE_TAG) {
+              # The same probe the publish step uses: a release that does not
+              # exist yet is the normal first run, not a failure, so its error
+              # text stays quiet here too.
+              gh release view $env:RELEASE_TAG *> $null
+              if ($LASTEXITCODE -eq 0) {
+                $raw = gh release view $env:RELEASE_TAG --json body 2>$null
+                if ($LASTEXITCODE -eq 0 -and $raw) {
+                  $body = ($raw -join "`n" | ConvertFrom-Json).body
+                  if ($body -and $body.Trim()) { $notes = $body.Trim() }
+                }
+              }
+            }
+
             $manifest = [ordered]@{
               version  = $version
-              notes    = "Gentle Shell Desktop $version"
+              notes    = $notes
               pub_date = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
               platforms = [ordered]@{
                 'windows-x86_64' = [ordered]@{

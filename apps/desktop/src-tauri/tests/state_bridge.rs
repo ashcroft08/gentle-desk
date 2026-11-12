@@ -114,6 +114,9 @@ fn the_view_state_slice_has_no_invented_fields() {
             // The same kind of line for a refused session action (T2's rename):
             // nothing was refused here either.
             sessions_notice: None,
+            // A holder that never ran the what's-new step of a run pushed no
+            // notes, so there is no modal to draw.
+            whats_new: None,
             // The launcher is resolved on the first command, so a run that has
             // asked for nothing yet has no fatal bar.
             fatal: None,

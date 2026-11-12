@@ -114,6 +114,21 @@ export async function attachImages(paths: string[]): Promise<void> {
 }
 
 /**
+ * The dismiss of the what's-new modal (S5): it stores the version this run runs
+ * as and clears the notes it pushed. It takes no argument on purpose - the page
+ * says it put the modal away, and the shell is the one that knows its version -
+ * and a failure is silent, because the notes simply come back and the modal is
+ * drawn again, which is the right answer to a dismiss that did not land.
+ */
+export async function storeLastRunVersion(): Promise<void> {
+  try {
+    await commands.storeLastRunVersion()
+  } catch {
+    // The next push still carries the notes; the modal comes back.
+  }
+}
+
+/**
  * Takes one attached image away before its send, named by the id the composer
  * drew. Nothing is sent, and a chat that goes away first changes nothing.
  */
