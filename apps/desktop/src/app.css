@@ -779,18 +779,26 @@ p {
   margin-top: auto;
 }
 
-/* The Preview chip (README's Preview label, in the app): a quiet rounded chip
-   beside the Settings gear, with the promise in its tooltip. */
+/* The Preview chip (README's Preview label, in the app): plain footer text,
+   no box - the footer's other controls are border-less and so is this. */
 .preview-chip {
   margin-left: auto;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1;
-  padding: 3px 8px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
+  color: var(--muted);
+  cursor: default;
+}
+
+.preview-chip:hover {
   color: var(--text);
-  opacity: 0.75;
-  white-space: nowrap;
+}
+
+/* The footer's gear hover lights the icon itself, without the ring the house
+   hover draws - the maintainer asked for no box around the footer's controls. */
+.foot .ic:hover {
+  box-shadow: none;
+  background: var(--surface2);
+  color: var(--text);
 }
 
 .tp {

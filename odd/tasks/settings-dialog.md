@@ -58,3 +58,5 @@ the theme moves too (Appearance section).
   gear; the theme moves into Settings too.
 
 - L3 (2026-11-12): T3 audit result: no contradiction between Settings' HOME_EXPLAIN and the welcome law (sign-ins/local models/chats in the terminal; clean space at ~/.gentle-shell/agent, nothing touched); the one drift found and fixed was the welcome screen's pointer to the sidebar footer, now pointing at Settings.
+
+- L4 (2026-11-12, user design feedback after the T1 review build): the stacked dialog reads too simple - the settings pattern the maintainer wants is a dialog-internal sidebar: a left rail with the three sections (Appearance, Shell home, About and updates), the selected section's content in a right pane, dialog widened to about 680px. Footer corrections: no boxes around the footer's controls (the chip renders as plain 12px footer text, hover lifts its color; the gear's hover lights the icon without the house ring), and the Preview text analyzed against the footer baseline: the home-choice buttons run 12px, so the chip runs 12px too.
