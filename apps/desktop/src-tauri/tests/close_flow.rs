@@ -7,10 +7,12 @@
 //! file starts a child or opens a window; the process-level proof lives in
 //! `fake_shell.rs`.
 
+use std::io;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
-use gentle_desk_lib::close::{CloseFlow, CloseSteps, Deadlines};
+use gentle_desk_lib::close::{CloseFlow, CloseSteps, Deadlines, SPAWN_ATTEMPTS};
 
 /// How long a test waits for a shutdown that its own deadlines bound.
 const LIMIT: Duration = Duration::from_secs(10);
@@ -142,6 +144,93 @@ fn a_second_close_request_while_shutting_down_runs_nothing_again() {
     std::thread::sleep(Duration::from_millis(200));
 
     assert_eq!(*lock(&ran), ORDER.to_vec(), "one shutdown, never two");
+}
+
+/// A spawner as the flow asks for one: start a thread for the shutdown's work,
+/// or say why there is none.
+type Spawn = Arc<dyn Fn(&Arc<dyn Fn() + Send + Sync>) -> io::Result<()> + Send + Sync>;
+
+/// A spawner that never starts a thread: what a close meets when the process
+/// has no thread to give it. It counts the asks, so the test sees the retry.
+fn refusing_spawner(asks: Arc<AtomicUsize>) -> Spawn {
+    Arc::new(move |_work: &Arc<dyn Fn() + Send + Sync>| {
+        asks.fetch_add(1, Ordering::SeqCst);
+        Err(io::Error::new(io::ErrorKind::WouldBlock, "no thread"))
+    })
+}
+
+#[test]
+fn a_close_that_cannot_get_a_thread_runs_nothing_on_the_caller() {
+    // The window's thread is where `CloseRequested` arrives. A shutdown run here
+    // would hold it for the sum of every deadline (about a minute), which is the
+    // freeze the close exists to avoid: with no thread for it, the close runs no
+    // step at all and the window keeps the close it already had.
+    let (steps, ran) = Recorded::new(None);
+    let asks = Arc::new(AtomicUsize::new(0));
+    let flow = CloseFlow::new(Arc::new(steps), deadlines())
+        .with_spawner(refusing_spawner(Arc::clone(&asks)));
+
+    let started = Instant::now();
+    let did_start = flow.request();
+    let took = started.elapsed();
+
+    assert!(
+        !did_start,
+        "a close that could not start its thread did not start the shutdown"
+    );
+    assert!(
+        lock(&ran).is_empty(),
+        "no step ran, least of all on the caller's thread: {:?}",
+        lock(&ran)
+    );
+    assert!(
+        !flow.shutdown_started(),
+        "no shutdown is underway, so the window's own close is still free to run"
+    );
+    assert_eq!(
+        asks.load(Ordering::SeqCst),
+        SPAWN_ATTEMPTS as usize,
+        "the close asks for its thread a bounded number of times, no more and no fewer"
+    );
+    assert!(
+        took < Duration::from_secs(2),
+        "the retries are a pause, not a wait: {took:?}"
+    );
+}
+
+#[test]
+fn a_close_that_could_not_get_a_thread_leaves_a_later_request_able_to_start_it() {
+    // The refusal is often the moment, not the process: a later close request
+    // must still be able to get its thread, so the started gate goes back.
+    let (steps, ran) = Recorded::new(None);
+    let asks = Arc::new(AtomicUsize::new(0));
+    let counter = Arc::clone(&asks);
+    let spawn: Spawn = Arc::new(move |work: &Arc<dyn Fn() + Send + Sync>| {
+        // The first close's attempts are refused; then a thread is there.
+        if counter.fetch_add(1, Ordering::SeqCst) < SPAWN_ATTEMPTS as usize {
+            return Err(io::Error::new(io::ErrorKind::WouldBlock, "no thread"));
+        }
+        let work = Arc::clone(work);
+        std::thread::Builder::new()
+            .name("app-close".to_owned())
+            .spawn(move || work())
+            .map(|_thread| ())
+    });
+    let flow = CloseFlow::new(Arc::new(steps), deadlines()).with_spawner(spawn);
+
+    assert!(!flow.request(), "the first close got no thread");
+    assert!(lock(&ran).is_empty(), "and ran nothing instead");
+
+    assert!(
+        flow.request(),
+        "a later request starts the shutdown the earlier one could not"
+    );
+    wait_for(&ran, "exit");
+    assert_eq!(
+        *lock(&ran),
+        ORDER.to_vec(),
+        "the shutdown that did start runs every step once, in order"
+    );
 }
 
 #[test]

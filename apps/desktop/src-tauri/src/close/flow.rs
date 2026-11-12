@@ -8,7 +8,14 @@
 //! Each step runs inside [`bounded`]: a step that misses its deadline is logged
 //! and left behind, so no hung child and no hung disk keeps the app open. The
 //! last step ends the process.
+//!
+//! The window's thread - where the close request arrives - only ever asks for
+//! the shutdown's thread. It never runs a step itself: a shutdown that ran there
+//! would hold the window for the sum of every deadline, which is the freeze this
+//! close exists to avoid. A request that cannot get a thread runs nothing and
+//! answers so, leaving the window the close it already had.
 
+use std::io;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
 use std::sync::Arc;
@@ -65,6 +72,38 @@ impl Default for Deadlines {
 /// close.
 pub const WINDOW_SAVE: Duration = Duration::from_secs(2);
 
+/// How many times a close asks for the thread its shutdown runs on.
+///
+/// A refused spawn is usually the moment, not the process: the run is out of
+/// threads for an instant, and the ask that follows a pause gets one. So the
+/// close tries again instead of settling for the first refusal, and the whole
+/// retry - [`SPAWN_ATTEMPTS`] asks and the pauses between them - costs the
+/// caller about a tenth of a second, far less than any step of the shutdown.
+/// A close that is still refused runs nothing at all: see
+/// [`CloseFlow::request`].
+pub const SPAWN_ATTEMPTS: u32 = 3;
+
+/// The pause between two asks for the shutdown's thread: long enough for a
+/// thread that was just released to become available, and short enough that the
+/// caller's wait for the whole retry stays around a tenth of a second - no part
+/// of the shutdown runs while it waits.
+const SPAWN_PAUSE: Duration = Duration::from_millis(50);
+
+/// What starts the thread a shutdown runs on. The flow's own spawner names the
+/// thread `app-close`; a test injects one that refuses, to prove what a close
+/// does when no thread can be had ([`CloseFlow::with_spawner`]). The work is
+/// shared rather than moved, so a refused attempt leaves it to the next one.
+type Spawner = Arc<dyn Fn(&Arc<dyn Fn() + Send + Sync>) -> io::Result<()> + Send + Sync>;
+
+/// The spawner of the app: one named thread, or the reason there is none.
+fn spawn_close_thread(work: &Arc<dyn Fn() + Send + Sync>) -> io::Result<()> {
+    let work = Arc::clone(work);
+    thread::Builder::new()
+        .name("app-close".to_owned())
+        .spawn(move || work())
+        .map(|_thread| ())
+}
+
 /// The steps of a close, in the order [`CloseFlow`] runs them. The real ones are
 /// [`super::BridgeSteps`]; a test records them.
 pub trait CloseSteps: Send + Sync {
@@ -100,6 +139,9 @@ pub struct CloseFlow {
     /// disk is the state of this close.
     window: Option<Arc<dyn WindowRecorder>>,
     started: AtomicBool,
+    /// How the shutdown's thread is started. [`spawn_close_thread`] in the app;
+    /// a test that must see what happens without one replaces it.
+    spawn: Spawner,
 }
 
 impl CloseFlow {
@@ -109,7 +151,16 @@ impl CloseFlow {
             deadlines,
             window: None,
             started: AtomicBool::new(false),
+            spawn: Arc::new(spawn_close_thread),
         }
+    }
+
+    /// The same close that starts its shutdown's thread with `spawn` instead of
+    /// the app's own. Only a test uses it, and only to force the refusal the
+    /// app meets when the process has no thread left to give: the close must run
+    /// nothing on the caller then.
+    pub fn with_spawner(self, spawn: Spawner) -> Self {
+        Self { spawn, ..self }
     }
 
     /// The same close with the window of this run, so where it was and how big it
@@ -125,6 +176,15 @@ impl CloseFlow {
     /// Asks for the shutdown. Answers whether THIS call started it: a second
     /// close request while shutting down, or after it finished, is ignored, so
     /// the steps never run twice and nothing panics.
+    ///
+    /// This runs on the window's own thread, where the close request arrives, so
+    /// it must not run a step of the shutdown: every deadline of [`Deadlines`]
+    /// adds up to about a minute, and a window held for that long is the freeze
+    /// this close exists to avoid. When the thread cannot be had, the request
+    /// asks [`SPAWN_ATTEMPTS`] times, logs the refusal, and answers `false`
+    /// having run nothing: the started gate goes back with it, so the caller
+    /// keeps the close it already had and the process ends there, as it did
+    /// before there was a flow.
     pub fn request(&self) -> bool {
         if self.started.swap(true, Ordering::SeqCst) {
             return false;
@@ -132,16 +192,41 @@ impl CloseFlow {
         let steps = Arc::clone(&self.steps);
         let deadlines = self.deadlines;
         let window = self.window.clone();
-        let spawned = thread::Builder::new()
-            .name("app-close".to_owned())
-            .spawn(move || shutdown(steps, deadlines, window));
-        if let Err(error) = spawned {
-            // A window whose close is prevented must still be closeable: with no
-            // thread to run them, the same steps run here, bounded as always.
-            eprintln!("close: no thread for the shutdown ({error}); running it here");
-            shutdown(Arc::clone(&self.steps), self.deadlines, self.window.clone());
+        let work: Arc<dyn Fn() + Send + Sync> = Arc::new(move || {
+            shutdown(Arc::clone(&steps), deadlines, window.clone());
+        });
+        let mut refusal = None;
+        for attempt in 1..=SPAWN_ATTEMPTS {
+            match (self.spawn)(&work) {
+                Ok(()) => return true,
+                Err(error) => {
+                    refusal = Some(error);
+                    if attempt < SPAWN_ATTEMPTS {
+                        thread::sleep(SPAWN_PAUSE);
+                    }
+                }
+            }
         }
-        true
+        // No thread for the shutdown, and running it here would freeze the
+        // window for the sum of every deadline: so nothing runs, and the gate
+        // goes back to the state a close that never happened leaves it in. The
+        // caller sees `false`, does not prevent the window's close, and the
+        // process ends the way it does without a flow at all.
+        self.started.store(false, Ordering::SeqCst);
+        let error = refusal.expect("a close that asked for its thread has a reason it has none");
+        eprintln!(
+            "close: no thread for the shutdown after {SPAWN_ATTEMPTS} asks ({error}); running nothing, the window's own close stands"
+        );
+        false
+    }
+
+    /// Whether a shutdown was started: from the first request that got its
+    /// thread, this stays true, and the window's close must be prevented until
+    /// the flow's exit step ends the process. It is false when no thread could
+    /// be had, so a window whose shutdown never started keeps the close it would
+    /// have had without a flow.
+    pub fn shutdown_started(&self) -> bool {
+        self.started.load(Ordering::SeqCst)
     }
 }
 

@@ -29,7 +29,7 @@ the goal is that the close flow's guarantees hold by construction, not by commen
 - T2 (S2) Last-writer rule: the close's flush must not race an in-flight pass - route: delegated
   writer, commit: see git log (fix/close-race-t2)
 - T3 (S3) One shared budget for `SessionsService::stop` - route: delegated writer, commit: see git log (fix/close-race-t3)
-- T4 (S4) The fallback shutdown leaves the caller thread - route: delegated writer, commit: pending
+- T4 (S4) The fallback shutdown leaves the caller thread - route: delegated writer, commit: see git log (fix/close-race-t4)
 
 ## Log
 
@@ -40,3 +40,5 @@ the goal is that the close flow's guarantees hold by construction, not by commen
 - L2 (2026-11-12, user): after shipping v0.1.7 and the close-up maintenance, the user chose to work
   the backlog starting with this item ("vamos con el mantenimiento de cierre y luego con lo del
   backlog", with #26 the parent's recommended start).
+
+- L8 (2026-11-12): T1-T4 all implemented and verified (fmt, clippy, workspace tests green each slice). T4: the request retries the app-close spawn 3 times (50 ms apart), never runs the shutdown inline, releases the started gate on total refusal, and lib.rs prevents the window's close only when a shutdown actually started. Recorded side effect: `UiIntent::RestartApp` also calls `request()`, so on a total spawn refusal the relaunch now does nothing and the app stays open with its relaunch flag (logged), instead of freezing the window thread with an inline shutdown.

@@ -102,15 +102,21 @@ pub fn run() {
         // avoids, and it cannot refuse the close.
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
-                // The close is prevented ONLY when there is a flow to finish it:
-                // a window that cannot be closed is worse than one that closes
+                // The close is prevented ONLY when there is a shutdown to finish
+                // it: a window that cannot be closed is worse than one that closes
                 // without the orderly shutdown, so an unarmed run (a request
-                // before the setup step armed it) keeps the default close. A
-                // second request while shutting down is ignored by the flow's
-                // own gate, so this needs no state of its own.
+                // before the setup step armed it) keeps the default close. So does
+                // a close whose shutdown could not get a thread: the flow runs
+                // nothing then (`CloseFlow::request`), and preventing this one
+                // would leave a window nobody can close. A second request while
+                // shutting down is ignored by the flow's own gate, but its close
+                // is still prevented: the flow's exit step is what ends the
+                // process.
                 if let Some(close) = window.app_handle().state::<Bridge>().close_flow() {
-                    api.prevent_close();
                     close.request();
+                    if close.shutdown_started() {
+                        api.prevent_close();
+                    }
                 }
             }
         })
