@@ -33,7 +33,7 @@ modal shows once per version.
 - T2 (S4) The modal, once per version, wired to the pushed slice - route: delegated writer,
   commit: see git log (feat/whats-new-t2)
 - T3 (S2) The release workflow embeds the release body into `latest.json` - route: delegated
-  writer, commit: pending
+  writer, commit: see git log (chore/whats-new-workflow)
 
 ## Log
 
@@ -43,3 +43,5 @@ modal shows once per version.
   with the update in the updater's own manifest (the `notes` field `latest.json` already has, now
   carrying the release body); the modal shows once per version. Detection via `last_run_version`
   in the app config is the parent's call.
+
+- L9 (2026-11-12): T1-T3 all implemented and verified. T3 embeds the release body into latest.json's notes via gh release view at manifest-write time, with the generic line as fallback and the ordering documented (edit the body, then re-run the workflow on the same tag to refresh the notes). Proven by a dry-run harness with a fake gh: 19 assertions green, 8 red against the pre-change snippet. Note for the first tag run: the first run embeds the generic text unless the release body pre-exists; the re-run path delivers the maintainer's notes.
