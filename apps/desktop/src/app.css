@@ -771,9 +771,24 @@ p {
    short, such as the empty state before any workspace exists. */
 .foot {
   display: flex;
+  align-items: center;
   padding-top: 8px;
   border-top: 1px solid var(--border);
   margin-top: auto;
+}
+
+/* The Preview chip (README's Preview label, in the app): a quiet rounded chip
+   beside the theme picker, with the promise in its tooltip. */
+.preview-chip {
+  margin-left: auto;
+  font-size: 11px;
+  line-height: 1;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--text);
+  opacity: 0.75;
+  white-space: nowrap;
 }
 
 .tp {

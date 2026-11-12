@@ -178,5 +178,10 @@
       <HomeSetting shell={model.view.shell} />
     {/if}
     <ThemePicker theme={model.view?.theme ?? 'system'} />
+    <span
+      class="preview-chip"
+      title="Preview: under active development - fixes ship fast"
+      >Preview</span
+    >
   </footer>
 </aside>
