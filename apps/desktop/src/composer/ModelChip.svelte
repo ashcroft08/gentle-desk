@@ -1,14 +1,16 @@
 <script lang="ts">
-  // The model chip (0.1.11): the session's model and thinking level, each its
-  // own dropdown, fed by the child's own answers. The page never guesses: what
-  // the child did not say is not shown, and a failed ask is a state, not an
-  // error the composer turns into.
+  // The model chip (0.1.11): the session's model and thinking level as two
+  // pill dropdowns inside the composer bar, right of the box and left of the
+  // send button, the way the user's screenshot shows it. The page never
+  // guesses: what the child did not say is not shown, and a failed ask is a
+  // state, not an error the composer turns into.
   //
   // One turn at a time is the composer's business, not the chip's: choosing a
   // model while the agent works is the child's session change, and pi answers
   // it or refuses it. The chip renders the refusal as the notice the app
   // already pushes, not as a disabled control.
   import { dispatchIntent } from '../bridge'
+  import Icon from '../icons/Icon.svelte'
   import type { ModelChipView } from '../contract/bindings'
   import {
     LEVEL_LABEL,
@@ -46,33 +48,33 @@
 {#if chip !== null}
   <div class="chip">
     {#if chip?.status.type === 'Ready' && models.length > 0}
-      <select
-        class="model"
-        aria-label={MODEL_LABEL}
-        value={current === null ? '' : `${current.provider}/${current.model_id}`}
-        onchange={choseModel}
-      >
-        {#if current === null}
-          <option value="" disabled hidden>{MODEL_LABEL}</option>
-        {/if}
-        {#each models as model (model.provider + '/' + model.model_id)}
-          <option value={model.provider + '/' + model.model_id}>{model.name}</option>
-        {/each}
-      </select>
-      {#if levels.length > 0}
+      <label class="pill">
         <select
-          class="level"
-          aria-label={LEVEL_LABEL}
-          value={level ?? ''}
-          onchange={choseLevel}
+          aria-label={MODEL_LABEL}
+          value={current === null ? '' : `${current.provider}/${current.model_id}`}
+          onchange={choseModel}
         >
-          {#if level === null}
-            <option value="" disabled hidden>{LEVEL_LABEL}</option>
+          {#if current === null}
+            <option value="" disabled hidden>{MODEL_LABEL}</option>
           {/if}
-          {#each levels as option (option)}
-            <option value={option}>{option}</option>
+          {#each models as model (model.provider + '/' + model.model_id)}
+            <option value={model.provider + '/' + model.model_id}>{model.name}</option>
           {/each}
         </select>
+        <Icon name="chevronDown" size={12} />
+      </label>
+      {#if levels.length > 0}
+        <label class="pill level">
+          <select aria-label={LEVEL_LABEL} value={level ?? ''} onchange={choseLevel}>
+            {#if level === null}
+              <option value="" disabled hidden>{LEVEL_LABEL}</option>
+            {/if}
+            {#each levels as option (option)}
+              <option value={option}>{option}</option>
+            {/each}
+          </select>
+          <Icon name="chevronDown" size={12} />
+        </label>
       {/if}
     {:else if status === 'Loading' || status === 'Unknown'}
       <p class="state">{MODELS_LOADING}</p>

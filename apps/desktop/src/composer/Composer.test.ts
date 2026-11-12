@@ -231,4 +231,25 @@ describe('Composer', () => {
     expect(box.value).toBe('half a thought')
     expect(intents()).toEqual([])
   })
+
+  // A real browser reports `scrollHeight` as at least the element's current
+  // height, so a box whose inline height stays at the expanded size keeps
+  // measuring itself as expanded forever (L9). The stub reproduces exactly
+  // that: scrollHeight is the typed content's height, but never below the
+  // height the inline style currently fixes.
+  it('shrinks the box back after a send (L9)', async () => {
+    const { box } = draw({ chat: 'chat-1' })
+    const content = () => (box.value === '' ? 24 : 400)
+    const scroll = vi.spyOn(box, 'scrollHeight', 'get')
+    scroll.mockImplementation(() => Math.max(content(), parseInt(box.style.height) || 0))
+
+    await type(box, 'a very long prompt that would expand the box')
+    expect(parseInt(box.style.height)).toBe(120) // capped at MAX_HEIGHT
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    expect(box.value).toBe('')
+    // The inline height must not stay at the expanded size once the draft is
+    // gone.
+    expect(box.style.height).not.toBe('120px')
+  })
 })

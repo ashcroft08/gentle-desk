@@ -100,10 +100,13 @@
     // Reading the draft is what makes this follow a push and the typing alike.
     void text
     if (box === null) return
+    // A browser reports scrollHeight as at least the current height, so the
+    // old size must be dropped first: without this reset a box that grew with
+    // a long draft keeps measuring itself as grown after the send (L9).
+    box.style.height = 'auto'
     const height = fittedHeight(box.scrollHeight)
     box.style.height = height === 0 ? 'auto' : `${height}px`
   })
-
   function typed(event: Event): void {
     if (chat === null) return
     const value = (event.currentTarget as HTMLTextAreaElement).value
@@ -150,7 +153,6 @@
 </script>
 
 <div class="composer-dock">
-  <ModelChip {chip} />
   {#if dropping}
     <!-- Where the files go while they are still in the air. -->
     <p class="drop">{DROP_HINT}</p>
@@ -185,6 +187,7 @@
       oninput={typed}
       onkeydown={keyed}
     ></textarea>
+    <ModelChip {chip} />
     {#if rule.mode === 'stop'}
       <StopButton onStop={stop} />
     {:else}
