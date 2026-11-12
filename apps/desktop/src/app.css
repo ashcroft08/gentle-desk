@@ -764,40 +764,50 @@ p {
   transform: none;
 }
 
-/* The footer theme control (01a, `.foot`, `.tp` and `.tpl`): the panel is drawn
-   above the button, in the page's own colors, so the list follows the theme it
-   offers. No native popup is involved. */
+/* The theme control (01a's `#theme-btn` and `#theme-list`, `.tp` and `.tpl`): it
+   lives in the Settings dialog's Appearance section now (settings-dialog S3), and
+   the list is drawn in the page's own colors, so it follows the theme it offers.
+   No native popup is involved. */
 /* Bottom-anchored, so the footer stays put when the middle of the sidebar is
    short, such as the empty state before any workspace exists. */
 .foot {
   display: flex;
   align-items: center;
+  gap: 6px;
   padding-top: 8px;
   border-top: 1px solid var(--border);
   margin-top: auto;
 }
 
-/* The Preview chip (README's Preview label, in the app): a quiet rounded chip
-   beside the theme picker, with the promise in its tooltip. */
+/* The Preview chip (README's Preview label, in the app): plain footer text,
+   no box - the footer's other controls are border-less and so is this. */
 .preview-chip {
   margin-left: auto;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1;
-  padding: 3px 8px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
+  color: var(--muted);
+  cursor: default;
+}
+
+.preview-chip:hover {
   color: var(--text);
-  opacity: 0.75;
-  white-space: nowrap;
+}
+
+/* The footer's gear hover lights the icon itself, without the ring the house
+   hover draws - the maintainer asked for no box around the footer's controls. */
+.foot .ic:hover {
+  box-shadow: none;
+  background: var(--surface2);
+  color: var(--text);
 }
 
 .tp {
   position: relative;
 }
 
-/* The home setting in the footer: two small answers side by side with the
-   current one filled, and, while a change waits for a restart, one line that
-   says so with its button. */
+/* The home setting (shell-choice S5), drawn in the Settings dialog's Shell home
+   section: two small answers side by side with the current one filled, and,
+   while a change waits for a restart, one line that says so with its button. */
 .home-setting {
   flex: 1;
   min-width: 0;
@@ -861,12 +871,30 @@ p {
 }
 
 .tpl li {
-  padding: 6px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
   border-radius: 6px;
   font-size: 13px;
   color: var(--text);
   background: transparent;
   cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+/* The theme's accent as a small dot beside its name. The dot is decoration:
+   the option's name is still its word, and `system` draws the two halves it
+   follows (the component fills it in). */
+.tpl .swatch {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--swatch, var(--accent));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
 }
 
 .tpl li:hover {
@@ -876,6 +904,7 @@ p {
 
 .tpl li[aria-selected='true'] {
   background: var(--tint);
+  color: var(--accent);
 }
 
 .tpl li[aria-selected='true']:hover {
@@ -1003,6 +1032,158 @@ p {
   background: var(--danger);
   border-color: var(--danger);
   color: var(--bg);
+}
+
+/* The Settings dialog (settings-dialog S2, L4): a rail of the three sections on
+   the left and the selected section's content in the pane on the right. The card
+   is wider than the other dialogs' 440px to hold both, about 680px. */
+.dlg.settings {
+  width: min(680px, calc(100vw - 32px));
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* The rail and the pane, side by side: the rail is fixed and the pane takes the
+   rest, with the one section drawn there. */
+.settings-body {
+  display: flex;
+  gap: 18px;
+  min-height: 240px;
+}
+
+.settings-rail {
+  flex: none;
+  width: 184px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 2px 14px 0 0;
+  border-right: 1px solid var(--border);
+}
+
+/* One rail entry: its glyph and its word, quiet until it is the selected one or
+   the pointer is over it. The selected entry wears the accent on its tint, the
+   house's own selected look (the picker list and the chat rows). */
+.settings-rail [role='tab'] {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: 32px;
+  padding: 0 10px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  border-radius: 8px;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.settings-rail [role='tab']:hover {
+  background: var(--surface2);
+  color: var(--text);
+}
+
+.settings-rail [role='tab'][aria-selected='true'] {
+  background: var(--tint);
+  color: var(--accent);
+}
+
+.settings-rail [role='tab']:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+
+/* The pane: breathing room from the rail, then the section's heading, its one
+   short hint and the content the section already drew. The body fades in when
+   the rail switches sections, so the swap reads as one calm step. */
+.settings-pane {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 2px 2px 0 2px;
+}
+
+.settings-pane .pane-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  animation: pane-in 120ms ease both;
+}
+
+@keyframes pane-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+/* The section's title at the dialog's own title size, so the two read as one
+   scale; the hint sits under it in the muted small text the house uses. */
+.settings-pane h3 {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.settings-pane .hint {
+  margin: 0 0 14px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.settings-pane .why {
+  margin: 0 0 12px;
+  line-height: 1.5;
+}
+
+/* The theme list opens DOWN from its button inside the dialog: the footer's own
+   rule draws it above, which in a card would leave it over the backdrop. */
+.dlg .tpl {
+  bottom: auto;
+  top: 38px;
+}
+
+/* About and updates (settings-dialog S5, S6): the name and the version this run
+   runs as on one line, then the one check button with its answer under it. */
+.dlg .about {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 10px;
+}
+
+.dlg .about-name {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.dlg .about-version {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.dlg .check .why {
+  margin: 8px 0 0;
+}
+
+/* The dialog's buttons keep the house button look with the same quiet
+   transition as the rail: border and fill, never a jump. */
+.dlg.settings .btn {
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease;
 }
 
 /* The dialog's own field and its options: the box the user types in, and one

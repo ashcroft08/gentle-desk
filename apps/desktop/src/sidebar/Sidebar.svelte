@@ -1,7 +1,8 @@
 <script lang="ts">
   // The sidebar: New session (D2), the New workspace control (D7), the two plain
   // notice lines, the reading line of the first pass, the workspace tree, and the
-  // footer's theme control (the v1 Appearance setting).
+  // footer with the Preview chip and the gear that opens Settings
+  // (settings-dialog S1: the theme picker and the home setting live there now).
   // It owns the only view-local selection this slice needs (P5): the workspace
   // row the user clicked last, and the chat row clicked while Rust catches up.
   import { dispatchIntent, renameSession, deleteSession } from '../bridge'
@@ -14,9 +15,10 @@
   import NewSessionButton from './NewSessionButton.svelte'
   import SidebarHeader from './SidebarHeader.svelte'
   import SidebarNotices from './SidebarNotices.svelte'
-  import HomeSetting from './HomeSetting.svelte'
-  import ThemePicker from './ThemePicker.svelte'
   import WorkspaceTree from './WorkspaceTree.svelte'
+  import Icon from '../icons/Icon.svelte'
+  import SettingsDialog from '../settings/SettingsDialog.svelte'
+  import { SETTINGS } from '../settings/copy'
   import {
     EMPTY_REASON,
     EMPTY_TITLE,
@@ -36,6 +38,8 @@
   let clickedChat = $state<string | null>(null)
   /** Whether the delete confirm dialog is open. */
   let deleteOpen = $state(false)
+  /** Whether the Settings dialog is open (settings-dialog S1-S6). */
+  let settingsOpen = $state(false)
   /** The chat row that dialog is about: the one whose Delete the user picked. */
   let deleting = $state<ChatRow | null>(null)
 
@@ -171,17 +175,32 @@
     path={deleting?.id ?? ''}
     onDelete={confirmDelete}
   />
-  <!-- The footer's theme control (01a): the v1 Appearance setting, drawn
-       where the artboard puts it. -->
+  <!-- The Settings dialog, the only home the theme picker and the home setting
+       have now (S1), and where the app's name, its running version and the
+       manual update check live (S5, S6). Closing it sends nothing: each section
+       persists through the command it already had. -->
+  <SettingsDialog
+    bind:open={settingsOpen}
+    theme={model.view?.theme ?? 'system'}
+    shell={model.view?.shell ?? null}
+    version={model.view?.app_version ?? null}
+  />
+  <!-- The footer keeps exactly two things (S1): the run's Preview chip and the
+       gear that opens Settings. -->
   <footer class="foot">
-    {#if model.view !== null}
-      <HomeSetting shell={model.view.shell} />
-    {/if}
-    <ThemePicker theme={model.view?.theme ?? 'system'} />
     <span
       class="preview-chip"
       title="Preview: under active development - fixes ship fast"
       >Preview</span
     >
+    <button
+      class="ic"
+      type="button"
+      aria-label={SETTINGS}
+      title={SETTINGS}
+      onclick={() => (settingsOpen = true)}
+    >
+      <Icon name="settings" />
+    </button>
   </footer>
 </aside>

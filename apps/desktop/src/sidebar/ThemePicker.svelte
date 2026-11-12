@@ -16,7 +16,7 @@
   import type { ThemeView } from '../contract/bindings'
   import { dispatchIntent } from '../bridge'
   import Icon from '../icons/Icon.svelte'
-  import { THEMES, themeLabel } from '../theme/themes'
+  import { THEMES, themeLabel, themeSwatch } from '../theme/themes'
   import { movedIndex, trappedIndex } from './theme-keys'
 
   let { theme }: { theme: ThemeView } = $props()
@@ -151,6 +151,9 @@
     >
       {#each THEMES as option (option)}
         <li role="option" tabindex="-1" aria-selected={option === theme} data-value={option}>
+          <!-- The theme's accent as a dot: decoration, so the option's name is
+               still only its word. `system` draws the two halves it follows. -->
+          <span class="swatch" style:--swatch={themeSwatch(option)} aria-hidden="true"></span>
           {themeLabel(option)}
         </li>
       {/each}

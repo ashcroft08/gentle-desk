@@ -117,6 +117,9 @@ fn the_view_state_slice_has_no_invented_fields() {
             // A holder that never ran the what's-new step of a run pushed no
             // notes, so there is no modal to draw.
             whats_new: None,
+            // And the run that never ran it named no version either, so the
+            // About section says it does not know one (settings-dialog S5).
+            app_version: None,
             // The launcher is resolved on the first command, so a run that has
             // asked for nothing yet has no fatal bar.
             fatal: None,
