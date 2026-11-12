@@ -43,6 +43,7 @@ describe('chatOf', () => {
       images: [],
       imagesNotice: null,
       fatal: null,
+      whatsNew: null,
       shell: { pi_path: null, choice: null, ask: false, launcher_found: true, install: { type: 'Idle' }, restart_needed: false },
     })
   })
@@ -94,6 +95,7 @@ describe('chatOf', () => {
       images: [],
       imagesNotice: null,
       fatal: null,
+      whatsNew: null,
       shell: { pi_path: null, choice: null, ask: false, launcher_found: true, install: { type: 'Idle' }, restart_needed: false },
     })
     expect(chatOf(null).chat).toBeNull()

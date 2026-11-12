@@ -31,7 +31,7 @@ modal shows once per version.
   injectable fetcher, the view-state push, and the store-on-dismiss/store-on-fail seam -
   route: delegated writer, commit: see git log (feat/whats-new-t1)
 - T2 (S4) The modal, once per version, wired to the pushed slice - route: delegated writer,
-  commit: pending
+  commit: see git log (feat/whats-new-t2)
 - T3 (S2) The release workflow embeds the release body into `latest.json` - route: delegated
   writer, commit: pending
 
