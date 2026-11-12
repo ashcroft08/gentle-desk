@@ -244,3 +244,128 @@ fn the_history_of_a_stored_chat_fills_its_own_thread() {
         "the history belongs to one chat"
     );
 }
+
+mod chip {
+    use super::*;
+    use gentle_core::rpc::RpcCommand;
+
+    /// The chip belongs to the foreground chat's child: its replies fold into
+    /// the app state through the per-chat path too (0.1.11).
+    #[test]
+    fn the_foreground_childs_model_reply_fills_the_chip() {
+        let chat = chat("a");
+        let (state, _) = apply(AppState::default(), vec![open(&chat), confirmed(&chat)]);
+        let (state, _) = apply(
+            state,
+            vec![event(
+                &chat,
+                RpcEvent::Response(gentle_core::rpc::RpcResponse {
+                    id: None,
+                    command: "get_available_models".into(),
+                    outcome: Ok(serde_json::json!({
+                        "models": [{"id": "m1", "name": "Model One", "provider": "prov", "reasoning": true}]
+                    })),
+                }),
+            )],
+        );
+        assert_eq!(state.models.len(), 1);
+        assert_eq!(state.models[0].name, "Model One");
+        assert_eq!(state.models_status, gentle_app::ModelsStatus::Ready);
+    }
+
+    /// A background chat's reply must not move the foreground chip.
+    #[test]
+    fn a_background_childs_reply_leaves_the_chip_alone() {
+        let a = chat("a");
+        let b = chat("b");
+        let (state, _) = apply(AppState::default(), vec![open(&a), confirmed(&a)]);
+        let (state, _) = apply(
+            state,
+            vec![event(
+                &b,
+                RpcEvent::Response(gentle_core::rpc::RpcResponse {
+                    id: None,
+                    command: "get_available_models".into(),
+                    outcome: Ok(serde_json::json!({"models": []})),
+                }),
+            )],
+        );
+        assert!(state.models.is_empty());
+        assert_eq!(state.models_status, gentle_app::ModelsStatus::Unknown);
+    }
+
+    /// Choosing a model sends it to the foreground chat's child, not to the
+    /// one-child send the chats shell drops.
+    #[test]
+    fn choosing_a_model_reaches_the_foreground_chat() {
+        let chat = chat("a");
+        let (state, effects) = apply(
+            AppState::default(),
+            vec![
+                open(&chat),
+                confirmed(&chat),
+                Input::Intent(Intent::SelectModel {
+                    provider: "prov".into(),
+                    model_id: "m1".into(),
+                }),
+            ],
+        );
+        assert_eq!(
+            effects.last().unwrap().chat_commands,
+            vec![gentle_app::ChatCommand::Send {
+                chat,
+                rpc: RpcCommand::SetModel {
+                    provider: "prov".into(),
+                    model_id: "m1".into(),
+                },
+            }]
+        );
+        let _ = state;
+    }
+
+    #[test]
+    fn choosing_a_level_applies_it_and_reaches_the_foreground_chat() {
+        let chat = chat("a");
+        let (state, effects) = apply(
+            AppState::default(),
+            vec![
+                open(&chat),
+                confirmed(&chat),
+                Input::Intent(Intent::SelectThinkingLevel {
+                    level: "high".into(),
+                }),
+            ],
+        );
+        assert_eq!(state.thinking_level.as_deref(), Some("high"));
+        assert_eq!(
+            effects.last().unwrap().chat_commands,
+            vec![gentle_app::ChatCommand::Send {
+                chat,
+                rpc: RpcCommand::SetThinkingLevel {
+                    level: "high".into()
+                },
+            }]
+        );
+    }
+
+    #[test]
+    fn asking_for_the_list_marks_it_loading_and_reaches_the_child() {
+        let chat = chat("a");
+        let (state, effects) = apply(
+            AppState::default(),
+            vec![
+                open(&chat),
+                confirmed(&chat),
+                Input::Intent(Intent::RequestModels),
+            ],
+        );
+        assert_eq!(state.models_status, gentle_app::ModelsStatus::Loading);
+        assert_eq!(
+            effects.last().unwrap().chat_commands,
+            vec![gentle_app::ChatCommand::Send {
+                chat,
+                rpc: RpcCommand::GetAvailableModels,
+            }]
+        );
+    }
+}

@@ -32,9 +32,10 @@ pub(crate) use intents::apply as apply_intent;
 
 use gentle_core::rpc::RpcEvent;
 
+use crate::chip;
 use crate::input::Effects;
 use crate::notices::{notice_from, push_notice};
-use crate::state::AppState;
+use crate::state::{AppState, NoticeLevel};
 
 /// Applies the boot's working cap for every chat at once (S7).
 pub(crate) fn set_working_cap(state: &mut AppState, cap: usize) {
@@ -70,6 +71,29 @@ pub(crate) fn apply_event(
     let (commands, chat_commands) = state.chats.apply(&chat, event, now_ms);
     if let Some((level, text)) = notice_from(event) {
         push_notice(&mut state, level, text);
+    }
+    // The chip belongs to the foreground chat's child, so only its replies
+    // fill the chip (0.1.11): the same parsing the one-child shell does.
+    if state.chats.foreground().as_ref() == Some(&&chat) {
+        if let RpcEvent::Response(response) = event {
+            match (&response.outcome, response.command.as_str()) {
+                (Ok(data), command) => {
+                    chip::apply_ok(&mut state, command, data);
+                }
+                (Err(error), command @ ("get_available_models" | "set_thinking_level")) => {
+                    chip::apply_err(&mut state, command, error, &mut |state, text| {
+                        push_notice(state, NoticeLevel::Error, text)
+                    });
+                }
+                (Err(error), command) => {
+                    push_notice(
+                        &mut state,
+                        NoticeLevel::Error,
+                        format!("{command} failed: {error}"),
+                    );
+                }
+            }
+        }
     }
     (
         state,

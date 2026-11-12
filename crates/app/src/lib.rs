@@ -18,6 +18,7 @@
 //! (whether that list is complete).
 
 mod chats;
+mod chip;
 mod events;
 mod input;
 mod intents;

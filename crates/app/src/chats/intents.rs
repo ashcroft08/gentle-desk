@@ -40,6 +40,31 @@ pub(crate) fn apply(state: &mut AppState, intent: &Intent) -> Option<Effects> {
         Intent::CopyMessage(id) => copy_message(state, id).map(for_shell),
         Intent::AnswerDialog { id, answer } => answer_dialog(state, id, answer).map(for_chat),
         Intent::SelectHelper(id) => select_helper(state, id),
+        // The chip's three asks go to the foreground chat's child, like any
+        // other prompt (0.1.11): the one-child send the fallthrough would
+        // produce is dropped by the chats shell.
+        Intent::RequestModels => {
+            state.models_status = ModelsStatus::Loading;
+            send_to_foreground(state, RpcCommand::GetAvailableModels).map(for_chat)
+        }
+        Intent::SelectModel { provider, model_id } => send_to_foreground(
+            state,
+            RpcCommand::SetModel {
+                provider: provider.clone(),
+                model_id: model_id.clone(),
+            },
+        )
+        .map(for_chat),
+        Intent::SelectThinkingLevel { level } => {
+            state.thinking_level = Some(level.clone());
+            send_to_foreground(
+                state,
+                RpcCommand::SetThinkingLevel {
+                    level: level.clone(),
+                },
+            )
+            .map(for_chat)
+        }
         Intent::CloseHelper => close_helper(state),
         _ => None,
     }
