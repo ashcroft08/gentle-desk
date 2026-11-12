@@ -13,40 +13,32 @@
 //! - `FAKE_SHELL_LOG` proves what the client actually sent (the prompt reached
 //!   the child) and what the child did (it started, and it exited).
 //!
-//! `Bridge::dispatch` needs a `tauri::AppHandle`, so it cannot run here: the
-//! loop it runs is reproduced with the public items it uses
-//! (`AppStateHolder::dispatch_commands`, `effects::run_one`, `fold_input`, the
-//! pump's `Push`), inline instead of on worker threads so the push order is
-//! deterministic.
+//! These tests drive the REAL `commands::Bridge`: `Bridge::new` with a recorder
+//! installed where the running app pushes `state-changed` (`Emit`), and the pump
+//! armed with the same recorder. The intent path, its worker threads and the
+//! child's events therefore run exactly as they do behind the window, and no
+//! Tauri app is ever built.
 //!
 //! Process note: a child started here ends when its stdin ends, and the OS
 //! closes that pipe when the test binary exits, so no child outlives the run.
 //! [`shutting_the_host_down_leaves_no_child_behind`] proves the shutdown path
-//! end to end against a child whose host the test itself owns.
+//! end to end against a child this run started.
 
 use std::path::{Path, PathBuf};
-use std::sync::mpsc::Receiver;
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
-use gentle_app::ChatCommand;
-use gentle_backend::chat_host::{
-    ChatHost, Clock, Limits, ProcessSpawner, Spawner, SystemClock, TaggedEvent,
-};
-use gentle_backend::home::{with_home_flag, HomeEnv};
-use gentle_backend::launcher::{self, LauncherEnv};
 use gentle_desk_lib::bridge::AppStateHolder;
 use gentle_desk_lib::close::{BridgeSteps, CloseFlow, Deadlines};
+use gentle_desk_lib::commands::{Bridge as AppBridge, Emit};
 use gentle_desk_lib::config::ConfigWriter;
 use gentle_desk_lib::contract::{
     ChatActivityMark, ChatActivityView, MessageRole, MessageView, NoticeLevel, NoticeView,
     UiIntent, ViewState,
 };
-use gentle_desk_lib::effects::{self, ChatExecutor, RuntimeExecutor};
+use gentle_desk_lib::effects::RuntimeExecutor;
 use gentle_desk_lib::events::{EventPump, Push};
 use gentle_desk_lib::pending::PendingFolders;
-use gentle_desk_lib::workspace;
-use gentle_runtime::chat_runtime::{ChatRuntime, Outcome};
 
 /// The stand-in child, relative to the repository root.
 const FAKE: &str = "tools/fake-gentle-shell/fake.mjs";
@@ -73,9 +65,9 @@ fn fake_shell() -> PathBuf {
 /// child, so only one of them runs at a time and each gets its own tempdir.
 static ENV_LOCK: Mutex<()> = Mutex::new(());
 
-/// One test's isolated world: its own `GENTLE_SHELL_HOME`, `LOCALAPPDATA` and
-/// `FAKE_SHELL_LOG`, never the user's home. Dropping it removes all four
-/// variables and the whole directory.
+/// One test's isolated world: its own `GENTLE_SHELL_HOME`, `APPDATA`,
+/// `LOCALAPPDATA`, pi folder and `FAKE_SHELL_LOG`, never the user's. Dropping it
+/// removes every variable and the whole directory.
 struct Harness {
     _serial: MutexGuard<'static, ()>,
     root: PathBuf,
@@ -95,6 +87,7 @@ impl Harness {
         std::fs::create_dir_all(root.join("home")).expect("the scratch home is creatable");
         std::fs::create_dir_all(root.join("localappdata"))
             .expect("the scratch LOCALAPPDATA is creatable");
+        std::fs::create_dir_all(root.join("appdata")).expect("the scratch APPDATA is creatable");
         let fake = fake_shell();
         assert!(
             fake.is_file(),
@@ -105,6 +98,11 @@ impl Harness {
         std::env::set_var("GENTLE_SHELL_BIN", &fake);
         std::env::set_var("GENTLE_SHELL_HOME", root.join("home"));
         std::env::set_var("LOCALAPPDATA", root.join("localappdata"));
+        // The REAL bridge reads its config from `APPDATA` and asks whether pi is
+        // there under `PI_CODING_AGENT_DIR`: both are scratch paths, so neither
+        // the user's config nor their pi folder is read.
+        std::env::set_var("APPDATA", root.join("appdata"));
+        std::env::set_var("PI_CODING_AGENT_DIR", root.join("pi"));
         std::env::set_var("FAKE_SHELL_LOG", &log);
         Some(Self {
             _serial: serial,
@@ -128,6 +126,8 @@ impl Drop for Harness {
             "GENTLE_SHELL_BIN",
             "GENTLE_SHELL_HOME",
             "LOCALAPPDATA",
+            "APPDATA",
+            "PI_CODING_AGENT_DIR",
             "FAKE_SHELL_LOG",
         ] {
             std::env::remove_var(name);
@@ -158,99 +158,59 @@ fn node_on_path() -> bool {
     std::env::split_paths(&path).any(|dir| dir.join(name).is_file())
 }
 
-/// `commands::Bridge` without the `AppHandle`: the same holder, the same
-/// executor and the same pump, with a recorder where the app emits
-/// `state-changed`.
+/// The REAL bridge of the app, windowless: `Bridge::new` with a recorder where
+/// the app pushes `state-changed` and the pump armed with the same recorder,
+/// exactly as the setup step arms both from one window handle. The slices these
+/// tests read are the payloads the web side would have received, pushed through
+/// the same intent path and the same worker threads.
 struct Bridge {
+    /// The app's own bridge: the same holder, executor, pump and config path.
+    app: AppBridge,
     holder: Arc<AppStateHolder>,
-    executor: Arc<dyn ChatExecutor>,
-    pushed: Arc<Mutex<Vec<ViewState>>>,
     folders: Arc<PendingFolders>,
-    /// The concrete executor and the pump behind the `dyn` seam, for the close
-    /// tests: the close flow stops the run through them and nowhere else.
-    runtime: Option<(Arc<RuntimeExecutor>, Arc<EventPump>)>,
+    pushed: Arc<Mutex<Vec<ViewState>>>,
 }
 
 impl Bridge {
-    /// The bridge of `commands::Bridge::new`, with the pump's emit step armed
-    /// exactly as startup arms it.
+    /// `commands::Bridge::new`, with a recorder in place of the window's emit
+    /// step.
     fn runtime_executor() -> Self {
-        let holder = Arc::new(AppStateHolder::default());
-        let pump = Arc::new(EventPump::new(Arc::clone(&holder)));
         let pushed = Arc::new(Mutex::new(Vec::new()));
-        arm(&pump, Arc::clone(&pushed));
-        let folders = Arc::new(PendingFolders::default());
-        let executor = Arc::new(RuntimeExecutor::new(
-            Arc::clone(&pump),
-            Arc::clone(&folders),
-            Arc::clone(&holder),
-        ));
+        let kept = Arc::clone(&pushed);
+        let emit: Emit = Arc::new(move |view: &ViewState| {
+            record(&kept, view.clone());
+            Ok(())
+        });
+        let app = AppBridge::new().with_emit(emit);
+        // The child's events come back through the pump, so its emit step is
+        // armed with the same recorder: a test reads both halves of the app.
+        arm(&app.pump, Arc::clone(&pushed));
         Self {
-            holder: Arc::clone(&holder),
-            executor: Arc::clone(&executor) as Arc<dyn ChatExecutor>,
+            holder: Arc::clone(&app.holder),
+            folders: app.folders(),
             pushed,
-            folders,
-            runtime: Some((executor, pump)),
+            app,
         }
     }
 
     /// The executor and the pump of this bridge, both the concrete types the
-    /// close flow needs: a run built by `runtime_executor` has them.
+    /// close flow needs.
     fn runtime_parts(&self) -> (Arc<RuntimeExecutor>, Arc<EventPump>) {
-        let (executor, pump) = self
-            .runtime
-            .as_ref()
-            .expect("this bridge runs the real executor");
-        (Arc::clone(executor), Arc::clone(pump))
+        (Arc::clone(&self.app.executor), Arc::clone(&self.app.pump))
     }
 
-    /// The same bridge over a host the test itself owns, so it can shut that
-    /// host down. The executor's host is not reachable through any public item
-    /// (`RuntimeExecutor` has no accessor), so the parts it assembles are
-    /// assembled here instead: the same launcher resolution, the same
-    /// `ChatHost`, the same `ChatRuntime`.
-    fn owned_runtime() -> (Self, Arc<ChatRuntime>) {
-        let holder = Arc::new(AppStateHolder::default());
-        let pump = Arc::new(EventPump::new(Arc::clone(&holder)));
-        let pushed = Arc::new(Mutex::new(Vec::new()));
-        arm(&pump, Arc::clone(&pushed));
-        let (runtime, events) = build_runtime();
-        pump.feed(Arc::clone(&runtime), events);
-        let bridge = Self {
-            holder,
-            executor: Arc::new(Direct(Arc::clone(&runtime))),
-            pushed,
-            folders: Arc::new(PendingFolders::default()),
-            runtime: None,
-        };
-        (bridge, runtime)
-    }
-
-    /// `Bridge::dispatch` minus the emit: fold the intent, push the slice, run
-    /// each per-chat command and fold what it came to, pushing each step.
-    /// Inline rather than on a worker thread, so the push order is fixed.
+    /// The real intent path, on its own worker threads, with the answer
+    /// unwrapped: no intent of these tests is refused while the run is open.
     fn dispatch(&self, intent: UiIntent) -> ViewState {
-        // The folder a workspace named, taken from the intent before the fold, as
-        // `Bridge::dispatch` does; a blank path names none.
-        let folder = match &intent {
-            UiIntent::NewChatInWorkspace { path } => Some(path.clone()),
-            _ => None,
-        };
-        let (view, commands) = self.holder.dispatch_commands(intent);
-        record(&self.pushed, view.clone());
-        if let Some(folder) = folder {
-            workspace::remember_folder(&self.folders, &commands, &folder);
-        }
-        for command in commands {
-            let ran = effects::run_one(command, self.executor.as_ref());
-            for input in ran.inputs {
-                record(&self.pushed, self.holder.fold_input(input));
-            }
-            // `ran.confirm_after` arms the bridge's 20 s net. The child here
-            // speaks inside the bounded wait, and a sleeping thread per open
-            // would only outlive the test.
-        }
-        view
+        self.app
+            .dispatch(intent)
+            .expect("an intent is accepted while the run is open")
+    }
+
+    /// Stops every live child through the executor's own shutdown, the step the
+    /// close flow runs before the caches: the host here is the run's real one.
+    fn stop_children(&self) {
+        self.app.executor.shutdown();
     }
 
     fn pushed(&self) -> Vec<ViewState> {
@@ -272,34 +232,6 @@ fn record(pushed: &Mutex<Vec<ViewState>>, view: ViewState) {
 /// must not turn into a second failure for the next test.
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(|poison| poison.into_inner())
-}
-
-/// The same host `RuntimeExecutor` builds, from the same public parts.
-fn build_runtime() -> (Arc<ChatRuntime>, Receiver<TaggedEvent>) {
-    let args = with_home_flag(
-        std::env::args_os().skip(1).collect(),
-        &HomeEnv::from_process(),
-    );
-    let launcher = launcher::resolve(&LauncherEnv::from_process())
-        .expect("GENTLE_SHELL_BIN points at the stand-in child");
-    let spawner = ProcessSpawner::new(launcher).with_args(args);
-    let host = ChatHost::with_parts(
-        Limits::default(),
-        Arc::new(spawner) as Arc<dyn Spawner>,
-        Arc::new(SystemClock) as Arc<dyn Clock>,
-    );
-    let (runtime, events) = ChatRuntime::new(host);
-    (Arc::new(runtime), events)
-}
-
-/// The executor of a host the test owns: the same `ChatExecutor` seam, without
-/// the lazy `OnceLock`.
-struct Direct(Arc<ChatRuntime>);
-
-impl ChatExecutor for Direct {
-    fn execute(&self, command: ChatCommand) -> Outcome {
-        self.0.execute(command)
-    }
 }
 
 /// Waits for what a bounded wait is about, failing the test instead of hanging.
@@ -581,7 +513,7 @@ fn shutting_the_host_down_leaves_no_child_behind() {
     let Some(harness) = Harness::new() else {
         return;
     };
-    let (bridge, runtime) = Bridge::owned_runtime();
+    let bridge = Bridge::runtime_executor();
 
     bridge.dispatch(UiIntent::OpenNewChat);
     let pid = wait_for("the child to log its start", || {
@@ -592,7 +524,7 @@ fn shutting_the_host_down_leaves_no_child_behind() {
     });
 
     let pushed_before = bridge.pushed().len();
-    runtime.shutdown();
+    bridge.stop_children();
 
     // The child is gone: the stand-in writes its own `exit` line as it ends, so
     // the proof comes from the process that stopped, not from this test.

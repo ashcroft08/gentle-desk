@@ -123,9 +123,10 @@ pub fn run() {
         .setup(move |app| {
             // Typed events need their registry mounted, or emitting panics.
             builder.mount_events(app);
-            // The pump's emit step needs the window handle, which only setup
-            // has: this is the one place the child events are armed. The pump's
-            // threads start the first time the executor builds its host.
+            // The bridge's emit step and the pump's need the window handle,
+            // which only setup has: this is the one place they are armed, from
+            // the one handle. The pump's threads start the first time the
+            // executor builds its host.
             app.state::<Bridge>().arm_events(app.handle());
             // Where the window opens: the stored rectangle when it still lands on
             // a screen the machine reports right now, the centre otherwise. Only
@@ -138,7 +139,7 @@ pub fn run() {
             app.state::<Bridge>().arm_window_theme(app.handle());
             // The session list is armed the same way, and its first pass asked
             // for here: the window opens with a list that says it is reading.
-            app.state::<Bridge>().start_sessions(app.handle());
+            app.state::<Bridge>().start_sessions();
             // The close is armed last and for the same reason: its exit step is
             // the one thing here that needs the handle.
             app.state::<Bridge>().arm_close(app.handle());
