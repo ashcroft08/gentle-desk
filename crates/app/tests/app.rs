@@ -363,11 +363,17 @@ mod sessions {
     }
 
     #[test]
-    fn a_successful_switch_asks_for_the_history() {
+    fn a_successful_switch_asks_for_the_history_and_the_chips_refill() {
         let (_, commands) = update(AppState::default(), event(SWITCH_OK));
         assert_eq!(
             commands,
-            vec![Command::Send(RpcCommand::GetMessages { id: None })]
+            vec![
+                Command::Send(RpcCommand::GetMessages { id: None }),
+                // The chip's refill (0.1.11): state, models, thinking levels.
+                Command::Send(RpcCommand::GetState),
+                Command::Send(RpcCommand::GetAvailableModels),
+                Command::Send(RpcCommand::GetAvailableThinkingLevels),
+            ]
         );
     }
 

@@ -55,7 +55,14 @@ fn apply_response(state: &mut AppState, response: &RpcResponse, commands: &mut V
             if data.get("cancelled").and_then(|c| c.as_bool()) == Some(true) {
                 state.current_session = None;
             } else {
+                // The history, then the chip's refill: the session's model and
+                // level, the models the child offers, and the levels it
+                // supports (R3-002). The chip was cleared on the switch, so
+                // these replies repopulate it.
                 commands.push(Command::Send(RpcCommand::GetMessages { id: None }));
+                commands.push(Command::Send(RpcCommand::GetState));
+                commands.push(Command::Send(RpcCommand::GetAvailableModels));
+                commands.push(Command::Send(RpcCommand::GetAvailableThinkingLevels));
             }
         }
         ("get_messages", Ok(data)) => state.chat.messages = messages_from_history(data),

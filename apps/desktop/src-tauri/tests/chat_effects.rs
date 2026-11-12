@@ -49,7 +49,7 @@ fn open_chat_asks_for_one_open_process_and_the_next_state_shows_it_opening() {
         fake.asked(),
         vec![
             ChatCommand::OpenProcess { chat: chat.clone() },
-            // The history, then the two questions the model chip needs (0.1.11).
+            // The history, then the chip's three questions (0.1.11).
             ChatCommand::Send {
                 chat: chat.clone(),
                 rpc: RpcCommand::GetMessages { id: None },
@@ -61,6 +61,10 @@ fn open_chat_asks_for_one_open_process_and_the_next_state_shows_it_opening() {
             ChatCommand::Send {
                 chat: chat.clone(),
                 rpc: RpcCommand::GetAvailableModels,
+            },
+            ChatCommand::Send {
+                chat: chat.clone(),
+                rpc: RpcCommand::GetAvailableThinkingLevels,
             },
         ]
     );

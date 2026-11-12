@@ -172,10 +172,11 @@ mod current {
         assert_eq!(state.model.expect("applied").model_id, "m2");
     }
 
-    /// The list and the current model belong to one child: opening another
-    /// chat leaves the chip blank until that chat's child answers.
+    /// The chip's data belongs to one child: opening another chat leaves the
+    /// chip blank until that chat's child answers — and the switch asks
+    /// again, so the blank is a moment, not a state (R3-002).
     #[test]
-    fn opening_a_session_clears_the_chips_state() {
+    fn opening_a_session_clears_the_chip_and_asks_again() {
         let (state, _) = update(
             AppState::default(),
             event(
@@ -190,7 +191,7 @@ mod current {
                     "data":{"id":"m1","name":"Model One","provider":"prov"}}"#,
             ),
         );
-        let (state, _) = update(state, intent(Intent::OpenSession("s.jsonl".into())));
+        let (state, commands) = update(state, intent(Intent::OpenSession("s.jsonl".into())));
         assert!(state.models.is_empty());
         assert!(matches!(
             state.models_status,
@@ -199,6 +200,29 @@ mod current {
         assert!(state.model.is_none());
         assert_eq!(state.thinking_level, None);
         assert!(state.thinking_levels.is_empty());
+        // The switch itself carries the history ask; the refill goes out after
+        // the session answers it (events.rs).
+        assert_eq!(
+            commands,
+            vec![Command::Send(gentle_core::rpc::RpcCommand::SwitchSession {
+                session_path: "s.jsonl".into(),
+            })]
+        );
+
+        let (state, commands) = update(
+            state,
+            event(r#"{"type":"response","command":"switch_session","success":true,"data":{}}"#),
+        );
+        assert_eq!(state.current_session.as_deref(), Some("s.jsonl"));
+        assert_eq!(
+            commands,
+            vec![
+                Command::Send(gentle_core::rpc::RpcCommand::GetMessages { id: None }),
+                Command::Send(gentle_core::rpc::RpcCommand::GetState),
+                Command::Send(gentle_core::rpc::RpcCommand::GetAvailableModels),
+                Command::Send(gentle_core::rpc::RpcCommand::GetAvailableThinkingLevels),
+            ]
+        );
     }
 }
 
