@@ -31,6 +31,16 @@ pub fn encode_command(command: &RpcCommand) -> String {
         RpcCommand::GetState => json!({ "type": "get_state" }),
         RpcCommand::GetMessages { id: None } => json!({ "type": "get_messages" }),
         RpcCommand::GetMessages { id: Some(id) } => json!({ "type": "get_messages", "id": id }),
+        RpcCommand::GetAvailableModels => json!({ "type": "get_available_models" }),
+        RpcCommand::SetModel { provider, model_id } => {
+            json!({ "type": "set_model", "provider": provider, "modelId": model_id })
+        }
+        RpcCommand::SetThinkingLevel { level } => {
+            json!({ "type": "set_thinking_level", "level": level })
+        }
+        RpcCommand::GetAvailableThinkingLevels => {
+            json!({ "type": "get_available_thinking_levels" })
+        }
         RpcCommand::UiResponse { id, answer } => {
             let mut map = Map::new();
             map.insert("type".into(), json!("extension_ui_response"));
