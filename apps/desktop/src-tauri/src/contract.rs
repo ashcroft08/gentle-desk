@@ -662,6 +662,12 @@ pub struct ViewState {
     /// modal is dismissed: the dismiss is what stores the version and clears it
     /// (S5), which is what makes the modal show once per version.
     pub whats_new: Option<WhatsNewView>,
+    /// The version this run RUNS as, which the bridge names once at startup
+    /// (`bridge::whats_new`): what the Settings dialog's About section draws
+    /// (settings-dialog S5) and the version the dismiss stores as the last run's,
+    /// never the manifest's. `None` for a run that never named one, so the section
+    /// says it does not know instead of guessing.
+    pub app_version: Option<String>,
 }
 
 /// The state slice after each dispatch, emitted to the web side (typed

@@ -2,7 +2,8 @@
 //! the version the last run stored, the one fetch of `latest.json` through the
 //! injectable fetcher, the notes pushed through the same emit step the other
 //! slices use, and the version stored - on the dismiss, or at once when there is
-//! nothing to show.
+//! nothing to show. The version this run RUNS as travels with every slice too
+//! (settings-dialog S5), because the About section draws it.
 //!
 //! No test reaches the network: the fetcher is a closure of the test, so the
 //! endpoint it is asked for, how often, and what it answers are all pinned here.
@@ -351,6 +352,40 @@ fn a_run_whose_config_names_no_endpoint_stores_the_version_and_pushes_nothing() 
     assert!(
         lock(&views).iter().all(|view| view.whats_new.is_none()),
         "no endpoint is no notes to show"
+    );
+}
+
+/// The version this run runs as reaches the web side on every slice, which is
+/// what the Settings dialog's About section draws (settings-dialog S5). A run
+/// that never named its version carries none, so the section never guesses one.
+#[test]
+fn the_version_this_run_runs_as_reaches_every_slice() {
+    let _harness = Harness::new(None);
+    let (bridge, views) = app_run();
+    assert_eq!(
+        bridge.holder.view().app_version,
+        None,
+        "a run that never named its version carries none"
+    );
+    let (fetch, _asked) = fetcher(latest("0.1.9", "Unread notes."));
+
+    // A first run pushes one slice as it stores the version, so the push below
+    // is the same emit step every other slice travels on.
+    bridge.start_whats_new("0.1.9", Some(ENDPOINT), fetch);
+
+    let view = lock(&views)
+        .first()
+        .expect("the first run pushes its slice")
+        .clone();
+    assert_eq!(
+        view.app_version.as_deref(),
+        Some("0.1.9"),
+        "the pushed slice carries the version this run runs as"
+    );
+    assert_eq!(
+        bridge.holder.view().app_version.as_deref(),
+        Some("0.1.9"),
+        "and so does the first read of a web view"
     );
 }
 

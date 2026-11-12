@@ -108,7 +108,9 @@ pub struct AppStateHolder {
     /// dismiss that stores the version (`bridge::whats_new`).
     whats_new: Mutex<Option<crate::contract::WhatsNewView>>,
     /// The version this run runs as, `None` until the what's-new step names it:
-    /// what the dismiss stores, never the manifest's version (S5).
+    /// what the dismiss stores, never the manifest's version (S5), and what
+    /// every slice carries as `ViewState.app_version` for the Settings
+    /// dialog's About section (settings-dialog S5).
     app_version: Mutex<Option<String>>,
     /// The images each chat holds: attached in the composer, read here, taken by
     /// that chat's send and served back as previews (`bridge::images`).
@@ -186,6 +188,7 @@ impl AppStateHolder {
         let workspace_notice = self.workspace_notice();
         let sessions_notice = self.sessions_notice();
         let whats_new = self.whats_new();
+        let app_version = self.app_version();
         let fatal = self.fatal();
         let theme = self.theme_value();
         let shell = self.shell_view();
@@ -197,6 +200,7 @@ impl AppStateHolder {
                 workspace_notice,
                 sessions_notice,
                 whats_new,
+                app_version,
                 fatal,
                 theme,
                 shell,
@@ -271,6 +275,7 @@ impl AppStateHolder {
         let workspace_notice = self.workspace_notice();
         let sessions_notice = self.sessions_notice();
         let whats_new = self.whats_new();
+        let app_version = self.app_version();
         let fatal = self.fatal();
         let theme = self.theme_value();
         let shell = self.shell_view();
@@ -291,6 +296,7 @@ impl AppStateHolder {
                     workspace_notice,
                     sessions_notice,
                     whats_new,
+                    app_version,
                     fatal,
                     theme,
                     shell,

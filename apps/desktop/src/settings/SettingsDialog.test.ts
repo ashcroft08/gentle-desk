@@ -1,8 +1,10 @@
 // The Settings dialog (settings-dialog S2-S6): the two controls that left the
 // footer - the theme picker and the home setting - one section each, with the
-// explanation the welcome screen gives for the two homes, and the shell of the
-// About and updates section T2 fills in. Dismiss, Escape and the backdrop close
-// it, and closing sends nothing: each section persists through its own command.
+// explanation the welcome screen gives for the two homes, and the About and
+// updates section: the app's name and the version this run runs as, which reach
+// the dialog from the pushed view (the check itself is AboutUpdates.test.ts's).
+// Dismiss, Escape and the backdrop close it, and closing sends nothing: each
+// section persists through its own command.
 import '../test-support/dom-env'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/svelte'
@@ -23,6 +25,11 @@ const HOME = 'Shell home'
 const ABOUT = 'About and updates'
 const EXPLAIN =
   'My pi uses the pi installation already on the machine: sign-ins, local models and chats appear in the terminal. Separate creates a clean space at ~/.gentle-shell/agent and touches nothing else.'
+/** About and updates (S5): the name, and the version this run runs as. */
+const APP_NAME = 'Gentle Shell Desktop'
+const VERSION = '0.1.9'
+const VERSION_LINE = 'Version 0.1.9'
+const VERSION_UNKNOWN = 'Version unknown'
 
 // The testing library only cleans up on its own with vitest globals on.
 afterEach(cleanup)
@@ -44,8 +51,13 @@ function shell(over: Partial<ShellView> = {}): ShellView {
 }
 
 /** The dialog, opened the way the user opens it: the footer's gear. */
-async function openSettings(over: Partial<ShellView> = {}): Promise<HTMLElement> {
-  serveSidebar({ view: viewState({ shell: shell(over), total_sessions: 1 }) })
+async function openSettings(
+  over: Partial<ShellView> = {},
+  appVersion: string | null = VERSION,
+): Promise<HTMLElement> {
+  serveSidebar({
+    view: viewState({ shell: shell(over), total_sessions: 1, app_version: appVersion }),
+  })
   render(Sidebar)
   await fireEvent.click(await screen.findByRole('button', { name: TITLE }))
   return await screen.findByRole('dialog')
@@ -112,11 +124,19 @@ describe('the Settings dialog', () => {
     expect(intents()).toEqual([{ type: 'SetShellHome', data: { choice: 'link' } }])
   })
 
-  it('leaves About and updates as a titled shell with no fields yet', async () => {
+  it('names the app and the version this run runs as in About and updates', async () => {
     const dialog = await openSettings()
     const about = section(dialog, ABOUT)
 
-    expect(about.querySelectorAll('input, button, select, a').length).toBe(0)
+    expect(within(about).getByText(APP_NAME)).toBeTruthy()
+    expect(within(about).getByText(VERSION_LINE)).toBeTruthy()
+    expect(within(about).getByRole('button', { name: 'Check now' })).toBeTruthy()
+  })
+
+  it('says it does not know the version when the bridge named none', async () => {
+    const dialog = await openSettings({}, null)
+
+    expect(within(section(dialog, ABOUT)).getByText(VERSION_UNKNOWN)).toBeTruthy()
   })
 
   it('closes on Escape and sends nothing: the sections keep their own paths', async () => {
