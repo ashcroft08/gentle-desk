@@ -135,7 +135,7 @@
   </div>
   <DropdownMenu.Root bind:open={menuOpen}>
     <DropdownMenu.Trigger
-      class="ic nc tip-l"
+      class="ic nc tip-r"
       aria-label={actions}
       data-tip="Chat actions"
       tabindex={active ? 0 : -1}
