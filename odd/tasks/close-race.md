@@ -27,7 +27,7 @@ the goal is that the close flow's guarantees hold by construction, not by commen
 - T1 (S1) Accept-or-stop: make the watch thread registration atomic with the stop so no spawned
   batch thread escapes the join - route: delegated writer, commit: see git log (fix/close-race-t1)
 - T2 (S2) Last-writer rule: the close's flush must not race an in-flight pass - route: delegated
-  writer, commit: pending
+  writer, commit: see git log (fix/close-race-t2)
 - T3 (S3) One shared budget for `SessionsService::stop` - route: delegated writer, commit: pending
 - T4 (S4) The fallback shutdown leaves the caller thread - route: delegated writer, commit: pending
 

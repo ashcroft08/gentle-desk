@@ -79,8 +79,10 @@ pub trait CloseSteps: Send + Sync {
     /// `budget` for their threads. Before the cache flush, so no batch asks for
     /// a pass after the last one was written.
     fn stop_watch(&self, budget: Duration);
-    /// Writes the session index cache the throttle held back. Blocking by
-    /// design (one file write); the flow's [`Deadlines::cache`] covers it.
+    /// Writes the session index cache the throttle held back, and seals it: no
+    /// pass writes it after this, so the state written here is the one the next
+    /// run restores. Blocking by design (one file write); the flow's
+    /// [`Deadlines::cache`] covers it.
     fn flush_cache(&self);
     /// Writes the last queued config snapshot, at most `budget`.
     fn flush_config(&self, budget: Duration);

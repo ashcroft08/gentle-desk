@@ -100,7 +100,8 @@ impl CloseSteps for BridgeSteps {
         };
         // The same write the iced shell did on close, and the only one that is
         // allowed past the throttle: the last state reaches the disk even when
-        // the window closes before the next pass.
+        // the window closes before the next pass. It also seals the cache, so a
+        // pass still in flight writes nothing over it.
         session_refresh::flush(shared);
     }
 
