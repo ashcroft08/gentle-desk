@@ -16,11 +16,10 @@ use std::time::{Duration, Instant};
 use gentle_app::{ChatCommand, ChatId};
 use gentle_core::rpc::{encode_command, ImageContent, RpcCommand};
 use gentle_desk_lib::bridge::AppStateHolder;
-use gentle_desk_lib::contract::{ChatActivityMark, MessageRole, UiIntent};
-use gentle_desk_lib::effects::{self, RuntimeExecutor};
-use gentle_desk_lib::events::{EventPump, Push};
+use gentle_desk_lib::commands::{Bridge as AppBridge, Emit};
+use gentle_desk_lib::contract::{ChatActivityMark, MessageRole, UiIntent, ViewState};
+use gentle_desk_lib::events::Push;
 use gentle_desk_lib::images::{self, Images};
-use gentle_desk_lib::pending::PendingFolders;
 
 /// A chat id the store is asked about: the bridge keys attachments by the text
 /// `ViewState::foreground_chat` carries.
@@ -365,7 +364,8 @@ fn repo_root() -> PathBuf {
 /// child, so only one of them runs at a time.
 static ENV_LOCK: Mutex<()> = Mutex::new(());
 
-/// One test's isolated world: its own home, its own log, never the user's.
+/// One test's isolated world: its own home, its own log, its own app config and
+/// cache and pi folder, never the user's.
 struct Harness {
     _serial: MutexGuard<'static, ()>,
     root: PathBuf,
@@ -388,9 +388,18 @@ impl Harness {
                 .unwrap_or(0)
         ));
         std::fs::create_dir_all(root.join("home")).unwrap();
+        std::fs::create_dir_all(root.join("appdata")).unwrap();
+        std::fs::create_dir_all(root.join("localappdata")).unwrap();
         let log = root.join("fake.log");
         std::env::set_var("GENTLE_SHELL_BIN", repo_root().join(FAKE));
         std::env::set_var("GENTLE_SHELL_HOME", root.join("home"));
+        // The REAL bridge reads its config from `APPDATA`, its session cache
+        // from `LOCALAPPDATA` and asks whether pi is there under
+        // `PI_CODING_AGENT_DIR`: all three are scratch paths, so nothing of the
+        // user's own is read.
+        std::env::set_var("APPDATA", root.join("appdata"));
+        std::env::set_var("LOCALAPPDATA", root.join("localappdata"));
+        std::env::set_var("PI_CODING_AGENT_DIR", root.join("pi"));
         std::env::set_var("FAKE_SHELL_LOG", &log);
         Some(Self {
             _serial: serial,
@@ -413,7 +422,14 @@ impl Harness {
 
 impl Drop for Harness {
     fn drop(&mut self) {
-        for name in ["GENTLE_SHELL_BIN", "GENTLE_SHELL_HOME", "FAKE_SHELL_LOG"] {
+        for name in [
+            "GENTLE_SHELL_BIN",
+            "GENTLE_SHELL_HOME",
+            "APPDATA",
+            "LOCALAPPDATA",
+            "PI_CODING_AGENT_DIR",
+            "FAKE_SHELL_LOG",
+        ] {
             std::env::remove_var(name);
         }
         let _ = std::fs::remove_dir_all(&self.root);
@@ -443,37 +459,43 @@ fn wait_for<T>(what: &str, mut probe: impl FnMut() -> Option<T>) -> T {
     }
 }
 
-/// The bridge pieces `Bridge::dispatch` drives, inline instead of on worker
-/// threads so the order is fixed: no window is needed and none is built.
+/// The REAL bridge, windowless: `Bridge::new` with a recorder that keeps nothing
+/// where the app pushes `state-changed`, and the pump armed the same way. What
+/// these tests assert is the state the real intent path folded, never a copy of
+/// that loop.
 struct Bridge {
+    app: AppBridge,
     holder: Arc<AppStateHolder>,
-    executor: Arc<RuntimeExecutor>,
 }
 
 impl Bridge {
     fn new() -> Self {
-        let holder = Arc::new(AppStateHolder::default());
-        let pump = Arc::new(EventPump::new(Arc::clone(&holder)));
-        // The push itself is the app's business; here only the folding matters.
+        let emit: Emit = Arc::new(|_view: &ViewState| Ok(()));
+        let app = AppBridge::new().with_emit(emit);
+        // The child's events come back through the pump, and a run with no
+        // window has nobody to show the slices to.
         let push: Push = Box::new(|_view| {});
-        pump.arm(push);
-        let folders = Arc::new(PendingFolders::default());
-        let executor = Arc::new(RuntimeExecutor::new(
-            Arc::clone(&pump),
-            folders,
-            Arc::clone(&holder),
-        ));
-        Self { holder, executor }
+        app.pump.arm(push);
+        Self {
+            holder: Arc::clone(&app.holder),
+            app,
+        }
     }
 
+    /// The real intent path, on its own worker threads, with the answer dropped:
+    /// these tests read the walked state, not the command's answer.
     fn dispatch(&self, intent: UiIntent) {
-        let (_, commands) = self.holder.dispatch_commands(intent);
-        for command in commands {
-            let ran = effects::run_one(command, self.executor.as_ref());
-            for input in ran.inputs {
-                self.holder.fold_input(input);
-            }
-        }
+        self.app
+            .dispatch(intent)
+            .expect("an intent is accepted while the run is open");
+    }
+
+    /// The real attach command: the paths are read and held here, and a refusal
+    /// is the slice it answers with, as the drop's answer carries it.
+    fn attach_images(&self, paths: &[String]) {
+        self.app
+            .attach_images(paths)
+            .expect("an attach answers, refused or not");
     }
 }
 
@@ -507,8 +529,12 @@ fn the_executor_merges_the_chat_images_into_the_send_the_child_receives() {
             .then_some(())
     });
 
-    let view = bridge.holder.attach_images(std::slice::from_ref(&path));
-    assert_eq!(view.images.len(), 1, "the chat holds the dropped image");
+    bridge.attach_images(std::slice::from_ref(&path));
+    assert_eq!(
+        bridge.holder.view().images.len(),
+        1,
+        "the chat holds the dropped image"
+    );
     bridge.dispatch(UiIntent::SendPrompt {
         text: "look".to_owned(),
     });
@@ -555,7 +581,7 @@ fn the_sent_message_carries_the_thumbnails_of_its_images() {
             .any(|entry| entry.chat_id == chat && entry.activity == ChatActivityMark::Opening);
         (!opening).then_some(chat)
     });
-    bridge.holder.attach_images(&[path]);
+    bridge.attach_images(&[path]);
     let held = bridge.holder.view().images;
     assert_eq!(held.len(), 1);
     let id = held[0].id.clone();
@@ -564,12 +590,17 @@ fn the_sent_message_carries_the_thumbnails_of_its_images() {
         text: "look".to_owned(),
     });
 
-    let view = bridge.holder.view();
-    let sent = view
-        .messages
-        .iter()
-        .find(|message| message.role == MessageRole::User)
-        .expect("the prompt is in the thread");
+    // The send reaches the child on a worker thread and its outcome is folded
+    // back from there, so the thread is read once the images it carried are on
+    // its last message.
+    let sent = wait_for("the sent message to carry its thumbnail", || {
+        bridge
+            .holder
+            .view()
+            .messages
+            .into_iter()
+            .find(|message| message.role == MessageRole::User && !message.images.is_empty())
+    });
     assert_eq!(
         sent.images.len(),
         1,

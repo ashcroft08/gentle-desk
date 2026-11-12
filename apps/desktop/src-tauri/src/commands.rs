@@ -11,6 +11,12 @@
 //! of them open a new chat through the same fold, so they finish through
 //! [`Bridge::finish`] and the same worker threads, and a workspace added by hand
 //! behaves like one that was there.
+//!
+//! Nothing here needs a window: the one thing the running app gets from Tauri is
+//! the EMIT step ([`Emit`]), installed at startup and replaceable by a recorder,
+//! and the two things a machine answers - whether the `gentle-shell` launcher
+//! resolves ([`LauncherProbe`]) and what installs it ([`Installer`]) - are seams
+//! of their own. A test therefore drives the real intent path windowless.
 
 use std::sync::{Arc, Mutex, MutexGuard};
 
@@ -33,6 +39,17 @@ use crate::shell_install::{CommandInstaller, Installer};
 use crate::theme::SystemWindowTheme;
 use crate::window::{self, SystemWindowRecorder};
 use crate::workspace::{self, WorkspaceAction};
+
+/// What shows one slice to the web side: the typed `state-changed` event in the
+/// running app, a recorder in a test. `Send + Sync` because the install pushes
+/// from a thread of its own and the pump pushes from its two.
+pub type Emit = Arc<dyn Fn(&ViewState) -> Result<(), String> + Send + Sync>;
+
+/// Whether the `gentle-shell` launcher resolves on this machine right now: the
+/// real probe for the app ([`launcher_resolves`]), a flag in a test. Asked at
+/// startup, on "Check again" and after a successful install, and for nothing
+/// else.
+pub type LauncherProbe = Arc<dyn Fn() -> bool + Send + Sync>;
 
 /// Everything the bridge owns and hands to the worker threads: the state, the
 /// pump the children's events come back through, the session list's passes, the
@@ -67,6 +84,13 @@ pub struct Bridge {
     relaunch: Arc<std::sync::atomic::AtomicBool>,
     /// What installs gentle-shell, once the user asked for it (shell-choice S4).
     installer: Arc<dyn Installer>,
+    /// The one push of the bridge, as the running app installed it (`arm_emit`)
+    /// or as a test gave it ([`Bridge::with_emit`]). Before it is installed
+    /// nothing is shown, which is a run with no window.
+    emit: Mutex<Emit>,
+    /// Whether the `gentle-shell` launcher resolves (shell-choice S1-S2): the
+    /// real probe unless a test gave one ([`Bridge::with_launcher`]).
+    launcher: LauncherProbe,
 }
 
 impl Bridge {
@@ -89,9 +113,6 @@ impl Bridge {
         let home_choice = snapshot.config.shell_home;
         let holder = Arc::new(AppStateHolder::with_config(snapshot));
         holder.set_started_with(home_choice);
-        // Whether the launcher resolves is asked once here too, so a machine with
-        // no gentle-shell is told at the first frame, not at the first chat.
-        holder.set_launcher_found(launcher_resolves());
         // Only the existence of pi's folder is asked, once, outside every lock.
         holder.set_pi_path(
             gentle_backend::home::detect_pi(
@@ -121,7 +142,15 @@ impl Bridge {
             close: Mutex::new(None),
             relaunch: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             installer: Arc::new(CommandInstaller::npm()),
+            // Nothing to push to until the window exists: the setup step
+            // installs the real emit, exactly as it arms the pump.
+            emit: Mutex::new(Arc::new(|_view: &ViewState| Ok(()))),
+            launcher: Arc::new(launcher_resolves),
         };
+        // Whether the launcher resolves is asked once here, through the seam, so
+        // a machine with no gentle-shell is told at the first frame, not at the
+        // first chat.
+        bridge.holder.set_launcher_found((bridge.launcher)());
         // The reducer doesn't refresh the list itself: it answers
         // `Command::RefreshSessions` and this is where that one is run. A copy
         // is run by the same sink, off the thread that folded it, so the two
@@ -131,6 +160,50 @@ impl Bridge {
             Arc::clone(&bridge.clipboard),
         ));
         bridge
+    }
+
+    /// The app's own emit step, installed once at startup: only the setup step
+    /// has the window handle, and this is where every push of this bridge gets
+    /// it. The pump and the session list are armed with the same seam
+    /// ([`Bridge::arm_events`]), because they push the same payload.
+    pub fn arm_emit(&self, app: &AppHandle<tauri::Wry>) {
+        let app = app.clone();
+        *lock(&self.emit) = Arc::new(move |view: &ViewState| emit_state(&app, view));
+    }
+
+    /// The same seam, given outright instead of built from a window: a recorder
+    /// in a test that runs the real dispatch windowless.
+    pub fn with_emit(mut self, emit: Emit) -> Self {
+        self.emit = Mutex::new(emit);
+        self
+    }
+
+    /// The launcher probe this bridge asks, instead of the real one. It is asked
+    /// here once, exactly as [`Bridge::new`] asks the real one, so the answer of
+    /// this probe is what the run starts with, and again wherever the app asks
+    /// ("Check again" and the completion of an install).
+    pub fn with_launcher(mut self, probe: LauncherProbe) -> Self {
+        self.holder.set_launcher_found(probe());
+        self.launcher = probe;
+        self
+    }
+
+    /// What installs gentle-shell, instead of the real `npm install -g`.
+    pub fn with_installer(mut self, installer: Arc<dyn Installer>) -> Self {
+        self.installer = installer;
+        self
+    }
+
+    /// Whether [`UiIntent::RestartApp`] asked for a relaunch: the flag the close
+    /// flow's last step reads (`close::exit_step`).
+    pub fn relaunch_requested(&self) -> bool {
+        self.relaunch.load(std::sync::atomic::Ordering::SeqCst)
+    }
+
+    /// The emit seam as it stands, cloned out so no lock is held while a push
+    /// runs. `Send + Sync`, so a worker thread can push with it too.
+    fn emitter(&self) -> Emit {
+        lock(&self.emit).clone()
     }
 
     /// The browser opener, as the `open_link` command takes it: cloned out of
@@ -154,7 +227,11 @@ impl Bridge {
     /// The same place arms what a failed config save says, because that reason
     /// reaches the user through the same push.
     pub fn arm_events(&self, app: &AppHandle<tauri::Wry>) {
-        self.pump.arm(push_to(app));
+        // The bridge's own pushes need the same handle the pump's do, so the two
+        // are installed in the same step.
+        self.arm_emit(app);
+        let emit = self.emitter();
+        self.pump.arm(push_via(emit.clone()));
         // The folder dialog is owned by the window, so it is modal to the app
         // instead of to the desktop. The window exists only from this step, and
         // it is the same step that arms the pump, for the same reason.
@@ -162,10 +239,10 @@ impl Bridge {
             self.picker.set_parent(window);
         }
         let holder = Arc::clone(&self.holder);
-        let failure_app = app.clone();
+        let failure_emit = emit;
         self.writer.on_failure(Arc::new(move |message: String| {
             let view = holder.note_config_problem(message);
-            push(&failure_app, view);
+            push(&failure_emit, view);
         }));
     }
 
@@ -181,8 +258,10 @@ impl Bridge {
     /// slice the state holds and emits nothing, so it starts from the truth
     /// whatever it missed. The boot is armed here because the setup step is the
     /// only place that has the handle, exactly as the child events are.
-    pub fn start_sessions(&self, app: &AppHandle<tauri::Wry>) {
-        self.sessions.arm(push_to(app));
+    pub fn start_sessions(&self) {
+        // The list pushes the same payload through the same seam the step before
+        // installed: it needs no handle of its own.
+        self.sessions.arm(push_via(self.emitter()));
         self.sessions.boot();
     }
 
@@ -268,12 +347,10 @@ impl Bridge {
     /// Folds one intent, pushes the slice it answers, and runs the per-chat
     /// commands on worker threads. Returns the slice the command answers with,
     /// the one the web side may render before any child has answered.
-    pub fn dispatch(
-        &self,
-        intent: UiIntent,
-        app: &AppHandle<tauri::Wry>,
-    ) -> Result<ViewState, String> {
+    pub fn dispatch(&self, intent: UiIntent) -> Result<ViewState, String> {
         self.accepting_work()?;
+        // The one push of this call, cloned out before any thread is given it.
+        let emit = self.emitter();
         // Installing gentle-shell: only the permission screen's button sends
         // this, and the install runs on a thread of its own, so the window keeps
         // answering and shows its progress through the next push.
@@ -281,12 +358,16 @@ impl Bridge {
             if self.holder.begin_install() {
                 let holder = Arc::clone(&self.holder);
                 let installer = Arc::clone(&self.installer);
-                let app = app.clone();
+                // The completion probe and the emit both travel with the
+                // thread: neither needs the window, and the handle is never
+                // cloned to reach it.
+                let launcher = Arc::clone(&self.launcher);
+                let emit = Arc::clone(&emit);
                 let started = std::thread::Builder::new()
                     .name("shell-install".to_owned())
                     .spawn(move || {
-                        let view = after_install(&holder, installer.install(), &launcher_resolves);
-                        push(&app, view);
+                        let view = after_install(&holder, installer.install(), launcher.as_ref());
+                        push(&emit, view);
                     });
                 if started.is_err() {
                     self.holder
@@ -294,12 +375,12 @@ impl Bridge {
                 }
             }
             let view = self.holder.view();
-            emit_state(app, &view)?;
+            emit_view(&emit, &view)?;
             return Ok(view);
         }
         if matches!(intent, UiIntent::CheckShellAgain) {
-            let view = self.holder.recheck_launcher(&launcher_resolves);
-            emit_state(app, &view)?;
+            let view = self.holder.recheck_launcher(self.launcher.as_ref());
+            emit_view(&emit, &view)?;
             return Ok(view);
         }
         // A relaunch is the close flow with a different last step: the config
@@ -320,13 +401,13 @@ impl Bridge {
             _ => None,
         };
         let (view, commands) = self.holder.dispatch_commands(intent);
-        emit_state(app, &view)?;
+        emit_view(&emit, &view)?;
         if let Some(folder) = folder {
             // Before the first command runs on its thread: the executor takes it
             // from here, once.
             workspace::remember_folder(&self.folders, &commands, &folder);
         }
-        self.run_chat_commands(commands, app);
+        self.run_chat_commands(commands);
         Ok(view)
     }
 
@@ -334,23 +415,19 @@ impl Bridge {
     /// event (a browser `File` has no path), and the files are read here, once,
     /// before anything is held. Answers the slice to push, so a refusal reaches
     /// the composer as `images_notice` in the same answer.
-    pub fn attach_images(
-        &self,
-        paths: &[String],
-        app: &AppHandle<tauri::Wry>,
-    ) -> Result<ViewState, String> {
+    pub fn attach_images(&self, paths: &[String]) -> Result<ViewState, String> {
         self.accepting_work()?;
         let view = self.holder.attach_images(paths);
-        emit_state(app, &view)?;
+        emit_view(&self.emitter(), &view)?;
         Ok(view)
     }
 
     /// Takes one attached image away before its send. Nothing is sent: the send
     /// that follows carries the images the chat still holds.
-    pub fn remove_image(&self, id: &str, app: &AppHandle<tauri::Wry>) -> Result<ViewState, String> {
+    pub fn remove_image(&self, id: &str) -> Result<ViewState, String> {
         self.accepting_work()?;
         let view = self.holder.remove_image(id);
-        emit_state(app, &view)?;
+        emit_view(&self.emitter(), &view)?;
         Ok(view)
     }
 
@@ -358,20 +435,19 @@ impl Bridge {
     /// command, because a child takes seconds to start and a write to it blocks.
     /// Never waits for one: each outcome folds back through the reducer and
     /// pushes the next `state-changed`.
-    pub(crate) fn run_chat_commands(
-        &self,
-        commands: Vec<gentle_app::ChatCommand>,
-        app: &AppHandle<tauri::Wry>,
-    ) {
+    pub(crate) fn run_chat_commands(&self, commands: Vec<gentle_app::ChatCommand>) {
+        let emit = self.emitter();
         for command in commands {
             let holder = Arc::clone(&self.holder);
             let executor = Arc::clone(&self.executor);
-            let app = app.clone();
+            // The seam is `Send + Sync`, so a worker thread pushes with it and
+            // no window handle is cloned anywhere.
+            let emit = Arc::clone(&emit);
             let spawned = std::thread::Builder::new()
                 .name("chat-command".to_owned())
                 .spawn(move || {
                     let ran = effects::run_one(command, executor.as_ref());
-                    fold_and_push(&holder, &app, ran);
+                    fold_and_push(&holder, &emit, ran);
                 });
             if let Err(error) = spawned {
                 // A command that never runs leaves its chat opening until its
@@ -385,14 +461,10 @@ impl Bridge {
     /// Pushes the slice one workspace action answers, then runs the new chat it
     /// opened: exactly what [`Bridge::dispatch`] does with the commands of the
     /// reducer, so a workspace added by hand behaves like one that was there.
-    pub(crate) fn finish(
-        &self,
-        action: WorkspaceAction,
-        app: &AppHandle<tauri::Wry>,
-    ) -> Result<ViewState, String> {
+    pub(crate) fn finish(&self, action: WorkspaceAction) -> Result<ViewState, String> {
         self.accepting_work()?;
-        emit_state(app, &action.view)?;
-        self.run_chat_commands(action.commands, app);
+        emit_view(&self.emitter(), &action.view)?;
+        self.run_chat_commands(action.commands);
         Ok(action.view)
     }
 
@@ -472,33 +544,39 @@ pub fn command_sink(
     })
 }
 /// Folds what one command came to and pushes each step, then arms the 20 s net
-/// of a fresh child against the same state and window.
-fn fold_and_push(holder: &Arc<AppStateHolder>, app: &AppHandle<tauri::Wry>, ran: Ran) {
+/// of a fresh child against the same state and the same emit seam.
+fn fold_and_push(holder: &Arc<AppStateHolder>, emit: &Emit, ran: Ran) {
     for input in ran.inputs {
-        push(app, holder.fold_input(input));
+        push(emit, holder.fold_input(input));
     }
     if let Some(chat) = ran.confirm_after {
         let holder = Arc::clone(holder);
-        let app = app.clone();
+        let emit = Arc::clone(emit);
         effects::opening_net(chat, move |input| {
             let view = holder.fold_input(input);
-            let _ = emit_state(&app, &view);
+            let _ = emit(&view);
         });
     }
 }
 
-fn push(app: &AppHandle<tauri::Wry>, view: ViewState) {
-    if let Err(error) = emit_state(app, &view) {
-        // Nothing to fall back to: the web side still has the command's answer.
+/// The push through the installed seam, as the result an intent path answers
+/// with: a walk that cannot be shown is a failed walk.
+fn emit_view(emit: &Emit, view: &ViewState) -> Result<(), String> {
+    emit(view)
+}
+
+/// A push whose failure is only a log line: the web side still has the
+/// command's answer, so there is nothing to fall back to.
+fn push(emit: &Emit, view: ViewState) {
+    if let Err(error) = emit(&view) {
         eprintln!("state-changed could not be emitted: {error}");
     }
 }
 
-/// The window's emit step as the [`Push`] a pump or the session list arms: the
-/// same closure at each of the three places one is installed.
-fn push_to(app: &AppHandle<tauri::Wry>) -> Push {
-    let app = app.clone();
-    Box::new(move |view| push(&app, view))
+/// The emit seam as the [`Push`] a pump or the session list arms: the same
+/// closure at each place one is installed.
+fn push_via(emit: Emit) -> Push {
+    Box::new(move |view| push(&emit, view))
 }
 
 /// The one push of the bridge: the typed event the web side listens on, the
@@ -517,9 +595,12 @@ pub(crate) fn emit_state(app: &AppHandle<tauri::Wry>, view: &ViewState) -> Resul
 pub fn dispatch_intent(
     intent: UiIntent,
     bridge: tauri::State<'_, Bridge>,
-    app: AppHandle<tauri::Wry>,
+    // Kept although the dispatch no longer needs it: the web side's binding for
+    // this command is generated from what it serializes, and the handle is one
+    // of Tauri's own arguments, never a payload field.
+    _app: AppHandle<tauri::Wry>,
 ) -> Result<ViewState, String> {
-    bridge.inner().dispatch(intent, &app)
+    bridge.inner().dispatch(intent)
 }
 
 /// The images a drop attached, as one command: the paths are the files the user
@@ -531,9 +612,9 @@ pub fn dispatch_intent(
 pub fn attach_images(
     paths: Vec<String>,
     bridge: tauri::State<'_, Bridge>,
-    app: AppHandle<tauri::Wry>,
+    _app: AppHandle<tauri::Wry>,
 ) -> Result<ViewState, String> {
-    bridge.inner().attach_images(&paths, &app)
+    bridge.inner().attach_images(&paths)
 }
 
 /// Takes one attached image away before its send, named by the id
@@ -543,7 +624,7 @@ pub fn attach_images(
 pub fn remove_image(
     id: String,
     bridge: tauri::State<'_, Bridge>,
-    app: AppHandle<tauri::Wry>,
+    _app: AppHandle<tauri::Wry>,
 ) -> Result<ViewState, String> {
-    bridge.inner().remove_image(&id, &app)
+    bridge.inner().remove_image(&id)
 }

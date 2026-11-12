@@ -12,8 +12,6 @@
 
 use std::sync::Arc;
 
-use tauri::AppHandle;
-
 use crate::commands::Bridge;
 use crate::contract::ViewState;
 use crate::workspace::WorkspaceAction;
@@ -27,16 +25,13 @@ use crate::{workspace_add, workspace_create};
 /// `ViewState.workspace_notice`.
 #[tauri::command]
 #[specta::specta]
-pub async fn add_workspace(
-    bridge: tauri::State<'_, Bridge>,
-    app: AppHandle<tauri::Wry>,
-) -> Result<ViewState, String> {
+pub async fn add_workspace(bridge: tauri::State<'_, Bridge>) -> Result<ViewState, String> {
     let holder = Arc::clone(&bridge.holder);
     let picker = bridge.picker();
     let folders = bridge.folders();
     let action =
         blocking(move || workspace_add::add_existing(&holder, picker.as_ref(), &folders)).await?;
-    bridge.finish(action, &app)
+    bridge.finish(action)
 }
 
 /// "Create a new folder": the user picks the PARENT, the app makes
@@ -50,7 +45,6 @@ pub async fn add_workspace(
 pub async fn create_workspace(
     name: String,
     bridge: tauri::State<'_, Bridge>,
-    app: AppHandle<tauri::Wry>,
 ) -> Result<ViewState, String> {
     let holder = Arc::clone(&bridge.holder);
     let picker = bridge.picker();
@@ -58,7 +52,7 @@ pub async fn create_workspace(
     let action =
         blocking(move || workspace_create::create_new(&holder, picker.as_ref(), &folders, &name))
             .await?;
-    bridge.finish(action, &app)
+    bridge.finish(action)
 }
 
 /// Runs one workspace flow off the window's thread: a folder dialog and a
