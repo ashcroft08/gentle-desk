@@ -305,8 +305,10 @@ fn a_manifest_of_another_version_stores_this_runs_version_and_pushes_nothing() {
 }
 
 #[test]
-fn a_first_run_shows_nothing_stores_nothing_and_fetches_nothing() {
+fn a_first_run_stores_its_version_and_fetches_nothing() {
     // The config every build before this feature wrote: no version stored.
+    // (R3-001) The first run records the version it runs as, so the NEXT
+    // update is detected; it still shows no modal and fetches nothing.
     let harness = Harness::new(None);
     let (bridge, views) = app_run();
     let (fetch, asked) = fetcher(latest("0.1.8", "The sidebar folds."));
@@ -317,8 +319,20 @@ fn a_first_run_shows_nothing_stores_nothing_and_fetches_nothing() {
         lock(&asked).is_empty(),
         "a first run is not an update, so nothing is fetched"
     );
-    assert!(lock(&views).is_empty(), "a first run shows nothing");
-    assert_eq!(harness.stored(), None, "a first run stores no version");
+    let view = lock(&views)
+        .first()
+        .expect("the store pushes its slice")
+        .clone();
+    assert_eq!(
+        view.whats_new, None,
+        "a first run shows no modal; the store only clears the slice"
+    );
+    wait_for_stored(&harness, "0.1.8");
+    assert_eq!(
+        harness.stored().as_deref(),
+        Some("0.1.8"),
+        "the first run stores the version it runs as"
+    );
 }
 
 #[test]

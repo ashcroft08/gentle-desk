@@ -492,11 +492,22 @@ impl Bridge {
     ///
     /// Nothing here waits for the network: the fetch runs on a thread of its own
     /// and pushes the slice it answers through the same emit step every other
-    /// step uses, so the first frame never depends on it. A run that follows no
-    /// update - the first one, or one of the stored version - asks nothing and
-    /// pushes nothing at all.
+    /// step uses, so the first frame never depends on it. A run of the stored
+    /// version asks nothing and pushes nothing at all; a first run records the
+    /// version it runs as before it returns (R3-001), so the next update is
+    /// detected, and shows no modal itself.
     pub fn start_whats_new(&self, app_version: &str, endpoint: Option<&str>, fetch: Fetcher) {
         self.holder.set_app_version(app_version);
+        if self.holder.update_run() == UpdateRun::FirstRun {
+            // A first run - any config from before this feature stored a
+            // version - records the version it runs as before it returns:
+            // returning without storing would keep the run FirstRun forever,
+            // so no later update would ever be detected.
+            if let Some(view) = self.holder.store_last_run_version() {
+                push(&self.emitter(), view);
+            }
+            return;
+        }
         if self.holder.update_run() != UpdateRun::Updated {
             return;
         }

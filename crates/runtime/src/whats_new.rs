@@ -11,7 +11,8 @@ use serde::{Deserialize, Deserializer};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UpdateRun {
     /// Nothing stored: the first run of a build that predates this feature, or a
-    /// run whose config was never written. Nothing is shown and nothing stored.
+    /// run whose config was never written. Nothing is shown; the run records
+    /// its version before it returns, so the next update is detected.
     FirstRun,
     /// The stored version is the one this run runs as: it follows no update.
     SameVersion,
