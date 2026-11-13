@@ -41,6 +41,9 @@ export const REMOVE_IMAGE = 'Remove'
 export const SEARCH_PLACEHOLDER = 'Search models...'
 export const NOTHING_MATCHES = 'Nothing matches.'
 
+/** The sidebar collapse toggle's accessible name (responsive-sidebar S1). */
+export const SIDEBAR_TOGGLE = 'Toggle sidebar'
+
 /** Ended: the chat's process is gone until it is restarted. */
 export const ENDED_REASON = "This chat's process exited. Restart it to keep talking."
 

@@ -127,6 +127,36 @@ p {
   grid-template-columns: 280px 1fr;
 }
 
+/* Collapsed (responsive-sidebar S4): the sidebar leaves the layout, and the
+   conversation takes the whole width. */
+.app.scollapsed {
+  grid-template-columns: 0 1fr;
+}
+
+.app.scollapsed .side {
+  display: none;
+}
+
+/* The sidebar collapse toggle: the header's first control, quiet until
+   hovered, the same circle the other icon buttons draw. */
+.side-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted, inherit);
+  cursor: pointer;
+  flex: none;
+}
+
+.side-toggle:hover {
+  background: var(--surface2);
+}
+
 /* The main area: the chat's header, its notices, the thread that takes what is
    left, and the composer at the bottom (T6). While no chat is open the same
    column holds the placeholder under the header. */

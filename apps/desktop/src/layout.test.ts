@@ -12,8 +12,18 @@ function ruleBody(selector: string): string {
   return APP_CSS.slice(start, APP_CSS.indexOf('}', start))
 }
 
-describe('the conversation width', () => {
-  it('keeps the line in the readable band instead of filling any window', () => {
+describe('the sidebar collapse (responsive-sidebar S4)', () => {
+  it('the collapsed layout drops the sidebar column and the sidebar itself', () => {
+    expect(ruleBody('.app.scollapsed')).toContain('grid-template-columns: 0 1fr')
+    expect(ruleBody('.app.scollapsed .side')).toContain('display: none')
+  })
+
+  it('the toggle control exists as a real button rule', () => {
+    expect(ruleBody('.side-toggle')).toContain('cursor: pointer')
+  })
+})
+
+describe('the conversation width', () => {  it('keeps the line in the readable band instead of filling any window', () => {
     const declared = /--chat-max:\s*(\d+)px/.exec(APP_CSS)
 
     expect(declared).not.toBeNull()
