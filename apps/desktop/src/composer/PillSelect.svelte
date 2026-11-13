@@ -44,6 +44,12 @@
     if (needle === '') return options
     return options.filter((option) => option.label.toLowerCase().includes(needle))
   })
+  // The highlighted row, always inside the visible list (-1 when it is empty):
+  // `active` is only where the user last moved, and the list can shrink under
+  // it when a state push or the filter changes (review R3-3, R4-1).
+  const activeIdx = $derived(
+    visible.length === 0 ? -1 : Math.min(Math.max(active, 0), visible.length - 1),
+  )
 
   // Opening resets the filter and puts the cursor on the chosen option, so a
   // second open does not inherit the last search. Only the open flag may re-run
@@ -91,9 +97,12 @@
     close()
   }
 
+  // A <button> already turns Enter and Space into a click, which toggles the
+  // list; handling them here too duplicated the activation (review R3-2, R4-2).
+  // Only ArrowDown, which a button does not handle by itself, opens from here.
   function buttonKeyed(event: KeyboardEvent): void {
     if (open) return
-    if (event.key === 'Enter' || event.key === ' ' || event.key === 'ArrowDown') {
+    if (event.key === 'ArrowDown') {
       event.preventDefault()
       open = true
     }
@@ -107,17 +116,17 @@
     }
     if (event.key === 'ArrowDown') {
       event.preventDefault()
-      active = Math.min(active + 1, visible.length - 1)
+      if (visible.length > 0) active = Math.min(activeIdx + 1, visible.length - 1)
       return
     }
     if (event.key === 'ArrowUp') {
       event.preventDefault()
-      active = Math.max(active - 1, 0)
+      active = Math.max(activeIdx - 1, 0)
       return
     }
     if (event.key === 'Enter') {
       event.preventDefault()
-      const choice = visible[active]
+      const choice = visible[activeIdx]
       if (choice !== undefined) choose(choice)
     }
   }
@@ -163,7 +172,7 @@
               type="button"
               role="option"
               class="option"
-              class:active={index === active}
+              class:active={index === activeIdx}
               aria-selected={option.value === value}
               onmouseenter={() => (active = index)}
               onclick={() => choose(option)}
