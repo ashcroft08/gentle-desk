@@ -30,8 +30,11 @@ pub mod pending;
 pub mod picker;
 pub mod release;
 pub mod sessions;
+pub mod settings;
 pub mod shell_install;
 pub mod state_view;
+pub mod terminal;
+pub mod terminal_commands;
 pub mod theme;
 pub mod view;
 pub mod window;
@@ -63,6 +66,7 @@ pub fn contract_builder() -> Builder<tauri::Wry> {
             commands::attach_images,
             commands::remove_image,
             commands::store_last_run_version,
+            terminal_commands::open_terminal,
         ])
         .events(tauri_specta::collect_events![contract::StateChanged,])
 }
@@ -156,6 +160,13 @@ pub fn run() {
                 release::endpoint(app.handle()).as_deref(),
                 release::fetcher(),
             );
+            // The update check of this run (0.1.12, S3): once, when the app
+            // opens, on a thread of its own, from the same manifest endpoint.
+            // It only CHECKS - nothing is installed from here - and it runs
+            // after the what's-new step so the version this run runs as is
+            // known to it.
+            app.state::<Bridge>()
+                .start_updates(release::endpoint(app.handle()).as_deref());
             Ok(())
         })
         .run(tauri::generate_context!())

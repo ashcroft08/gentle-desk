@@ -1,0 +1,35 @@
+{
+  "title": "Settings 0.1.12",
+  "brief": "Four pieces for the 0.1.12 delivery: a read-only Profiles section, an Account section with terminal hand-off, an Updates section (auto check at open, buttons gated on zero open chats), and a context-percentage chip beside the chat composer. Settings join the existing 680px two-rail dialog.",
+  "feature": "odd/tasks/settings-0.1.12.md",
+  "artboards": [
+    {
+      "file": "01-rail.html",
+      "title": "A: the familiar rail grows",
+      "tradeoff": "One dialog everyone knows; the rail gains three entries and Updates shows status rows with the chats-closed gate",
+      "width": 900,
+      "height": 560
+    },
+    {
+      "file": "02-ledger.html",
+      "title": "B: Profiles and Account as quiet ledgers",
+      "tradeoff": "Dense, scannable tables for read-only data; weaker emotional pull than cards",
+      "width": 900,
+      "height": 560
+    },
+    {
+      "file": "03-chat-chip.html",
+      "title": "C: the context chip lives in the chat",
+      "tradeoff": "Per-chat number beside the composer with its five states; detail one hover away, never default",
+      "width": 900,
+      "height": 720
+    },
+    {
+      "file": "04-account.html",
+      "title": "D: Account, its own quiet section",
+      "tradeoff": "Auth status and terminal hand-off get their own rail entry; nothing shares the Profiles pane's length",
+      "width": 900,
+      "height": 560
+    }
+  ]
+}

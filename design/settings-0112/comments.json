@@ -1,0 +1,148 @@
+{
+  "version": 1,
+  "comments": [
+    {
+      "id": "r0uhc9xw",
+      "file": "03-chat-chip.html",
+      "selector": "body",
+      "excerpt": "The context chip, next to the composer One number per chat. Reads the session stats that the chat's own shell already knows; refreshes when the chat settles, not on a timer. ¿Y si movemos el chequeo de updates al arranque? Sí — one check when the app opens, cached, so the settings pane never blocks",
+      "comment": "revisa el diseño que manejamos, porque el modelo va debajo de donde se escribe, replica esta parte como esta en el sistema para tener una perpectiva real",
+      "createdAt": "2026-11-13T17:05:19.784Z",
+      "status": "resolved",
+      "sentAt": null,
+      "resolvedAt": "2026-11-13T17:06:22.564Z"
+    },
+    {
+      "id": "u099fu9i",
+      "file": "02-ledger.html",
+      "selector": "body > div > div > div > div:nth-of-type(1)",
+      "excerpt": "Claude-CommandCode Used in this session · Default for new sessions ◎ organic ↼ inline ⇌ writer ORCHESTRATOR claude-bridge/claude-sonnet-5-5 medium ⇆ FALLBACK commandcode/z-ai/glm-5.3-flash",
+      "comment": "eso de inline y writer que es? porque ni en la terminal entiendo porque esta eso, lo que falta es la parte para cambiar de organic a full delegation",
+      "createdAt": "2026-11-13T17:11:09.091Z",
+      "status": "resolved",
+      "sentAt": "2026-11-13T17:11:10.087Z",
+      "resolvedAt": "2026-11-13T17:11:45.798Z"
+    },
+    {
+      "id": "ti3l8pi7",
+      "file": "02-ledger.html",
+      "selector": "body > div > div > div",
+      "excerpt": "Profiles What gentle-pi holds in profiles.json, read as it is — the same screen the terminal draws with /gentle:profiles. Orchestrator mode Organic Full delegation applies to chats opened from now on · not stored Claude-CommandCode Used in this session · Default for new sessions ORCHESTRATOR claude-",
+      "comment": "la parte de account creo que deberia tener su propio apartado porque se hace muy largo mantenerlo aqui mismo o si es para mostrar que cuenta usa el perfil mejor eliminala",
+      "createdAt": "2026-11-13T17:13:32.425Z",
+      "status": "resolved",
+      "sentAt": "2026-11-13T17:13:32.883Z",
+      "resolvedAt": "2026-11-13T17:14:12.269Z"
+    },
+    {
+      "id": "njib2ziv",
+      "file": "01-rail.html",
+      "selector": "body > div > div > div > div:nth-of-type(1)",
+      "excerpt": "gentle-desk 0.1.11 Up to date via the in-app updater pi 1.5.2 2.0.5 available Update pi extensions 3 installed Update extensions gentle-shell 4.7.0 Up to date Update gentle-shell",
+      "comment": "para el usuario deberia ser la informacion mas simple y que por detras la logica sea la compleja",
+      "createdAt": "2026-11-13T17:14:33.376Z",
+      "status": "resolved",
+      "sentAt": "2026-11-13T17:14:33.396Z",
+      "resolvedAt": "2026-11-13T17:14:54.651Z"
+    },
+    {
+      "id": "vkcfmbc1",
+      "file": "02-ledger.html",
+      "selector": "body > div > div > div > p",
+      "excerpt": "What gentle-pi holds in profiles.json, read as it is — the same screen the terminal draws with /gentle:profiles.",
+      "comment": "revisa si esta informacion no confunde al usuario",
+      "createdAt": "2026-11-13T17:18:25.112Z",
+      "status": "resolved",
+      "sentAt": "2026-11-13T17:18:25.578Z",
+      "resolvedAt": "2026-11-13T17:18:37.524Z"
+    },
+    {
+      "id": "roivqj88",
+      "file": "02-ledger.html",
+      "selector": "body > div > div > div > div:nth-of-type(3) > button",
+      "excerpt": "Open in terminal",
+      "comment": "una duda, para poder editar mi perfil el usuario deberia darle aqui= si es asi haz mas claro la parte del uso del boton que tenga informacion que le explique bien al usuario",
+      "createdAt": "2026-11-13T17:19:34.032Z",
+      "status": "resolved",
+      "sentAt": null,
+      "resolvedAt": "2026-11-13T17:19:48.702Z"
+    },
+    {
+      "id": "ogpzlpur",
+      "file": "02-ledger.html",
+      "selector": "body > div > div > div",
+      "excerpt": "Profiles Your agent profiles, the way the shell keeps them. Orchestrator mode Organic Full delegation applies to chats opened from now on · not stored Claude-CommandCode Used in this session · Default for new sessions ORCHESTRATOR claude-bridge/claude-sonnet-5-5 medium ⇆ FALLBACK commandcode/z-ai/gl",
+      "comment": "se puede crear perfiles o no? y tambien poder usar esos pefiles para cambiar",
+      "createdAt": "2026-11-13T17:21:40.559Z",
+      "status": "resolved",
+      "sentAt": "2026-11-13T17:21:41.002Z",
+      "resolvedAt": "2026-11-13T17:21:59.262Z"
+    },
+    {
+      "id": "xqqhx0gl",
+      "file": "02-ledger.html",
+      "selector": "body > div > div > div > div:nth-of-type(3) > span",
+      "excerpt": "Edits, creates and switches profiles — the panel refreshes when the terminal closes.",
+      "comment": "ponlo debajo del boton, asi se ve todo apretado",
+      "createdAt": "2026-11-13T17:24:35.880Z",
+      "status": "resolved",
+      "sentAt": "2026-11-13T17:24:35.897Z",
+      "resolvedAt": "2026-11-13T17:24:42.171Z"
+    },
+    {
+      "id": "7efzc5eg",
+      "file": "02-ledger.html",
+      "selector": "body > div > div > div > span",
+      "excerpt": "🔁 Read-only — the terminal does the work",
+      "comment": "para que es esto?",
+      "createdAt": "2026-11-13T17:24:44.710Z",
+      "status": "resolved",
+      "sentAt": "2026-11-13T17:24:44.725Z",
+      "resolvedAt": "2026-11-13T17:24:57.006Z"
+    },
+    {
+      "id": "fzb8whe8",
+      "file": "02-ledger.html",
+      "selector": "body > div > div > div",
+      "excerpt": "Profiles Your agent profiles, the way the shell keeps them. Orchestrator mode Organic Full delegation applies to chats opened from now on · not stored Claude-CommandCode Used in this session · Default for new sessions ORCHESTRATOR claude-bridge/claude-sonnet-5-5 medium ⇆ FALLBACK commandcode/z-ai/gl",
+      "comment": "mejora el espaciado entre la tabla y el boton, revisa y mejora el diseño",
+      "createdAt": "2026-11-13T17:25:29.760Z",
+      "status": "resolved",
+      "sentAt": "2026-11-13T17:25:29.779Z",
+      "resolvedAt": "2026-11-13T17:25:42.892Z"
+    },
+    {
+      "id": "kyd04lcq",
+      "file": "02-ledger.html",
+      "selector": "body > div > div > div",
+      "excerpt": "Profiles Your agent profiles, the way the shell keeps them. Orchestrator mode Organic Full delegation applies to chats opened from now on · not stored Claude-CommandCode Used in this session · Default for new sessions ORCHESTRATOR claude-bridge/claude-sonnet-5-5 medium ⇆ FALLBACK commandcode/z-ai/gl",
+      "comment": "mejora el diseño de todo el apartado, usa las cards cuando sean necesario y hazla mas organica, como solo es informativa haz que se vea asi y lo que tenga acciones que se vean como acciones",
+      "createdAt": "2026-11-13T17:26:38.497Z",
+      "status": "resolved",
+      "sentAt": null,
+      "resolvedAt": "2026-11-13T17:27:26.554Z"
+    },
+    {
+      "id": "5vzx837k",
+      "file": "02-ledger.html",
+      "selector": "body > div > div > div > div:nth-of-type(2) > div:nth-of-type(2)",
+      "excerpt": "ORCHESTRATOR claude-bridge/claude-sonnet-5-5 medium ⇆ FALLBACK commandcode/z-ai/glm-5.3-flash",
+      "comment": "pon a lado del modelo el effort y elimina ese icono de flechas",
+      "createdAt": "2026-11-13T17:28:24.392Z",
+      "status": "resolved",
+      "sentAt": "2026-11-13T17:28:24.893Z",
+      "resolvedAt": "2026-11-13T17:28:46.055Z"
+    },
+    {
+      "id": "u2q9gark",
+      "file": "02-ledger.html",
+      "selector": "body > div > div > div > div:nth-of-type(2) > div:nth-of-type(2) > span:nth-of-type(3)",
+      "excerpt": "medium",
+      "comment": "esto ponlo a lado de su modelo no abajo",
+      "createdAt": "2026-11-13T17:29:20.664Z",
+      "status": "resolved",
+      "sentAt": "2026-11-13T17:29:20.686Z",
+      "resolvedAt": "2026-11-13T17:30:06.000Z"
+    }
+  ]
+}

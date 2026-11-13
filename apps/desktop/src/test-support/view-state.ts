@@ -29,6 +29,8 @@ export function viewState(overrides: Partial<ViewState_Serialize> = {}): ViewSta
     list_status: { type: 'Complete' },
     sessions_revision: 1,
     total_sessions: 0,
+    // No chat open: the Updates pane's gate is free (S4).
+    open_chats: 0,
     messages: [],
     notices: [],
     dialog: null,
@@ -45,9 +47,22 @@ export function viewState(overrides: Partial<ViewState_Serialize> = {}): ViewSta
       thinking_level: null,
       thinking_levels: [],
     },
-    // No chat has been read yet: no context reading exists, and a chat-less
-    // fixture cannot carry one (the field is per chat, in the chat slice).
+    // A chat that has not answered yet: every field null, never a zero.
     context_usage: { tokens: null, percent: null, window: null },
+    // The Settings panes before their first read (0.1.12): nothing known yet.
+    profiles: {
+      status: { type: 'Unknown' },
+      active: null,
+      profiles: [],
+      mode: 'organic',
+    },
+    auth: { status: { type: 'Unknown' }, providers: [] },
+    updates: {
+      status: 'Unknown',
+      desk: { current: null, latest: null, update_available: null },
+      pi: { current: null, latest: null, update_available: null },
+      shell: { current: null, latest: null, update_available: null },
+    },
     fatal: null,
     config_notice: null,
     workspace_notice: null,

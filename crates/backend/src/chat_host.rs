@@ -40,7 +40,7 @@ pub mod spawner;
 pub use child::{Child, Writer};
 pub use host::{ChatHost, SendError};
 pub use policy::{Admission, ChatView, Clock, Limits, ManualClock, SystemClock, TooManyLive};
-pub use spawner::{ProcessSpawner, Spawner};
+pub use spawner::{OrchestratorMode, ProcessSpawner, Spawner};
 
 /// Which chat a child belongs to: its session file, or an id for a chat that
 /// has none yet.

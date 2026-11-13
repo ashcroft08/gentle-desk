@@ -58,6 +58,13 @@ pub fn to_intent(state: &gentle_app::AppState, intent: UiIntent) -> Option<gentl
         UiIntent::SelectThinkingLevel { level } => {
             gentle_app::Intent::SelectThinkingLevel { level }
         }
+        // The Settings pane's intents (0.1.12) are the shell's: they read a
+        // file, run the shell's own check, or pass a mode to the children, so
+        // the bridge answers them before it asks this (`Bridge::dispatch`).
+        UiIntent::RefreshProfiles
+        | UiIntent::RefreshAuth
+        | UiIntent::CheckUpdates
+        | UiIntent::SetOrchestratorMode { .. } => return None,
     })
 }
 

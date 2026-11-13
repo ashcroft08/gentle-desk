@@ -18,9 +18,9 @@ use gentle_runtime::app_config::Theme;
 use gentle_runtime::badge::{Badge, BadgeMark};
 
 use crate::contract::{
-    ChatActivityMark, ChatActivityView, ContextUsageView, ImageView, ModelChipView,
-    ModelChoiceView, ModelListStatusView, NoticeActionView, NoticeLevel, NoticeView, ShellView,
-    ThemeView, ViewState, WhatsNewView,
+    AuthView, ChatActivityMark, ChatActivityView, ContextUsageView, ImageView, ModelChipView,
+    ModelChoiceView, ModelListStatusView, NoticeActionView, NoticeLevel, NoticeView, ProfilesView,
+    ShellView, ThemeView, UpdatesView, ViewState, WhatsNewView,
 };
 use crate::images::Images;
 use crate::{dialogs, helper_thread, helpers, sessions, view};
@@ -51,6 +51,13 @@ pub struct ShellParts<'a> {
     pub theme: Theme,
     /// The shell and home this run sees.
     pub shell: ShellView,
+    /// The agent profiles read for the Profiles pane (0.1.12, T2), and the mode
+    /// the desk's next chats start with.
+    pub profiles: ProfilesView,
+    /// Where the shell's authentication stands (0.1.12, T3).
+    pub auth: AuthView,
+    /// The versions this machine runs (0.1.12, S2, S7).
+    pub updates: UpdatesView,
     /// The images each chat holds or sent.
     pub images: &'a Images,
 }
@@ -68,6 +75,9 @@ pub fn view_state(state: &AppState, sessions_revision: u32, shell: ShellParts<'_
         fatal,
         theme,
         shell,
+        profiles,
+        auth,
+        updates,
         images,
     } = shell;
     let helpers_view = helpers::helpers(state);
@@ -86,6 +96,9 @@ pub fn view_state(state: &AppState, sessions_revision: u32, shell: ShellParts<'_
         list_status: sessions::view::status(state),
         sessions_revision,
         total_sessions: sessions::view::total(state),
+        // Every chat whose child this run started, idle ones included: the
+        // Updates pane's chats-closed gate reads exactly this (0.1.12, S4).
+        open_chats: u32::try_from(state.chats.len()).unwrap_or(u32::MAX),
         messages: view::messages(state, images),
         notices: state.notices.iter().map(NoticeView::of).collect(),
         dialog: dialogs::dialog(state),
@@ -105,6 +118,9 @@ pub fn view_state(state: &AppState, sessions_revision: u32, shell: ShellParts<'_
         images_notice: images.notice(),
         model_chip: model_chip_view(state),
         context_usage: context_usage_view(state),
+        profiles,
+        auth,
+        updates,
         config_notice,
         workspace_notice,
         sessions_notice,
