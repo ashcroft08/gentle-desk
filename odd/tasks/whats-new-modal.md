@@ -33,8 +33,8 @@ modal shows once per version.
 - T1 (S1, S3, S5) Detection + fetch + push: the config field, the update-detected state, the
   injectable fetcher, the view-state push, and the store-on-dismiss/store-on-fail seam -
   route: delegated writer, commit: see git log (feat/whats-new-t1)
-- T2 (S4) The modal, once per version, wired to the pushed slice - route: delegated writer,
-  commit: see git log (feat/whats-new-t2)
+- T2 (S4) The modal, once per version, wired to the pushed slice; redone as themed markdown (L10) in
+  0c297b1 on feat/whats-new-modal-design - route: delegated writer, commit: see git log
 - T3 (S2) The release workflow embeds the release body into `latest.json` - route: delegated
   writer, commit: see git log (chore/whats-new-workflow)
 
