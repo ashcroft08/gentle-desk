@@ -1,9 +1,10 @@
-// The Profiles pane (0.1.12, S1, T2, L11): the orchestrator switch of the chats
-// opened from now on, then the ACTIVE profile read-only - its name, its two
-// routes and one row per agent - and the one way out of the pane, the terminal.
-// One test per rule: the drawn profile, the switch's intent, the empty state, the
-// failed state with its safe retry, the refresh on open and on focus, and the
-// terminal button.
+// The Profiles pane (0.1.12, S1, T2, L11, L17): the orchestrator switch of the
+// chats opened from now on and the ACTIVE profile read-only in the Profile tab -
+// its name, its two routes and the one way out of the pane, the terminal - and
+// one row per agent in the Agents tab (the fallback is the card's, never a row).
+// One test per rule: the drawn profile, the two sub-tabs and their wiring, the
+// switch's intent, the empty state, the failed state with its safe retry, the
+// refresh on open and on focus, and the terminal button.
 import '../test-support/dom-env'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, within } from '@testing-library/svelte'
@@ -28,7 +29,6 @@ vi.mock('@tauri-apps/api/core', () => import('../test-support/tauri-mock').then(
 vi.mock('@tauri-apps/api/event', () => import('../test-support/tauri-mock').then((m) => m.eventModule()))
 
 afterEach(cleanup)
-
 beforeEach(() => {
   resetTauriMock()
   setHandler('dispatch_intent', () => null)
@@ -78,8 +78,78 @@ function reads(): number {
     .length
 }
 
+/** The pane's two sub-tabs, quoted as the user reads them (L17). */
+const PROFILE_TAB = 'Profile'
+const AGENTS_TAB = 'Agents'
+
+/** The panel a sub-tab points its `aria-controls` at. */
+function panelOf(pane: HTMLElement, name: string): HTMLElement {
+  const tab = within(pane).getByRole('tab', { name })
+  const id = tab.getAttribute('aria-controls')
+  const panel = id === null ? null : pane.querySelector<HTMLElement>(`#${id}`)
+  if (panel === null) throw new Error(`the ${name} tab names no panel`)
+  return panel
+}
+
 describe('the Profiles pane', () => {
-  it('draws the active profile: its name, its two routes and one row per agent', () => {
+  it('opens on the Profile tab: the switch, the active profile, the terminal button', () => {
+    const pane = draw()
+    const profileTab = within(pane).getByRole('tab', { name: PROFILE_TAB })
+    const agentsTab = within(pane).getByRole('tab', { name: AGENTS_TAB })
+
+    expect(profileTab.getAttribute('aria-selected')).toBe('true')
+    expect(agentsTab.getAttribute('aria-selected')).toBe('false')
+
+    // The tab and the panel name each other, so a reader follows one to the other.
+    const panel = panelOf(pane, PROFILE_TAB)
+    expect(panel.getAttribute('role')).toBe('tabpanel')
+    expect(panel.getAttribute('aria-labelledby')).toBe(profileTab.id)
+    expect(within(panel).getByRole('radiogroup')).toBeTruthy()
+    expect(panel.querySelector('.profile')).toBeTruthy()
+    expect(within(panel).getByRole('button', { name: EDIT_IN_TERMINAL })).toBeTruthy()
+
+    // The table is the other tab's, so the first view is not the long one.
+    expect(within(pane).queryByRole('table')).toBeNull()
+  })
+
+  it('switches to the Agents tab: the table, and neither the switch nor the button', async () => {
+    const pane = draw()
+
+    await fireEvent.click(within(pane).getByRole('tab', { name: AGENTS_TAB }))
+
+    const agentsTab = within(pane).getByRole('tab', { name: AGENTS_TAB })
+    expect(agentsTab.getAttribute('aria-selected')).toBe('true')
+    expect(
+      within(pane).getByRole('tab', { name: PROFILE_TAB }).getAttribute('aria-selected'),
+    ).toBe('false')
+
+    const panel = panelOf(pane, AGENTS_TAB)
+    expect(panel.getAttribute('aria-labelledby')).toBe(agentsTab.id)
+    expect(within(panel).getByRole('table')).toBeTruthy()
+    expect(within(pane).queryByRole('radiogroup')).toBeNull()
+    expect(within(pane).queryByRole('button', { name: EDIT_IN_TERMINAL })).toBeNull()
+  })
+
+  it('walks the sub-tabs with the arrow keys, one tab stop', async () => {
+    const pane = draw()
+    const profileTab = within(pane).getByRole('tab', { name: PROFILE_TAB })
+    const agentsTab = within(pane).getByRole('tab', { name: AGENTS_TAB })
+
+    expect([profileTab.getAttribute('tabindex'), agentsTab.getAttribute('tabindex')]).toEqual([
+      '0',
+      '-1',
+    ])
+
+    await fireEvent.keyDown(profileTab, { key: 'ArrowRight' })
+    expect(agentsTab.getAttribute('aria-selected')).toBe('true')
+    expect(document.activeElement).toBe(agentsTab)
+
+    await fireEvent.keyDown(agentsTab, { key: 'ArrowLeft' })
+    expect(profileTab.getAttribute('aria-selected')).toBe('true')
+    expect(document.activeElement).toBe(profileTab)
+  })
+
+  it('draws the active profile: its name, its two routes and one row per agent', async () => {
     const pane = draw()
 
     expect(within(pane).getByText('Mine')).toBeTruthy()
@@ -88,15 +158,24 @@ describe('the Profiles pane', () => {
     expect(pane.querySelector('.pair.orchestrator')?.textContent).toContain('prov/big')
     expect(pane.querySelector('.pair.orchestrator')?.textContent).toContain('medium')
     expect(pane.querySelector('.pair.fallback')?.textContent).toContain('prov/fb')
+
+    await fireEvent.click(within(pane).getByRole('tab', { name: AGENTS_TAB }))
     // One table row per other role, with its model and its effort.
     const rows = within(pane).getAllByRole('row').slice(1)
     expect(
       rows.map((row) => [...row.querySelectorAll('td')].map((cell) => cell.textContent?.trim())),
-    ).toEqual([
-      ['fallback', 'prov/fb', 'low'],
-      ['worker', 'prov/small', 'high'],
-    ])
+    ).toEqual([['worker', 'prov/small', 'high']])
     expect(within(pane).getByRole('columnheader', { name: 'Effort' })).toBeTruthy()
+  })
+
+  it('never draws the fallback role as a row: the card already carries it', async () => {
+    const pane = draw()
+
+    expect(pane.querySelector('.pair.fallback')?.textContent).toContain('prov/fb')
+
+    await fireEvent.click(within(pane).getByRole('tab', { name: AGENTS_TAB }))
+    const rows = within(pane).getAllByRole('row').slice(1)
+    expect(rows.map((row) => row.querySelector('td')?.textContent?.trim())).toEqual(['worker'])
   })
 
   it('sends the orchestrator mode the user picks, and says it is not stored', async () => {

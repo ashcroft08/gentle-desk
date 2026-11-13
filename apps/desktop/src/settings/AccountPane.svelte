@@ -37,16 +37,38 @@
   )
   const ready = $derived(auth !== null && auth.status.type === 'Ready')
 
+  /**
+   * The pane reads when it appears, never waiting for a button: the check runs
+   * on the intent thread (~1s per provider) and the quiet "Reading..." above is
+   * the waiting state. This is the Profiles pane's own pattern (0.1.12, L17).
+   */
+  $effect(() => {
+    check()
+  })
+
+  /**
+   * The terminal window closes and the desk is focused again, while this pane is
+   * the one on screen: one more check, the same push, never a timer.
+   */
+  $effect(() => {
+    window.addEventListener('focus', check)
+    return () => window.removeEventListener('focus', check)
+  })
+
+  /**
+   * The same check the "Check again" button asks for, and the one the pane asks
+   * for itself: the shell's per-provider check, never a token refresh.
+   */
+  function check(): void {
+    void dispatchIntent({ type: 'RefreshAuth' })
+  }
+
   /** One provider's check as the row draws it: its word and its tone. */
   function drawn(status: ProviderStatusView): { label: string; tone: string } {
     if (status === 'Ready') return { label: CONNECTED, tone: 'ok' }
     if (status === 'NotReady') return { label: NOT_READY, tone: 'warn' }
     if (status === 'Invalid') return { label: INVALID, tone: 'bad' }
     return { label: ERROR, tone: 'bad' }
-  }
-
-  function check(): void {
-    void dispatchIntent({ type: 'RefreshAuth' })
   }
 
   async function open(where: 'Login' | 'Logout'): Promise<void> {

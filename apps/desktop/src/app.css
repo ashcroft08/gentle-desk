@@ -1635,6 +1635,60 @@ p {
   color: var(--accent);
 }
 
+/* The Profiles pane's sub-tabs (L17): the quiet segmented control the chat
+   header and the settings rail already use, drawn here with the theme's own
+   tokens because a pane had no tab pair before. The selected one wears the
+   accent on its tint, and a keyboard focus is a line, never a colour alone. */
+.settings-pane .subtabs {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  margin-bottom: 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.settings-pane .subtabs [role='tab'] {
+  border: 0;
+  border-radius: 8px;
+  padding: 4px 14px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.settings-pane .subtabs [role='tab']:hover {
+  background: var(--surface2);
+  color: var(--text);
+}
+
+.settings-pane .subtabs [role='tab'][aria-selected='true'] {
+  background: var(--tint);
+  color: var(--accent);
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.settings-pane .subtabs [role='tab']:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* One tab's panel: a column like the pane's own body, so the card, the table and
+   the action row line up the same way on either tab. */
+.settings-pane .tabpane {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+}
+
 /* The agent table: the role, its model (cut with an ellipsis, the whole one on
    hover) and its effort. A row highlights under the pointer, as the house's
    lists do, and a focus inside it does the same for a keyboard reader. */
@@ -1642,7 +1696,7 @@ p {
   width: 100%;
   border-collapse: collapse;
   font-size: 13px;
-  margin-top: 14px;
+  margin-top: 0;
 }
 
 .settings-pane .agents th {

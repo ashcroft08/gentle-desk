@@ -57,6 +57,45 @@ the subscription panel goes to NEXT version's analysis; 0.1.12 ships the four pi
 
 ## Log
 
+- L17 (2026-11-13, maintainer round on the running app; web side): three reported defects,
+  fixed on feat/settings-0112. FEEDBACK (verbatim): Profiles — "esta mucha la informacion, hay
+  forma de mejorarlo con pestañas"; Account — the pane sits on "Reading the sign-ins..."
+  forever; the fallback chain is drawn twice (card pair AND a `fallback` table row). FIX 1
+  (Account, bug): nothing dispatched `RefreshAuth` on appearance, so the only trigger was
+  "Check again". `AccountPane.svelte` now mirrors the Profiles pane - one dispatch when the
+  pane mounts and one on every `window` focus while it is the section on screen (the dialog
+  draws only the selected section, so mount IS the appearance and unmount drops the
+  listener) - and the quiet "Reading the sign-ins..." is the waiting state of the ~1s
+  per-provider check that runs on the intent thread. FIX 2 (Profiles, the maintainer's ask):
+  the pane is now two sub-tabs, Profile | Agents, a segmented control built from the theme
+  tokens (`app.css` `.settings-pane .subtabs`, no new colour), with the chat header's
+  tablist pattern (`chat/tabs.ts`): one tab stop, arrows walk and wrap, Home/End jump, and
+  tab/panel name each other through `aria-controls`/`aria-labelledby`; both panels stay
+  mounted with the inactive one `hidden`, the way App.svelte keeps Chat | Helpers. The rules
+  live in the new pure module `settings/profile-tabs.ts` (`PROFILE_TABS`, copy, ids,
+  `profileTabAfter`). Tab "Profile" holds the orchestrator switch with its "For chats opened
+  from now on · not stored" note, the active-profile card (name accent, "Default for new
+  sessions", ORCHESTRATOR + FALLBACK pairs) and the "Edit in terminal" button with its note;
+  tab "Agents" holds the Agent | Model | Effort table and nothing else. Default tab: Profile.
+  The pane's title and hint stay the dialog's. The file's own states (reading, failed with
+  the safe retry, no profiles) sit above the pair, because both tabs read the same document.
+  FIX 3 (fallback row, bug): `agents` filters `role.role !== 'fallback'` out of the table, so
+  the chain is drawn once, in the card's FALLBACK pair. Design: design/settings-0112/
+  02-ledger.html redrawn to the tabbed layout (same artboard, same manifest entry), including
+  the Agents panel and the "no switch, no button, no fallback row" caption. Tests (test-first,
+  RED observed then GREEN): 4 new in `settings/ProfilesPane.test.ts` (opens on the Profile tab
+  with the switch, card and button and no table; switching to Agents with the aria wiring and
+  neither switch nor button; arrow-key walk with one tab stop; the fallback role never renders
+  a row) and 1 new in `settings/AccountPane.test.ts` (one check on mount, one more on focus);
+  the existing "checks again" and "draws the active profile" tests were adapted to the new
+  trigger and to the Agents tab, and `test-support/settings.ts`'s `pane()` now reads the
+  dialog's own pane by id so a section's nested panel cannot be mistaken for it. Full gates
+  green on apps/desktop: npm run lint, npm run check, npx vitest run (465/465), npm run build.
+  Render check: the pane dumped from a disposable vitest render and screenshotted with Chrome
+  `--headless=new` in both themes - Profile tab: segmented pair with the selected one on the
+  tint and accent, mode switch readable in both themes, card and button aligned; Agents tab:
+  the same pair, the table alone, no fallback row. Both themes keep the house contrast.
+
 - L12 (2026-11-13, Rust side): the four surfaces have their Rust half. `get_session_stats`
   joined `RpcCommand` (codec + test); the app keeps one context reading per chat
   (`crate::context`), asks it on every `AgentSettled` and on open

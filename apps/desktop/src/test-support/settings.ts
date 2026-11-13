@@ -8,6 +8,7 @@ import type {
   ViewState_Serialize as ViewState,
 } from '../contract/bindings'
 import Sidebar from '../sidebar/Sidebar.svelte'
+import { PANEL_ID } from '../settings/sections'
 import { serveSidebar } from './sidebar'
 import { handlerArgs, viewState } from './tauri-mock'
 
@@ -53,9 +54,17 @@ export function rail(dialog: HTMLElement): HTMLElement[] {
   return within(dialog).getAllByRole('tab')
 }
 
-/** The one section drawn in the pane: only the selected one is there. */
+/**
+ * The dialog's own pane: only the selected section is there. Read by id, since a
+ * section may hold sub-tabs of its own whose panel is drawn inside this one
+ * (0.1.12, L17: the Profiles section's Profile | Agents pair).
+ */
 export function pane(dialog: HTMLElement): HTMLElement {
-  return within(dialog).getByRole('tabpanel')
+  const found = within(dialog)
+    .getAllByRole('tabpanel')
+    .find((panel) => panel.id === PANEL_ID)
+  if (found === undefined) throw new Error('the dialog drew no pane')
+  return found
 }
 
 /** Picks a section in the rail, the way the user does. */

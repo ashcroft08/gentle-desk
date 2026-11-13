@@ -51,6 +51,11 @@ function intents(): unknown[] {
   return handlerArgs('dispatch_intent').map((args) => args.intent)
 }
 
+/** How many checks the pane asked for. */
+function checks(): number {
+  return intents().filter((intent) => (intent as { type: string }).type === 'RefreshAuth').length
+}
+
 describe('the Account pane', () => {
   it('lists one row per provider, with what its own check said', () => {
     const pane = draw()
@@ -89,8 +94,23 @@ describe('the Account pane', () => {
   it('checks again when the user asks', async () => {
     const pane = draw()
 
+    // The pane reads once on open, so the click is one more check, not the first.
+    const before = checks()
     await fireEvent.click(within(pane).getByRole('button', { name: CHECK_AGAIN }))
-    expect(intents()).toEqual([{ type: 'RefreshAuth' }])
+    expect(checks()).toBe(before + 1)
+  })
+
+  it('checks when the pane opens and again when the desk is focused', async () => {
+    draw()
+
+    // Opened: one check, which is why the quiet "Reading..." is not forever.
+    await vi.waitFor(() => expect(intents()).toEqual([{ type: 'RefreshAuth' }]))
+
+    // The terminal window closes and the desk takes the focus back: one more.
+    window.dispatchEvent(new Event('focus'))
+    await vi.waitFor(() =>
+      expect(intents()).toEqual([{ type: 'RefreshAuth' }, { type: 'RefreshAuth' }]),
+    )
   })
 
   it('opens login and logout in a terminal window', async () => {

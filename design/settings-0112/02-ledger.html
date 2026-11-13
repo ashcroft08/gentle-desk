@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Settings 0.1.12 — B: Profiles as the terminal shows them</title>
+<title>Settings 0.1.12 — B: Profiles as the terminal shows them (Profile | Agents)</title>
 <style>
 :root{--bg:#0e1116;--surface:#151a21;--surface2:#1c222b;--border:#2b333d;--text:#e4e8ee;--muted:#9aa4b2;--faint:#7d8593;--accent:#7aa2f7;--tint:rgba(122,162,247,.14);--success:#7edc9a;--warning:#e7b455;--danger:#ff8585;--shadow:0 8px 24px rgba(0,0,0,.45)}
 *{box-sizing:border-box}
@@ -13,6 +13,12 @@ body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 system-ui,'Se
 .pane{flex:1;padding:20px 24px;overflow:auto;min-width:0}
 h2{margin:0 0 2px;font-size:16px;font-weight:600}
 .sub{margin:0 0 18px;color:var(--muted);font-size:12.5px}
+/* --- the pane's two sub-tabs (L17: one pane was too long) --- */
+.tabs{display:inline-flex;gap:2px;padding:2px;margin-bottom:14px;border:1px solid var(--border);border-radius:10px;background:var(--surface)}
+.tabs .tab{border:0;border-radius:8px;padding:4px 14px;background:transparent;color:var(--muted);font:inherit;font-size:12.5px;cursor:pointer}
+.tabs .tab:hover{background:var(--surface2);color:var(--text)}
+.tabs .tab[aria-selected="true"]{background:var(--tint);color:var(--accent);font-weight:600;box-shadow:inset 0 0 0 1px var(--accent)}
+.tabs .tab:focus-visible{outline:1px solid var(--accent);outline-offset:-2px}
 /* --- information is typography, not boxes --- */
 .mode{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding-bottom:14px;border-bottom:1px solid var(--border);margin-bottom:16px}
 .mlabel{font-size:12px;font-weight:600;color:var(--muted)}
@@ -26,7 +32,7 @@ h2{margin:0 0 2px;font-size:16px;font-weight:600}
 .pair{display:flex;align-items:baseline;gap:8px}.pair .mono{margin-right:6px}
 .lbl{font-size:11px;font-weight:600;color:var(--faint);text-transform:uppercase;letter-spacing:.05em;width:88px;flex:none}
 .mono{font-family:ui-monospace,Consolas,monospace;font-size:12px;color:var(--muted)}
-table{width:100%;border-collapse:collapse;font-size:13px;margin-top:18px}
+table{width:100%;border-collapse:collapse;font-size:13px}
 th{font-size:11px;font-weight:600;color:var(--faint);text-align:left;text-transform:uppercase;letter-spacing:.05em;padding:4px 8px 8px;border-bottom:1px solid var(--border)}
 td{padding:5px 8px;border:0}
 td.a{color:var(--text);width:172px}
@@ -34,12 +40,13 @@ td.m{color:var(--muted);font-family:ui-monospace,Consolas,monospace;font-size:12
 td.e{color:var(--muted);font-family:ui-monospace,Consolas,monospace;font-size:12px;width:64px;text-align:right}
 tr:hover td{background:var(--surface2);border-radius:6px}
 tbody tr:focus-within td{background:var(--surface2)}
-.acts{display:flex;gap:8px;align-items:center;margin:18px 0 0 8px}
+.acts{display:flex;gap:8px;align-items:center;margin:18px 0 0}
 .btn{border:1px solid var(--border);background:var(--surface2);color:var(--text);border-radius:8px;padding:6px 14px;font:inherit;font-size:13px;cursor:pointer}
 .btn.primary{border-color:var(--accent);background:var(--accent);color:var(--bg);font-weight:600}
 .btn:hover{border-color:var(--accent)}
 .btn:focus-visible{outline:2px solid var(--text);outline-offset:2px}
-.note{color:var(--faint);font-size:12px;font-style:italic;margin:8px 0 0 8px}
+.note{color:var(--faint);font-size:12px;font-style:italic;margin:8px 0 0}
+.cap{margin:14px 0 0;color:var(--faint);font-size:11.5px;line-height:1.5}
 </style></head><body>
 <div class="stage"><div class="dlg" role="dialog" aria-modal="true" aria-label="Settings">
   <nav class="rail" aria-label="Settings sections">
@@ -54,48 +61,61 @@ tbody tr:focus-within td{background:var(--surface2)}
     <h2>Profiles</h2>
     <p class="sub">Your agent profiles, the way the shell keeps them.</p>
 
-    <div class="mode">
-      <span class="k" style="width:auto">Orchestrator mode</span>
-      <div class="seg" role="radiogroup" aria-label="Orchestrator mode">
-        <button class="on" role="radio" aria-checked="true">Organic</button>
-        <button role="radio" aria-checked="false">Full delegation</button>
-      </div>
-      <span class="note" style="margin:0">applies to chats opened from now on &middot; not stored</span>
+    <!-- Profile | Agents: the pane's pair, Profile first (L17). -->
+    <div class="tabs" role="tablist" aria-label="Profile details">
+      <button class="tab" role="tab" aria-selected="true" aria-controls="pane-profile">Profile</button>
+      <button class="tab" role="tab" aria-selected="false" aria-controls="pane-agents">Agents</button>
     </div>
 
-    <div class="card" style="margin-top:14px">
-      <div class="head">
-        <span class="pname">Claude-CommandCode</span>
-        <span class="mark">Used in this session &middot; Default for new sessions</span>
-        
+    <div id="pane-profile" role="tabpanel" aria-labelledby="settings-tab-profile">
+      <div class="mode">
+        <span class="mlabel">Orchestrator mode</span>
+        <div class="seg" role="radiogroup" aria-label="Orchestrator mode">
+          <button class="on" role="radio" aria-checked="true">Organic</button>
+          <button role="radio" aria-checked="false">Full delegation</button>
+        </div>
+        <span class="note" style="margin:0">For chats opened from now on &middot; not stored</span>
       </div>
-      <div class="sum">
-        <div class="pair"><span class="lbl">Orchestrator</span><span class="mono" style="color:var(--text)">claude-bridge/claude-sonnet-5-5</span><span class="mono" style="color:var(--accent)">medium</span></div>
-        <div class="pair"><span class="lbl">Fallback</span><span class="mono">commandcode/z-ai/glm-5.3-flash</span></div>
+
+      <div class="card" style="margin-top:14px">
+        <div>
+          <span class="pname">Claude-CommandCode</span>
+          <div class="mark">Default for new sessions</div>
+        </div>
+        <div class="sum">
+          <div class="pair"><span class="lbl">Orchestrator</span><span class="mono" style="color:var(--text)">claude-bridge/claude-sonnet-5-5</span><span class="mono" style="color:var(--accent)">medium</span></div>
+          <div class="pair"><span class="lbl">Fallback</span><span class="mono">commandcode/z-ai/glm-5.3-flash</span></div>
+        </div>
       </div>
+
+      <div class="acts">
+        <button class="btn primary">Edit in terminal</button>
+      </div>
+      <p class="note">Edits, creates and switches profiles — the panel refreshes when the terminal closes.</p>
     </div>
 
-    <table>
-      <thead><tr><th scope="col">Agent</th><th scope="col">Model</th><th scope="col" style="text-align:right">Effort</th></tr></thead>
-      <tbody>
-        <tr><td class="a">review-refuter</td><td class="m">commandcode/z-ai/glm-5.3-flash</td><td class="e">high</td></tr>
-        <tr><td class="a">review-validator</td><td class="m">commandcode/deepseek/deepseek-v4.1-flash</td><td class="e">high</td></tr>
-        <tr><td class="a">jd-judge-a</td><td class="m">commandcode/z-ai/glm-5.3-flash</td><td class="e">high</td></tr>
-        <tr><td class="a">jd-judge-b</td><td class="m">commandcode/deepseek/deepseek-v4.1-flash</td><td class="e">high</td></tr>
-        <tr><td class="a">jd-fix-agent</td><td class="m">commandcode/z-ai/glm-5.3-flash</td><td class="e">high</td></tr>
-        <tr><td class="a">gentle-ai-explore</td><td class="m">commandcode/deepseek/deepseek-v4.1-flash</td><td class="e">high</td></tr>
-        <tr><td class="a">gentle-ai-verify</td><td class="m">commandcode/deepseek/deepseek-v4.1-flash</td><td class="e">high</td></tr>
-        <tr><td class="a">gentle-ai-worker</td><td class="m">commandcode/deepseek/deepseek-v4.1-flash</td><td class="e">high</td></tr>
-        <tr><td class="a">review-readability</td><td class="m">commandcode/z-ai/glm-5.3-flash</td><td class="e">high</td></tr>
-        <tr><td class="a">review-reliability</td><td class="m">commandcode/deepseek/deepseek-v4.1-flash</td><td class="e">high</td></tr>
-        <tr><td class="a">review-resilience</td><td class="m">commandcode/z-ai/glm-5.3-flash</td><td class="e">high</td></tr>
-        <tr><td class="a">review-risk</td><td class="m">commandcode/z-ai/glm-5.3-flash</td><td class="e">high</td></tr>
-      </tbody>
-    </table>
-    <div class="acts">
-      <button class="btn primary">Edit in terminal</button>
+    <!-- The Agents tab is drawn only when picked: one row per agent, and the
+         fallback is the card's own pair, never a row here (L17). -->
+    <div id="pane-agents" role="tabpanel" aria-labelledby="settings-tab-agents" hidden>
+      <table>
+        <thead><tr><th scope="col">Agent</th><th scope="col">Model</th><th scope="col" style="text-align:right">Effort</th></tr></thead>
+        <tbody>
+          <tr><td class="a">review-refuter</td><td class="m">commandcode/z-ai/glm-5.3-flash</td><td class="e">high</td></tr>
+          <tr><td class="a">review-validator</td><td class="m">commandcode/deepseek/deepseek-v4.1-flash</td><td class="e">high</td></tr>
+          <tr><td class="a">jd-judge-a</td><td class="m">commandcode/z-ai/glm-5.3-flash</td><td class="e">high</td></tr>
+          <tr><td class="a">jd-judge-b</td><td class="m">commandcode/deepseek/deepseek-v4.1-flash</td><td class="e">high</td></tr>
+          <tr><td class="a">jd-fix-agent</td><td class="m">commandcode/z-ai/glm-5.3-flash</td><td class="e">high</td></tr>
+          <tr><td class="a">gentle-ai-explore</td><td class="m">commandcode/deepseek/deepseek-v4.1-flash</td><td class="e">high</td></tr>
+          <tr><td class="a">gentle-ai-verify</td><td class="m">commandcode/deepseek/deepseek-v4.1-flash</td><td class="e">high</td></tr>
+          <tr><td class="a">gentle-ai-worker</td><td class="m">commandcode/deepseek/deepseek-v4.1-flash</td><td class="e">high</td></tr>
+          <tr><td class="a">review-readability</td><td class="m">commandcode/z-ai/glm-5.3-flash</td><td class="e">high</td></tr>
+          <tr><td class="a">review-reliability</td><td class="m">commandcode/deepseek/deepseek-v4.1-flash</td><td class="e">high</td></tr>
+          <tr><td class="a">review-resilience</td><td class="m">commandcode/z-ai/glm-5.3-flash</td><td class="e">high</td></tr>
+          <tr><td class="a">review-risk</td><td class="m">commandcode/z-ai/glm-5.3-flash</td><td class="e">high</td></tr>
+        </tbody>
+      </table>
     </div>
-    <p class="note" style="margin-top:6px">Edits, creates and switches profiles — the panel refreshes when the terminal closes.</p>
 
-</div>
+    <p class="cap">The Agents tab: the same table, without the switch and without the terminal button — and without the fallback row, since the card's FALLBACK pair already shows that chain.</p>
+  </div>
 </div></div></body></html>
