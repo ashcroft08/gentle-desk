@@ -131,6 +131,31 @@ describe('model chip', () => {
     })
   })
 
+  // R3-1 (native review): ModelChip rebuilds the options array on every chip
+  // push, and a chat that is answering pushes constantly. The reset that runs
+  // when the list OPENS must not run again when the options merely change
+  // identity, or the filter is wiped while the user types.
+  it('keeps the typed filter and the choice when a state push brings the same options (R3-1)', async () => {
+    const drawn = chipProp(READY)
+    const list = await openList(modelPill())
+    const filter = screen.getByPlaceholderText('Search models...') as HTMLInputElement
+    await fireEvent.input(filter, { target: { value: 'other' } })
+    expect(list.querySelectorAll('[role="option"]').length).toBe(1)
+
+    // The same chip content as a NEW object, the way every push delivers it.
+    const sameChip: ModelChipView = {
+      ...READY,
+      models: READY.models.map((model) => ({ ...model })),
+    }
+    await drawn.rerender({ chat: 'c1', chip: sameChip })
+
+    const after = screen.getByPlaceholderText('Search models...') as HTMLInputElement
+    expect(after.value).toBe('other')
+    expect(
+      screen.getByRole('listbox', { name: 'Model' }).querySelectorAll('[role="option"]').length,
+    ).toBe(1)
+  })
+
   it('Escape closes the list', async () => {
     chipProp(READY)
     await openList(modelPill())

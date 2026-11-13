@@ -4,6 +4,7 @@
   // The list may be filtered by typing; arrows move, Enter chooses, Escape
   // closes, a click outside closes. The choice leaves through `onchange`, the
   // same intent the old select dispatched.
+  import { untrack } from 'svelte'
   import Icon from '../icons/Icon.svelte'
   import { NOTHING_MATCHES, SEARCH_PLACEHOLDER } from './copy'
 
@@ -45,12 +46,22 @@
   })
 
   // Opening resets the filter and puts the cursor on the chosen option, so a
-  // second open does not inherit the last search.
+  // second open does not inherit the last search. Only the open flag may re-run
+  // it (review R3-1): `options` and `value` are read untracked, because the chip
+  // rebuilds the options array on every state push and a chat that is answering
+  // pushes constantly, so a tracked read wiped the filter while the user typed.
   $effect(() => {
     if (!open) return
-    filter = ''
-    const chosen = options.findIndex((option) => option.value === value)
-    active = chosen < 0 ? 0 : chosen
+    untrack(() => {
+      filter = ''
+      const chosen = options.findIndex((option) => option.value === value)
+      active = chosen < 0 ? 0 : chosen
+    })
+  })
+
+  // The focus follows the popover's elements being bound, never the options.
+  $effect(() => {
+    if (!open) return
     if (filterable) {
       filterBox?.focus()
     } else {
