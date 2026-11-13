@@ -58,13 +58,20 @@ afterEach(() => {
 })
 
 describe('model chip', () => {
-  it('draws the pills in their own row below the composer form', () => {
+  it('the pills share the keys-hint line below the composer form', () => {
     const { container } = chipProp(READY)
     const form = container.querySelector('form.composer')
+    const bottom = container.querySelector('.dock-bottom')
     const chip = container.querySelector('.chip')
+    const keys = container.querySelector('.dock-bottom .keys')
     expect(form).toBeTruthy()
+    expect(bottom).toBeTruthy()
     expect(chip).toBeTruthy()
-    expect(form!.compareDocumentPosition(chip as Node) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(keys).toBeTruthy()
+    // The row comes after the form, and the hints and the pills share it.
+    expect(form!.compareDocumentPosition(bottom as Node) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(bottom!.contains(keys as Node)).toBeTruthy()
+    expect(bottom!.contains(chip as Node)).toBeTruthy()
   })
 
   it('the pills show the current model and level without a list open', () => {

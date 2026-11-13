@@ -193,9 +193,6 @@
       <SendButton disabled={rule.disabled} describedBy={SEND_WHY_ID} />
     {/if}
   </form>
-  <!-- The chip lives in its own row BELOW the box (S7): it never competes
-       with what is being typed. -->
-  <ModelChip {chip} />
   {#if rule.reason !== null}
     <!-- The visible reason for a disabled Send, which Send is described by. -->
     <p class="why" id={SEND_WHY_ID}>{rule.reason}</p>
@@ -204,5 +201,10 @@
     <!-- Why the last drop attached nothing, in the words Rust refused it with. -->
     <p class="refused" role="status">{imagesNotice}</p>
   {/if}
-  <p class="keys">{KEYS_HINT}</p>
+  <!-- The chip shares the keys-hint line (S7): the hints take the left, the
+       pills take the right, and no blank row is left under the box. -->
+  <div class="dock-bottom">
+    <p class="keys">{KEYS_HINT}</p>
+    <ModelChip {chip} />
+  </div>
 </div>

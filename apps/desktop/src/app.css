@@ -511,7 +511,7 @@ p {
   align-items: center;
   flex-wrap: nowrap;
   gap: 4px;
-  margin-top: 6px;
+  margin-top: 0;
 }
 
 .pill-select {
@@ -694,6 +694,20 @@ p {
   padding-left: 16px;
   color: var(--danger);
   font-size: 12px;
+}
+
+/* The bottom row under the box: the key hints take the left, the chip's pills
+   take the right, so no blank row is left under the box (S7 feedback). */
+.composer-dock .dock-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.composer-dock .dock-bottom .keys {
+  margin: 0;
 }
 
 /* The key hints under the box: quiet, left-aligned with the box's text, never
