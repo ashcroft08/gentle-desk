@@ -52,11 +52,12 @@ is written. Backed by the verified facts in the roadmap (2026-11-12 section).
       send box is untouched + test — covered by ModelChip tests (loading, empty,
       failed, no chip) and app tests (Empty/Failed/notice); the send box is a
       separate component and the chip adds no disabled rule to it.
-- [ ] T5 (S6) final verification: focused tests, full suite, clippy/fmt, and a note
+- [x] T5 (S6) final verification: focused tests, full suite, clippy/fmt, and a note
       in the roadmap that 0.1.11 shipped — automated: full cargo workspace (91
-      binaries, 0 failed), web vitest 392, svelte-check 0, clippy -D warnings 0,
-      fmt applied, contract drift guard ok. Pending: the manual window check
-      against a stand-in shell, and the version bump commit.
+      binaries, 0 failed), web vitest 400, svelte-check 0, clippy -D warnings 0,
+      fmt applied, contract drift guard ok. Native review of the feature and of
+      the design/layout slices approved and acknowledged. Version bumped to
+      0.1.11; the roadmap notes it shipped.
 - [x] T6 (S1, L9) chip inline: the two dropdowns as pill selects inside the
       composer form, right of the box, left of Send, with a `chevronDown` icon
       added to the icon set — web tests green (393), svelte-check 0. Commit 4719ea4.

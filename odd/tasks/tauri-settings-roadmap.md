@@ -13,10 +13,10 @@ calendar one. Version numbers never repeat or go down (updater compares them).
 
 - 0.1.10: what is already on main, unreleased: Settings dialog with Appearance, Shell
   home, About and Updates (#135), Preview chip (#133). Publishable now.
-- 0.1.11: model and thinking-level selector by existing RPC
-  (get_available_models, set_model, set_thinking_level). Estimated 250-350 changed
-  lines, mostly tests; layers: gentle-core rpc types+codec, app intents/events/state,
-  tauri contract, web ModelChip component.
+- 0.1.11: model and thinking-level selector by existing RPC — SHIPPED 2026-11-13
+  on feat/model-selector-0.1.11 (13 feature commits + review corrections; native
+  review approved twice, including the design slice; see
+  odd/tasks/model-selector-0.1.11.md).
 - 0.1.12: read-only profiles view (read profiles.json), auth status via
   `gentle-shell auth check --json`, "Open in terminal" buttons for login/logout and
   profile editing, organic vs full-delegation switch via the
