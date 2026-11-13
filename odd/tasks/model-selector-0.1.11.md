@@ -95,7 +95,26 @@ is written. Backed by the verified facts in the roadmap (2026-11-12 section).
   in correction_required with the recovery authorized; no further recover
   attempts without a user decision.
 - L9 (user requests after the window test, verbatim): "se quedo en Loading
-  models... o no se si demora" — diagnosed as L7/L8 findings, fix in 9976f29;
+  models... o no se si demora"; "quiero el diseño de esta forma" (chip inline in
+  the composer bar, right-aligned next to Send) — done in T6; "el textarea se
+  queda expandido" — done in T7; "el thinking no sale para elegir" — L11.
+- L10: The real window folds every event through chats::apply_event and drops
+  shared Command::Send (commands.rs:630), so the chip never parsed replies and
+  its selections went nowhere in the chats shell — the user's "Loading
+  models..." report. Fixed by chip.rs shared parsing (foreground-only) and the
+  three intents as ChatCommand::Send (commit 159e840).
+- L11: pi answers get_available_thinking_levels as { levels: [...] }, not a bare
+  array; the parser only took arrays, so the level pill never rendered. Fixed
+  with an object parse plus a bare-array fallback (commit bc17f47).
+- L12: Native review of the chats-fix candidate (lineage review-003af3193db3ff9f,
+  medium tier, reliability + resilience + refuter + targeted validator) returned
+  two deterministic CRITICAL findings — the Existing open never ran the chip asks
+  (effects.rs) and a set_model reply left the levels owned by the old model —
+  both fixed in commit dec5d68 (151 diff lines of the 100 planned, budget 200;
+  the validator admitted the correction). The review was APPROVED and the
+  acknowledge-approved burned (review-ai.review-acknowledged/v1); three
+  informational follow-ups remain: ModelChip.svelte:44, chip.rs:96-99,
+  chats/intents.rs:46-49. Delivery follows ordinary repository policy.
   "quiero el diseño de esta forma" (screenshot: the chip inline in the composer
   bar, right-aligned next to the send button, model name bold, level faint,
   chevron) — NEW scope, pending task; the textarea stays expanded after sending
