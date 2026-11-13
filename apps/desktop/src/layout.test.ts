@@ -13,9 +13,28 @@ function ruleBody(selector: string): string {
 }
 
 describe('the sidebar collapse (responsive-sidebar S4)', () => {
-  it('the collapsed layout drops the sidebar column and the sidebar itself', () => {
-    expect(ruleBody('.app.scollapsed')).toContain('grid-template-columns: 0 1fr')
+  // A grid column must be minmax(0, 1fr): a bare `1fr` cannot shrink below its
+  // content's min-content, so one nowrap title or code line pushed the whole
+  // chat past the window's right edge (the user's narrow-window screenshot).
+  it('the conversation column can shrink below its content', () => {
+    expect(ruleBody('.app')).toContain('280px minmax(0, 1fr)')
+    expect(ruleBody('.main')).toContain('min-width: 0')
+  })
+
+  // With the sidebar `display: none` the main area is the grid's FIRST item, so
+  // a leftover 0-width first column crushed it to nothing (the collapsed
+  // screenshot). The collapsed grid is one column that takes the whole width.
+  it('the collapsed layout is one full-width column and the sidebar leaves it', () => {
+    const collapsed = ruleBody('.app.scollapsed')
+    expect(collapsed).toContain('grid-template-columns: minmax(0, 1fr)')
+    expect(collapsed).not.toMatch(/grid-template-columns:\s*0/)
     expect(ruleBody('.app.scollapsed .side')).toContain('display: none')
+  })
+
+  it('on a narrow window an open sidebar overlays the chat, one full-width column', () => {
+    expect(ruleBody('.app.soverlay')).toContain('grid-template-columns: minmax(0, 1fr)')
+    expect(ruleBody('.app.soverlay .side')).toContain('position: absolute')
+    expect(ruleBody('.app.soverlay .scrim')).toContain('position: absolute')
   })
 
   it('the toggle control exists as a real button rule', () => {

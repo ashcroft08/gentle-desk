@@ -18,3 +18,16 @@ export function collapsedOf(manual: boolean | null, width: number | null): boole
   if (manual !== null) return manual
   return width !== null && width < SIDEBAR_AUTO_COLLAPSE_BELOW
 }
+
+/**
+ * Whether the open sidebar overlays the chat instead of sitting beside it.
+ *
+ * Below the same width that collapses it by default, an expanded sidebar (the
+ * user opened it by hand) floats over the conversation with a scrim, because a
+ * 280px column beside a 400px window leaves the chat unreadable. Above it the
+ * sidebar is a column; collapsed, it is not drawn at all. The single threshold
+ * lives here, so the stylesheet never repeats the number.
+ */
+export function overlayOf(collapsed: boolean, width: number | null): boolean {
+  return !collapsed && width !== null && width < SIDEBAR_AUTO_COLLAPSE_BELOW
+}

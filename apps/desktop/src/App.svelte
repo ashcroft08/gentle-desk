@@ -19,7 +19,7 @@
   import { visibleNotices } from './notices/visible'
   import Sidebar from './sidebar/Sidebar.svelte'
   import SidebarToggle from './chat/SidebarToggle.svelte'
-  import { collapsedOf } from './sidebar/collapse'
+  import { collapsedOf, overlayOf } from './sidebar/collapse'
   import Thread from './thread/Thread.svelte'
   import type { Update } from '@tauri-apps/plugin-updater'
   import UpdateNotice from './update/UpdateNotice.svelte'
@@ -45,6 +45,8 @@
   let manualCollapsed = $state<boolean | null>(null)
   let width = $state<number | null>(typeof window === 'undefined' ? null : window.innerWidth)
   const sidebarCollapsed = $derived(collapsedOf(manualCollapsed, width))
+  // Narrow window, sidebar opened by hand: it floats over the chat with a scrim.
+  const sidebarOverlay = $derived(overlayOf(sidebarCollapsed, width))
 
   $effect(() => {
     const onResize = () => (width = window.innerWidth)
@@ -124,8 +126,17 @@
 {#if chat.fatal !== null}
   <FatalBanner text={chat.fatal} />
 {/if}
-<div class="app" class:scollapsed={sidebarCollapsed}>
+<div class="app" class:scollapsed={sidebarCollapsed} class:soverlay={sidebarOverlay}>
   <Sidebar />
+  {#if sidebarOverlay}
+    <!-- Click outside the floating sidebar closes it; the manual choice wins. -->
+    <button
+      type="button"
+      class="scrim"
+      aria-label="Close sidebar"
+      onclick={() => (manualCollapsed = true)}
+    ></button>
+  {/if}
   <main id="main" class="main">
     {#if model.chat === null}
       <header class="mh">

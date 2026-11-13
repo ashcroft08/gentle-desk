@@ -124,17 +124,47 @@ p {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: 280px 1fr;
+  /* minmax(0, 1fr), never a bare 1fr: a bare 1fr cannot shrink below its
+     content's min-content, so one nowrap title or code line pushed the whole
+     chat past the window's right edge. */
+  grid-template-columns: 280px minmax(0, 1fr);
+  position: relative;
 }
 
-/* Collapsed (responsive-sidebar S4): the sidebar leaves the layout, and the
-   conversation takes the whole width. */
+/* Collapsed (responsive-sidebar S4): the sidebar leaves the layout, so the main
+   area becomes the grid's first item and the grid is ONE full-width column.
+   (A leftover 0-width first column crushed the chat to nothing.) */
 .app.scollapsed {
-  grid-template-columns: 0 1fr;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .app.scollapsed .side {
   display: none;
+}
+
+/* Narrow window with the sidebar opened by hand: it floats over the chat with
+   a scrim instead of squeezing it; the main area keeps the whole width. */
+.app.soverlay {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.app.soverlay .side {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: min(280px, 85vw);
+  z-index: 40;
+  box-shadow: 8px 0 24px rgba(0, 0, 0, 0.45);
+}
+
+.app.soverlay .scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  border: 0;
+  background: rgba(0, 0, 0, 0.45);
+  cursor: pointer;
 }
 
 /* The sidebar collapse toggle: the header's first control, quiet until
@@ -164,6 +194,7 @@ p {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  min-width: 0;
   background: var(--bg);
 }
 
@@ -730,9 +761,10 @@ p {
    take the right, so no blank row is left under the box (S7 feedback). */
 .composer-dock .dock-bottom {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 4px 12px;
   margin-top: 8px;
 }
 

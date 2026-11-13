@@ -115,9 +115,9 @@ describe('The stylesheet rules that keep the row and its menu readable', () => {
   })
 
   it('keeps a chat row menu inside the sidebar it opens in', () => {
-    // The sidebar is 280px wide (`grid-template-columns: 280px 1fr`), and the card
-    // leaves a margin on both sides of it, so no label can be cut by its edge.
-    expect(rule('.app')).toContain('grid-template-columns: 280px 1fr')
+    // The sidebar is 280px wide (`grid-template-columns: 280px minmax(0, 1fr)`), and
+    // the card leaves a margin on both sides of it, so no label can be cut by its edge.
+    expect(rule('.app')).toContain('grid-template-columns: 280px minmax(0, 1fr)')
     expect(rule('.chat-menu')).toContain('max-width: calc(280px - 24px)')
   })
 })
