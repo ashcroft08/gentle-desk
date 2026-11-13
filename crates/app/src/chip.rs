@@ -57,8 +57,14 @@ pub(crate) fn apply_ok(state: &mut AppState, command: &str, data: &Value) -> boo
         }
         "set_model" => state.model = model_from_value(Some(data)),
         "get_available_thinking_levels" => {
-            state.thinking_levels = data
-                .as_array()
+            // pi answers { levels: ThinkingLevel[] } (rpc-types.d.ts); a bare
+            // array is accepted too, so a shape drift cannot empty the list
+            // silently.
+            let levels = data
+                .get("levels")
+                .and_then(Value::as_array)
+                .or_else(|| data.as_array());
+            state.thinking_levels = levels
                 .map(|levels| {
                     levels
                         .iter()

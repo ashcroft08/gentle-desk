@@ -270,16 +270,30 @@ mod thinking {
     }
 
     /// `get_available_thinking_levels` answers the levels the session's model
-    /// supports.
+    /// supports, as `{ levels: [...] }` (rpc-types.d.ts).
     #[test]
     fn the_levels_list_is_parsed_from_the_reply() {
         let (state, _) = update(
             AppState::default(),
             event(
                 r#"{"type":"response","command":"get_available_thinking_levels","success":true,
-                    "data":["off","low","medium","high"]}"#,
+                    "data":{"levels":["off","low","medium","high"]}}"#,
             ),
         );
         assert_eq!(state.thinking_levels, vec!["off", "low", "medium", "high"]);
+    }
+
+    /// A bare array is accepted too, so a shape drift cannot empty the list
+    /// silently.
+    #[test]
+    fn a_bare_array_of_levels_is_accepted_as_well() {
+        let (state, _) = update(
+            AppState::default(),
+            event(
+                r#"{"type":"response","command":"get_available_thinking_levels","success":true,
+                    "data":["off","high"]}"#,
+            ),
+        );
+        assert_eq!(state.thinking_levels, vec!["off", "high"]);
     }
 }
