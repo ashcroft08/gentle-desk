@@ -2,7 +2,7 @@
 //! one chat, the activity the sidebar shows follows it, and nothing else moves.
 
 use gentle_app::{update_chats, AppState, ChatActivity, ChatId, Command, Input, Intent};
-use gentle_core::rpc::{decode_line, Decoded, RpcEvent, UiRequest};
+use gentle_core::rpc::{decode_line, Decoded, RpcCommand, RpcEvent, UiRequest};
 
 fn chat(name: &str) -> ChatId {
     ChatId::of_session(name)
@@ -247,7 +247,6 @@ fn the_history_of_a_stored_chat_fills_its_own_thread() {
 
 mod chip {
     use super::*;
-    use gentle_core::rpc::RpcCommand;
 
     /// The chip belongs to the foreground chat's child: its replies fold into
     /// the app state through the per-chat path too (0.1.11).
@@ -292,6 +291,46 @@ mod chip {
         );
         assert!(state.models.is_empty());
         assert_eq!(state.models_status, gentle_app::ModelsStatus::Unknown);
+    }
+
+    /// A successful set_model in the foreground chat queues the two refills:
+    /// the new model owns the levels list and the level (R3-002).
+    #[test]
+    fn a_successful_set_model_asks_the_new_models_levels() {
+        let chat = chat("a");
+        let (state, effects) = apply(
+            AppState::default(),
+            vec![
+                open(&chat),
+                confirmed(&chat),
+                event(
+                    &chat,
+                    RpcEvent::Response(gentle_core::rpc::RpcResponse {
+                        id: None,
+                        command: "set_model".into(),
+                        outcome: Ok(
+                            serde_json::json!({"id": "m2", "name": "M2", "provider": "prov"}),
+                        ),
+                    }),
+                ),
+            ],
+        );
+        assert_eq!(state.model.expect("applied").model_id, "m2");
+        let commands = effects.last().unwrap();
+        assert_eq!(
+            commands.chat_commands,
+            vec![
+                gentle_app::ChatCommand::Send {
+                    chat: chat.clone(),
+                    rpc: RpcCommand::GetState,
+                },
+                gentle_app::ChatCommand::Send {
+                    chat,
+                    rpc: RpcCommand::GetAvailableThinkingLevels,
+                },
+            ]
+        );
+        assert!(commands.commands.is_empty());
     }
 
     /// Choosing a model sends it to the foreground chat's child, not to the

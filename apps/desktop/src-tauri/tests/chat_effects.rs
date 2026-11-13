@@ -91,6 +91,25 @@ fn an_already_live_chat_is_confirmed_at_once() {
 
     assert_eq!(ran.inputs, vec![Input::ChatOpened { chat: chat.clone() }]);
     assert_eq!(ran.confirm_after, None, "nothing waits for that child");
+    // The chip was cleared while the chat was away, so the return asks the
+    // state and both lists again (R3-001).
+    assert_eq!(
+        fake.asked()[1..],
+        [
+            ChatCommand::Send {
+                chat: chat.clone(),
+                rpc: RpcCommand::GetState,
+            },
+            ChatCommand::Send {
+                chat: chat.clone(),
+                rpc: RpcCommand::GetAvailableModels,
+            },
+            ChatCommand::Send {
+                chat: chat.clone(),
+                rpc: RpcCommand::GetAvailableThinkingLevels,
+            },
+        ]
+    );
     let after = holder.fold_inputs(ran.inputs);
     assert!(after.activity.is_empty(), "the chat is not left opening");
 }

@@ -49,6 +49,13 @@ fn apply_response(state: &mut AppState, response: &RpcResponse, commands: &mut V
             }
         }
         ("get_messages", Ok(data)) => state.chat.messages = messages_from_history(data),
+        ("set_model", Ok(data)) => {
+            // The chip's new model owns the levels list and the current
+            // level: ask for both again (R3-002).
+            chip::apply_ok(state, "set_model", data);
+            commands.push(Command::Send(RpcCommand::GetState));
+            commands.push(Command::Send(RpcCommand::GetAvailableThinkingLevels));
+        }
         (command, Ok(data)) => {
             // The chip's four questions parse the same in both shells.
             chip::apply_ok(state, command, data);

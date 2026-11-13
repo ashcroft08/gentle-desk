@@ -172,6 +172,49 @@ mod current {
         assert_eq!(state.model.expect("applied").model_id, "m2");
     }
 
+    /// The new model owns the levels list and the current level: the reply
+    /// queues the two refills (R3-002).
+    #[test]
+    fn a_successful_set_model_asks_for_the_new_models_levels() {
+        let (state, _) = update(
+            AppState::default(),
+            event(
+                r#"{"type":"response","command":"set_model","success":true,
+                    "data":{"id":"m2","name":"Model Two","provider":"prov"}}"#,
+            ),
+        );
+        let (_, commands) = update(
+            state,
+            event(
+                r#"{"type":"response","command":"get_state","success":true,
+                    "data":{"model":{"id":"m2","name":"Model Two","provider":"prov"},"thinkingLevel":"low"}}"#,
+            ),
+        );
+        assert!(commands.is_empty(), "only set_model queues the refill");
+
+        let (state, _) = update(
+            AppState::default(),
+            event(
+                r#"{"type":"response","command":"set_model","success":true,
+                    "data":{"id":"m2","name":"Model Two","provider":"prov"}}"#,
+            ),
+        );
+        let (_, commands) = update(
+            state,
+            event(
+                r#"{"type":"response","command":"set_model","success":true,
+                    "data":{"id":"m3","name":"Model Three","provider":"prov"}}"#,
+            ),
+        );
+        assert_eq!(
+            commands,
+            vec![
+                Command::Send(gentle_core::rpc::RpcCommand::GetState),
+                Command::Send(gentle_core::rpc::RpcCommand::GetAvailableThinkingLevels),
+            ]
+        );
+    }
+
     /// The chip's data belongs to one child: opening another chat leaves the
     /// chip blank until that chat's child answers — and the switch asks
     /// again, so the blank is a moment, not a state (R3-002).
