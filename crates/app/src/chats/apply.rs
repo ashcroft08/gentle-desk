@@ -2,11 +2,12 @@
 //! release of the working queue the fold itself may free (S7).
 
 use gentle_core::chat::{messages_from_history, reduce_chat_at};
-use gentle_core::rpc::RpcEvent;
+use gentle_core::rpc::{RpcCommand, RpcEvent};
 
 use super::queue;
 use super::store::Chats;
 use super::ChatId;
+use crate::context;
 use crate::input::{ChatCommand, Command};
 
 impl Chats {
@@ -39,19 +40,40 @@ impl Chats {
         entry.refresh(foreground);
         // The turn that just ended freed a slot: the oldest queued prompt goes
         // out, if any waited.
-        let released = if ended && was_working {
+        let mut released = if ended && was_working {
             queue::release(self)
         } else {
             Vec::new()
         };
+        // A settled turn may also have moved the context: this chat's own
+        // child is the only one that can answer for it, so its `get_session_stats`
+        // is asked now (0.1.12, S5). pi pushes nothing, so nothing else would.
+        if matches!(event, RpcEvent::AgentSettled) {
+            released.push(ChatCommand::Send {
+                chat: chat.clone(),
+                rpc: RpcCommand::GetSessionStats,
+            });
+        }
         let commands = match event {
             // A finished turn may have created or extended a session file.
             RpcEvent::AgentSettled => vec![Command::RefreshSessions],
-            // A stored chat's history arrives in one reply to `get_messages`.
+            // A stored chat's history arrives in one reply to `get_messages`;
+            // its context reading in one reply to `get_session_stats`.
             RpcEvent::Response(response) => {
-                if let ("get_messages", Ok(data)) = (response.command.as_str(), &response.outcome) {
-                    let entry = self.entries.entry(chat.clone()).or_default();
-                    entry.state.messages = messages_from_history(data);
+                match (response.command.as_str(), &response.outcome) {
+                    ("get_messages", Ok(data)) => {
+                        let entry = self.entries.entry(chat.clone()).or_default();
+                        entry.state.messages = messages_from_history(data);
+                    }
+                    // A reply without a reading (an older child, a failure)
+                    // changes nothing: the chip keeps what it knew.
+                    ("get_session_stats", Ok(data)) => {
+                        let usage = context::from_reply(data);
+                        if usage.is_some() {
+                            self.set_context(chat, usage);
+                        }
+                    }
+                    _ => {}
                 }
                 Vec::new()
             }

@@ -9,8 +9,8 @@
 use gentle_app::{ChatId, Input, Intent};
 use gentle_desk_lib::bridge::AppStateHolder;
 use gentle_desk_lib::contract::{
-    InstallView, ListStatusView, ModelChipView, ModelListStatusView, NoticeLevel, ShellView,
-    ThemeView, UiIntent, ViewState,
+    ContextUsageView, InstallView, ListStatusView, ModelChipView, ModelListStatusView, NoticeLevel,
+    ShellView, ThemeView, UiIntent, ViewState,
 };
 
 #[test]
@@ -116,6 +116,9 @@ fn the_view_state_slice_has_no_invented_fields() {
                 thinking_level: None,
                 thinking_levels: Vec::new(),
             },
+            // No chat has answered a statistics ask, so the context chip has no
+            // reading at all - every field null, never a zero (0.1.12, S5).
+            context_usage: ContextUsageView::default(),
             config_notice: None,
             // The shell-owned line a refused workspace action sets: nothing was
             // refused here, so it carries nothing.

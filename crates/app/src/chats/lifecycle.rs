@@ -5,6 +5,7 @@ use gentle_core::chat::ChatState;
 
 use super::store::Chats;
 use super::{queue, ChatId};
+use crate::context::ContextUsage;
 
 impl Chats {
     /// Makes `chat` the foreground one and clears its finished-unread mark,
@@ -93,5 +94,15 @@ impl Chats {
     /// One chat's state, created empty if this is the first it is heard of.
     pub(crate) fn chat_mut(&mut self, chat: &ChatId) -> &mut ChatState {
         &mut self.entries.entry(chat.clone()).or_default().state
+    }
+
+    /// Records the context reading one chat's child just reported (0.1.12, S5).
+    /// Only that chat changes: a reply of a background child is kept for when
+    /// the user returns to it.
+    pub(crate) fn set_context(&mut self, chat: &ChatId, usage: Option<ContextUsage>) {
+        let foreground = self.foreground.as_ref() == Some(chat);
+        let entry = self.entries.entry(chat.clone()).or_default();
+        entry.context = usage;
+        entry.refresh(foreground);
     }
 }

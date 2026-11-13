@@ -123,6 +123,44 @@ export type ChatBadge = {
 };
 
 /**
+ *  How full the foreground chat's context is (0.1.12, S5): pi's own
+ *  `contextUsage` numbers, one reading per chat. Every field is nullable and a
+ *  null is drawn as nothing at all - never as `0` - because pi answers null
+ *  right after a compaction.
+ */
+export type ContextUsageView = ContextUsageView_Serialize | ContextUsageView_Deserialize;
+
+/**
+ *  How full the foreground chat's context is (0.1.12, S5): pi's own
+ *  `contextUsage` numbers, one reading per chat. Every field is nullable and a
+ *  null is drawn as nothing at all - never as `0` - because pi answers null
+ *  right after a compaction.
+ */
+export type ContextUsageView_Deserialize = {
+	/**  The tokens the session's context holds. */
+	tokens?: number | null,
+	/**  The share of the window in use, in percent, as pi computed it. */
+	percent?: number | null,
+	/**  The model's window, the denominator of the percentage. */
+	window?: number | null,
+};
+
+/**
+ *  How full the foreground chat's context is (0.1.12, S5): pi's own
+ *  `contextUsage` numbers, one reading per chat. Every field is nullable and a
+ *  null is drawn as nothing at all - never as `0` - because pi answers null
+ *  right after a compaction.
+ */
+export type ContextUsageView_Serialize = {
+	/**  The tokens the session's context holds. */
+	tokens: number | null,
+	/**  The share of the window in use, in percent, as pi computed it. */
+	percent: number | null,
+	/**  The model's window, the denominator of the percentage. */
+	window: number | null,
+};
+
+/**
  *  How the user answered a dialog, as the web side sends it back. The three
  *  shapes are the child's own protocol (`gentle_core::rpc::UiAnswer`), named
  *  here so the contract stays free of that type (S2).
@@ -1103,6 +1141,12 @@ export type ViewState_Deserialize = {
 	 */
 	model_chip: ModelChipView_Deserialize,
 	/**
+	 *  How full the foreground chat's context is (0.1.12, S5), from that chat's
+	 *  own `get_session_stats` reply. Every field is null when there is no
+	 *  reading, and null is never drawn as zero.
+	 */
+	context_usage: ContextUsageView_Deserialize,
+	/**
 	 *  Why the last workspace action was refused, as one line of plain text: a
 	 *  name Windows would not accept, a folder that is not there, a folder that
 	 *  already holds files (Q6). `None` when nothing was refused, and cleared by
@@ -1264,6 +1308,12 @@ export type ViewState_Serialize = {
 	 *  the chat panel, not the window.
 	 */
 	model_chip: ModelChipView_Serialize,
+	/**
+	 *  How full the foreground chat's context is (0.1.12, S5), from that chat's
+	 *  own `get_session_stats` reply. Every field is null when there is no
+	 *  reading, and null is never drawn as zero.
+	 */
+	context_usage: ContextUsageView_Serialize,
 	/**
 	 *  Why the last workspace action was refused, as one line of plain text: a
 	 *  name Windows would not accept, a folder that is not there, a folder that

@@ -12,6 +12,7 @@ use gentle_core::chat::ChatState;
 
 use super::activity::{activity_of, ChatActivity};
 use super::{queue, ChatId};
+use crate::context::ContextUsage;
 
 /// Every chat the app has heard of, and the one the user is looking at.
 #[derive(Debug, Clone, PartialEq)]
@@ -33,6 +34,10 @@ pub struct Chats {
 pub(crate) struct Entry {
     pub(crate) state: ChatState,
     pub(crate) unread: bool,
+    /// The context reading this chat's child last reported (0.1.12, S5).
+    /// `None` until the chat's first `get_session_stats` reply, and it belongs
+    /// to this chat alone: another chat's turn never overwrites it.
+    pub(crate) context: Option<ContextUsage>,
     /// The chat's child is getting one now: set when the chat is asked for and
     /// cleared when the child is up (or the start failed). Cleared the same way
     /// when the chat's child goes away, so it can never stick.
