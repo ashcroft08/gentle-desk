@@ -50,6 +50,26 @@ export function viewState(overrides: Partial<ViewState_Serialize> = {}): ViewSta
     workspace_notice: null,
     sessions_notice: null,
     whats_new: null,
+    // The settings slices (0.1.12): a fixture before its first read is the
+    // status each pane draws while it waits, and no chat is open for the
+    // update gate.
+    profiles: {
+      status: { type: 'Unknown' },
+      active: null,
+      profiles: [],
+      mode: 'organic',
+    },
+    auth: { status: { type: 'Unknown' }, providers: [] },
+    updates: {
+      status: 'Unknown',
+      desk: { current: null, latest: null, update_available: null },
+      pi: { current: null, latest: null, update_available: null },
+      shell: { current: null, latest: null, update_available: null },
+    },
+    open_chats: 0,
+    // No chat has been read yet: no context reading exists, and a chat-less
+    // fixture cannot carry one (the field is per chat, in the chat slice).
+    context_usage: { tokens: null, percent: null, window: null },
     // A run whose bridge named no version: the About section says so (S5).
     app_version: null,
     ...overrides,
