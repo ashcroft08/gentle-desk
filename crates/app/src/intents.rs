@@ -5,7 +5,7 @@ use gentle_core::rpc::RpcCommand;
 
 use crate::chats;
 use crate::input::{Command, Effects, Intent};
-use crate::state::{push_user_message, AppState};
+use crate::state::{push_user_message, AppState, ModelsStatus};
 
 pub(crate) fn apply_intent(mut state: AppState, intent: Intent) -> (AppState, Effects) {
     // The intents that name a chat act on that chat's child; the rest act on the
@@ -96,6 +96,23 @@ fn single_chat(mut state: AppState, intent: Intent) -> (AppState, Vec<Command>) 
             state.selected_helper = None;
             (state, Vec::new())
         }
+        Intent::RequestModels => {
+            state.models_status = ModelsStatus::Loading;
+            (state, vec![Command::Send(RpcCommand::GetAvailableModels)])
+        }
+        Intent::SelectModel { provider, model_id } => (
+            state,
+            vec![Command::Send(RpcCommand::SetModel { provider, model_id })],
+        ),
+        // The reply carries no data, so the level applies when the command
+        // goes out; a failed reply drops it to unknown (events.rs).
+        Intent::SelectThinkingLevel { level } => {
+            state.thinking_level = Some(level.clone());
+            (
+                state,
+                vec![Command::Send(RpcCommand::SetThinkingLevel { level })],
+            )
+        }
         Intent::OpenSession(path) => {
             let mut commands = Vec::new();
             if state.chat.working {
@@ -107,6 +124,12 @@ fn single_chat(mut state: AppState, intent: Intent) -> (AppState, Vec<Command>) 
             state.chat = ChatState::default();
             state.selected_helper = None;
             state.current_session = Some(path);
+            // The chip's data belongs to the old session's child.
+            state.models = Vec::new();
+            state.models_status = ModelsStatus::Unknown;
+            state.model = None;
+            state.thinking_level = None;
+            state.thinking_levels = Vec::new();
             (state, commands)
         }
         Intent::DismissNotice(id) => {

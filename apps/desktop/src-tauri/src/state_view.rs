@@ -13,13 +13,14 @@
 //! which the shell reads and the reducer never sees (`bridge::images`), the
 //! version this run runs as, and the notes it follows (`bridge::whats_new`).
 
-use gentle_app::AppState;
+use gentle_app::{AppState, ModelsStatus};
 use gentle_runtime::app_config::Theme;
 use gentle_runtime::badge::{Badge, BadgeMark};
 
 use crate::contract::{
-    ChatActivityMark, ChatActivityView, ImageView, NoticeActionView, NoticeLevel, NoticeView,
-    ShellView, ThemeView, ViewState, WhatsNewView,
+    ChatActivityMark, ChatActivityView, ImageView, ModelChipView, ModelChoiceView,
+    ModelListStatusView, NoticeActionView, NoticeLevel, NoticeView, ShellView, ThemeView,
+    ViewState, WhatsNewView,
 };
 use crate::images::Images;
 use crate::{dialogs, helper_thread, helpers, sessions, view};
@@ -102,12 +103,45 @@ pub fn view_state(state: &AppState, sessions_revision: u32, shell: ShellParts<'_
             })
             .unwrap_or_default(),
         images_notice: images.notice(),
+        model_chip: model_chip_view(state),
         config_notice,
         workspace_notice,
         sessions_notice,
         whats_new,
         app_version,
         fatal,
+    }
+}
+
+/// The composer's model chip from the app state, one to one. A no-foreground
+/// state shows nothing, so every field is simply the app's value.
+fn model_chip_view(state: &AppState) -> ModelChipView {
+    ModelChipView {
+        status: match &state.models_status {
+            ModelsStatus::Unknown => ModelListStatusView::Unknown,
+            ModelsStatus::Loading => ModelListStatusView::Loading,
+            ModelsStatus::Ready => ModelListStatusView::Ready,
+            ModelsStatus::Empty => ModelListStatusView::Empty,
+            ModelsStatus::Failed(error) => ModelListStatusView::Failed(error.clone()),
+        },
+        models: state
+            .models
+            .iter()
+            .map(|m| ModelChoiceView {
+                provider: m.provider.clone(),
+                model_id: m.model_id.clone(),
+                name: m.name.clone(),
+                reasoning: m.reasoning,
+            })
+            .collect(),
+        current: state.model.as_ref().map(|m| ModelChoiceView {
+            provider: m.provider.clone(),
+            model_id: m.model_id.clone(),
+            name: m.name.clone(),
+            reasoning: m.reasoning,
+        }),
+        thinking_level: state.thinking_level.clone(),
+        thinking_levels: state.thinking_levels.clone(),
     }
 }
 

@@ -7,6 +7,32 @@ use gentle_core::chat::{ChatMessage, ChatRole, ChatState};
 use crate::chats::{ChatActivity, ChatId, Chats};
 use crate::list_status::ListStatus;
 
+/// One model pi offers, flattened for the chip's dropdown.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ModelChoice {
+    pub provider: String,
+    pub model_id: String,
+    pub name: String,
+    /// Whether the model does reasoning, from pi's own `reasoning` flag.
+    pub reasoning: bool,
+}
+
+/// Where the model list stands: the chip renders each state differently.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub enum ModelsStatus {
+    /// Not asked yet.
+    #[default]
+    Unknown,
+    /// Asked, no reply yet.
+    Loading,
+    /// The reply listed models.
+    Ready,
+    /// The reply listed none.
+    Empty,
+    /// The ask failed; the string is what the child said.
+    Failed(String),
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NoticeLevel {
     Info,
@@ -82,6 +108,17 @@ pub struct AppState {
     pub selected_helper: Option<String>,
     /// Ids are never reused, so a dismissed notice cannot be confused with a new one.
     pub(crate) next_notice_id: u64,
+    /// What pi offers, for the chip's dropdown. Cleared when the foreground
+    /// chat changes: a list is per child, not global.
+    pub models: Vec<ModelChoice>,
+    pub models_status: ModelsStatus,
+    /// The session's current model, from `get_state` / a `set_model` reply.
+    pub model: Option<ModelChoice>,
+    /// The session's current thinking level; `None` is unknown, not off.
+    pub thinking_level: Option<String>,
+    /// The levels the current model supports, from
+    /// `get_available_thinking_levels`.
+    pub thinking_levels: Vec<String>,
 }
 
 impl AppState {

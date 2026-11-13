@@ -18,6 +18,8 @@
   import Notices from './notices/Notices.svelte'
   import { visibleNotices } from './notices/visible'
   import Sidebar from './sidebar/Sidebar.svelte'
+  import SidebarToggle from './chat/SidebarToggle.svelte'
+  import { collapsedOf, overlayOf } from './sidebar/collapse'
   import Thread from './thread/Thread.svelte'
   import type { Update } from '@tauri-apps/plugin-updater'
   import UpdateNotice from './update/UpdateNotice.svelte'
@@ -37,6 +39,20 @@
   // The active view is the shell's own choice, never Rust's state: it survives a
   // push and a chat switch, and the next start begins on Chat.
   let tab = $state<ViewTab>('chat')
+  // The sidebar's collapse (responsive-sidebar S2, S3): the width decides
+  // until the user toggles it, and a manual toggle wins for the run. The
+  // width follows the window's resizes.
+  let manualCollapsed = $state<boolean | null>(null)
+  let width = $state<number | null>(typeof window === 'undefined' ? null : window.innerWidth)
+  const sidebarCollapsed = $derived(collapsedOf(manualCollapsed, width))
+  // Narrow window, sidebar opened by hand: it floats over the chat with a scrim.
+  const sidebarOverlay = $derived(overlayOf(sidebarCollapsed, width))
+
+  $effect(() => {
+    const onResize = () => (width = window.innerWidth)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  })
   // Where the reader was in the thread. The thread stays mounted while the
   // Helpers view covers it, so this is what puts them back in the same place.
   let threadScroll = $state(0)
@@ -110,11 +126,21 @@
 {#if chat.fatal !== null}
   <FatalBanner text={chat.fatal} />
 {/if}
-<div class="app">
+<div class="app" class:scollapsed={sidebarCollapsed} class:soverlay={sidebarOverlay}>
   <Sidebar />
+  {#if sidebarOverlay}
+    <!-- Click outside the floating sidebar closes it; the manual choice wins. -->
+    <button
+      type="button"
+      class="scrim"
+      aria-label="Close sidebar"
+      onclick={() => (manualCollapsed = true)}
+    ></button>
+  {/if}
   <main id="main" class="main">
     {#if model.chat === null}
       <header class="mh">
+        <SidebarToggle collapsed={sidebarCollapsed} onToggle={() => (manualCollapsed = !sidebarCollapsed)} />
         <h1>No chat open</h1>
       </header>
       <p class="placeholder">Choose a chat in the workspace tree, or start a new session.</p>
@@ -123,6 +149,8 @@
         title={chat.title ?? ''}
         {tab}
         running={chat.helpers?.running ?? 0}
+        collapsed={sidebarCollapsed}
+        onToggleSidebar={() => (manualCollapsed = !sidebarCollapsed)}
         onSelect={(next) => (tab = next)}
       />
       {#if shownNotices.length > 0}
@@ -152,6 +180,7 @@
             mark={chat.mark}
             images={chat.images}
             imagesNotice={chat.imagesNotice}
+            chip={chat.modelChip}
           />
         </div>
         <div class="view" id="p-helpers" role="tabpanel" aria-labelledby="t-help" hidden={tab !== 'helpers'}>

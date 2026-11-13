@@ -31,6 +31,7 @@ import type {
   ImageView,
   HelperThreadView as HelperThreadView,
   HelpersView_Serialize as HelpersView,
+  ModelChipView_Serialize as ModelChipView,
   NoticeView,
   ShellView_Serialize as ShellView,
   ViewState_Serialize as ViewState,
@@ -60,6 +61,9 @@ export type ChatViewState = {
   images: ImageView[]
   /** Why the last drop was refused, or `null`. */
   imagesNotice: string | null
+  /** What the composer's model chip shows (0.1.11): the child's truth, never
+   * the page's guess. */
+  modelChip: ModelChipView | null
   /** The run's fatal launcher failure, or `null`; not about any one chat. */
   fatal: string | null
   /** The notes of the version this run follows, or `null`; not about a chat. */
@@ -115,6 +119,7 @@ export function chatOf(view: ViewState | null): ChatViewState {
       dialog: null,
       images: NO_IMAGES,
       imagesNotice: null,
+      modelChip: null,
       fatal,
       whatsNew,
       shell,
@@ -131,6 +136,7 @@ export function chatOf(view: ViewState | null): ChatViewState {
     dialog: view?.dialog ?? null,
     images: view?.images ?? NO_IMAGES,
     imagesNotice: view?.images_notice ?? null,
+    modelChip: view?.model_chip ?? null,
     fatal,
     whatsNew,
     shell,
@@ -179,6 +185,7 @@ export function createChatView(deps: ChatViewDeps = {}): ChatView {
     dialog: null,
     images: [],
     imagesNotice: null,
+    modelChip: null,
     fatal: null,
     whatsNew: null,
     shell: NO_SHELL,

@@ -54,6 +54,10 @@ export type IconName =
   // home and its `info` for About and updates, in the gear's own stroke.
   | 'house'
   | 'info'
+  // The model chip's two dropdowns (0.1.11): Lucide's `chevron-down`.
+  | 'chevronDown'
+  // The sidebar collapse toggle (responsive-sidebar S1): Lucide's `menu`.
+  | 'menu'
 
 const FOLDER = 'M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z'
 const FOLDER_OPEN =
@@ -78,6 +82,10 @@ export const ICON_SHAPES: Record<IconName, IconShape[]> = {
   stop: [rect(3, 3, 18, 18, 2)],
   restart: [path('M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8'), path('M3 3v5h5')],
   x: [path('M18 6 6 18'), path('m6 6 12 12')],
+  // The model chip's two dropdowns (0.1.11): Lucide's `chevron-down`.
+  chevronDown: [path('m6 9 6 6 6-6')],
+  // The sidebar collapse toggle (responsive-sidebar S1): Lucide's `menu`.
+  menu: [path('M3 6h18'), path('M3 12h18'), path('M3 18h18')],
   // The helper thread's Back, 01b's `i-back` symbol.
   back: [path('m12 19-7-7 7-7'), path('M19 12H5')],
   // The footer theme control, 01a's `i-theme` symbol: a half-filled circle.

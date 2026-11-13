@@ -15,8 +15,9 @@
   //   a thumbnail is drawn from the URL Rust answers with, never from a byte the
   //   page holds.
   import { attachImages, dispatchIntent, removeImage } from '../bridge'
-  import type { ChatActivityMark, ImageView } from '../contract/bindings'
+  import type { ChatActivityMark, ImageView, ModelChipView } from '../contract/bindings'
   import Icon from '../icons/Icon.svelte'
+  import ModelChip from './ModelChip.svelte'
   import {
     DROP_HINT,
     KEYS_HINT,
@@ -36,6 +37,7 @@
     mark = null,
     images = [],
     imagesNotice = null,
+    chip = null,
   }: {
     /** The foreground chat: which draft is shown, and where a send goes. */
     chat: string | null
@@ -46,6 +48,8 @@
     images?: ImageView[]
     /** Why the last drop was refused, as one plain line, or `null`. */
     imagesNotice?: string | null
+    /** What the model chip shows, as Rust pushes it, or `null`. */
+    chip?: ModelChipView | null
   } = $props()
 
   /** The drafts, one per chat id, kept for as long as the box is on screen. */
@@ -96,10 +100,13 @@
     // Reading the draft is what makes this follow a push and the typing alike.
     void text
     if (box === null) return
+    // A browser reports scrollHeight as at least the current height, so the
+    // old size must be dropped first: without this reset a box that grew with
+    // a long draft keeps measuring itself as grown after the send (L9).
+    box.style.height = 'auto'
     const height = fittedHeight(box.scrollHeight)
     box.style.height = height === 0 ? 'auto' : `${height}px`
   })
-
   function typed(event: Event): void {
     if (chat === null) return
     const value = (event.currentTarget as HTMLTextAreaElement).value
@@ -194,5 +201,10 @@
     <!-- Why the last drop attached nothing, in the words Rust refused it with. -->
     <p class="refused" role="status">{imagesNotice}</p>
   {/if}
-  <p class="keys">{KEYS_HINT}</p>
+  <!-- The chip shares the keys-hint line (S7): the hints take the left, the
+       pills take the right, and no blank row is left under the box. -->
+  <div class="dock-bottom">
+    <p class="keys">{KEYS_HINT}</p>
+    <ModelChip {chip} />
+  </div>
 </div>

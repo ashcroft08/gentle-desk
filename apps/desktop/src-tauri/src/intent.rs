@@ -51,6 +51,13 @@ pub fn to_intent(state: &gentle_app::AppState, intent: UiIntent) -> Option<gentl
         // reducer checks, so an id that names no task selects nothing.
         UiIntent::SelectHelper { helper_id } => gentle_app::Intent::SelectHelper(helper_id),
         UiIntent::CloseHelper => gentle_app::Intent::CloseHelper,
+        UiIntent::RequestModels => gentle_app::Intent::RequestModels,
+        UiIntent::SelectModel { provider, model_id } => {
+            gentle_app::Intent::SelectModel { provider, model_id }
+        }
+        UiIntent::SelectThinkingLevel { level } => {
+            gentle_app::Intent::SelectThinkingLevel { level }
+        }
     })
 }
 

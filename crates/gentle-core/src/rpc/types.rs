@@ -30,6 +30,21 @@ pub enum RpcCommand {
     GetMessages {
         id: Option<String>,
     },
+    /// Every model whose provider auth resolves. Read-only.
+    GetAvailableModels,
+    /// Switch this session's model. pi errors `Model not found:` when the
+    /// provider/model pair is not in its available snapshot.
+    SetModel {
+        provider: String,
+        model_id: String,
+    },
+    /// Set this session's thinking level
+    /// (off|minimal|low|medium|high|xhigh|max).
+    SetThinkingLevel {
+        level: String,
+    },
+    /// The thinking levels the session's current model supports.
+    GetAvailableThinkingLevels,
     UiResponse {
         id: String,
         answer: UiAnswer,

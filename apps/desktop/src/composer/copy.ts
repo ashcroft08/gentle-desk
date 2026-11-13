@@ -37,5 +37,21 @@ export const DROP_HINT = 'Drop the images here to attach them.'
  * drawn name adds the file it takes. */
 export const REMOVE_IMAGE = 'Remove'
 
+/** The custom dropdown's filter box and its empty result (S7). */
+export const SEARCH_PLACEHOLDER = 'Search models...'
+export const NOTHING_MATCHES = 'Nothing matches.'
+
+/** The sidebar collapse toggle's accessible name (responsive-sidebar S1). */
+export const SIDEBAR_TOGGLE = 'Toggle sidebar'
+
 /** Ended: the chat's process is gone until it is restarted. */
 export const ENDED_REASON = "This chat's process exited. Restart it to keep talking."
+
+/** The model chip's two accessible names (0.1.11). */
+export const MODEL_LABEL = 'Model'
+export const LEVEL_LABEL = 'Thinking level'
+
+/** The chip's states, in the words the child's own truth takes. */
+export const MODELS_LOADING = 'Loading models...'
+export const MODELS_EMPTY = 'No models are available for this chat.'
+export const MODELS_UNAVAILABLE = 'Models unavailable:'

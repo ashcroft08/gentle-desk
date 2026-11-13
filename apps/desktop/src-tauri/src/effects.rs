@@ -57,19 +57,21 @@ pub fn run_one(command: ChatCommand, executor: &dyn ChatExecutor) -> Ran {
 
 fn run_into(command: ChatCommand, executor: &dyn ChatExecutor, ran: &mut Ran) {
     match executor.execute(command) {
-        Outcome::Opened { chat, how } => match how {
-            // A fresh child: the host confirmed the process only. The chat is
-            // asked for what the window has to show, and stays opening.
-            Opened::Started => {
-                if let Some(next) = request_after_open(&chat, how) {
-                    run_into(next, executor, ran);
-                }
-                ran.confirm_after = Some(chat);
+        Outcome::Opened { chat, how } => {
+            // A fresh child: the host confirmed the process only, so the chat
+            // stays opening. An already-live child is confirmed at once — but
+            // either way the chip's questions go out (R3-001): a chat that was
+            // away from the foreground cleared its chip and needs the state
+            // and both lists again.
+            for next in request_after_open(&chat, how) {
+                run_into(next, executor, ran);
             }
-            // Already live, or its start was discarded while starting: nothing
-            // waits for that child any more, so it is confirmed at once.
-            _ => ran.inputs.push(Input::ChatOpened { chat }),
-        },
+            if how == Opened::Started {
+                ran.confirm_after = Some(chat);
+            } else {
+                ran.inputs.push(Input::ChatOpened { chat });
+            }
+        }
         // A failed open ends the opening phase too: `ChatFailed` clears it.
         Outcome::OpenFailed { chat, message } | Outcome::SendFailed { chat, message } => {
             ran.inputs.push(Input::ChatFailed { chat, message });

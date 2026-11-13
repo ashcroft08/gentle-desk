@@ -31,8 +31,9 @@ describe('Header', () => {
 
     expect(screen.getByRole('tablist', { name: 'View' })).toBeTruthy()
     expect(screen.getAllByRole('tab')).toHaveLength(2)
-    // The artboard's "..." menu (Rename, Delete) is not built yet.
-    expect(screen.queryByRole('button')).toBeNull()
+    // The artboard's "..." menu (Rename, Delete) is not built yet; the only
+    // button is the sidebar toggle (responsive-sidebar S1).
+    expect(screen.getAllByRole('button')).toHaveLength(1)
   })
 
   it('reports the tab the user picks and draws the working badge when told to', async () => {
@@ -43,5 +44,20 @@ describe('Header', () => {
     await fireEvent.click(screen.getByRole('tab', { name: /Helpers/ }))
 
     expect(onSelect).toHaveBeenCalledWith('helpers')
+  })
+
+  it('carries the sidebar toggle, expanded by default (responsive-sidebar S1)', () => {
+    render(Header, { props: { title: 'Idle one' } })
+    const toggle = screen.getByRole('button', { name: 'Toggle sidebar' })
+    expect(toggle.getAttribute('aria-expanded')).toBe('true')
+  })
+
+  it('the toggle reports the collapsed state and fires the toggle (S1)', async () => {
+    const onToggleSidebar = vi.fn()
+    render(Header, { props: { title: 'Idle one', collapsed: true, onToggleSidebar } })
+    const toggle = screen.getByRole('button', { name: 'Toggle sidebar' })
+    expect(toggle.getAttribute('aria-expanded')).toBe('false')
+    await fireEvent.click(toggle)
+    expect(onToggleSidebar).toHaveBeenCalledTimes(1)
   })
 })

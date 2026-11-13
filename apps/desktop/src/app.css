@@ -124,7 +124,67 @@ p {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: 280px 1fr;
+  /* minmax(0, 1fr), never a bare 1fr: a bare 1fr cannot shrink below its
+     content's min-content, so one nowrap title or code line pushed the whole
+     chat past the window's right edge. */
+  grid-template-columns: 280px minmax(0, 1fr);
+  position: relative;
+}
+
+/* Collapsed (responsive-sidebar S4): the sidebar leaves the layout, so the main
+   area becomes the grid's first item and the grid is ONE full-width column.
+   (A leftover 0-width first column crushed the chat to nothing.) */
+.app.scollapsed {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.app.scollapsed .side {
+  display: none;
+}
+
+/* Narrow window with the sidebar opened by hand: it floats over the chat with
+   a scrim instead of squeezing it; the main area keeps the whole width. */
+.app.soverlay {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.app.soverlay .side {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: min(280px, 85vw);
+  z-index: 40;
+  box-shadow: 8px 0 24px rgba(0, 0, 0, 0.45);
+}
+
+.app.soverlay .scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  border: 0;
+  background: rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+}
+
+/* The sidebar collapse toggle: the header's first control, quiet until
+   hovered, the same circle the other icon buttons draw. */
+.side-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted, inherit);
+  cursor: pointer;
+  flex: none;
+}
+
+.side-toggle:hover {
+  background: var(--surface2);
 }
 
 /* The main area: the chat's header, its notices, the thread that takes what is
@@ -134,6 +194,7 @@ p {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  min-width: 0;
   background: var(--bg);
 }
 
@@ -502,6 +563,128 @@ p {
   padding-left: 16px;
 }
 
+/* The model chip (0.1.11, S7): the two pill dropdowns in their own row BELOW
+   the composer form, right-aligned, and the themed popover listbox they open
+   upward (the row sits at the window's bottom edge). */
+.chip {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 4px;
+  margin-top: 0;
+}
+
+.pill-select {
+  position: relative;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  border: 0;
+  background: transparent;
+  border-radius: 10px;
+  padding: 3px 6px;
+  color: var(--faint);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.pill:hover {
+  background: var(--surface2);
+}
+
+.pill-select:not(.faint) .pill-value {
+  color: inherit;
+  font-weight: 600;
+}
+
+.pill .ic {
+  flex: none;
+}
+
+.popover {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 4px);
+  /* Sized to its content: the level list is short, the model list is long
+     but capped, so neither shows empty width around the rows. */
+  width: max-content;
+  max-width: 320px;
+  max-height: 300px;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  padding: 4px;
+  z-index: 30;
+}
+
+.popover .filter {
+  width: 200px;
+  margin: 2px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  outline: none;
+}
+
+.popover .filter:focus {
+  border-color: var(--accent);
+}
+
+.options {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.option {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.option.active {
+  background: var(--surface2);
+}
+
+.option[aria-selected='true'] {
+  color: var(--accent);
+}
+
+.option .hint {
+  color: var(--faint);
+  font-size: 11px;
+}
+
+.chip .state {
+  margin: 0;
+  font-size: 12px;
+  color: var(--faint);
+  white-space: nowrap;
+}
+
 /* The images a chat holds and the images a sent message carried: the same
    thumbnails in both places, drawn from the URL the shell serves, so not one
    byte of an image travels through the push. */
@@ -572,6 +755,21 @@ p {
   padding-left: 16px;
   color: var(--danger);
   font-size: 12px;
+}
+
+/* The bottom row under the box: the key hints take the left, the chip's pills
+   take the right, so no blank row is left under the box (S7 feedback). */
+.composer-dock .dock-bottom {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 12px;
+  margin-top: 8px;
+}
+
+.composer-dock .dock-bottom .keys {
+  margin: 0;
 }
 
 /* The key hints under the box: quiet, left-aligned with the box's text, never

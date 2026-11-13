@@ -83,6 +83,32 @@ mod encode {
         );
     }
 
+    /// pi's model commands, byte for byte (rpc-types.d.ts:44-58, 230-243).
+    #[test]
+    fn model_commands_carry_pis_exact_fields() {
+        assert_eq!(
+            encode_command(&RpcCommand::GetAvailableModels),
+            "{\"type\":\"get_available_models\"}\n"
+        );
+        assert_eq!(
+            encode_command(&RpcCommand::SetModel {
+                provider: "anthropic".into(),
+                model_id: "claude-opus-4-5".into(),
+            }),
+            "{\"modelId\":\"claude-opus-4-5\",\"provider\":\"anthropic\",\"type\":\"set_model\"}\n"
+        );
+        assert_eq!(
+            encode_command(&RpcCommand::SetThinkingLevel {
+                level: "high".into()
+            }),
+            "{\"level\":\"high\",\"type\":\"set_thinking_level\"}\n"
+        );
+        assert_eq!(
+            encode_command(&RpcCommand::GetAvailableThinkingLevels),
+            "{\"type\":\"get_available_thinking_levels\"}\n"
+        );
+    }
+
     #[test]
     fn get_messages_and_switch_session_carry_their_fields() {
         let with_id = encode_command(&RpcCommand::GetMessages {

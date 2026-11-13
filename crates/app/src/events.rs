@@ -3,9 +3,10 @@
 use gentle_core::chat::{messages_from_history, reduce_chat_at};
 use gentle_core::rpc::{RpcCommand, RpcEvent, RpcResponse};
 
+use crate::chip;
 use crate::input::Command;
 use crate::notices::{notice_from, push_notice};
-use crate::state::{AppState, NoticeLevel};
+use crate::state::{AppState, ModelsStatus, NoticeLevel};
 
 pub(crate) fn apply_event(
     state: AppState,
@@ -37,10 +38,46 @@ fn apply_response(state: &mut AppState, response: &RpcResponse, commands: &mut V
             if data.get("cancelled").and_then(|c| c.as_bool()) == Some(true) {
                 state.current_session = None;
             } else {
+                // The history, then the chip's refill: the session's model and
+                // level, the models the child offers, and the levels it
+                // supports (R3-002). The chip was cleared on the switch, so
+                // these replies repopulate it.
                 commands.push(Command::Send(RpcCommand::GetMessages { id: None }));
+                commands.push(Command::Send(RpcCommand::GetState));
+                commands.push(Command::Send(RpcCommand::GetAvailableModels));
+                commands.push(Command::Send(RpcCommand::GetAvailableThinkingLevels));
             }
         }
         ("get_messages", Ok(data)) => state.chat.messages = messages_from_history(data),
+        ("set_model", Ok(data)) => {
+            // The chip's new model owns the levels list and the current
+            // level: ask for both again (R3-002).
+            chip::apply_ok(state, "set_model", data);
+            commands.push(Command::Send(RpcCommand::GetState));
+            commands.push(Command::Send(RpcCommand::GetAvailableThinkingLevels));
+        }
+        (command, Ok(data)) => {
+            // The chip's four questions parse the same in both shells.
+            chip::apply_ok(state, command, data);
+        }
+        ("set_thinking_level", Err(error)) => {
+            // The optimistic level from the intent is gone; unknown until the
+            // session reports again. Same notice as every failed command.
+            state.thinking_level = None;
+            push_notice(
+                state,
+                NoticeLevel::Error,
+                format!("set_thinking_level failed: {error}"),
+            );
+        }
+        ("get_available_models", Err(error)) => {
+            state.models_status = ModelsStatus::Failed(error.clone());
+            push_notice(
+                state,
+                NoticeLevel::Error,
+                format!("get_available_models failed: {error}"),
+            );
+        }
         (command, Err(error)) => {
             if command == "switch_session" {
                 state.current_session = None;
@@ -51,6 +88,5 @@ fn apply_response(state: &mut AppState, response: &RpcResponse, commands: &mut V
                 format!("{command} failed: {error}"),
             );
         }
-        _ => {}
     }
 }

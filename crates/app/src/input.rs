@@ -29,6 +29,17 @@ pub enum Intent {
     SelectHelper(String),
     /// Back from a helper's thread to the helpers list.
     CloseHelper,
+    /// Ask the child for the models it offers (the chip's dropdown).
+    RequestModels,
+    /// Make a model the session's model.
+    SelectModel {
+        provider: String,
+        model_id: String,
+    },
+    /// Set the session's thinking level.
+    SelectThinkingLevel {
+        level: String,
+    },
     /// Make a chat the foreground one. Its child is started if it has none, and
     /// no other chat is stopped.
     OpenChat(ChatId),

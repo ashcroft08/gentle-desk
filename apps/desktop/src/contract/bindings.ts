@@ -517,6 +517,58 @@ export type MessageView_Serialize = {
 };
 
 /**
+ *  What the composer's model chip shows: the models the child offers, the
+ *  session's current model and thinking level, and the levels it supports.
+ *  All of it is the child's truth, never the page's guess: the chip renders a
+ *  state, it does not invent one.
+ */
+export type ModelChipView = ModelChipView_Serialize | ModelChipView_Deserialize;
+
+/**
+ *  What the composer's model chip shows: the models the child offers, the
+ *  session's current model and thinking level, and the levels it supports.
+ *  All of it is the child's truth, never the page's guess: the chip renders a
+ *  state, it does not invent one.
+ */
+export type ModelChipView_Deserialize = {
+	status: ModelListStatusView,
+	models: ModelChoiceView[],
+	current?: ModelChoiceView | null,
+	/**  The session's thinking level; `None` is unknown, not off. */
+	thinking_level?: string | null,
+	/**  The levels the current model supports, in pi's order. */
+	thinking_levels: string[],
+};
+
+/**
+ *  What the composer's model chip shows: the models the child offers, the
+ *  session's current model and thinking level, and the levels it supports.
+ *  All of it is the child's truth, never the page's guess: the chip renders a
+ *  state, it does not invent one.
+ */
+export type ModelChipView_Serialize = {
+	status: ModelListStatusView,
+	models: ModelChoiceView[],
+	current: ModelChoiceView | null,
+	/**  The session's thinking level; `None` is unknown, not off. */
+	thinking_level: string | null,
+	/**  The levels the current model supports, in pi's order. */
+	thinking_levels: string[],
+};
+
+/**  One model pi offers, flattened for the chip's dropdown. */
+export type ModelChoiceView = {
+	provider: string,
+	model_id: string,
+	name: string,
+	/**  Whether the model does reasoning, pi's own `reasoning` flag. */
+	reasoning: boolean,
+};
+
+/**  Where the model list stands, matching `gentle_app::ModelsStatus` one to one. */
+export type ModelListStatusView = { type: "Unknown" } | { type: "Loading" } | { type: "Ready" } | { type: "Empty" } | { type: "Failed"; data: string };
+
+/**
  *  The one thing the user can do about a notice, when the notice reports
  *  something the app can fix by itself (S3). It names its own target, so a
  *  notice about a background chat is fixed without opening that chat first.
@@ -890,7 +942,25 @@ export type UiIntent = { type: "SendPrompt"; data: {
  *  Back from a helper's thread to the helpers list: the same intent the
  *  iced panel's Back sends (`crates/ui/src/app.rs`).
  */
-{ type: "CloseHelper" };
+{ type: "CloseHelper" } | 
+/**
+ *  Ask the child what models it offers: what the chip's dropdown shows
+ *  (0.1.11). The answer travels back on
+ *  [`ViewState::model_chip`].
+ */
+{ type: "RequestModels" } | 
+/**
+ *  Make a model the session's model (RPC `set_model`). The chip updates
+ *  from the reply's Model object, never from the choice alone.
+ */
+{ type: "SelectModel"; data: {
+	provider: string,
+	model_id: string,
+} } | 
+/**  Set the session's thinking level (RPC `set_thinking_level`). */
+{ type: "SelectThinkingLevel"; data: {
+	level: string,
+} };
 
 /**
  *  The state the current views render: the foreground chat (as the app names
@@ -1026,6 +1096,12 @@ export type ViewState_Deserialize = {
 	 *  shell reads the files, so the shell is what says no.
 	 */
 	images_notice?: string | null,
+	/**
+	 *  What the composer's model chip shows, for the foreground chat's child
+	 *  (0.1.11). A no-foreground-chat run shows nothing, so the chip is part of
+	 *  the chat panel, not the window.
+	 */
+	model_chip: ModelChipView_Deserialize,
 	/**
 	 *  Why the last workspace action was refused, as one line of plain text: a
 	 *  name Windows would not accept, a folder that is not there, a folder that
@@ -1182,6 +1258,12 @@ export type ViewState_Serialize = {
 	 *  shell reads the files, so the shell is what says no.
 	 */
 	images_notice: string | null,
+	/**
+	 *  What the composer's model chip shows, for the foreground chat's child
+	 *  (0.1.11). A no-foreground-chat run shows nothing, so the chip is part of
+	 *  the chat panel, not the window.
+	 */
+	model_chip: ModelChipView_Serialize,
 	/**
 	 *  Why the last workspace action was refused, as one line of plain text: a
 	 *  name Windows would not accept, a folder that is not there, a folder that

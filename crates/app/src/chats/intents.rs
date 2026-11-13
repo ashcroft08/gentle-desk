@@ -12,7 +12,7 @@ use crate::chats::push_death_notice;
 use crate::input::{ChatCommand, Command, Effects, Intent};
 use crate::intents::dialog_id;
 use crate::notices::drop_restart_notice;
-use crate::state::{push_user_message, AppState};
+use crate::state::{push_user_message, AppState, ModelsStatus};
 
 /// Applies `intent` if it belongs to the per-chat model, answering the effects
 /// for one chat's child (and the shared ones it asks for). Answers `None` when
@@ -40,6 +40,31 @@ pub(crate) fn apply(state: &mut AppState, intent: &Intent) -> Option<Effects> {
         Intent::CopyMessage(id) => copy_message(state, id).map(for_shell),
         Intent::AnswerDialog { id, answer } => answer_dialog(state, id, answer).map(for_chat),
         Intent::SelectHelper(id) => select_helper(state, id),
+        // The chip's three asks go to the foreground chat's child, like any
+        // other prompt (0.1.11): the one-child send the fallthrough would
+        // produce is dropped by the chats shell.
+        Intent::RequestModels => {
+            state.models_status = ModelsStatus::Loading;
+            send_to_foreground(state, RpcCommand::GetAvailableModels).map(for_chat)
+        }
+        Intent::SelectModel { provider, model_id } => send_to_foreground(
+            state,
+            RpcCommand::SetModel {
+                provider: provider.clone(),
+                model_id: model_id.clone(),
+            },
+        )
+        .map(for_chat),
+        Intent::SelectThinkingLevel { level } => {
+            state.thinking_level = Some(level.clone());
+            send_to_foreground(
+                state,
+                RpcCommand::SetThinkingLevel {
+                    level: level.clone(),
+                },
+            )
+            .map(for_chat)
+        }
         Intent::CloseHelper => close_helper(state),
         _ => None,
     }
@@ -103,6 +128,13 @@ fn open(state: &mut AppState, chat: ChatId) -> Vec<ChatCommand> {
     // The helper the panel had open was that chat's: another chat is on screen
     // now, and a selection never names a task of a chat the user left.
     state.selected_helper = None;
+    // The chip's data belongs to the previous chat's child; the new one
+    // answers `get_state` / `get_available_models` when it opens.
+    state.models = Vec::new();
+    state.models_status = ModelsStatus::Unknown;
+    state.model = None;
+    state.thinking_level = None;
+    state.thinking_levels = Vec::new();
     vec![ChatCommand::OpenProcess { chat }]
 }
 
