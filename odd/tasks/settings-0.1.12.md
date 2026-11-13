@@ -83,6 +83,17 @@ the subscription panel goes to NEXT version's analysis; 0.1.12 ships the four pi
   (Profiles and Account as quiet ledgers), 03-chat-chip.html (context chip beside the
   composer with its five states). The chosen artboard will be recorded when handed off;
   the others stay alternatives.
+- L15 (2026-11-13, native review of the Unverified fix, lineage review-b47114a668c5a5cb,
+  tier high, lenses review-risk + review-reliability, 2 reviewer model runs via host relay,
+  total cost ~USD 0.008): APPROVED, no correction. Advisory finding saved here verbatim:
+  "R1-provider-not-found-overbroad" (lens review-risk,
+  apps/desktop/src-tauri/src/settings/auth.rs:60-67, severity WARNING, disposition
+  informational): the finding's title flags that the provider_not_found -> Unverified mapping
+  may be overbroad (it treats every provider pi's registry does not name as unverified);
+  non-blocking, later work. The reviewer result artifacts:
+  rart1_f7162444b0bfa5d96429a3405e334af67511856981ddca64c2666cc286cf6547 (risk,
+  sha256:46834e3beee35890b669d782ae6645abbf718e35bab8981e7442a30d10e4865b) and the
+  reliability artifact of the same store revision b4503588474990240a3416b38ea0f88226a0813d6afca02c7b06214df947d2fd.
 - L13 (2026-11-13, user): fallback route — "(a)" add the profile-fallbacks.json read to the
   Rust side so the Profiles pane's FALLBACK row shows the real chain; and "Levantas la app para
   probar todo lo nuevo implementado" — the app runs for the maintainer's hands-on test of all
