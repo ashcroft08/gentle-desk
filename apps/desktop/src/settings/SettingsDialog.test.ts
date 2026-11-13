@@ -91,7 +91,7 @@ describe('the Settings dialog', () => {
 
     await pick(dialog, ACCOUNT)
     expect(within(pane(dialog)).getByRole('button', { name: 'Check again' })).toBeTruthy()
-    expect(within(pane(dialog)).getByRole('button', { name: 'Open login in terminal' })).toBeTruthy()
+    expect(within(pane(dialog)).getByRole('button', { name: 'Open shell to sign in or out' })).toBeTruthy()
   })
 
   it('draws the theme picker in Appearance, named with the current theme', async () => {

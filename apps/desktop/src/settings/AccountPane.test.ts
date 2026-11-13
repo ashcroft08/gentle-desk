@@ -12,8 +12,7 @@ import {
   CHECK_AGAIN,
   CONNECTED,
   FAILED,
-  LOGIN,
-  LOGOUT,
+  OPEN_SHELL,
   NOT_READY,
   NO_PROVIDERS,
   READING,
@@ -113,11 +112,16 @@ describe('the Account pane', () => {
     )
   })
 
-  it('opens login and logout in a terminal window', async () => {
+  // `pi auth login|logout` need a provider the desk does not have, so signing in
+  // or out is pi's own /login and /logout INSIDE the shell: one button opens the
+  // shell, and there is no second button that would open the very same window.
+  it('opens the shell in a terminal window with one button, and says what to type', async () => {
     const pane = draw()
 
-    await fireEvent.click(within(pane).getByRole('button', { name: LOGIN }))
-    await fireEvent.click(within(pane).getByRole('button', { name: LOGOUT }))
-    expect(handlerArgs('open_terminal')).toEqual([{ action: 'Login' }, { action: 'Logout' }])
+    await fireEvent.click(within(pane).getByRole('button', { name: OPEN_SHELL }))
+    expect(handlerArgs('open_terminal')).toEqual([{ action: 'Login' }])
+    expect(within(pane).queryByRole('button', { name: /sign out in terminal/i })).toBeNull()
+    expect(pane.textContent).toContain('/login')
+    expect(pane.textContent).toContain('/logout')
   })
 })

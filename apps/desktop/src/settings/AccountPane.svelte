@@ -17,8 +17,7 @@
     ERROR,
     FAILED,
     INVALID,
-    LOGIN,
-    LOGOUT,
+    OPEN_SHELL,
     NOT_READY,
     UNVERIFIED,
     NOTE,
@@ -101,8 +100,7 @@
 {/if}
 
 <div class="acts">
-  <button class="btn" type="button" onclick={() => void open('Login')}>{LOGIN}</button>
-  <button class="btn" type="button" onclick={() => void open('Logout')}>{LOGOUT}</button>
+  <button class="btn" type="button" onclick={() => void open('Login')}>{OPEN_SHELL}</button>
   <button class="btn accent" type="button" onclick={check}>{CHECK_AGAIN}</button>
 </div>
 <p class="note">{NOTE}</p>
