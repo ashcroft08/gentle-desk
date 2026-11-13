@@ -20,6 +20,7 @@
     LOGIN,
     LOGOUT,
     NOT_READY,
+    UNVERIFIED,
     NOTE,
     NO_PROVIDERS,
     READING,
@@ -66,6 +67,7 @@
   /** One provider's check as the row draws it: its word and its tone. */
   function drawn(status: ProviderStatusView): { label: string; tone: string } {
     if (status === 'Ready') return { label: CONNECTED, tone: 'ok' }
+    if (status === 'Unverified') return { label: UNVERIFIED, tone: 'quiet' }
     if (status === 'NotReady') return { label: NOT_READY, tone: 'warn' }
     if (status === 'Invalid') return { label: INVALID, tone: 'bad' }
     return { label: ERROR, tone: 'bad' }

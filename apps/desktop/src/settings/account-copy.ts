@@ -17,6 +17,7 @@ export const NOTE = 'Login and logout run in a terminal window; this panel shows
 
 /** One provider's check, in the words the pane draws (the state, then its reason). */
 export const CONNECTED = 'Connected'
+export const UNVERIFIED = 'Signed in (not checkable)'
 export const NOT_READY = 'Not ready'
 export const INVALID = 'Sign-in is not valid'
 export const ERROR = 'Could not check'

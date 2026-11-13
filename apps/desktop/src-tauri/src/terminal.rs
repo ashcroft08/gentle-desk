@@ -3,13 +3,13 @@
 //!
 //! Four jobs travel this way:
 //!
-//! - profiles: the shell's interactive screen, `/gentle:profiles`, named as the
-//!   opening prompt. The screen is a TUI its own extension draws, reachable only
-//!   by naming that command once the terminal is up, so the command is passed to
-//!   the launcher as its positional prompt: that is the smallest thing that
-//!   opens the right screen (no new subcommand, and no keystrokes typed into
-//!   someone's window after it opens). There `n` creates a profile and `u` uses
-//!   one in the session (L9), and the desk never writes the file.
+//! - profiles: the shell's INTERACTIVE screen, opened with no opening prompt.
+//!   The maintainer's first run showed pi's extension erroring on a
+//!   prompt-started profiles screen (`saveFirst` undefined — the screen needs
+//!   the interactive context pi builds after startup), so the desk opens the
+//!   shell and the user names `/gentle:profiles` in the window; the panel's
+//!   note already says so. There `n` creates a profile and `u` uses one in the
+//!   session (L9), and the desk never writes the file.
 //! - login / logout: the shell's own `auth login` / `auth logout`.
 //! - update: the shell's own `update`, which forwards to pi's updater (L5), run
 //!   from a terminal because S4 lets an update run only with every chat closed.
@@ -32,10 +32,14 @@ use gentle_backend::launcher::{self, Launcher, LauncherEnv};
 use crate::contract::TerminalActionView;
 
 /// What one action asks the shell to do: the arguments after the launcher's own
-/// and the home flags.
+/// and the home flags. Profiles opens the INTERACTIVE shell with no opening
+/// prompt: the maintainer's first run showed pi's extension erroring on a
+/// prompt-started profiles screen (`saveFirst` undefined — the screen needs the
+/// interactive context pi builds after startup), so the desk opens the shell
+/// and the user names the command; the panel's note already says so.
 pub fn action_args(action: TerminalActionView) -> &'static [&'static str] {
     match action {
-        TerminalActionView::Profiles => &["/gentle:profiles"],
+        TerminalActionView::Profiles => &[],
         TerminalActionView::Login => &["auth", "login"],
         TerminalActionView::Logout => &["auth", "logout"],
         TerminalActionView::Update => &["update"],
@@ -92,6 +96,13 @@ pub fn open(action: TerminalActionView, home_args: &[OsString]) -> Result<(), St
 
 /// Starts `program` in a terminal window of its own, answering as soon as the
 /// window exists: nothing here waits for the window to close.
+///
+/// No shell in between: `CREATE_NEW_CONSOLE` gives the process its own visible
+/// console, and the launcher runs as `Command::new(program)` — the same shape
+/// the settings probes already run, whose program is `node` under
+/// `C:\Program Files\...` (a path with a space). A `cmd /c` wrapper mangled
+/// that quoted first token (cmd strips the line's outer quotes) and the
+/// window died at once having run nothing.
 #[cfg(windows)]
 fn launch(program: &Path, args: &[OsString]) -> Result<(), String> {
     use std::os::windows::process::CommandExt;
@@ -100,9 +111,7 @@ fn launch(program: &Path, args: &[OsString]) -> Result<(), String> {
     /// command exists to open.
     const CREATE_NEW_CONSOLE: u32 = 0x0000_0010;
 
-    std::process::Command::new("cmd")
-        .arg("/c")
-        .arg(program)
+    std::process::Command::new(program)
         .args(args)
         .creation_flags(CREATE_NEW_CONSOLE)
         .spawn()
@@ -138,13 +147,15 @@ mod tests {
         args.iter().map(OsString::from).collect()
     }
 
-    /// Each button names the shell's own command, and the profiles screen is the
-    /// slash command the shell already answers to.
+    /// Each button names the shell's own command. Profiles opens the shell
+    /// INTERACTIVE with no opening prompt: pi's extension errors on a
+    /// prompt-started profiles screen (the maintainer's run:
+    /// `saveFirst` undefined), so the user names the command in the window.
     #[test]
     fn every_action_names_the_shells_own_command() {
         assert_eq!(
-            action_args(TerminalActionView::Profiles),
-            &["/gentle:profiles"]
+            action_args(TerminalActionView::Profiles) as &[&str],
+            &[] as &[&str]
         );
         assert_eq!(action_args(TerminalActionView::Login), &["auth", "login"]);
         assert_eq!(action_args(TerminalActionView::Logout), &["auth", "logout"]);
@@ -177,13 +188,7 @@ mod tests {
 
         assert_eq!(
             args,
-            os(&[
-                "C:/npm/gentle-shell.mjs",
-                "--home",
-                "C:/h",
-                "--link",
-                "/gentle:profiles"
-            ]),
+            os(&["C:/npm/gentle-shell.mjs", "--home", "C:/h", "--link"]),
             "the flags travel as the children get them: `--home` is the one the shell reads first"
         );
     }
