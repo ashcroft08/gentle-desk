@@ -1,0 +1,9 @@
+{
+  "title": "What's new modal",
+  "brief": "Improve the modal that tells the user what an update brings: the release notes now show raw markdown (## and ** visible, bullets glued into one paragraph). Show the real notes, readable, in the app's own dark theme.",
+  "artboards": [
+    { "file": "01-document.html", "title": "A: Release notes as a document", "tradeoff": "Closest to today's dialog and the calmest: a version pill, a clear list and a divider before the footer; less personality, scales to any length by scrolling", "width": 900, "height": 700 },
+    { "file": "02-hero.html", "title": "B: Version hero", "tradeoff": "Makes the update an event with a large version and one card per change; friendlier and scannable, but taller and heavier for a modal shown once per version", "width": 900, "height": 760 },
+    { "file": "03-compact.html", "title": "C: Compact and quiet", "tradeoff": "Smallest and least intrusive: two changes visible, the rest behind a disclosure; hides detail unless the user opens it and needs a link to the full notes", "width": 900, "height": 600 }
+  ]
+}

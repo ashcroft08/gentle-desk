@@ -1,22 +1,34 @@
-// The what's-new modal's words, in one place: the title carries the version this
-// run runs as, and the notes arrive from Rust as plain text (S4). No locale, no
-// markup: the modal decides how the release body is laid out.
+// The what's-new modal's words, in one place. The notes arrive from Rust as the
+// release body's markdown and are drawn through the thread's sanitized pipeline.
 
-/** The title, with the run's own version (S5: never the manifest's). */
-export const WHATS_NEW_TITLE = (version: string): string =>
-  `What's new in gentle-desk ${version}`
+/** The modal's heading; the version pill sits beside it in the same title. */
+export const HEADING = "What's new"
 
 /** The modal's one answer: it stores the version and clears the notes. */
 export const DISMISS = 'Got it'
 
+/** The keyboard hint beside the answer. */
+export const ESC_HINT = 'Esc to close'
+
+/** The numeric parts of a dotted version, or null when it is not one. */
+function parts(version: string): number[] | null {
+  if (!/^\d+(\.\d+)*$/.test(version)) return null
+  return version.split('.').map(Number)
+}
+
 /**
- * The notes split into paragraphs on blank lines. A release body separates its
- * sections with one, and the modal draws one paragraph per chunk as plain text,
- * so no markup of the body ever becomes markup in the app.
+ * "since X" for the header: only when `previous` is a version strictly older
+ * than `version`, compared number by number (0.1.9 < 0.1.11). A missing,
+ * equal, newer (downgrade) or unparsable previous version says nothing.
  */
-export function paragraphsOf(notes: string): string[] {
-  return notes
-    .split(/\r?\n\s*\r?\n/)
-    .map((chunk) => chunk.trim())
-    .filter((chunk) => chunk !== '')
+export function sinceLabel(version: string, previous: string | null | undefined): string | null {
+  const now = parts(version)
+  const before = previous ? parts(previous) : null
+  if (now === null || before === null) return null
+  for (let i = 0; i < Math.max(now.length, before.length); i++) {
+    const a = before[i] ?? 0
+    const b = now[i] ?? 0
+    if (a !== b) return a < b ? `since ${previous}` : null
+  }
+  return null
 }

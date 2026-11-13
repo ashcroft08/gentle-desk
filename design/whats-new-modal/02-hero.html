@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What's new - B: Version hero</title>
+<style>
+:root{--bg:#0e1116;--surface:#151a21;--surface2:#1c222b;--border:#2b333d;--text:#e4e8ee;--muted:#9aa4b2;--faint:#7d8593;--accent:#7aa2f7;--tint:rgba(122,162,247,.14);--shadow:0 8px 24px rgba(0,0,0,.45)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,'Segoe UI',Roboto,sans-serif}
+.stage{min-height:100vh;display:grid;place-items:center;background:rgba(0,0,0,.55);padding:24px}
+.dlg{width:min(600px,100%);background:var(--surface);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column;max-height:min(600px,calc(100vh - 48px))}
+.hero{padding:26px 28px 22px;background:linear-gradient(135deg,var(--tint),transparent 70%);border-bottom:1px solid var(--border)}
+.kicker{color:var(--accent);font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+h2{margin:6px 0 2px;font-size:30px;line-height:1.1;font-weight:700;letter-spacing:-.01em}
+.sub{margin:0;color:var(--muted)}
+.notes{padding:18px 28px;overflow:auto;display:grid;gap:10px}
+.item{background:var(--surface2);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:10px;padding:12px 14px}
+.item h3{margin:0 0 2px;font-size:14px}
+.item p{margin:0;color:var(--muted)}
+.foot{margin:6px 0 0;color:var(--faint);font-size:12px}
+.acts{display:flex;justify-content:flex-end;padding:14px 28px 22px}
+.btn{font:inherit;font-weight:600;color:#0e1116;background:var(--accent);border:0;border-radius:10px;padding:9px 22px;cursor:pointer}
+.btn:focus-visible{outline:2px solid var(--text);outline-offset:2px}
+</style></head><body>
+<div class="stage"><div class="dlg" role="dialog" aria-modal="true" aria-labelledby="t">
+<div class="hero"><div class="kicker">Updated</div><h2 id="t">gentle-desk 0.1.11</h2><p class="sub">Here is what changed since 0.1.9.</p></div>
+<div class="notes">
+<div class="item"><h3>Model and thinking-level picker</h3><p>Choose the model and how hard it thinks for each chat, with search and keyboard control.</p></div>
+<div class="item"><h3>Responsive layout</h3><p>The sidebar folds away on narrow windows and floats over the chat when you open it.</p></div>
+<div class="item"><h3>Settings dialog</h3><p>Appearance, shell home, about and updates in one place.</p></div>
+<div class="item"><h3>Preview label</h3><p>The footer says plainly that this is a preview build.</p></div>
+<p class="foot">Installer without code signing: SmartScreen may warn. The updater itself remains signed with its own key.</p>
+</div>
+<div class="acts"><button class="btn" type="button">Got it</button></div>
+</div></div></body></html>

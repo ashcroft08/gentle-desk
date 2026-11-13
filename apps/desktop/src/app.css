@@ -1911,3 +1911,120 @@ p {
     opacity: 0.6;
   }
 }
+
+/* The what's-new modal: release notes as a document (design/whats-new-modal,
+   artboard A). Theme variables only, so it follows whichever theme is active. */
+.dlg.whatsnew {
+  width: min(560px, calc(100vw - 32px));
+  max-height: min(560px, calc(100vh - 48px));
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.dlg.whatsnew header {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  padding: 20px 24px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.dlg.whatsnew .dt {
+  margin: 0;
+  font-size: 16px;
+}
+
+.dlg.whatsnew .ver {
+  margin-left: 6px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--tint);
+  color: var(--accent);
+  font: 600 12px/1 ui-monospace, Consolas, monospace;
+}
+
+.dlg.whatsnew .since {
+  margin-left: auto;
+  color: var(--faint);
+  font-size: 12px;
+}
+
+.dlg.whatsnew .notes {
+  padding: 16px 24px;
+  overflow: auto;
+  min-height: 0;
+  color: var(--muted);
+}
+
+.dlg.whatsnew .notes h1,
+.dlg.whatsnew .notes h2,
+.dlg.whatsnew .notes h3 {
+  margin: 0 0 12px;
+  color: var(--faint);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.dlg.whatsnew .notes ul {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dlg.whatsnew .notes li {
+  position: relative;
+  padding-left: 16px;
+}
+
+.dlg.whatsnew .notes li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.6em;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.dlg.whatsnew .notes strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.dlg.whatsnew .notes em {
+  color: var(--faint);
+}
+
+.dlg.whatsnew .notes hr {
+  margin: 18px 0 14px;
+  border: 0;
+  border-top: 1px dashed var(--border);
+}
+
+.dlg.whatsnew .acts {
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  padding: 14px 24px 20px;
+  border-top: 1px solid var(--border);
+}
+
+.dlg.whatsnew .hint {
+  margin-right: auto;
+  color: var(--faint);
+  font-size: 12px;
+}
+
+.dlg.whatsnew .btn.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--bg);
+  font-weight: 600;
+}

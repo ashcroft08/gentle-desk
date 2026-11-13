@@ -1,5 +1,5 @@
 // The what's-new modal (T2, S4): the run's own version in the title, the release
-// body as plain-text paragraphs, and the one dismiss that tells the shell to
+// body drawn as sanitized markdown, and the one dismiss that tells the shell to
 // store the version. Rust owns WHEN the modal exists (`ViewState.whats_new` is
 // pushed for exactly one run and cleared by that dismiss), so these tests assert
 // only what the view draws and the one command it sends.
@@ -15,10 +15,10 @@ vi.mock('@tauri-apps/api/core', () => import('../test-support/tauri-mock').then(
 vi.mock('@tauri-apps/api/event', () => import('../test-support/tauri-mock').then((m) => m.eventModule()))
 
 const VERSION = '0.1.8'
-const TITLE = "What's new in gentle-desk 0.1.8"
 const FIRST = 'The sidebar now names the workspace you are in.'
 const SECOND = 'A dropped image can be taken away before it is sent.'
-const NOTES = `${FIRST}\n\n${SECOND}`
+// Two spaces before a newline are a markdown hard break: title over description.
+const NOTES = ['- **Sidebar**  ', FIRST, '- **Images**  ', SECOND].join('\n')
 
 const DISMISS_COMMAND = 'store_last_run_version'
 
@@ -43,38 +43,69 @@ async function modal(): Promise<HTMLElement> {
   return await screen.findByRole('dialog')
 }
 
-/** The notes' paragraphs, in the order the modal drew them. */
-function paragraphs(dialog: HTMLElement): (string | null)[] {
-  return [...dialog.querySelectorAll('p')].map((line) => line.textContent)
-}
-
-describe('the what\u2019s-new modal', () => {
-  it('names the version in its title and draws the notes as plain paragraphs', async () => {
+describe('the what’s-new modal', () => {
+  it('names the version in its accessible title, with the product line', async () => {
     draw(notes())
     const dialog = await modal()
 
-    expect(within(dialog).getByText(TITLE)).toBeTruthy()
-    expect(paragraphs(dialog)).toEqual([FIRST, SECOND])
+    const title = within(dialog).getByRole('heading', { name: /What's new.*0\.1\.8/ })
+    expect(title.querySelector('.ver')?.textContent).toBe(VERSION)
   })
 
-  it('draws one paragraph per blank-line chunk of the notes', async () => {
-    draw(notes({ notes: `${FIRST}\n\n${SECOND}` }))
+  it('draws the notes as markdown: bullets are separate items, no markup shows', async () => {
+    draw(notes())
     const dialog = await modal()
-    expect(paragraphs(dialog)).toHaveLength(2)
 
+    const items = [...dialog.querySelectorAll('.notes li')]
+    expect(items).toHaveLength(2)
+    expect(items[0].querySelector('strong')?.textContent).toBe('Sidebar')
+    expect(items[1].textContent).toContain(SECOND)
+    expect(dialog.textContent).not.toContain('**')
+    expect(dialog.textContent).not.toContain('##')
+  })
+
+  it('keeps a leading heading, drawn as a small section label', async () => {
+    draw(notes({ notes: `## Highlights
+
+- one` }))
+    const dialog = await modal()
+
+    expect(dialog.querySelector('.notes h2')?.textContent).toBe('Highlights')
+    expect(dialog.textContent).not.toContain('##')
+  })
+
+  it('draws no active markup a release body could carry', async () => {
+    draw(notes({ notes: 'hi <script>window.x=1</script> <img src="http://x/y.png"> **b**' }))
+    const dialog = await modal()
+
+    expect(dialog.querySelector('script')).toBeNull()
+    expect(dialog.querySelector('img')).toBeNull()
+    expect(dialog.querySelector('.notes strong')?.textContent).toBe('b')
+  })
+
+  it('says "since X" only when the previous version is strictly older', async () => {
+    draw(notes({ version: '0.1.11', previous_version: '0.1.9' }))
+    expect((await modal()).querySelector('.since')?.textContent).toBe('since 0.1.9')
+
+    for (const previous of [null, undefined, '0.1.11', '0.2.0', '0.1.12', 'garbage']) {
+      cleanup()
+      draw(notes({ version: '0.1.11', previous_version: previous }))
+      const dialog = await modal()
+      expect(dialog.querySelector('.since')).toBeNull()
+    }
+  })
+
+  it('compares versions numerically, not as text', async () => {
+    draw(notes({ version: '0.1.11', previous_version: '0.1.9' }))
+    expect((await modal()).querySelector('.since')).toBeTruthy()
     cleanup()
-    draw(notes({ notes: FIRST }))
-    const single = await modal()
-    expect(paragraphs(single)).toEqual([FIRST])
+    draw(notes({ version: '0.1.9', previous_version: '0.1.11' }))
+    expect((await modal()).querySelector('.since')).toBeNull()
   })
 
-  it('draws no markup a release body could carry, only the text it holds', async () => {
-    draw(notes({ notes: '# <b>Bold</b> notes' }))
-    const dialog = await modal()
-
-    expect(paragraphs(dialog)).toEqual(['# <b>Bold</b> notes'])
-    expect(dialog.querySelector('b')).toBeNull()
-    expect(dialog.querySelector('h1')).toBeNull()
+  it('shows the Esc hint beside the one answer', async () => {
+    draw(notes())
+    expect(within(await modal()).getByText('Esc to close')).toBeTruthy()
   })
 
   it('opens with the focus on the one answer it has, and keeps it inside', async () => {

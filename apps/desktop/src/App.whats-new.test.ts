@@ -13,7 +13,7 @@ vi.mock('@tauri-apps/api/core', () => import('./test-support/tauri-mock').then((
 vi.mock('@tauri-apps/api/event', () => import('./test-support/tauri-mock').then((m) => m.eventModule()))
 
 const VERSION = '0.1.8'
-const TITLE = "What's new in gentle-desk 0.1.8"
+const TITLE = /What's new.*0\.1\.8/
 const NOTE = 'A dropped image can be taken away before it is sent.'
 
 afterEach(cleanup)
@@ -28,13 +28,13 @@ describe('The what\u2019s-new modal in the shell', () => {
       view: viewState({
         foreground_chat: 'chat-1',
         foreground_title: 'Some chat',
-        whats_new: { version: VERSION, notes: NOTE },
+        whats_new: { version: VERSION, notes: NOTE, previous_version: null },
       }),
     })
     render(App)
 
     const dialog = await screen.findByRole('dialog')
-    expect(within(dialog).getByText(TITLE)).toBeTruthy()
+    expect(within(dialog).getByRole('heading', { name: TITLE })).toBeTruthy()
     expect(within(dialog).getByText(NOTE)).toBeTruthy()
 
     // The slice is not a notice: no notice strip is drawn, and the only line
@@ -53,7 +53,7 @@ describe('The what\u2019s-new modal in the shell', () => {
 
   it('sends the dismiss once, and the push that clears the slice ends it', async () => {
     const fixture = serveSidebar({
-      view: viewState({ whats_new: { version: VERSION, notes: NOTE } }),
+      view: viewState({ whats_new: { version: VERSION, notes: NOTE, previous_version: null } }),
     })
     setHandler('store_last_run_version', () => viewState({ whats_new: null }))
     render(App)

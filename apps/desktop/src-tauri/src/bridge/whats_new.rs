@@ -43,9 +43,16 @@ impl AppStateHolder {
     }
 
     /// Records the notes to show and answers the slice to push. The revision does
-    /// not move: no list changed.
+    /// not move: no list changed. The version the config still stores is the one
+    /// this run followed (it is only replaced when the modal is dismissed), so it
+    /// travels with the notes as `previous_version`.
     pub fn note_whats_new(&self, version: String, notes: String) -> ViewState {
-        *lock(&self.whats_new) = Some(WhatsNewView { version, notes });
+        let previous_version = self.config_snapshot().config.last_run_version.clone();
+        *lock(&self.whats_new) = Some(WhatsNewView {
+            version,
+            previous_version,
+            notes,
+        });
         self.view()
     }
 
