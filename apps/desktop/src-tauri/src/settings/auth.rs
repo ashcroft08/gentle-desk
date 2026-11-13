@@ -54,10 +54,21 @@ fn provider_view(name: &str, probe: &ProviderProbe) -> AuthProviderView {
     match probe(name) {
         Ok(answer) => {
             let check = rule::check(answer.exit_code, &answer.stdout);
+            // A custom provider (one pi's own registry does not name, the way
+            // this run's `commandcode` is named only by the store) answers
+            // "provider_not_found" even when its credentials sit in the store.
+            // That is not "not ready": the credentials exist, nobody checked
+            // them, and the pane says exactly that instead of a false alarm.
+            let unverified = check.status == AuthStatus::NotReady
+                && check.reason.as_deref() == Some("provider_not_found");
             AuthProviderView {
                 name: name.to_owned(),
-                status: status_view(check.status),
-                reason: check.reason,
+                status: if unverified {
+                    ProviderStatusView::Unverified
+                } else {
+                    status_view(check.status)
+                },
+                reason: if unverified { None } else { check.reason },
             }
         }
         Err(reason) => AuthProviderView {
@@ -117,6 +128,39 @@ mod tests {
                 stdout: (*line).to_owned(),
             })
         })
+    }
+
+    #[test]
+    fn a_provider_pi_does_not_know_is_unverified_not_not_ready() {
+        // The store names `commandcode`; pi's registry does not, so its check
+        // answers provider_not_found even though the credentials exist. The
+        // row says the honest middle word, with no jargon reason.
+        let asked = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let probe = probe(
+            &[
+                (
+                    "anthropic",
+                    1,
+                    r#"{"status":"not_ready","provider":"anthropic","reason":"OAuth token expired"}"#,
+                ),
+                (
+                    "commandcode",
+                    1,
+                    r#"{"status":"not_ready","provider":"commandcode","reason":"provider_not_found"}"#,
+                ),
+            ],
+            Arc::clone(&asked),
+        );
+
+        let view = view(
+            &reader(Some(STORE)),
+            Some(&PathBuf::from("C:/pi/agent/auth.json")),
+            &probe,
+        );
+
+        assert_eq!(view.providers[1].status, ProviderStatusView::Unverified);
+        assert_eq!(view.providers[1].reason, None);
+        assert_eq!(view.providers[0].status, ProviderStatusView::NotReady);
     }
 
     #[test]

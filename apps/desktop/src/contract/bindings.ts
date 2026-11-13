@@ -890,7 +890,13 @@ export type ProfilesView_Serialize = {
 };
 
 /**  How one provider's `auth check` stands: the four states the shell reports. */
-export type ProviderStatusView = "Ready" | "NotReady" | "Invalid" | "Error";
+export type ProviderStatusView = "Ready" | "NotReady" | 
+/**
+ *  The store lists the provider, but pi's registry does not know the name
+ *  (a custom provider), so the check cannot speak: the credentials exist,
+ *  nobody verified them.
+ */
+"Unverified" | "Invalid" | "Error";
 
 /**
  *  One row of the session list, flattened for display. Rows are served a

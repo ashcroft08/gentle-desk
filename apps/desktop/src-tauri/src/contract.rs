@@ -366,6 +366,10 @@ pub enum TerminalActionView {
 pub enum ProviderStatusView {
     Ready,
     NotReady,
+    /// The store lists the provider, but pi's registry does not know the name
+    /// (a custom provider), so the check cannot speak: the credentials exist,
+    /// nobody verified them.
+    Unverified,
     Invalid,
     Error,
 }
