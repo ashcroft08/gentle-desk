@@ -782,6 +782,66 @@ p {
   font-size: 12px;
 }
 
+/* The context chip (0.1.12, S5): how full this chat's window is, in the bottom
+   row between the key hints and the model pills. One number and one tiny bar;
+   the tokens behind it are the hover. Its tone is the reader's own scale - quiet
+   until 75%, the warning token from there, the danger token from 95% - so the
+   colour never carries the meaning alone: the number is drawn too. */
+.ctx {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: default;
+}
+
+.ctx .bar {
+  display: inline-block;
+  width: 38px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.ctx .bar i {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+.ctx.warning {
+  color: var(--warning);
+  border-color: var(--warning);
+}
+
+.ctx.warning .bar i {
+  background: var(--warning);
+}
+
+.ctx.danger {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.ctx.danger .bar i {
+  background: var(--danger);
+}
+
+/* No percentage: a dash, quiet, and no bar to pretend there is a reading. */
+.ctx.unknown {
+  color: var(--faint);
+}
+
 .placeholder {
   color: var(--muted);
   padding: 28px 24px;
@@ -1353,8 +1413,9 @@ p {
   top: 38px;
 }
 
-/* About and updates (settings-dialog S5, S6): the name and the version this run
-   runs as on one line, then the one check button with its answer under it. */
+/* About (settings-dialog S5): the name and the version this run runs as on one
+   line. What is installed, and whether something newer is out, is the Updates
+   section's own card (0.1.12). */
 .dlg .about {
   display: flex;
   align-items: baseline;
@@ -1372,10 +1433,6 @@ p {
   font-size: 12px;
 }
 
-.dlg .check .why {
-  margin: 8px 0 0;
-}
-
 /* The dialog's buttons keep the house button look with the same quiet
    transition as the rail: border and fill, never a jump. */
 .dlg.settings .btn {
@@ -1384,9 +1441,343 @@ p {
     background-color 120ms ease;
 }
 
+/* --- the 0.1.12 panes (S1-S4) ------------------------------------------- */
+
+/* One quiet line for a pane's own state (reading, nothing found, why it could
+   not be read): never a box, never a broken pane. */
+.settings-pane .quiet {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+/* The pane's action row and the note under it: the button is the one action a
+   pane has, and the note says what it opens. */
+.settings-pane .acts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 8px;
+  align-items: center;
+  margin: 12px 0 0;
+}
+
+.settings-pane .note {
+  margin: 8px 0 0;
+  color: var(--faint);
+  font-size: 12px;
+  font-style: italic;
+  line-height: 1.5;
+}
+
+/* The one button that carries the pane's action: the accent, filled, in the
+   house's own button geometry (the dialog's `.btn`). */
+.dlg.settings .btn.accent {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--bg);
+  font-weight: 600;
+}
+
+.dlg.settings .btn.accent:hover:not(:disabled) {
+  border-color: var(--accent);
+  filter: brightness(1.08);
+}
+
+/* A tag: one short word of state, its colour carried by its text as well as its
+   border (the design system's `.tag`). */
+.settings-pane .tag {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  white-space: nowrap;
+}
+
+.settings-pane .tag.ok {
+  color: var(--success);
+}
+
+.settings-pane .tag.warn {
+  color: var(--warning);
+}
+
+.settings-pane .tag.bad {
+  color: var(--danger);
+}
+
+/* The Profiles pane: the orchestrator switch on its own line, then the active
+   profile, then the agent table. Information is typography here - one card for
+   the profile, a table for its roles - and the only action is at the bottom. */
+.settings-pane .mode {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  width: 100%;
+  padding-bottom: 12px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-pane .mode-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.settings-pane .mode-note {
+  margin: 0;
+  flex-basis: 100%;
+  color: var(--faint);
+  font-size: 11.5px;
+}
+
+.settings-pane .seg {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.settings-pane .seg [role='radio'] {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12.5px;
+  padding: 5px 12px;
+  cursor: pointer;
+}
+
+.settings-pane .seg [role='radio']:hover {
+  background: var(--surface2);
+  color: var(--text);
+}
+
+.settings-pane .seg [role='radio'][aria-checked='true'] {
+  background: var(--accent);
+  color: var(--bg);
+  font-weight: 600;
+}
+
+.settings-pane .seg [role='radio']:focus-visible {
+  outline: 1px solid var(--text);
+  outline-offset: -2px;
+}
+
+.settings-pane .profile {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface2);
+  padding: 12px 14px;
+}
+
+.settings-pane .pname {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.settings-pane .pmark {
+  margin: 0 0 8px;
+  color: var(--faint);
+  font-size: 12px;
+}
+
+/* One route of the profile: its label in the faint small caps, its model in the
+   monospace, its effort beside it in the accent. */
+.settings-pane .routes {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+}
+
+.settings-pane .pair {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+}
+
+.settings-pane .pair dt {
+  width: 92px;
+  flex: none;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--faint);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.settings-pane .pair dd {
+  margin: 0;
+}
+
+.settings-pane .mono {
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  font-size: 12px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-pane .pair .think {
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  font-size: 12px;
+  color: var(--accent);
+}
+
+/* The agent table: the role, its model (cut with an ellipsis, the whole one on
+   hover) and its effort. A row highlights under the pointer, as the house's
+   lists do, and a focus inside it does the same for a keyboard reader. */
+.settings-pane .agents {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  margin-top: 14px;
+}
+
+.settings-pane .agents th {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--faint);
+  text-align: left;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 4px 8px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-pane .agents th.effort,
+.settings-pane .agents td.effort {
+  text-align: right;
+  width: 64px;
+}
+
+.settings-pane .agents td {
+  padding: 5px 8px;
+}
+
+.settings-pane .agents td.agent {
+  color: var(--text);
+  width: 150px;
+}
+
+.settings-pane .agents td.model {
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  font-size: 12px;
+  color: var(--muted);
+  max-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-pane .agents td.effort {
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.settings-pane .agents tbody tr:hover td,
+.settings-pane .agents tbody tr:focus-within td {
+  background: var(--surface2);
+}
+
+/* The Account pane's providers: one row each, the name and the state of its
+   own check, then the reason the shell gave when it gave one. */
+.settings-pane .providers {
+  list-style: none;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 4px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface2);
+}
+
+.settings-pane .provider {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  padding: 7px 0;
+}
+
+.settings-pane .provider + .provider {
+  border-top: 1px dashed var(--border);
+}
+
+.settings-pane .provider-name {
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  font-size: 12.5px;
+  color: var(--text);
+}
+
+.settings-pane .reason {
+  flex-basis: 100%;
+  color: var(--faint);
+  font-size: 12px;
+}
+
+/* The Updates pane's one card: the tag and the headline, the quiet versions,
+   then the buttons and - while a chat is open - the gate's reason. */
+.settings-pane .card.updates {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface2);
+  padding: 12px 16px;
+}
+
+.settings-pane .card.updates .head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+}
+
+.settings-pane .headline {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.settings-pane .card.updates .headline + .headline {
+  flex-basis: 100%;
+}
+
+.settings-pane .versions {
+  margin: 8px 0 0;
+  color: var(--faint);
+  font-size: 12px;
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+}
+
+/* The gate: the rule that keeps an update away from a running chat, in the tint
+   the house gives to a thing that is waiting rather than broken. */
+.settings-pane .gate {
+  margin: 10px 0 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--tint);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 /* The dialog's own field and its options: the box the user types in, and one
-   button per option for a select. Both take the focus the dialog gives them. */
-.dlg .field {
+   button per option for a select. Both take the focus the dialog gives them. */.dlg .field {
   width: 100%;
   border: 1px solid var(--accent);
   border-radius: 8px;

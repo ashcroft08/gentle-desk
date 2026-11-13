@@ -15,8 +15,14 @@
   //   a thumbnail is drawn from the URL Rust answers with, never from a byte the
   //   page holds.
   import { attachImages, dispatchIntent, removeImage } from '../bridge'
-  import type { ChatActivityMark, ImageView, ModelChipView } from '../contract/bindings'
+  import type {
+    ChatActivityMark,
+    ContextUsageView_Serialize as ContextUsageView,
+    ImageView,
+    ModelChipView,
+  } from '../contract/bindings'
   import Icon from '../icons/Icon.svelte'
+  import ContextChip from './ContextChip.svelte'
   import ModelChip from './ModelChip.svelte'
   import {
     DROP_HINT,
@@ -38,6 +44,7 @@
     images = [],
     imagesNotice = null,
     chip = null,
+    contextUsage = null,
   }: {
     /** The foreground chat: which draft is shown, and where a send goes. */
     chat: string | null
@@ -50,6 +57,8 @@
     imagesNotice?: string | null
     /** What the model chip shows, as Rust pushes it, or `null`. */
     chip?: ModelChipView | null
+    /** How full this chat's context is (0.1.12, S5), as Rust pushes it. */
+    contextUsage?: ContextUsageView | null
   } = $props()
 
   /** The drafts, one per chat id, kept for as long as the box is on screen. */
@@ -202,9 +211,11 @@
     <p class="refused" role="status">{imagesNotice}</p>
   {/if}
   <!-- The chip shares the keys-hint line (S7): the hints take the left, the
-       pills take the right, and no blank row is left under the box. -->
+       context chip sits beside the model pills (0.1.12, S5), and the pills take
+       the right, so no blank row is left under the box. -->
   <div class="dock-bottom">
     <p class="keys">{KEYS_HINT}</p>
+    <ContextChip usage={contextUsage} />
     <ModelChip {chip} />
   </div>
 </div>

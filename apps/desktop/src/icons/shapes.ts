@@ -54,6 +54,10 @@ export type IconName =
   // home and its `info` for About and updates, in the gear's own stroke.
   | 'house'
   | 'info'
+  // The 0.1.12 rail's own two entries: Lucide's `users` for Profiles, whose
+  // rows are the agents a profile routes, and its `key` for Account.
+  | 'users'
+  | 'key'
   // The model chip's two dropdowns (0.1.11): Lucide's `chevron-down`.
   | 'chevronDown'
   // The sidebar collapse toggle (responsive-sidebar S1): Lucide's `menu`.
@@ -101,9 +105,22 @@ export const ICON_SHAPES: Record<IconName, IconShape[]> = {
     path('M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8'),
     path('M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z'),
   ],
-  // The rail's About and updates entry: Lucide's `info`, the ring, the stem and
-  // the dot. The same three-shape style as the two above.
+  // The rail's About entry: Lucide's `info`, the ring, the stem and the dot. The
+  // same three-shape style as the two above.
   info: [circle(12, 12, 10), path('M12 16v-4'), path('M12 8h.01')],
+  // The rail's Profiles entry (0.1.12): Lucide's `users`, two heads on one line.
+  users: [
+    path('M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2'),
+    circle(9, 7, 4),
+    path('M22 21v-2a4 4 0 0 0-3-3.87'),
+    path('M16 3.13a4 4 0 0 1 0 7.75'),
+  ],
+  // The rail's Account entry (0.1.12): Lucide's `key`, the ring and the bit.
+  key: [
+    circle(7.5, 15.5, 5.5),
+    path('m21 2-9.6 9.6'),
+    path('m15.5 7.5 3 3L22 7l-3-3'),
+  ],
 }
 
 /** The six chat states a session row can mark, as the contract names them. */

@@ -27,6 +27,7 @@
 
 import type {
   ChatActivityMark,
+  ContextUsageView_Serialize as ContextUsageView,
   DialogView,
   ImageView,
   HelperThreadView as HelperThreadView,
@@ -64,6 +65,9 @@ export type ChatViewState = {
   /** What the composer's model chip shows (0.1.11): the child's truth, never
    * the page's guess. */
   modelChip: ModelChipView | null
+  /** How full this chat's context is (0.1.12, S5): pi's own reading, every
+   * field null when there is none. `null` while no chat is open. */
+  contextUsage: ContextUsageView | null
   /** The run's fatal launcher failure, or `null`; not about any one chat. */
   fatal: string | null
   /** The notes of the version this run follows, or `null`; not about a chat. */
@@ -120,6 +124,7 @@ export function chatOf(view: ViewState | null): ChatViewState {
       images: NO_IMAGES,
       imagesNotice: null,
       modelChip: null,
+      contextUsage: null,
       fatal,
       whatsNew,
       shell,
@@ -137,6 +142,7 @@ export function chatOf(view: ViewState | null): ChatViewState {
     images: view?.images ?? NO_IMAGES,
     imagesNotice: view?.images_notice ?? null,
     modelChip: view?.model_chip ?? null,
+    contextUsage: view?.context_usage ?? null,
     fatal,
     whatsNew,
     shell,
@@ -186,6 +192,7 @@ export function createChatView(deps: ChatViewDeps = {}): ChatView {
     images: [],
     imagesNotice: null,
     modelChip: null,
+    contextUsage: null,
     fatal: null,
     whatsNew: null,
     shell: NO_SHELL,
@@ -212,6 +219,7 @@ export function createChatView(deps: ChatViewDeps = {}): ChatView {
       next.dialog === state.dialog &&
       next.images === state.images &&
       next.imagesNotice === state.imagesNotice &&
+      next.contextUsage === state.contextUsage &&
       next.fatal === state.fatal &&
       next.whatsNew === state.whatsNew &&
       sameShell(next.shell, state.shell)

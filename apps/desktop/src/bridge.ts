@@ -6,7 +6,7 @@
 // that is gone, a name Windows would not take) or `ViewState.config_notice`
 // (what became of the config file) in the next push, which the sidebar draws.
 
-import { commands, type UiIntent } from './contract/bindings'
+import { commands, type TerminalActionView, type UiIntent } from './contract/bindings'
 
 /** Sends one user intent; the answer is drawn through the next pushed state. */
 export async function dispatchIntent(intent: UiIntent): Promise<void> {
@@ -125,6 +125,24 @@ export async function storeLastRunVersion(): Promise<void> {
     await commands.storeLastRunVersion()
   } catch {
     // The next push still carries the notes; the modal comes back.
+  }
+}
+
+/**
+ * Opens a visible terminal window on one of the jobs the desk does not do
+ * itself (0.1.12, S1, S2, T2, T3): the shell's profiles screen, its login or
+ * logout, or its own update. Rust resolves the launcher and runs it with the
+ * home flags the chats' children get, so the window reads the home the desk is
+ * showing. A refusal - no launcher on this machine, no console to open - comes
+ * back as the one line the pane draws under its button, so a click that did
+ * nothing is never silent.
+ */
+export async function openTerminal(action: TerminalActionView): Promise<string | null> {
+  try {
+    const answer = await commands.openTerminal(action)
+    return answer.status === 'ok' ? null : answer.error
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error)
   }
 }
 

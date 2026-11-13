@@ -181,6 +181,7 @@
             images={chat.images}
             imagesNotice={chat.imagesNotice}
             chip={chat.modelChip}
+            contextUsage={chat.contextUsage}
           />
         </div>
         <div class="view" id="p-helpers" role="tabpanel" aria-labelledby="t-help" hidden={tab !== 'helpers'}>

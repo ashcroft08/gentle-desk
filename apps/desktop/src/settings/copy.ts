@@ -1,8 +1,9 @@
-// The Settings dialog's words (settings-dialog S2-S6). The two sections hold the
-// controls the footer used to carry, so their labels are the ones those controls
-// already had, and the Shell home section says what the welcome screen says about
-// the two homes (shell-choice S2). The third section carries the app's name and
-// version and the manual update check. Everything here is plain ASCII.
+// The Settings dialog's words (settings-dialog S2-S6; 0.1.12 S1-S7). The two
+// sections hold the controls the footer used to carry, so their labels are the
+// ones those controls already had, and the Shell home section says what the
+// welcome screen says about the two homes (shell-choice S2). The other four
+// sections are the 0.1.12 panes, each with its own copy file beside it.
+// Everything here is plain ASCII.
 
 /** The gear's name and the dialog's title: the same word for both (S5, S2). */
 export const SETTINGS = 'Settings'
@@ -15,10 +16,17 @@ export const SETTINGS = 'Settings'
  */
 export const APPEARANCE_HINT = 'The look of this window.'
 export const HOME_HINT = 'Which pi this shell runs on.'
-export const ABOUT_HINT = 'Which build this is, and whether a newer one exists.'
+export const UPDATES_HINT = 'What this machine runs, and whether something newer is out.'
+export const PROFILES_HINT = 'Your agent profiles, as the terminal keeps them.'
+export const ACCOUNT_HINT = 'Which providers are signed in, and where to sign in or out.'
+export const ABOUT_HINT = 'Which build this is.'
 
 export const APPEARANCE_TITLE = 'Appearance'
 export const HOME_TITLE = 'Shell home'
+export const UPDATES_TITLE = 'Updates'
+export const PROFILES_TITLE = 'Profiles'
+export const ACCOUNT_TITLE = 'Account'
+export const ABOUT_TITLE = 'About'
 
 /**
  * The full two-home explanation, the same two answers the welcome screen gives
@@ -29,10 +37,6 @@ export const HOME_TITLE = 'Shell home'
 export const HOME_EXPLAIN =
   'My pi uses the pi installation already on the machine: sign-ins, local models and chats appear in the terminal. Separate creates a clean space at ~/.gentle-shell/agent and touches nothing else.'
 
-/** The third section's title: it carries the app's own information and the
- * manual update check (settings-dialog S5, S6). */
-export const ABOUT_TITLE = 'About and updates'
-
 /** The app's name, as the About section says it (S5): the same name the window's
  * title and the installer carry. */
 export const APP_NAME = 'Gentle Shell Desktop'
@@ -42,13 +46,5 @@ export const VERSION = (version: string): string => `Version ${version}`
 
 /** What the version line says while the bridge has named none: never a guess. */
 export const VERSION_UNKNOWN = 'Version unknown'
-
-/** The check and what it answered (S6): the section draws the answer in place. */
-export const CHECK_NOW = 'Check now'
-export const CHECKING = 'Checking for updates...'
-export const UP_TO_DATE = 'You are up to date.'
-export const CHECK_AVAILABLE = (version: string): string => `Version ${version} is available.`
-export const CHECK_FAILED = (message: string): string =>
-  `The update check failed: ${message}`
 
 export const CLOSE = 'Close'

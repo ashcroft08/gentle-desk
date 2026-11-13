@@ -1,17 +1,31 @@
-// The Settings dialog's rail (settings-dialog L4): the three sections as entries
-// in a left rail, the selected entry highlighted, and that section's content in
-// the pane on the right. The order here is the order the rail draws and the first
-// one is the section the dialog opens on. Each entry's glyph carries no meaning
-// on its own - the entry's word is its name - and the three follow the house
-// style the settings gear set: Lucide outline geometry on one 24x24 grid.
+// The Settings dialog's rail (settings-dialog L4; 0.1.12 S1-S7): the six sections
+// as entries in a left rail, the selected entry highlighted, and that section's
+// content in the pane on the right. The order here is the order the rail draws
+// and the first one is the section the dialog opens on. Each entry's glyph
+// carries no meaning on its own - the entry's word is its name - and the six
+// follow the house style the settings gear set: Lucide outline geometry on one
+// 24x24 grid.
 //
 // The keys are the chat header's tablist keys (chat/tabs.ts): arrows walk the
 // rail and wrap, Home and End jump to the ends, and one entry is the tab stop.
 import type { IconName } from '../icons/shapes'
-import { ABOUT_HINT, ABOUT_TITLE, APPEARANCE_HINT, APPEARANCE_TITLE, HOME_HINT, HOME_TITLE } from './copy'
+import {
+  ABOUT_HINT,
+  ABOUT_TITLE,
+  ACCOUNT_HINT,
+  ACCOUNT_TITLE,
+  APPEARANCE_HINT,
+  APPEARANCE_TITLE,
+  HOME_HINT,
+  HOME_TITLE,
+  PROFILES_HINT,
+  PROFILES_TITLE,
+  UPDATES_HINT,
+  UPDATES_TITLE,
+} from './copy'
 
-/** The three sections, as the dialog names them. */
-export type Section = 'appearance' | 'home' | 'about'
+/** The six sections, as the dialog names them. */
+export type Section = 'appearance' | 'home' | 'updates' | 'profiles' | 'account' | 'about'
 
 /** One rail entry: the section it draws, its word and its glyph. */
 export interface SectionEntry {
@@ -24,6 +38,9 @@ export interface SectionEntry {
 export const SECTIONS: SectionEntry[] = [
   { id: 'appearance', title: APPEARANCE_TITLE, icon: 'theme' },
   { id: 'home', title: HOME_TITLE, icon: 'house' },
+  { id: 'updates', title: UPDATES_TITLE, icon: 'restart' },
+  { id: 'profiles', title: PROFILES_TITLE, icon: 'users' },
+  { id: 'account', title: ACCOUNT_TITLE, icon: 'key' },
   { id: 'about', title: ABOUT_TITLE, icon: 'info' },
 ]
 
@@ -31,6 +48,9 @@ export const SECTIONS: SectionEntry[] = [
 export const SECTION_TITLES: Record<Section, string> = {
   appearance: APPEARANCE_TITLE,
   home: HOME_TITLE,
+  updates: UPDATES_TITLE,
+  profiles: PROFILES_TITLE,
+  account: ACCOUNT_TITLE,
   about: ABOUT_TITLE,
 }
 
@@ -44,6 +64,9 @@ export const RAIL_LABEL = 'Settings sections'
 export const SECTION_HINTS: Record<Section, string> = {
   appearance: APPEARANCE_HINT,
   home: HOME_HINT,
+  updates: UPDATES_HINT,
+  profiles: PROFILES_HINT,
+  account: ACCOUNT_HINT,
   about: ABOUT_HINT,
 }
 
@@ -51,6 +74,9 @@ export const SECTION_HINTS: Record<Section, string> = {
 export const TAB_IDS: Record<Section, string> = {
   appearance: 'settings-tab-appearance',
   home: 'settings-tab-home',
+  updates: 'settings-tab-updates',
+  profiles: 'settings-tab-profiles',
+  account: 'settings-tab-account',
   about: 'settings-tab-about',
 }
 
