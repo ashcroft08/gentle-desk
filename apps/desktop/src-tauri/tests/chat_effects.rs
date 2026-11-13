@@ -49,7 +49,8 @@ fn open_chat_asks_for_one_open_process_and_the_next_state_shows_it_opening() {
         fake.asked(),
         vec![
             ChatCommand::OpenProcess { chat: chat.clone() },
-            // The history, then the chip's three questions (0.1.11).
+            // The history, then the session's own questions: its state, its
+            // context reading (0.1.12) and the chip's two lists (0.1.11).
             ChatCommand::Send {
                 chat: chat.clone(),
                 rpc: RpcCommand::GetMessages { id: None },
@@ -57,6 +58,10 @@ fn open_chat_asks_for_one_open_process_and_the_next_state_shows_it_opening() {
             ChatCommand::Send {
                 chat: chat.clone(),
                 rpc: RpcCommand::GetState,
+            },
+            ChatCommand::Send {
+                chat: chat.clone(),
+                rpc: RpcCommand::GetSessionStats,
             },
             ChatCommand::Send {
                 chat: chat.clone(),
@@ -92,13 +97,17 @@ fn an_already_live_chat_is_confirmed_at_once() {
     assert_eq!(ran.inputs, vec![Input::ChatOpened { chat: chat.clone() }]);
     assert_eq!(ran.confirm_after, None, "nothing waits for that child");
     // The chip was cleared while the chat was away, so the return asks the
-    // state and both lists again (R3-001).
+    // state, the context reading and both lists again (R3-001, 0.1.12).
     assert_eq!(
         fake.asked()[1..],
         [
             ChatCommand::Send {
                 chat: chat.clone(),
                 rpc: RpcCommand::GetState,
+            },
+            ChatCommand::Send {
+                chat: chat.clone(),
+                rpc: RpcCommand::GetSessionStats,
             },
             ChatCommand::Send {
                 chat: chat.clone(),

@@ -45,6 +45,10 @@ pub enum RpcCommand {
     },
     /// The thinking levels the session's current model supports.
     GetAvailableThinkingLevels,
+    /// The session's own statistics, whose `contextUsage` answers how full the
+    /// model's window is (rpc-mode.js:488-490). Read-only and request/response:
+    /// nothing pushes it, so a chat asks again when its turn settles.
+    GetSessionStats,
     UiResponse {
         id: String,
         answer: UiAnswer,

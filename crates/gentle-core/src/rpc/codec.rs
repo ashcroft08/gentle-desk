@@ -41,6 +41,7 @@ pub fn encode_command(command: &RpcCommand) -> String {
         RpcCommand::GetAvailableThinkingLevels => {
             json!({ "type": "get_available_thinking_levels" })
         }
+        RpcCommand::GetSessionStats => json!({ "type": "get_session_stats" }),
         RpcCommand::UiResponse { id, answer } => {
             let mut map = Map::new();
             map.insert("type".into(), json!("extension_ui_response"));

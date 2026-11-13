@@ -251,6 +251,20 @@ pub struct ModelChipView {
     pub thinking_levels: Vec<String>,
 }
 
+/// How full the foreground chat's context is (0.1.12, S5): pi's own
+/// `contextUsage` numbers, one reading per chat. Every field is nullable and a
+/// null is drawn as nothing at all - never as `0` - because pi answers null
+/// right after a compaction.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, Type)]
+pub struct ContextUsageView {
+    /// The tokens the session's context holds.
+    pub tokens: Option<u32>,
+    /// The share of the window in use, in percent, as pi computed it.
+    pub percent: Option<f64>,
+    /// The model's window, the denominator of the percentage.
+    pub window: Option<u32>,
+}
+
 /// How complete the session list is, matching `gentle_app::ListStatus` one to
 /// one. `Loading` carries how far the first pass got, so the sidebar can say it
 /// is still reading; only `Complete` lets an empty list call itself empty.
@@ -697,6 +711,10 @@ pub struct ViewState {
     /// (0.1.11). A no-foreground-chat run shows nothing, so the chip is part of
     /// the chat panel, not the window.
     pub model_chip: ModelChipView,
+    /// How full the foreground chat's context is (0.1.12, S5), from that chat's
+    /// own `get_session_stats` reply. Every field is null when there is no
+    /// reading, and null is never drawn as zero.
+    pub context_usage: ContextUsageView,
     /// Why the last workspace action was refused, as one line of plain text: a
     /// name Windows would not accept, a folder that is not there, a folder that
     /// already holds files (Q6). `None` when nothing was refused, and cleared by

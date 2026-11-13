@@ -45,6 +45,9 @@ export function viewState(overrides: Partial<ViewState_Serialize> = {}): ViewSta
       thinking_level: null,
       thinking_levels: [],
     },
+    // No chat has been read yet: no context reading exists, and a chat-less
+    // fixture cannot carry one (the field is per chat, in the chat slice).
+    context_usage: { tokens: null, percent: null, window: null },
     fatal: null,
     config_notice: null,
     workspace_notice: null,

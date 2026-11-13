@@ -18,9 +18,9 @@ use gentle_runtime::app_config::Theme;
 use gentle_runtime::badge::{Badge, BadgeMark};
 
 use crate::contract::{
-    ChatActivityMark, ChatActivityView, ImageView, ModelChipView, ModelChoiceView,
-    ModelListStatusView, NoticeActionView, NoticeLevel, NoticeView, ShellView, ThemeView,
-    ViewState, WhatsNewView,
+    ChatActivityMark, ChatActivityView, ContextUsageView, ImageView, ModelChipView,
+    ModelChoiceView, ModelListStatusView, NoticeActionView, NoticeLevel, NoticeView, ShellView,
+    ThemeView, ViewState, WhatsNewView,
 };
 use crate::images::Images;
 use crate::{dialogs, helper_thread, helpers, sessions, view};
@@ -104,6 +104,7 @@ pub fn view_state(state: &AppState, sessions_revision: u32, shell: ShellParts<'_
             .unwrap_or_default(),
         images_notice: images.notice(),
         model_chip: model_chip_view(state),
+        context_usage: context_usage_view(state),
         config_notice,
         workspace_notice,
         sessions_notice,
@@ -142,6 +143,29 @@ fn model_chip_view(state: &AppState) -> ModelChipView {
         }),
         thinking_level: state.thinking_level.clone(),
         thinking_levels: state.thinking_levels.clone(),
+    }
+}
+
+/// How full the foreground chat's context is (0.1.12, S5): the reading its own
+/// child last reported. No foreground chat, or a chat that has not answered yet,
+/// is every field null - which the chip draws as nothing, never as `0%`.
+fn context_usage_view(state: &AppState) -> ContextUsageView {
+    let usage = state
+        .chats
+        .foreground()
+        .and_then(|chat| state.chats.context(chat));
+    match usage {
+        // The contract narrows both counts to `u32` (a model's window and a
+        // session's token count are far below it); a number that somehow did not
+        // fit is unknown rather than a wrapped lie.
+        Some(usage) => ContextUsageView {
+            tokens: usage.tokens.and_then(|tokens| u32::try_from(tokens).ok()),
+            percent: usage.percent,
+            window: usage
+                .context_window
+                .and_then(|window| u32::try_from(window).ok()),
+        },
+        None => ContextUsageView::default(),
     }
 }
 
