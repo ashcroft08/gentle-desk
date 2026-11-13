@@ -596,6 +596,10 @@ pub struct HelperThreadView {
 pub struct WhatsNewView {
     /// The version this run runs as, never the manifest's (S5).
     pub version: String,
+    /// The version the last run stored, which this run followed: the modal says
+    /// "since <it>". `None` when the config stored nothing, so the modal never
+    /// invents a starting point.
+    pub previous_version: Option<String>,
     /// The release notes as plain text: no markup and no locale, so the modal
     /// decides how it lays them out (T2).
     pub notes: String,

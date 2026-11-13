@@ -1130,7 +1130,7 @@ export type ViewState_Deserialize = {
 	 *  modal is dismissed: the dismiss is what stores the version and clears it
 	 *  (S5), which is what makes the modal show once per version.
 	 */
-	whats_new?: WhatsNewView | null,
+	whats_new?: WhatsNewView_Deserialize | null,
 	/**
 	 *  The version this run RUNS as, which the bridge names once at startup
 	 *  (`bridge::whats_new`): what the Settings dialog's About section draws
@@ -1292,7 +1292,7 @@ export type ViewState_Serialize = {
 	 *  modal is dismissed: the dismiss is what stores the version and clears it
 	 *  (S5), which is what makes the modal show once per version.
 	 */
-	whats_new: WhatsNewView | null,
+	whats_new: WhatsNewView_Serialize | null,
 	/**
 	 *  The version this run RUNS as, which the bridge names once at startup
 	 *  (`bridge::whats_new`): what the Settings dialog's About section draws
@@ -1310,9 +1310,47 @@ export type ViewState_Serialize = {
  *  dismiss stores the version (S5), so the web side draws it for exactly the run
  *  that follows an update.
  */
-export type WhatsNewView = {
+export type WhatsNewView = WhatsNewView_Serialize | WhatsNewView_Deserialize;
+
+/**
+ *  The notes of the version this run follows (what's-new S3b): the version the run
+ *  runs as and the plain text its release carried. It is pushed once, through the
+ *  same `state-changed` step the notices travel on, and cleared when the modal's
+ *  dismiss stores the version (S5), so the web side draws it for exactly the run
+ *  that follows an update.
+ */
+export type WhatsNewView_Deserialize = {
 	/**  The version this run runs as, never the manifest's (S5). */
 	version: string,
+	/**
+	 *  The version the last run stored, which this run followed: the modal says
+	 *  "since <it>". `None` when the config stored nothing, so the modal never
+	 *  invents a starting point.
+	 */
+	previous_version?: string | null,
+	/**
+	 *  The release notes as plain text: no markup and no locale, so the modal
+	 *  decides how it lays them out (T2).
+	 */
+	notes: string,
+};
+
+/**
+ *  The notes of the version this run follows (what's-new S3b): the version the run
+ *  runs as and the plain text its release carried. It is pushed once, through the
+ *  same `state-changed` step the notices travel on, and cleared when the modal's
+ *  dismiss stores the version (S5), so the web side draws it for exactly the run
+ *  that follows an update.
+ */
+export type WhatsNewView_Serialize = {
+	/**  The version this run runs as, never the manifest's (S5). */
+	version: string,
+	/**
+	 *  The version the last run stored, which this run followed: the modal says
+	 *  "since <it>". `None` when the config stored nothing, so the modal never
+	 *  invents a starting point.
+	 */
+	previous_version: string | null,
 	/**
 	 *  The release notes as plain text: no markup and no locale, so the modal
 	 *  decides how it lays them out (T2).

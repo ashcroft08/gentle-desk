@@ -1,8 +1,9 @@
 <script lang="ts">
   // The what's-new modal (T2, S4): the one thing a run that follows an update
   // says about the version it now runs. Rust pushes it as `ViewState.whats_new`
-  // with the run's OWN version and the release body as plain text; this side
-  // draws that text, one paragraph per blank-line chunk, and nothing else.
+  // with the run's OWN version, the version the config held before, and the
+  // release body as markdown; this side draws it through the thread's sanitized
+  // markdown pipeline (no script, no image, links go to the shell).
   //
   // Dismiss, Escape and a backdrop click all mean the same: put the modal away
   // and tell the shell (`storeLastRunVersion`), which stores the version and
@@ -13,7 +14,11 @@
   import { Dialog } from 'bits-ui'
   import { storeLastRunVersion } from '../bridge'
   import type { WhatsNewView } from '../contract/bindings'
-  import { DISMISS, WHATS_NEW_TITLE, paragraphsOf } from './copy'
+  import Markdown from '../thread/Markdown.svelte'
+  import { createMarkdownCache } from '../thread/markdown'
+  import { DISMISS, ESC_HINT, HEADING, sinceLabel } from './copy'
+
+  const markdown = createMarkdownCache()
 
   let { whatsNew }: { whatsNew: WhatsNewView | null } = $props()
 
@@ -58,15 +63,21 @@
   <Dialog.Root bind:open onOpenChange={changed}>
     <Dialog.Portal>
       <Dialog.Overlay class="ovl" />
-      <Dialog.Content class="dlg" onOpenAutoFocus={(event) => event.preventDefault()}>
-        <Dialog.Title class="dt">{WHATS_NEW_TITLE(whatsNew.version)}</Dialog.Title>
+      <Dialog.Content class="dlg whatsnew" onOpenAutoFocus={(event) => event.preventDefault()}>
+        <header>
+          <Dialog.Title class="dt">
+            {HEADING} <span class="ver">{whatsNew.version}</span>
+          </Dialog.Title>
+          {#if sinceLabel(whatsNew.version, whatsNew.previous_version)}
+            <span class="since">{sinceLabel(whatsNew.version, whatsNew.previous_version)}</span>
+          {/if}
+        </header>
         <Dialog.Description class="notes">
-          {#each paragraphsOf(whatsNew.notes) as paragraph}
-            <p>{paragraph}</p>
-          {/each}
+          <Markdown html={markdown.htmlFor('whats-new', whatsNew.notes)} />
         </Dialog.Description>
         <div class="acts">
-          <button class="btn" type="button" bind:this={dismiss} onclick={putAway}>
+          <span class="hint">{ESC_HINT}</span>
+          <button class="btn primary" type="button" bind:this={dismiss} onclick={putAway}>
             {DISMISS}
           </button>
         </div>

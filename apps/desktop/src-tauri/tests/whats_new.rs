@@ -214,9 +214,12 @@ fn an_update_shows_the_notes_of_this_version_and_stores_nothing_yet() {
         view.whats_new,
         Some(WhatsNewView {
             version: "0.1.8".to_owned(),
+            // The modal says "since 0.1.7": the version the config stored is the
+            // one this run followed, and it reaches the slice with the notes.
+            previous_version: Some("0.1.7".to_owned()),
             notes: "The sidebar folds.".to_owned(),
         }),
-        "the slice carries the version and the plain-text notes"
+        "the slice carries the version, the version it follows and the notes"
     );
     assert_eq!(
         lock(&asked).as_slice(),
