@@ -143,3 +143,19 @@ is written. Backed by the verified facts in the roadmap (2026-11-12 section).
   para usarse mediante la interfaz, no agregar nada nuevo."
 - L4: The chip in the screenshot belongs to the gentle-pi TUI routing table; the
   gentle-desk composer has no chip today (verified 2026-11-12).
+- L14 (user, after the merge of #137; verbatim): "tambien quiero tratar Las seis
+  advertencias antes de lanzar la release". The six informational findings of the
+  approved native review (lineage review-552abe7c43fcc5bb) were R3-2, R3-3, R3-4,
+  R4-1, R4-2 (WARNING) and R4-3 (SUGGESTION). Their original texts were lost: the
+  review state file is deleted when the approved review is acknowledged and they
+  were not saved first, so each disposition below comes from reading the code at
+  the reported location, not from the reviewer's words (lesson: save the findings
+  before acknowledging). R4-1 and R3-3: the highlighted row was an index into the
+  visible list that a shrinking list or an empty filter left out of range; it is
+  now clamped (test: the list shrinks while open). R3-2 and R4-2: the pill button
+  handled Enter and Space as well as the native click it already produces; only
+  ArrowDown is handled now (test: Enter and Space are not prevented). R3-4: the
+  chip's CSS comment still said it had its own row, and a margin-top: 0 was left
+  over; both removed. R4-3: NOT changed. SidebarToggle's default no-op handler is
+  there so the control renders alone in tests; both production call sites pass the
+  real handler, and requiring it there would only move the default up to Header.
