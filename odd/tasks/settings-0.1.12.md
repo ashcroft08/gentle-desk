@@ -255,3 +255,18 @@ the subscription panel goes to NEXT version's analysis; 0.1.12 ships the four pi
   commit had spliced the new contract views between the two lines of ListStatusView's doc
   comment (in contract.rs, and so in bindings.ts); the chain keeps that comment whole, the
   only content difference from bd0d463's tree.
+
+- L19 (2026-11-13, delivery complete): the feature landed on main as the approved 3-PR chain
+  (#146 6fc8470 context seam; #147 f266ead settings reads + orchestrator mode + terminals;
+  #148 197ec6e web panes + context chip + update gate); issue #144 closed. The auth surface
+  was natively reviewed twice, both APPROVED and acknowledged: lineage
+  review-b47114a668c5a5cb (the Unverified fix; advisory R1-provider-not-found-overbroad) and
+  lineage review-60d4fdba89098aa0 (the auth link candidate, 1674 lines, 2 reviewer runs,
+  advisories R3-001 crates/app/src/chats/apply.rs:52-55 and R3-002 crates/runtime/src/auth.rs:44-56;
+  findings preserved at Temp/wn/auth-review-findings.md and quoted here by id and location).
+  The wider settings range exceeded the native lens-context budget as one candidate (terminal
+  stop lens_context_budget_exceeded at 9234 and 6790 lines; nothing created, no retry possible),
+  so per the maintainer's decisions it was delivered as the chain, with CI green on every link
+  and the maintainer's real-app test feeding three fixes (L17) into the final link. Open for the
+  release: nothing in the feature; the maintainer's retest of the dev app (open_terminal never
+  executed by a writer) and the 0.1.12 release phase remain maintainer decisions.
