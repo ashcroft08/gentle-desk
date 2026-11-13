@@ -213,6 +213,25 @@ pub enum UiIntent {
     SelectThinkingLevel {
         level: String,
     },
+    /// Re-read gentle-pi's agent profiles from the config home (0.1.12, T2). The
+    /// Settings dialog sends it when the Profiles pane opens and after the
+    /// terminal may have changed the file. Nothing is written: the shell owns
+    /// the file. The answer travels back on [`ViewState::profiles`].
+    RefreshProfiles,
+    /// Re-read the provider names and re-run one `auth check` per provider
+    /// (0.1.12, T3). The answer travels back on [`ViewState::auth`].
+    RefreshAuth,
+    /// Check the three versions again (0.1.12, S2, S7), the same check the app
+    /// runs once when it opens. It only ever CHECKS: no update is installed
+    /// from here. The answer travels back on [`ViewState::updates`].
+    CheckUpdates,
+    /// Choose the orchestrator mode of the chats opened from now on (0.1.12,
+    /// S1, T4). Session-scoped: the mode is passed to each child through
+    /// `GENTLE_PI_ORCHESTRATOR_MODE` and is never stored in the config, so a new
+    /// run starts on gentle-pi's own default again.
+    SetOrchestratorMode {
+        mode: OrchestratorModeView,
+    },
 }
 
 /// One model pi offers, flattened for the chip's dropdown.
@@ -249,6 +268,181 @@ pub struct ModelChipView {
     pub thinking_level: Option<String>,
     /// The levels the current model supports, in pi's order.
     pub thinking_levels: Vec<String>,
+}
+
+/// How the orchestrator runs a turn, named exactly as gentle-pi's
+/// `GENTLE_PI_ORCHESTRATOR_MODE` names them (`organic`, `full-delegation`), so
+/// neither side translates a value (0.1.12, S1, T4).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub enum OrchestratorModeView {
+    /// gentle-pi's own default: the orchestrator works and delegates as it
+    /// chooses. A run that never chose shows this one.
+    #[default]
+    #[serde(rename = "organic")]
+    Organic,
+    #[serde(rename = "full-delegation")]
+    FullDelegation,
+}
+
+/// One role of a profile: what it runs and how hard it thinks. Every field is
+/// optional because the file allows a partial row, and a missing one is drawn as
+/// nothing rather than as a guess.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub struct ProfileRoleView {
+    /// The role's name, the file's own key (`orchestrator`, `review-refuter`...).
+    pub role: String,
+    pub model: Option<String>,
+    pub thinking: Option<String>,
+    pub tier: Option<String>,
+}
+
+/// One agent profile as the Profiles pane draws it (0.1.12, T2): its name, its
+/// orchestrator route, its other roles, and the orchestration mode the file
+/// records for it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub struct ProfileView {
+    pub name: String,
+    /// True for the profile the file records as active, which is the one the
+    /// pane's header names.
+    pub active: bool,
+    /// The reserved `orchestrator` role, drawn as the profile's summary line.
+    pub orchestrator: Option<ProfileRoleView>,
+    /// Every other role, sorted by name.
+    pub roles: Vec<ProfileRoleView>,
+    /// The mode this profile prefers, from the file's sibling `workflow` map.
+    /// `None` for a profile that names none.
+    pub mode: Option<OrchestratorModeView>,
+}
+
+/// Where the read of `profiles.json` stands. A file of another kind or version
+/// is `Failed` with the reason: the pane then says it cannot read the file
+/// instead of drawing a wrong one.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(tag = "type", content = "data")]
+pub enum ProfilesStatusView {
+    /// Not read yet.
+    #[default]
+    Unknown,
+    /// Read: the profiles here are the file's.
+    Ready,
+    /// The file could not be read or is not this reader's document; the string
+    /// is why.
+    Failed(String),
+}
+
+/// The Profiles pane (0.1.12, S1, T2), read-only: the active profile's name, its
+/// roles, and the mode the desk's next chats will start with.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub struct ProfilesView {
+    pub status: ProfilesStatusView,
+    /// The active profile's name, `None` when the file names none.
+    pub active: Option<String>,
+    pub profiles: Vec<ProfileView>,
+    /// The mode the desk passes to the chats it opens from now on. It is the
+    /// SESSION's switch, never a stored preference (S1).
+    pub mode: OrchestratorModeView,
+}
+
+/// What one "Open in terminal" button asks the shell to do (0.1.12, S1, S2,
+/// T2, T3). It is a COMMAND and not an intent, like `open_link`: nothing of the
+/// app state changes when a terminal window opens, and the `argv` the shell is
+/// run with is the shell's business ([`crate::terminal`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub enum TerminalActionView {
+    /// The shell's profiles screen, as its opening prompt: the desk's Profiles
+    /// pane sends every edit, create and switch there (L9).
+    Profiles,
+    /// The shell's own `auth login`.
+    Login,
+    /// The shell's own `auth logout`.
+    Logout,
+    /// The shell's own `update`, which forwards to pi's updater (L5): run from a
+    /// terminal, and only offered with every chat closed (S4).
+    Update,
+}
+
+/// How one provider's `auth check` stands: the four states the shell reports.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub enum ProviderStatusView {
+    Ready,
+    NotReady,
+    /// The store lists the provider, but pi's registry does not know the name
+    /// (a custom provider), so the check cannot speak: the credentials exist,
+    /// nobody verified them.
+    Unverified,
+    Invalid,
+    Error,
+}
+
+/// One provider the shell's auth store lists, with what its own check said. The
+/// NAME is all that is read from the store: no key, token or account identity
+/// travels up (S1's refinement, L11).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub struct AuthProviderView {
+    pub name: String,
+    pub status: ProviderStatusView,
+    /// The shell's own reason, when it gave one.
+    pub reason: Option<String>,
+}
+
+/// Where the auth read stands.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(tag = "type", content = "data")]
+pub enum AuthStatusView {
+    /// Not read yet.
+    #[default]
+    Unknown,
+    /// Read: every provider listed was checked.
+    Ready,
+    /// The store could not be read; the string is why.
+    Failed(String),
+}
+
+/// The Account pane (0.1.12, S1, T3): one row per connected provider, as the
+/// shell's own check answered.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub struct AuthView {
+    pub status: AuthStatusView,
+    pub providers: Vec<AuthProviderView>,
+}
+
+/// One version row of the Updates pane: what is installed, what is published,
+/// and whether the second is newer. `update_available: None` means the
+/// comparison cannot be made - a probe that failed, a registry that did not
+/// answer, or gentle-shell's channel, which the desk cannot tell - and it is
+/// never drawn as "up to date".
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub struct VersionRowView {
+    pub current: Option<String>,
+    pub latest: Option<String>,
+    pub update_available: Option<bool>,
+}
+
+/// Where the update check stands. It runs once when the app opens (S3) and again
+/// only when the user asks.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub enum UpdatesStatusView {
+    /// Not checked yet.
+    #[default]
+    Unknown,
+    Checking,
+    /// The check ran; each row says what it found on its own.
+    Ready,
+}
+
+/// The Updates pane (0.1.12, S2, S7): the three pieces this machine runs, and
+/// the one check the app made for them. It is read-only: no update is installed
+/// from the contract.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub struct UpdatesView {
+    pub status: UpdatesStatusView,
+    /// The desk itself, against the release manifest the updater reads.
+    pub desk: VersionRowView,
+    /// pi, against the npm registry's published version.
+    pub pi: VersionRowView,
+    /// gentle-shell. Its channel decides where a newer version lives and the
+    /// desk cannot tell the channel, so this row never claims an update.
+    pub shell: VersionRowView,
 }
 
 /// How full the foreground chat's context is (0.1.12, S5): pi's own
@@ -658,6 +852,14 @@ pub struct ViewState {
     /// How many sessions the app holds, whatever the search box says: the
     /// unfiltered count, next to the filtered total each window answers with.
     pub total_sessions: u32,
+    /// How many chats the app has OPEN right now, whatever they are doing:
+    /// every chat whose child this run started, the foreground one included.
+    ///
+    /// The Updates pane's gate reads it (0.1.12, S4): an update runs only with
+    /// every chat closed, and an idle chat in the background is still a child
+    /// the update would land under, so the rule counts them all rather than the
+    /// foreground one alone.
+    pub open_chats: u32,
     /// The foreground chat's messages, oldest first. Message text is the model's
     /// whole markdown reply, so the slice carries the last
     /// [`MESSAGES_PUSHED`](crate::view::MESSAGES_PUSHED) of them and never a
@@ -715,6 +917,15 @@ pub struct ViewState {
     /// own `get_session_stats` reply. Every field is null when there is no
     /// reading, and null is never drawn as zero.
     pub context_usage: ContextUsageView,
+    /// The agent profiles the shell keeps (0.1.12, T2), read on the pane's
+    /// behalf and never written.
+    pub profiles: ProfilesView,
+    /// Where the shell's authentication stands (0.1.12, T3): provider names and
+    /// their own check, never a key.
+    pub auth: AuthView,
+    /// The versions this machine runs and the newer ones published (0.1.12,
+    /// S2, S7). Checked once when the app opens.
+    pub updates: UpdatesView,
     /// Why the last workspace action was refused, as one line of plain text: a
     /// name Windows would not accept, a folder that is not there, a folder that
     /// already holds files (Q6). `None` when nothing was refused, and cleared by

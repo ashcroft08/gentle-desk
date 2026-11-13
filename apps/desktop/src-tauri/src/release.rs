@@ -65,8 +65,9 @@ fn fetch(url: &str) -> Result<Latest, String> {
 /// Installs the ring crypto provider a rustls client needs once per process: the
 /// same provider the updater plugin installs for its own request, so the two
 /// never disagree about which one is in use. A provider already installed is not
-/// an error - it is the one this would set.
-fn install_tls_provider() {
+/// an error - it is the one this would set. Shared with the Settings pane's own
+/// GETs (`settings::web`), so both ride one stack.
+pub(crate) fn install_tls_provider() {
     let _ = rustls::crypto::ring::default_provider().install_default();
 }
 

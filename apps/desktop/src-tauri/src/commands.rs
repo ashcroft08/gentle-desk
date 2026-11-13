@@ -29,13 +29,17 @@ use crate::bridge::{AppStateHolder, CommandSink};
 use crate::clipboard::{self, Clipboard, SystemClipboard};
 use crate::close::{self, BridgeSteps, CloseFlow, CLOSING};
 use crate::config::{ConfigSnapshot, ConfigWriter};
-use crate::contract::{StateChanged, UiIntent, ViewState};
+use crate::contract::{
+    OrchestratorModeView, StateChanged, TerminalActionView, UiIntent, UpdatesStatusView,
+    UpdatesView, ViewState,
+};
 use crate::effects::{self, Ran, RuntimeExecutor};
 use crate::events::{EventPump, Push};
 use crate::link_opener::{LinkOpener, SystemLinkOpener};
 use crate::pending::PendingFolders;
 use crate::picker::{FolderPicker, NativeFolderPicker};
 use crate::sessions::{startup, SessionsService};
+use crate::settings::{self, FileRead, ProviderProbe, SettingsSeams, VersionProbe, WebGet};
 use crate::shell_install::{CommandInstaller, Installer};
 use crate::theme::SystemWindowTheme;
 use crate::window::{self, SystemWindowRecorder};
@@ -98,6 +102,14 @@ pub struct Bridge {
     /// Whether the `gentle-shell` launcher resolves (shell-choice S1-S2): the
     /// real probe unless a test gave one ([`Bridge::with_launcher`]).
     launcher: LauncherProbe,
+    /// The Settings pane's seams and paths (0.1.12): the files, the provider
+    /// check, the version probe and one GET. Nothing runs until the pane asks or
+    /// the update check starts.
+    settings: SettingsSeams,
+    /// Where a later "Check again" reads the desk's own manifest from: the same
+    /// endpoint the updater names, named once at startup by
+    /// [`Bridge::start_updates`].
+    desk_endpoint: Mutex<Option<String>>,
 }
 
 impl Bridge {
@@ -153,6 +165,10 @@ impl Bridge {
             // installs the real emit, exactly as it arms the pump.
             emit: Mutex::new(Arc::new(|_view: &ViewState| Ok(()))),
             launcher: Arc::new(launcher_resolves),
+            // The Settings pane's seams read the environment once, here: the
+            // files it reads and the flags the shell runs with.
+            settings: SettingsSeams::new(home_choice),
+            desk_endpoint: Mutex::new(None),
         };
         // Whether the launcher resolves is asked once here, through the seam, so
         // a machine with no gentle-shell is told at the first frame, not at the
@@ -198,6 +214,33 @@ impl Bridge {
     /// What installs gentle-shell, instead of the real `npm install -g`.
     pub fn with_installer(mut self, installer: Arc<dyn Installer>) -> Self {
         self.installer = installer;
+        self
+    }
+
+    /// The Settings pane's file reader, instead of the machine's: a test reads a
+    /// scratch profiles.json or auth.json without touching a real home.
+    pub fn with_settings_files(mut self, files: FileRead) -> Self {
+        self.settings.files = files;
+        self
+    }
+
+    /// The per-provider check, instead of the real `auth check` run: no test
+    /// starts a shell.
+    pub fn with_provider_probe(mut self, probe: ProviderProbe) -> Self {
+        self.settings.probe = probe;
+        self
+    }
+
+    /// The version probe, instead of the real `gentle-shell --version`.
+    pub fn with_version_probe(mut self, versions: VersionProbe) -> Self {
+        self.settings.versions = versions;
+        self
+    }
+
+    /// One GET, instead of the real one: no test of the update check reaches the
+    /// network.
+    pub fn with_web_get(mut self, web: WebGet) -> Self {
+        self.settings.web = web;
         self
     }
 
@@ -390,6 +433,16 @@ impl Bridge {
             emit_view(&emit, &view)?;
             return Ok(view);
         }
+        // The Settings pane's intents (0.1.12) are the shell's, not the
+        // reducer's: they read a file, run the shell's own check, or pass a mode
+        // to the children. Each answers the slice it pushed.
+        match &intent {
+            UiIntent::RefreshProfiles => return self.refresh_profiles(),
+            UiIntent::RefreshAuth => return self.refresh_auth(),
+            UiIntent::CheckUpdates => return self.check_updates(),
+            UiIntent::SetOrchestratorMode { mode } => return self.set_orchestrator_mode(*mode),
+            _ => {}
+        }
         // A relaunch is the close flow with a different last step: the config
         // writer and the session cache are flushed first, as for any close.
         if matches!(intent, UiIntent::RestartApp) {
@@ -555,12 +608,139 @@ impl Bridge {
             None => Ok(self.holder.view()),
         }
     }
+
+    /// Opens a visible terminal window on one of the jobs the desk hands to the
+    /// shell (0.1.12, S1, S2, T2, T3): the profiles screen, its login or logout,
+    /// or its own update. It is a COMMAND, like `open_link`: no intent folds and
+    /// nothing of the slice changes, so no push follows it.
+    ///
+    /// The window runs with the home flags this run's children get, so the
+    /// terminal reads and writes the home the pane is showing, and the refusal
+    /// (no launcher, no console) reaches the button that asked.
+    pub fn open_terminal(&self, action: TerminalActionView) -> Result<(), String> {
+        self.accepting_work()?;
+        crate::terminal::open(action, &self.settings.paths.home_args)
+    }
+
+    /// The Profiles pane's read (0.1.12, T2): the config home's `profiles.json`
+    /// through the seam, pushed as the next slice, with the fallback chains of
+    /// its sibling `profile-fallbacks.json` (L13) as each profile's FALLBACK row.
+    /// A document of another kind or version reaches the page as `Failed` with
+    /// its reason, never as a wrong view, and a file that is not there is a pane
+    /// with no profiles. A chain file that is missing or refused only leaves the
+    /// row undrawn: it never fails the pane.
+    pub fn refresh_profiles(&self) -> Result<ViewState, String> {
+        self.accepting_work()?;
+        let emit = self.emitter();
+        let view = self.holder.note_profiles(settings::profiles_view(
+            &self.settings.files,
+            self.settings.paths.profiles.as_deref(),
+            self.settings.paths.fallbacks.as_deref(),
+            self.holder.orchestrator_mode(),
+        ));
+        emit_view(&emit, &view)?;
+        Ok(view)
+    }
+
+    /// The Account pane's read (0.1.12, T3): the provider names the auth store
+    /// lists, and one `auth check --no-refresh` per provider, pushed as the next
+    /// slice.
+    ///
+    /// The checks run on the intent's own thread - one short process each, and
+    /// the pane draws the answer it asked for - and nothing here refreshes a
+    /// token: `--no-refresh` is part of the command.
+    pub fn refresh_auth(&self) -> Result<ViewState, String> {
+        self.accepting_work()?;
+        let emit = self.emitter();
+        let view = self.holder.note_auth(settings::auth_view(
+            &self.settings.files,
+            self.settings.paths.auth.as_deref(),
+            &self.settings.probe,
+        ));
+        emit_view(&emit, &view)?;
+        Ok(view)
+    }
+
+    /// One update check (0.1.12, S2, S3, S7): "Check again" from the pane. The
+    /// answer to the click says the check is running, and the check's own thread
+    /// pushes the versions it found. A check only ever CHECKS: no update is
+    /// installed from here.
+    pub fn check_updates(&self) -> Result<ViewState, String> {
+        self.accepting_work()?;
+        let emit = self.emitter();
+        let view = self.holder.note_updates_checking();
+        emit_view(&emit, &view)?;
+        self.run_update_check(emit);
+        Ok(view)
+    }
+
+    /// The automatic check of this run (S3): once, when the app opens, and never
+    /// on the thread that draws. The endpoint is kept so a later "Check again"
+    /// reads the same manifest.
+    pub fn start_updates(&self, desk_endpoint: Option<&str>) {
+        *lock(&self.desk_endpoint) = desk_endpoint.map(str::to_owned);
+        self.run_update_check(self.emitter());
+    }
+
+    /// The mode the chats opened from now on start with (0.1.12, S1, T4). The
+    /// executor's spawner carries it to each child through
+    /// `GENTLE_PI_ORCHESTRATOR_MODE`, the pane draws which one is on, and nothing
+    /// is stored: a new run starts on gentle-pi's own default again.
+    pub fn set_orchestrator_mode(&self, mode: OrchestratorModeView) -> Result<ViewState, String> {
+        self.accepting_work()?;
+        let emit = self.emitter();
+        self.executor
+            .set_orchestrator_mode(Some(orchestrator_mode(mode)));
+        let view = self.holder.note_orchestrator_mode(mode);
+        emit_view(&emit, &view)?;
+        Ok(view)
+    }
+
+    /// The check itself, on a thread of its own: the two versions the shell
+    /// prints, the desk's own manifest and pi's registry entry, gathered outside
+    /// every lock and pushed when they are all in.
+    fn run_update_check(&self, emit: Emit) {
+        let desk = self.holder.app_version();
+        let manifest = lock(&self.desk_endpoint).clone();
+        let web = Arc::clone(&self.settings.web);
+        let versions = Arc::clone(&self.settings.versions);
+        let holder = Arc::clone(&self.holder);
+        let thread_emit = Arc::clone(&emit);
+        let spawned = std::thread::Builder::new()
+            .name("update-check".to_owned())
+            .spawn(move || {
+                let checked =
+                    settings::updates_view(desk.as_deref(), manifest.as_deref(), &web, &versions);
+                push(&thread_emit, holder.note_updates(checked));
+            });
+        if spawned.is_err() {
+            // No thread to check on: the version probe and the two GETs are not
+            // moved onto the thread that draws, so the pane says the check ran
+            // and learned nothing rather than staying on "checking".
+            let view = self.holder.note_updates(UpdatesView {
+                status: UpdatesStatusView::Ready,
+                ..UpdatesView::default()
+            });
+            push(&emit, view);
+        }
+    }
 }
 
 /// Whether the `gentle-shell` launcher resolves on this machine right now.
 fn launcher_resolves() -> bool {
     gentle_backend::launcher::resolve(&gentle_backend::launcher::LauncherEnv::from_process())
         .is_ok()
+}
+
+/// The contract's mode as the spawner's own type: the two enums carry the same
+/// two values, so neither side parses a string.
+fn orchestrator_mode(mode: OrchestratorModeView) -> gentle_backend::chat_host::OrchestratorMode {
+    match mode {
+        OrchestratorModeView::Organic => gentle_backend::chat_host::OrchestratorMode::Organic,
+        OrchestratorModeView::FullDelegation => {
+            gentle_backend::chat_host::OrchestratorMode::FullDelegation
+        }
+    }
 }
 
 /// What follows an install, whoever ran it: the outcome reaches the install state

@@ -29,7 +29,7 @@ use gentle_runtime::app_config::{self, folder_key};
 use gentle_runtime::clock::now_ms;
 
 use crate::config::{ConfigSnapshot, ConfigWriter};
-use crate::contract::{SessionsWindow, UiIntent, ViewState};
+use crate::contract::{AuthView, ProfilesView, SessionsWindow, UiIntent, UpdatesView, ViewState};
 use crate::images::Images;
 use crate::sessions::cache::TreeCache;
 use crate::sessions::revision;
@@ -44,6 +44,7 @@ mod fatal;
 mod images;
 mod notice;
 mod session_notice;
+mod settings;
 mod shell;
 mod theme;
 mod whats_new;
@@ -115,6 +116,14 @@ pub struct AppStateHolder {
     /// The images each chat holds: attached in the composer, read here, taken by
     /// that chat's send and served back as previews (`bridge::images`).
     images: Images,
+    /// The Profiles pane's slice (0.1.12, T2): what the config home's
+    /// `profiles.json` said, read on the pane's behalf and never written.
+    profiles: Mutex<ProfilesView>,
+    /// The Account pane's slice (0.1.12, T3): the provider names the shell's
+    /// store lists and what its own check said about each.
+    auth: Mutex<AuthView>,
+    /// The Updates pane's slice (0.1.12, S2, S7): the last check's answer.
+    updates: Mutex<UpdatesView>,
     /// The run's one fatal failure, as `ViewState.fatal` carries it: the
     /// launcher could not be resolved, so no chat can start (`bridge::fatal`).
     fatal: Mutex<Option<String>>,
@@ -184,29 +193,8 @@ impl AppStateHolder {
     /// The two shell-owned notice lines are read before the state lock, as the
     /// config notice is, so no path holds the state and a notice at once.
     pub fn view(&self) -> ViewState {
-        let notice = self.config_notice();
-        let workspace_notice = self.workspace_notice();
-        let sessions_notice = self.sessions_notice();
-        let whats_new = self.whats_new();
-        let app_version = self.app_version();
-        let fatal = self.fatal();
-        let theme = self.theme_value();
-        let shell = self.shell_view();
-        view_state(
-            &self.state(),
-            self.sessions_revision(),
-            ShellParts {
-                config_notice: notice,
-                workspace_notice,
-                sessions_notice,
-                whats_new,
-                app_version,
-                fatal,
-                theme,
-                shell,
-                images: &self.images,
-            },
-        )
+        let shell = self.shell_parts();
+        view_state(&self.state(), self.sessions_revision(), shell)
     }
 
     /// The activity the reducer holds for the chat stored at `session` (S4): the
@@ -267,18 +255,11 @@ impl AppStateHolder {
 
     fn apply(&self, input: gentle_app::Input) -> (ViewState, Vec<gentle_app::ChatCommand>) {
         // One lock for the fold and the slice it answers: a revision read here
-        // describes exactly the state it is pushed with. The config notice is
-        // read before it, so no path ever holds the state and the config at
-        // once. The shared commands run after the lock is released, because a
-        // refresh pass folds back into this same holder.
-        let notice = self.config_notice();
-        let workspace_notice = self.workspace_notice();
-        let sessions_notice = self.sessions_notice();
-        let whats_new = self.whats_new();
-        let app_version = self.app_version();
-        let fatal = self.fatal();
-        let theme = self.theme_value();
-        let shell = self.shell_view();
+        // describes exactly the state it is pushed with. Everything the shell
+        // owns is read before it, so no path ever holds the state and another
+        // lock at once. The shared commands run after the lock is released,
+        // because a refresh pass folds back into this same holder.
+        let shell = self.shell_parts();
         let (view, chat_commands, commands) = {
             let mut app = lock(&self.app);
             let previous = app.clone();
@@ -288,25 +269,30 @@ impl AppStateHolder {
                 self.sessions_revision.fetch_add(1, Ordering::Relaxed);
             }
             *app = state;
-            let view = view_state(
-                &app,
-                self.sessions_revision(),
-                ShellParts {
-                    config_notice: notice,
-                    workspace_notice,
-                    sessions_notice,
-                    whats_new,
-                    app_version,
-                    fatal,
-                    theme,
-                    shell,
-                    images: &self.images,
-                },
-            );
+            let view = view_state(&app, self.sessions_revision(), shell);
             (view, effects.chat_commands, effects.commands)
         };
         self.run_shared(commands);
         (view, chat_commands)
+    }
+
+    /// Everything the slice carries beside the state: the lines and slices the
+    /// shell owns, read together and before any state lock.
+    fn shell_parts(&self) -> ShellParts<'_> {
+        ShellParts {
+            config_notice: self.config_notice(),
+            workspace_notice: self.workspace_notice(),
+            sessions_notice: self.sessions_notice(),
+            whats_new: self.whats_new(),
+            app_version: self.app_version(),
+            fatal: self.fatal(),
+            theme: self.theme_value(),
+            shell: self.shell_view(),
+            profiles: self.profiles(),
+            auth: self.auth(),
+            updates: self.updates(),
+            images: &self.images,
+        }
     }
 
     /// Runs the shared commands of one fold through the sink, if any.

@@ -1,385 +1,102 @@
 <!doctype html>
-<html lang="en" data-theme="system">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>gentle-desk - starter system (gentle-shell themes)</title>
+<title>gentle-desk — system (sourced from theme.css + app.css)</title>
 <style>
-  /* ---- Theme tables: real gentle-pi files + PROPOSED built-ins (from system.md) ---- */
-  :root[data-theme="system"]{ transform:none } /* resolved by media query below */
-  :root[data-theme="dark"]{
-    --bg:#0e1116; --surface:#151a21; --surface-2:#1c222b; --border:#2b333d;
-    --text:#e4e8ee; --muted:#9aa4b2; --faint:#7d8593;
-    --accent:#7aa2f7; --success:#7edc9a; --warning:#e7b455; --danger:#ff8585;
-    --accent-tint:rgba(122,162,247,.14); --success-tint:rgba(126,220,154,.12);
-    --warning-tint:rgba(231,180,85,.14); --danger-tint:rgba(255,133,133,.14);
-    --on-danger:#0e1116; --shadow-1:0 6px 20px rgba(0,0,0,.45); --shadow-2:0 14px 50px rgba(0,0,0,.6);
-  }
-  :root[data-theme="gentle"]{
-    --bg:#06080f; --surface:#06080f; --surface-2:#0d0f14; --border:#313342;
-    --text:#F3F6F9; --muted:#8394A3; --faint:#96A2B0;
-    --accent:#7FB4CA; --success:#B7CC85; --warning:#DEBA87; --danger:#CB7C94;
-    --accent-tint:#161D2E; --success-tint:#1a2e1a;
-    --warning-tint:rgba(222,186,135,.14); --danger-tint:#2e1a1a;
-    --on-danger:#06080f; --shadow-1:0 6px 20px rgba(0,0,0,.55); --shadow-2:0 14px 50px rgba(0,0,0,.7);
-  }
-  :root[data-theme="cute"]{
-    --bg:#060407; --surface:#100A0F; --surface-2:#100A0F; --border:#563040;
-    --text:#F6EFF3; --muted:#A78E9B; --faint:#D7A0B8;
-    --accent:#F095C8; --success:#B4E7C7; --warning:#F2B86D; --danger:#FF718F;
-    --accent-tint:#2A1523; --success-tint:#151316;
-    --warning-tint:rgba(242,184,109,.14); --danger-tint:#261019;
-    --on-danger:#060407; --shadow-1:0 6px 20px rgba(0,0,0,.55); --shadow-2:0 14px 50px rgba(0,0,0,.7);
-  }
-  :root[data-theme="sexy"]{
-    --bg:#060407; --surface:#100A0F; --surface-2:#100A0F; --border:#563040;
-    --text:#F6EFF3; --muted:#A78E9B; --faint:#D7A0B8;
-    --accent:#F43888; --success:#D2CBD0; --warning:#F2B86D; --danger:#FF718F;
-    --accent-tint:#2E0F1F; --success-tint:#151316;
-    --warning-tint:rgba(242,184,109,.14); --danger-tint:#261019;
-    --on-danger:#060407; --shadow-1:0 6px 20px rgba(0,0,0,.55); --shadow-2:0 14px 50px rgba(0,0,0,.7);
-  }
-  :root[data-theme="light"]{
-    --bg:#f2f4f7; --surface:#ffffff; --surface-2:#e9edf2; --border:#cfd5dd;
-    --text:#17202a; --muted:#576272; --faint:#6b7686;
-    --accent:#2e5bd7; --success:#166e38; --warning:#8a5800; --danger:#c22f37;
-    --accent-tint:rgba(46,91,215,.10); --success-tint:rgba(30,138,74,.10);
-    --warning-tint:rgba(217,155,38,.14); --danger-tint:rgba(224,82,82,.10);
-    --on-danger:#ffffff; --shadow-1:0 6px 20px rgba(23,32,42,.12); --shadow-2:0 14px 50px rgba(23,32,42,.22);
-  }
-  /* system = the built-in picker entry: dark or light via prefers-color-scheme */
-  :root[data-theme="system"]{
-    --bg:#0e1116; --surface:#151a21; --surface-2:#1c222b; --border:#2b333d;
-    --text:#e4e8ee; --muted:#9aa4b2; --faint:#7d8593;
-    --accent:#7aa2f7; --success:#7edc9a; --warning:#e7b455; --danger:#ff8585;
-    --accent-tint:rgba(122,162,247,.14); --success-tint:rgba(126,220,154,.12);
-    --warning-tint:rgba(231,180,85,.14); --danger-tint:rgba(255,133,133,.14);
-    --on-danger:#0e1116; --shadow-1:0 6px 20px rgba(0,0,0,.45); --shadow-2:0 14px 50px rgba(0,0,0,.6);
-  }
-  @media (prefers-color-scheme: light){
-    :root[data-theme="system"]{
-      --bg:#f2f4f7; --surface:#ffffff; --surface-2:#e9edf2; --border:#cfd5dd;
-      --text:#17202a; --muted:#576272; --faint:#6b7686;
-      --accent:#2e5bd7; --success:#166e38; --warning:#8a5800; --danger:#c22f37;
-      --accent-tint:rgba(46,91,215,.10); --success-tint:rgba(30,138,74,.10);
-      --warning-tint:rgba(217,155,38,.14); --danger-tint:rgba(224,82,82,.10);
-      --on-danger:#ffffff; --shadow-1:0 6px 20px rgba(23,32,42,.12); --shadow-2:0 14px 50px rgba(23,32,42,.22);
-    }
-  }
-
+  :root, [data-theme='dark']{--bg:#0e1116;--surface:#151a21;--surface2:#1c222b;--border:#2b333d;--text:#e4e8ee;--muted:#9aa4b2;--faint:#7d8593;--accent:#7aa2f7;--tint:rgba(122,162,247,.14);--success:#7edc9a;--warning:#e7b455;--danger:#ff8585;--shadow:0 8px 24px rgba(0,0,0,.45)}
+  [data-theme='light']{--bg:#f2f4f7;--surface:#ffffff;--surface2:#e9edf2;--border:#cfd5dd;--text:#17202a;--muted:#576272;--faint:#6b7686;--accent:#2e5bd7;--tint:rgba(46,91,215,.1);--success:#166e38;--warning:#8a5800;--danger:#c22f37;--shadow:0 8px 24px rgba(23,32,42,.18)}
+  [data-theme='Gentle']{--bg:#06080f;--surface:#06080f;--surface2:#0d0f14;--border:#313342;--text:#f3f6f9;--muted:#8394a3;--faint:#96a2b0;--accent:#7fb4ca;--tint:#161d2e;--success:#b7cc85;--warning:#deba87;--danger:#cb7c94;--shadow:0 8px 24px rgba(0,0,0,.6)}
+  [data-theme='Gentleman-Cute']{--bg:#060407;--surface:#100a0f;--surface2:#100a0f;--border:#563040;--text:#f6eff3;--muted:#a78e9b;--faint:#d7a0b8;--accent:#f095c8;--tint:#2a1523;--success:#b4e7c7;--warning:#f2b86d;--danger:#ff718f;--shadow:0 8px 24px rgba(0,0,0,.6)}
+  [data-theme='Gentleman-Sexy']{--bg:#060407;--surface:#100a0f;--surface2:#100a0f;--border:#563040;--text:#f6eff3;--muted:#a78e9b;--faint:#d7a0b8;--accent:#f43888;--tint:#2e0f1f;--success:#d2cbd0;--warning:#f2b86d;--danger:#ff718f;--shadow:0 8px 24px rgba(0,0,0,.6)}
   *{box-sizing:border-box}
-  html{width:1440px;margin:0 auto}
-  body{margin:0;font:14px/1.5 -apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
-       background:var(--bg);color:var(--text)}
-  .mono{font-family:ui-monospace,"Cascadia Code",Consolas,monospace}
-  h1{font-size:20px;margin:0}h2{font-size:16px;margin:32px 0 12px;padding-top:16px;border-top:1px solid var(--border)}
-  .muted{color:var(--muted)}.faint{color:var(--faint)}
-  .size-11{font-size:11px}.size-12{font-size:12px}.size-13{font-size:13px}
-  main{padding:8px 40px 64px}
-  :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-  button,input{font:inherit}
-
-  header.top{display:flex;align-items:center;gap:16px;padding:16px 40px;border-bottom:1px solid var(--border)}
-  .tag{background:var(--warning-tint);color:var(--warning);border:1px solid var(--warning);border-radius:8px;
-       padding:2px 10px;font-size:12px;font-weight:600}
-
-  /* ---- Theme picker, styled like the gentle-pi picker: a radio group ---- */
-  #picker{margin-left:auto}
-  #picker fieldset{margin:0;padding:6px 8px;border:1px solid var(--border);border-radius:10px;background:var(--surface-2)}
-  #picker legend{font-size:11px;color:var(--muted);padding:0 6px}
-  #picker .opt{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer}
-  #picker input{appearance:none;width:12px;height:12px;border-radius:999px;border:1px solid var(--muted);margin:0}
-  #picker input:checked{background:var(--accent);border-color:var(--accent)}
-  #picker input:checked + span{color:var(--text);font-weight:600}
-  #switch-note{font-size:11px;color:var(--faint);margin-top:6px}
-
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:12px}
-  .swatch{border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--surface)}
-  .swatch .chip{height:56px}
-  .swatch .info{padding:8px 10px;font-size:11px;color:var(--muted)}
-  .swatch b{font-size:12px;color:var(--text)}
-  .swatch code{display:block;font-size:11px;color:var(--muted)}
-  .adj{color:var(--warning);font-weight:600}
-  .swatch .chip.hair{outline:1px solid var(--border);outline-offset:-1px}
-
-  .typecard{padding:10px 0;border-bottom:1px solid var(--border)}
-  .demo{margin:16px 0;border:1px dashed var(--border);border-radius:10px;padding:14px 16px}
-  .badge{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:2px 10px;
-         font-size:12px;font-weight:600;border:1px solid transparent}
-  .b-work{background:var(--accent-tint);color:var(--accent)}
-  .b-read{background:var(--success-tint);color:var(--success)}
-  .b-queued,.b-open{background:var(--surface-2);color:var(--muted);border-color:var(--border)}
-  .b-att{background:var(--warning-tint);color:var(--warning)}
-  .b-end{background:var(--danger-tint);color:var(--danger)}
-  .notice{border-radius:8px;padding:10px 12px;display:flex;gap:10px;align-items:center;font-size:14px}
-  .n-warn{background:var(--warning-tint);border:1px solid var(--warning)}
-  .n-err{background:var(--danger-tint);border:1px solid var(--danger)}
-  .n-info{background:var(--surface-2);border:1px solid var(--border)}
-  .card{background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:10px 12px}
-  .btn{border:1px solid transparent;border-radius:8px;font-size:13px;padding:8px 16px;cursor:pointer}
-  .btn-primary{background:var(--accent);color:var(--bg)}
-  .btn-danger{background:var(--danger);color:var(--on-danger)}
-  .btn-secondary{background:var(--surface-2);color:var(--text);border-color:var(--border)}
-  .btn-ghost{background:none;color:var(--muted)}
-  table.contrast{border-collapse:collapse;font-size:12px;width:100%}
-  table.contrast th,table.contrast td{border:1px solid var(--border);padding:4px 8px;text-align:left}
-  .pass{color:var(--success)}.fail{color:var(--danger);font-weight:700}
-  @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+  body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 system-ui,'Segoe UI',sans-serif;padding:32px;transition:background .15s}
+  .bar{position:sticky;top:0;display:flex;gap:8px;padding:12px 0;background:inherit;z-index:2}
+  .bar button{font:600 12px/1 inherit;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-radius:999px;padding:8px 14px;cursor:pointer}
+  .bar button.on{color:var(--bg);background:var(--accent);border-color:var(--accent)}
+  h1{font-size:16px;font-weight:600;margin:8px 0 4px}
+  .src{color:var(--faint);font-size:12px;margin:0 0 24px}
+  h2{font-size:13px;font-weight:600;color:var(--muted);margin:28px 0 10px;text-transform:uppercase;letter-spacing:.06em}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+  .sw{border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--surface)}
+  .sw .c{height:52px}
+  .sw .t{padding:8px 10px;font-size:11px;color:var(--muted);font-family:ui-monospace,Consolas,monospace}
+  .sw .t b{display:block;color:var(--text);font-weight:600;font-size:12px}
+  .row{display:flex;align-items:baseline;gap:18px;border-bottom:1px dashed var(--border);padding:6px 0}
+  .row span{color:var(--faint);font-size:11px;font-family:ui-monospace,Consolas,monospace;width:70px;flex:none}
+  .radius{display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap}
+  .radius div{width:86px;height:44px;background:var(--surface2);border:1px solid var(--border);display:grid;place-items:center;font-size:11px;color:var(--muted)}
+  .comps{display:flex;flex-wrap:wrap;gap:12px;align-items:center;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px;box-shadow:var(--shadow);max-width:900px}
+  .btn{border:1px solid var(--border);background:var(--surface2);color:var(--text);border-radius:8px;padding:6px 14px;font:inherit;font-size:13px;cursor:pointer}
+  .btn:hover{border-color:var(--accent)}
+  .btn.primary{border-color:var(--accent);background:var(--accent);color:var(--bg);font-weight:600}
+  .btn.d{background:var(--danger);border-color:var(--danger);color:var(--bg)}
+  .pill{font:600 12px/1 ui-monospace,Consolas,monospace;color:var(--accent);background:var(--tint);padding:4px 8px;border-radius:999px}
+  .chip{font-size:11px;font-weight:600;padding:3px 8px;border-radius:999px;display:inline-flex;gap:5px;align-items:center}
+  .chip.ok{color:var(--success)} .chip.warn{color:var(--warning)} .chip.err{color:var(--danger)}
+  .chip::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor}
+  .hint{color:var(--faint);font-size:12px;font-style:italic}
+  .muted{color:var(--muted);font-size:12px}
+  .fld{display:block;margin:0 0 6px;font-size:12px;font-weight:600;color:var(--muted)}
+  input{width:260px;border:1px solid var(--accent);border-radius:8px;padding:7px 10px;background:var(--bg);color:var(--text);font:inherit;font-size:13px}
+  .code{display:block;padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:8px;font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:12.5px;color:var(--muted);word-break:break-all}
+  button:focus-visible,.btn:focus-visible,input:focus-visible{outline:2px solid var(--text);outline-offset:2px}
 </style>
 </head>
 <body>
+<div class="bar" role="toolbar" aria-label="Theme preview">
+  <button class="on" data-t="dark">dark</button><button data-t="light">light</button><button data-t="Gentle">Gentle</button><button data-t="Gentleman-Cute">Cute</button><button data-t="Gentleman-Sexy">Sexy</button>
+</div>
+<h1>gentle-desk system</h1>
+<p class="src">Values copied from apps/desktop/src/theme.css (six themes) and apps/desktop/src/app.css (components). Stale names —surface-2 / --accent-tint— do not exist.</p>
 
-<header class="top">
-  <h1>gentle-desk . starter system on the gentle-shell themes</h1>
-  <span class="tag">PROPOSED - not project tokens</span>
-  <nav id="picker" aria-label="Theme">
-    <fieldset>
-      <legend>Theme (same entries as the gentle-shell picker)</legend>
-      <label class="opt"><input type="radio" name="theme" value="system" checked><span>system</span></label>
-      <label class="opt"><input type="radio" name="theme" value="dark"><span>dark</span></label>
-      <label class="opt"><input type="radio" name="theme" value="gentle"><span>Gentle</span></label>
-      <label class="opt"><input type="radio" name="theme" value="cute"><span>Gentleman-Cute</span></label>
-      <label class="opt"><input type="radio" name="theme" value="sexy"><span>Gentleman-Sexy</span></label>
-      <label class="opt"><input type="radio" name="theme" value="light"><span>light</span></label>
-    </fieldset>
-    <p id="switch-note"></p>
-  </nav>
-</header>
+<h2>Colour tokens</h2>
+<div class="grid">
+  <div class="sw"><div class="c" style="background:var(--bg)"></div><div class="t"><b>--bg</b> page</div></div>
+  <div class="sw"><div class="c" style="background:var(--surface)"></div><div class="t"><b>--surface</b> dialogs</div></div>
+  <div class="sw"><div class="c" style="background:var(--surface2)"></div><div class="t"><b>--surface2</b> buttons</div></div>
+  <div class="sw"><div class="c" style="background:var(--border)"></div><div class="t"><b>--border</b> separators</div></div>
+  <div class="sw"><div class="c" style="background:var(--tint)"></div><div class="t"><b>--tint</b> selected</div></div>
+  <div class="sw"><div class="c" style="background:var(--accent)"></div><div class="t"><b>--accent</b> primary</div></div>
+  <div class="sw"><div class="c" style="background:var(--success)"></div><div class="t"><b>--success</b> ok</div></div>
+  <div class="sw"><div class="c" style="background:var(--warning)"></div><div class="t"><b>--warning</b> attention</div></div>
+  <div class="sw"><div class="c" style="background:var(--danger)"></div><div class="t"><b>--danger</b> errors</div></div>
+</div>
 
-<main>
-  <p class="muted size-13"><b>Gentle</b>, <b>Gentleman-Cute</b> and <b>Gentleman-Sexy</b> come from the real theme
-  files (<span class="mono">themes/Gentle.json</span>, <span class="mono">themes/Gentleman-Cute.json</span>,
-  <span class="mono">themes/Gentleman-Sexy.json</span>). <b>system</b>, <b>dark</b> and <b>light</b> are built-in picker
-  entries with no theme file available to this session: their values stay the round-1 PROPOSAL.
-  <b>system</b> follows <span class="mono">prefers-color-scheme</span> - pick it and flip your OS setting to watch it switch.</p>
+<h2>Type scale</h2>
+<div class="row"><span>18px/600</span><div style="font-size:18px;font-weight:600">Section heading</div></div>
+<div class="row"><span>15px/600</span><div style="font-size:15px;font-weight:600">Dialog title</div></div>
+<div class="row"><span>14px</span><div style="font-size:14px">Body base (13px in the app shell)</div></div>
+<div class="row"><span>12px/600</span><div class="muted" style="font-weight:600">Field label</div></div>
+<div class="row"><span>12px mono</span><span class="pill">0.1.12</span></div>
+<div class="row"><span>12px faint</span><span class="hint">Esc to close</span></div>
 
-  <h2>Colour tokens of the active theme</h2>
-  <div class="grid" id="swatches"></div>
+<h2>Radius</h2>
+<div class="radius">
+  <div style="border-radius:6px">6px chips</div><div style="border-radius:8px">8px controls</div>
+  <div style="border-radius:10px">10px</div><div style="border-radius:12px">12px cards</div>
+  <div style="border-radius:14px">14px dialog</div><div style="border-radius:999px">999px pill</div>
+</div>
 
-  <h2>Contrast of the active theme (WCAG 2.1, 4.5:1 text)</h2>
-  <p class="size-12 muted">
-    Values marked <span class="adj">adj</span> are recorded ADJUSTMENTS from the original theme file value; the original
-    value and its failing ratio live in <span class="mono">system.md</span>. Nothing was changed silently.
-  </p>
-  <table class="contrast" id="contrast"></table>
-
-  <h2>Typography - system stack only (PROPOSED, shared by all themes)</h2>
-  <div class="typecard" style="font-size:16px;font-weight:600">16 / 600 - pane headers, dialog titles</div>
-  <div class="typecard" style="font-size:14px">14 / 400 - body "The reply is ready. Two of five tests still fail..."</div>
-  <div class="typecard size-13">13 / 600 - sidebar title, bold unread "Fix flaky CI on Windows"</div>
-  <div class="typecard size-12 muted">12 / 400 - badges and notice meta</div>
-  <div class="typecard size-11 muted">11 / 400 - row meta "gentle-desk . 14:02"</div>
-
-  <h2>Status vocabulary - mark + text, never colour alone</h2>
-  <div class="demo">
-    <div style="display:flex;gap:10px;flex-wrap:wrap">
-      <span class="badge b-work" title="Working">&#9679; Working</span>
-      <span class="badge b-read" title="New reply">&#9670; New reply</span>
-      <span class="badge b-queued" title="Queued">&#8943; Queued</span>
-      <span class="badge b-open" title="Opening">&#9676; Opening</span>
-      <span class="badge b-att" title="Needs attention">! Needs you</span>
-      <span class="badge b-end" title="Ended">&#215; Ended</span>
-    </div>
-    <p class="size-12 muted" style="margin:10px 0 0">Every badge has a mark plus a text label plus a title/aria name.
-    Gentle's queued/opening badges use the ADJUSTED muted value (original 3.10:1 on surface-2). Working pulse 1.2 s;
-    all motion off under <span class="mono">prefers-reduced-motion</span>.</p>
-  </div>
-
-  <h2>Core components on the active theme</h2>
-  <div class="demo" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-    <button class="btn btn-primary">Send</button>
-    <button class="btn btn-secondary">Restart</button>
-    <button class="btn btn-danger">Delete chat</button>
-    <button class="btn btn-ghost">Clear</button>
-  </div>
-  <div class="demo" style="display:grid;gap:8px">
-    <div class="notice n-err"><span aria-hidden="true">&#215;</span><span>Stored session working directory does not exist.</span>
-      <button class="btn btn-secondary" style="margin-left:auto">Restart</button></div>
-    <div class="notice n-warn"><span aria-hidden="true">!</span><span>Extension is waiting for an answer in <b>Debug WSL proxy</b>.</span></div>
-    <div class="notice n-info"><span aria-hidden="true">i</span><span>Chats cached. The pass read 3 214 of 50 000 files.</span></div>
-  </div>
-  <div class="demo card size-13">
-    <b>Find flaky CI patterns</b> <span class="muted">. explorer . 3 turns . 7 tool calls</span><br>
-    <span style="color:var(--accent)">Running</span> <span class="muted">- last: read .github/workflows/ci.yml</span>
-  </div>
-  <p class="size-12 faint">Focus ring: 2px <span class="mono">var(--accent)</span>, offset 2 - Tab reaches the picker,
-  every button and both radios here. Danger buttons use the theme's <span class="mono">--on-danger</span> (see table).</p>
-</main>
+<h2>Components</h2>
+<div class="comps">
+  <button class="btn">Secondary</button><button class="btn primary">Primary</button>
+  <button class="btn d">Delete</button>
+  <span class="pill">pi 1.5.2</span>
+  <span class="chip ok">ok</span><span class="chip warn">attention</span><span class="chip err">error</span>
+  <span class="hint">Esc to close</span>
+</div>
+<div class="comps" style="margin-top:12px">
+  <div><label class="fld" for="d">Home directory</label><input id="d" value="C:\Users\josep\.gentle-shell"></div>
+  <code class="code">gentle-shell auth check --json</code>
+</div>
 
 <script>
-/* Theme data straight from the JSON files (real) or round-1 (PROPOSED), */
-/* with ADJUSTED values where WCAG failed (kept original in the note).   */
-const THEMES = {
-  system: null, /* resolves below to dark or light */
-  dark: [
-    t("--bg","#0e1116","app background",null),
-    t("--surface","#151a21","panes: sidebar, cards",null),
-    t("--surface-2","#1c222b","rows, composer, 2nd buttons",null),
-    t("--border","#2b333d","separators",null),
-    t("--text","#e4e8ee","body text","PASS 14.21 on surface"),
-    t("--muted","#9aa4b2","secondary text, queued/opening",null),
-    t("--faint","#7d8593","placeholders","PASS 4.70 on surface (thin)"),
-    t("--accent","#7aa2f7","working / primary / focus",null),
-    t("--accent-tint","rgba(122,162,247,.14)","selected rows, user bubbles",null),
-    t("--success","#7edc9a","new reply / done",null),
-    t("--success-tint","rgba(126,220,154,.12)","success notices",null),
-    t("--warning","#e7b455","needs attention / warn",null),
-    t("--warning-tint","rgba(231,180,85,.14)","warning notices",null),
-    t("--danger","#ff8585","ended / error",null),
-    t("--danger-tint","rgba(255,133,133,.14)","error notices",null),
-    t("--on-danger","#0e1116","text on filled danger button","adj: was #ffffff, 2.35 FAIL -> 8.06")
-  ],
-  gentle: [
-    t("--bg","#06080f","app background",null),
-    t("--surface","#06080f","panes (bgPanel = bg in this file)",null),
-    t("--surface-2","#0d0f14","rows, composer, 2nd buttons (bgSubtle)",null),
-    t("--border","#313342","separators",null),
-    t("--text","#F3F6F9","body text","PASS 18.45 on surface"),
-    t("--muted","#8394A3","secondary text, queued/opening","adj: file's #5C6170 = 3.24 on surface -> 6.41 (syntaxComment)"),
-    t("--faint","#96A2B0","placeholders","adj: file's dim #5C6170 = 3.24 -> 7.71 (syntaxPunctuation)"),
-    t("--accent","#7FB4CA","working / primary / focus (colors.accent = blue)","PASS 8.85 on surface"),
-    t("--accent-tint","#161D2E","selected rows, user bubbles (userMessageBg)",null),
-    t("--success","#B7CC85","new reply / done (green)","PASS 8.27 on success-tint"),
-    t("--success-tint","#1a2e1a","success notices (toolSuccessBg)",null),
-    t("--warning","#DEBA87","needs attention / warn","PASS 8.74 on warning-tint"),
-    t("--warning-tint","rgba(222,186,135,.14)","warning notices (derived rule, no source var)",null),
-    t("--danger","#CB7C94","ended / error (red)","PASS 5.36 on danger-tint"),
-    t("--danger-tint","#2e1a1a","error notices (toolErrorBg)",null),
-    t("--on-danger","#06080f","text on filled danger button","adj: was #ffffff, 3.07 FAIL -> 6.53")
-  ],
-  cute: [
-    t("--bg","#060407","app background",null),
-    t("--surface","#100A0F","panes (bgPanel/bgElement)",null),
-    t("--surface-2","#100A0F","rows (equals surface; rows read via border, bgSubtle)","note: same value as surface in the file"),
-    t("--border","#563040","separators",null),
-    t("--text","#F6EFF3","body text","PASS 17.31 on surface"),
-    t("--muted","#A78E9B","secondary text, queued/opening","PASS 6.51 on surface"),
-    t("--faint","#D7A0B8","placeholders","adj: file's dim #76616B = 3.44 -> 8.96 (softRose)"),
-    t("--accent","#F095C8","working / primary / focus (accent)","PASS 9.17 on surface"),
-    t("--accent-tint","#2A1523","selected rows, user bubbles (userMessageBg)",null),
-    t("--success","#B4E7C7","new reply / done (mint)","PASS 13.37 on success-tint"),
-    t("--success-tint","#151316","success notices (toolSuccessBg)",null),
-    t("--warning","#F2B86D","needs attention / warn","PASS 8.64 on warning-tint"),
-    t("--warning-tint","rgba(242,184,109,.14)","warning notices (derived rule, no source var)",null),
-    t("--danger","#FF718F","ended / error (error)","PASS 6.84 on danger-tint"),
-    t("--danger-tint","#261019","error notices (toolErrorBg)",null),
-    t("--on-danger","#060407","text on filled danger button","adj: was #ffffff, 2.62 FAIL -> 7.79")
-  ],
-  sexy: [
-    t("--bg","#060407","app background",null),
-    t("--surface","#100A0F","panes (bgPanel/bgElement)",null),
-    t("--surface-2","#100A0F","rows (equals surface; rows read via border, bgSubtle)","note: same value as surface in the file"),
-    t("--border","#563040","separators",null),
-    t("--text","#F6EFF3","body text","PASS 17.31 on surface"),
-    t("--muted","#A78E9B","secondary text, queued/opening","PASS 6.51 on surface"),
-    t("--faint","#D7A0B8","placeholders","adj: file's dim #76616B = 3.44 -> 8.96 (softRose)"),
-    t("--accent","#F43888","working / primary / focus (accent)","PASS 5.38 on surface"),
-    t("--accent-tint","#2E0F1F","selected rows, user bubbles (userMessageBg)","accent badge on tint 4.79 PASS (thin)"),
-    t("--success","#D2CBD0","new reply / done (pearl)","PASS 11.61 on success-tint"),
-    t("--success-tint","#151316","success notices (toolSuccessBg)",null),
-    t("--warning","#F2B86D","needs attention / warn","PASS 8.64 on warning-tint"),
-    t("--warning-tint","rgba(242,184,109,.14)","warning notices (derived rule, no source var)",null),
-    t("--danger","#FF718F","ended / error (error)","PASS 6.84 on danger-tint"),
-    t("--danger-tint","#261019","error notices (toolErrorBg)",null),
-    t("--on-danger","#060407","text on filled danger button","adj: was #ffffff, 2.62 FAIL -> 7.79")
-  ],
-  light: [
-    t("--bg","#f2f4f7","app background",null),
-    t("--surface","#ffffff","panes",null),
-    t("--surface-2","#e9edf2","rows, composer, 2nd buttons",null),
-    t("--border","#cfd5dd","separators",null),
-    t("--text","#17202a","body text","PASS 16.45 on surface"),
-    t("--muted","#576272","secondary text, queued/opening","PASS 6.19 / 5.26 on surface-2"),
-    t("--faint","#6b7686","placeholders","PASS 4.60 on surface (thin)"),
-    t("--accent","#2e5bd7","working / primary / focus","PASS 5.84 on surface"),
-    t("--accent-tint","rgba(46,91,215,.10)","selected rows, user bubbles",null),
-    t("--success","#166e38","new reply / done","PASS 5.57 on success-tint"),
-    t("--success-tint","rgba(30,138,74,.10)","success notices",null),
-    t("--warning","#8a5800","needs attention / warn","PASS 5.39 on warning-tint"),
-    t("--warning-tint","rgba(217,155,38,.14)","warning notices",null),
-    t("--danger","#c22f37","ended / error","PASS 4.95 on danger-tint"),
-    t("--danger-tint","rgba(224,82,82,.10)","error notices",null),
-    t("--on-danger","#ffffff","text on filled danger button","PASS 5.59, no adjustment")
-  ]
-};
-function t(name, value, usage, note){ return {name, value, usage, note}; }
-
-const acute = {
-  dark: [ ["text on surface","#e4e8ee/#151a21","14.21 PASS"],["muted on surface","#9aa4b2/#151a21","6.93 PASS"],
-    ["muted on surface-2","#9aa4b2/#1c222b","6.34 PASS"],["faint on surface","#7d8593/#151a21","4.70 PASS (thin)"],
-    ["accent on surface","#7aa2f7/#151a21","6.94 PASS"],["accent badge on tint","#7aa2f7/lim","5.49 PASS"],
-    ["success badge on tint","#7edc9a/lim","8.12 PASS"],["warning badge on tint","#e7b455/lim","6.96 PASS"],
-    ["danger badge on tint","#ff8585/lim","5.90 PASS"],["bg text on accent","#0e1116/lim","7.51 PASS"],
-    ["#fff on danger","#ffffff/#ff8585","2.35 FAIL -> adj #0e1116 = 8.06"] ],
-  gentle: [ ["text on surface","#F3F6F9/#06080f","18.45 PASS"],["muted on surface","#5C6170/lim","3.24 FAIL -> adj #8394A3 = 6.41"],
-    ["muted on surface-2","#5C6170/#0d0f14","3.10 FAIL -> adj = 6.14"],["faint on surface","#5C6170/lim","3.24 FAIL -> adj #96A2B0 = 7.71"],
-    ["accent on surface","#7FB4CA/#06080f","8.85 PASS"],["accent badge on tint","#7FB4CA/#161D2E","7.43 PASS"],
-    ["success badge on tint","#B7CC85/#1a2e1a","8.27 PASS"],["warning badge on tint","#DEBA87/lim","8.74 PASS"],
-    ["danger badge on tint","#CB7C94/#2e1a1a","5.36 PASS"],["bg text on accent","#06080f/#7FB4CA","8.85 PASS"],
-    ["#fff on danger","#ffffff/#CB7C94","3.07 FAIL -> adj #06080f = 6.53"] ],
-  cute: [ ["text on surface","#F6EFF3/#100A0F","17.31 PASS"],["muted on surface","#A78E9B/#100A0F","6.51 PASS"],
-    ["faint on surface","#76616B/lim","3.44 FAIL -> adj #D7A0B8 = 8.96"],["accent on surface","#F095C8/#100A0F","9.17 PASS"],
-    ["accent badge on tint","#F095C8/#2A1523","8.00 PASS"],["success badge on tint","#B4E7C7/#151316","13.37 PASS"],
-    ["warning badge on tint","#F2B86D/lim","8.64 PASS"],["danger badge on tint","#FF718F/#261019","6.84 PASS"],
-    ["bg text on accent","#060407/#F095C8","9.57 PASS"],["#fff on danger","#ffffff/#FF718F","2.62 FAIL -> adj #060407 = 7.79"],
-    ["muted on surface-2","#A78E9B/#100A0F","6.51 PASS"] ],
-  sexy: [ ["text on surface","#F6EFF3/#100A0F","17.31 PASS"],["muted on surface","#A78E9B/#100A0F","6.51 PASS"],
-    ["faint on surface","#76616B/lim","3.44 FAIL -> adj #D7A0B8 = 8.96"],["accent on surface","#F43888/#100A0F","5.38 PASS"],
-    ["accent badge on tint","#F43888/#2E0F1F","4.79 PASS (thin)"],["success badge on tint","#D2CBD0/#151316","11.61 PASS"],
-    ["warning badge on tint","#F2B86D/lim","8.64 PASS"],["danger badge on tint","#FF718F/#261019","6.84 PASS"],
-    ["bg text on accent","#060407/#F43888","5.61 PASS"],["#fff on danger","#ffffff/#FF718F","2.62 FAIL -> adj #060407 = 7.79"],
-    ["muted on surface-2","#A78E9B/#100A0F","6.51 PASS"] ],
-  light: [ ["text on surface","#17202a/#ffffff","16.45 PASS"],["muted on surface","#576272/#ffffff","6.19 PASS"],
-    ["muted on surface-2","#576272/#e9edf2","5.26 PASS"],["faint on surface","#6b7686/#ffffff","4.60 PASS (thin)"],
-    ["accent on surface","#2e5bd7/#ffffff","5.84 PASS"],["accent badge on tint","#2e5bd7/lim","5.07 PASS"],
-    ["success badge on tint","#166e38/lim","5.57 PASS"],["warning badge on tint","#8a5800/lim","5.39 PASS"],
-    ["danger badge on tint","#c22f37/lim","4.95 PASS"],["bg text on accent","#f2f4f7/#2e5bd7","5.30 PASS"],
-    ["#fff on danger","#ffffff/#c22f37","5.59 PASS"] ]
-};
-
-const radios = Array.from(document.querySelectorAll('input[name="theme"]'));
-const THEME_NAMES = {system:"system (resolves to your OS scheme: dark or light)",
-  dark:"dark (PROPOSED - no theme file for this built-in entry)",
-  gentle:"Gentle (real: themes/Gentle.json)",
-  cute:"Gentleman-Cute (real: themes/Gentleman-Cute.json)",
-  sexy:"Gentleman-Sexy (real: themes/Gentleman-Sexy.json)",
-  light:"light (PROPOSED - no theme file for this built-in entry)"};
-
-function resolveSystem(){ return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark"; }
-function activeKey(){ const v = document.documentElement.dataset.theme || "system"; return v === "system" ? resolveSystem() : v; }
-
-function render(){
-  const key = activeKey();
-  const sw = document.getElementById("swatches");
-  sw.innerHTML = THEMES[key].map(function(x){
-    const chipBg = x.name.endsWith("tint") && x.value.indexOf("rgba") === 0
-      ? "background:" + getComputedStyle(document.documentElement).getPropertyValue(x.name).trim() : "background:" + x.value;
-    return '<div class="swatch"><div class="chip hair" style="' + chipBg + '"></div>' +
-      '<div class="info"><b>' + x.name + '</b><code>' + x.value + '</code><span>' + x.usage + '</span>' +
-      (x.note ? '<br><span class="' + (x.note.indexOf("FAIL") >= 0 ? "adj" : "pass") + '">' + x.note + '</span>' : "") + '</div></div>';
-  }).join("");
-
-  const rows = acute[key].map(function(p){
-    const fails = p[2].indexOf("FAIL") >= 0;
-    return "<tr><th scope=\"row\">" + p[0] + '</th><td class="mono size-12">' + p[1] +
-      '</td><td class="' + (fails ? "fail" : "pass") + '">' + p[2] + "</td></tr>";
-  }).join("");
-  document.getElementById("contrast").innerHTML =
-    "<thead><tr><th>Pair</th><th>context (fg/bg or tinted)</th><th>WCAG 2.1 ratio and verdict</th></tr></thead><tbody>" +
-    rows + "</tbody>";
-
-  const checked = radios.find(function(r){return r.checked;
-  }) || radios[0];
-  document.getElementById("switch-note").textContent = THEME_NAMES[checked.value];
-}
-
-radios.forEach(function(r){ r.addEventListener("change", function(){
-  document.documentElement.dataset.theme = r.value; render();
-});});
-window.matchMedia("(prefers-color-scheme: light)").addEventListener("change", function(){
-  if (document.documentElement.dataset.theme === "system") render();
-});
-render();
+  document.querySelectorAll('.bar button').forEach(function(b){b.onclick=function(){
+    document.documentElement.dataset.theme=b.dataset.t;
+    document.querySelectorAll('.bar button').forEach(function(x){x.classList.toggle('on',x===b)});
+  };});
 </script>
 </body>
 </html>
