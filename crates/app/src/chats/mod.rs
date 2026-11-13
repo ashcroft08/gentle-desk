@@ -110,6 +110,10 @@ pub(crate) fn apply_event(
                         push_notice(state, NoticeLevel::Error, text)
                     });
                 }
+                // A statistics read that fails is not news: the ask fires on
+                // every settled turn, and a child that does not know the
+                // command would end every turn with a notice (0.1.12, S5).
+                (Err(_), "get_session_stats") => {}
                 (Err(error), command) => {
                     push_notice(
                         &mut state,

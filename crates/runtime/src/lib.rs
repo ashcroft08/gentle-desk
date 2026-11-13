@@ -6,12 +6,14 @@
 //! both sit on top of this crate.
 
 pub mod app_config;
+pub mod auth;
 pub mod badge;
 pub mod cache_path;
 pub mod chat_keys;
 pub mod chat_runtime;
 pub mod clock;
 pub mod helper_text;
+pub mod profiles;
 pub mod refresh_flow;
 pub mod refresh_queue;
 pub mod save_throttle;
@@ -20,5 +22,6 @@ pub mod sessions;
 pub mod startup;
 pub mod text;
 pub mod time_ago;
+pub mod updates;
 pub mod whats_new;
 pub mod workspaces;

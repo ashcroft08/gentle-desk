@@ -94,6 +94,15 @@ export const commands = {
 	 *  shell is the one that knows which version it is.
 	 */
 	storeLastRunVersion: () => typedError<ViewState_Serialize, string>(__TAURI_INVOKE("store_last_run_version")),
+	/**
+	 *  Opens a visible terminal window on `action`: the shell's profiles screen, its
+	 *  login or logout, or its own update.
+	 * 
+	 *  Opening a window is a fast call that waits for nothing - the command answers
+	 *  as soon as the window exists, and the terminal keeps running on its own - so
+	 *  it runs on this thread and no lock of the bridge is held meanwhile.
+	 */
+	openTerminal: (action: TerminalActionView) => typedError<null, string>(__TAURI_INVOKE("open_terminal", { action })),
 };
 
 /** Events */
@@ -102,6 +111,70 @@ export const events = {
 };
 
 /* Types */
+/**
+ *  One provider the shell's auth store lists, with what its own check said. The
+ *  NAME is all that is read from the store: no key, token or account identity
+ *  travels up (S1's refinement, L11).
+ */
+export type AuthProviderView = AuthProviderView_Serialize | AuthProviderView_Deserialize;
+
+/**
+ *  One provider the shell's auth store lists, with what its own check said. The
+ *  NAME is all that is read from the store: no key, token or account identity
+ *  travels up (S1's refinement, L11).
+ */
+export type AuthProviderView_Deserialize = {
+	name: string,
+	status: ProviderStatusView,
+	/**  The shell's own reason, when it gave one. */
+	reason?: string | null,
+};
+
+/**
+ *  One provider the shell's auth store lists, with what its own check said. The
+ *  NAME is all that is read from the store: no key, token or account identity
+ *  travels up (S1's refinement, L11).
+ */
+export type AuthProviderView_Serialize = {
+	name: string,
+	status: ProviderStatusView,
+	/**  The shell's own reason, when it gave one. */
+	reason: string | null,
+};
+
+/**  Where the auth read stands. */
+export type AuthStatusView = 
+/**  Not read yet. */
+{ type: "Unknown" } | 
+/**  Read: every provider listed was checked. */
+{ type: "Ready" } | 
+/**  The store could not be read; the string is why. */
+{ type: "Failed"; data: string };
+
+/**
+ *  The Account pane (0.1.12, S1, T3): one row per connected provider, as the
+ *  shell's own check answered.
+ */
+export type AuthView = AuthView_Serialize | AuthView_Deserialize;
+
+/**
+ *  The Account pane (0.1.12, S1, T3): one row per connected provider, as the
+ *  shell's own check answered.
+ */
+export type AuthView_Deserialize = {
+	status: AuthStatusView,
+	providers: AuthProviderView_Deserialize[],
+};
+
+/**
+ *  The Account pane (0.1.12, S1, T3): one row per connected provider, as the
+ *  shell's own check answered.
+ */
+export type AuthView_Serialize = {
+	status: AuthStatusView,
+	providers: AuthProviderView_Serialize[],
+};
+
 export type ChatActivityMark = "Working" | "Queued" | "Opening" | "NewReply" | "NeedsAttention" | "Ended";
 
 /**
@@ -120,6 +193,44 @@ export type ChatBadge = {
 	chat_id: string,
 	activity: ChatActivityMark,
 	unread: boolean,
+};
+
+/**
+ *  How full the foreground chat's context is (0.1.12, S5): pi's own
+ *  `contextUsage` numbers, one reading per chat. Every field is nullable and a
+ *  null is drawn as nothing at all - never as `0` - because pi answers null
+ *  right after a compaction.
+ */
+export type ContextUsageView = ContextUsageView_Serialize | ContextUsageView_Deserialize;
+
+/**
+ *  How full the foreground chat's context is (0.1.12, S5): pi's own
+ *  `contextUsage` numbers, one reading per chat. Every field is nullable and a
+ *  null is drawn as nothing at all - never as `0` - because pi answers null
+ *  right after a compaction.
+ */
+export type ContextUsageView_Deserialize = {
+	/**  The tokens the session's context holds. */
+	tokens?: number | null,
+	/**  The share of the window in use, in percent, as pi computed it. */
+	percent?: number | null,
+	/**  The model's window, the denominator of the percentage. */
+	window?: number | null,
+};
+
+/**
+ *  How full the foreground chat's context is (0.1.12, S5): pi's own
+ *  `contextUsage` numbers, one reading per chat. Every field is nullable and a
+ *  null is drawn as nothing at all - never as `0` - because pi answers null
+ *  right after a compaction.
+ */
+export type ContextUsageView_Serialize = {
+	/**  The tokens the session's context holds. */
+	tokens: number | null,
+	/**  The share of the window in use, in percent, as pi computed it. */
+	percent: number | null,
+	/**  The model's window, the denominator of the percentage. */
+	window: number | null,
 };
 
 /**
@@ -432,7 +543,6 @@ export type InstallView = { type: "Idle" } | { type: "Running" } | { type: "Done
 } };
 
 /**
- *  How complete the session list is, matching `gentle_app::ListStatus` one to
  *  one. `Loading` carries how far the first pass got, so the sidebar can say it
  *  is still reading; only `Complete` lets an empty list call itself empty.
  */
@@ -626,6 +736,161 @@ export type NoticeView_Serialize = {
 	 */
 	action: NoticeActionView | null,
 };
+
+/**
+ *  How the orchestrator runs a turn, named exactly as gentle-pi's
+ *  `GENTLE_PI_ORCHESTRATOR_MODE` names them (`organic`, `full-delegation`), so
+ *  neither side translates a value (0.1.12, S1, T4).
+ */
+export type OrchestratorModeView = 
+/**
+ *  gentle-pi's own default: the orchestrator works and delegates as it
+ *  chooses. A run that never chose shows this one.
+ */
+"organic" | "full-delegation";
+
+/**
+ *  One role of a profile: what it runs and how hard it thinks. Every field is
+ *  optional because the file allows a partial row, and a missing one is drawn as
+ *  nothing rather than as a guess.
+ */
+export type ProfileRoleView = ProfileRoleView_Serialize | ProfileRoleView_Deserialize;
+
+/**
+ *  One role of a profile: what it runs and how hard it thinks. Every field is
+ *  optional because the file allows a partial row, and a missing one is drawn as
+ *  nothing rather than as a guess.
+ */
+export type ProfileRoleView_Deserialize = {
+	/**  The role's name, the file's own key (`orchestrator`, `review-refuter`...). */
+	role: string,
+	model?: string | null,
+	thinking?: string | null,
+	tier?: string | null,
+};
+
+/**
+ *  One role of a profile: what it runs and how hard it thinks. Every field is
+ *  optional because the file allows a partial row, and a missing one is drawn as
+ *  nothing rather than as a guess.
+ */
+export type ProfileRoleView_Serialize = {
+	/**  The role's name, the file's own key (`orchestrator`, `review-refuter`...). */
+	role: string,
+	model: string | null,
+	thinking: string | null,
+	tier: string | null,
+};
+
+/**
+ *  One agent profile as the Profiles pane draws it (0.1.12, T2): its name, its
+ *  orchestrator route, its other roles, and the orchestration mode the file
+ *  records for it.
+ */
+export type ProfileView = ProfileView_Serialize | ProfileView_Deserialize;
+
+/**
+ *  One agent profile as the Profiles pane draws it (0.1.12, T2): its name, its
+ *  orchestrator route, its other roles, and the orchestration mode the file
+ *  records for it.
+ */
+export type ProfileView_Deserialize = {
+	name: string,
+	/**
+	 *  True for the profile the file records as active, which is the one the
+	 *  pane's header names.
+	 */
+	active: boolean,
+	/**  The reserved `orchestrator` role, drawn as the profile's summary line. */
+	orchestrator?: ProfileRoleView_Deserialize | null,
+	/**  Every other role, sorted by name. */
+	roles: ProfileRoleView_Deserialize[],
+	/**
+	 *  The mode this profile prefers, from the file's sibling `workflow` map.
+	 *  `None` for a profile that names none.
+	 */
+	mode?: OrchestratorModeView | null,
+};
+
+/**
+ *  One agent profile as the Profiles pane draws it (0.1.12, T2): its name, its
+ *  orchestrator route, its other roles, and the orchestration mode the file
+ *  records for it.
+ */
+export type ProfileView_Serialize = {
+	name: string,
+	/**
+	 *  True for the profile the file records as active, which is the one the
+	 *  pane's header names.
+	 */
+	active: boolean,
+	/**  The reserved `orchestrator` role, drawn as the profile's summary line. */
+	orchestrator: ProfileRoleView_Serialize | null,
+	/**  Every other role, sorted by name. */
+	roles: ProfileRoleView_Serialize[],
+	/**
+	 *  The mode this profile prefers, from the file's sibling `workflow` map.
+	 *  `None` for a profile that names none.
+	 */
+	mode: OrchestratorModeView | null,
+};
+
+/**
+ *  Where the read of `profiles.json` stands. A file of another kind or version
+ *  is `Failed` with the reason: the pane then says it cannot read the file
+ *  instead of drawing a wrong one.
+ */
+export type ProfilesStatusView = 
+/**  Not read yet. */
+{ type: "Unknown" } | 
+/**  Read: the profiles here are the file's. */
+{ type: "Ready" } | 
+/**
+ *  The file could not be read or is not this reader's document; the string
+ *  is why.
+ */
+{ type: "Failed"; data: string };
+
+/**
+ *  The Profiles pane (0.1.12, S1, T2), read-only: the active profile's name, its
+ *  roles, and the mode the desk's next chats will start with.
+ */
+export type ProfilesView = ProfilesView_Serialize | ProfilesView_Deserialize;
+
+/**
+ *  The Profiles pane (0.1.12, S1, T2), read-only: the active profile's name, its
+ *  roles, and the mode the desk's next chats will start with.
+ */
+export type ProfilesView_Deserialize = {
+	status: ProfilesStatusView,
+	/**  The active profile's name, `None` when the file names none. */
+	active?: string | null,
+	profiles: ProfileView_Deserialize[],
+	/**
+	 *  The mode the desk passes to the chats it opens from now on. It is the
+	 *  SESSION's switch, never a stored preference (S1).
+	 */
+	mode: OrchestratorModeView,
+};
+
+/**
+ *  The Profiles pane (0.1.12, S1, T2), read-only: the active profile's name, its
+ *  roles, and the mode the desk's next chats will start with.
+ */
+export type ProfilesView_Serialize = {
+	status: ProfilesStatusView,
+	/**  The active profile's name, `None` when the file names none. */
+	active: string | null,
+	profiles: ProfileView_Serialize[],
+	/**
+	 *  The mode the desk passes to the chats it opens from now on. It is the
+	 *  SESSION's switch, never a stored preference (S1).
+	 */
+	mode: OrchestratorModeView,
+};
+
+/**  How one provider's `auth check` stands: the four states the shell reports. */
+export type ProviderStatusView = "Ready" | "NotReady" | "Invalid" | "Error";
 
 /**
  *  One row of the session list, flattened for display. Rows are served a
@@ -828,6 +1093,28 @@ export type StateChanged_Deserialize = ViewState_Deserialize;
 export type StateChanged_Serialize = ViewState_Serialize;
 
 /**
+ *  What one "Open in terminal" button asks the shell to do (0.1.12, S1, S2,
+ *  T2, T3). It is a COMMAND and not an intent, like `open_link`: nothing of the
+ *  app state changes when a terminal window opens, and the `argv` the shell is
+ *  run with is the shell's business ([`crate::terminal`]).
+ */
+export type TerminalActionView = 
+/**
+ *  The shell's profiles screen, as its opening prompt: the desk's Profiles
+ *  pane sends every edit, create and switch there (L9).
+ */
+"Profiles" | 
+/**  The shell's own `auth login`. */
+"Login" | 
+/**  The shell's own `auth logout`. */
+"Logout" | 
+/**
+ *  The shell's own `update`, which forwards to pi's updater (L5): run from a
+ *  terminal, and only offered with every chat closed (S4).
+ */
+"Update";
+
+/**
  *  The six themes the whole window can be set to (the v1 Appearance setting),
  *  named exactly as `design/system.md` and the artboard's picker name them: one
  *  spelling for the config file, the `data-theme` attribute the page paints, and
@@ -960,7 +1247,122 @@ export type UiIntent = { type: "SendPrompt"; data: {
 /**  Set the session's thinking level (RPC `set_thinking_level`). */
 { type: "SelectThinkingLevel"; data: {
 	level: string,
+} } | 
+/**
+ *  Re-read gentle-pi's agent profiles from the config home (0.1.12, T2). The
+ *  Settings dialog sends it when the Profiles pane opens and after the
+ *  terminal may have changed the file. Nothing is written: the shell owns
+ *  the file. The answer travels back on [`ViewState::profiles`].
+ */
+{ type: "RefreshProfiles" } | 
+/**
+ *  Re-read the provider names and re-run one `auth check` per provider
+ *  (0.1.12, T3). The answer travels back on [`ViewState::auth`].
+ */
+{ type: "RefreshAuth" } | 
+/**
+ *  Check the three versions again (0.1.12, S2, S7), the same check the app
+ *  runs once when it opens. It only ever CHECKS: no update is installed
+ *  from here. The answer travels back on [`ViewState::updates`].
+ */
+{ type: "CheckUpdates" } | 
+/**
+ *  Choose the orchestrator mode of the chats opened from now on (0.1.12,
+ *  S1, T4). Session-scoped: the mode is passed to each child through
+ *  `GENTLE_PI_ORCHESTRATOR_MODE` and is never stored in the config, so a new
+ *  run starts on gentle-pi's own default again.
+ */
+{ type: "SetOrchestratorMode"; data: {
+	mode: OrchestratorModeView,
 } };
+
+/**
+ *  Where the update check stands. It runs once when the app opens (S3) and again
+ *  only when the user asks.
+ */
+export type UpdatesStatusView = 
+/**  Not checked yet. */
+"Unknown" | "Checking" | 
+/**  The check ran; each row says what it found on its own. */
+"Ready";
+
+/**
+ *  The Updates pane (0.1.12, S2, S7): the three pieces this machine runs, and
+ *  the one check the app made for them. It is read-only: no update is installed
+ *  from the contract.
+ */
+export type UpdatesView = UpdatesView_Serialize | UpdatesView_Deserialize;
+
+/**
+ *  The Updates pane (0.1.12, S2, S7): the three pieces this machine runs, and
+ *  the one check the app made for them. It is read-only: no update is installed
+ *  from the contract.
+ */
+export type UpdatesView_Deserialize = {
+	status: UpdatesStatusView,
+	/**  The desk itself, against the release manifest the updater reads. */
+	desk: VersionRowView_Deserialize,
+	/**  pi, against the npm registry's published version. */
+	pi: VersionRowView_Deserialize,
+	/**
+	 *  gentle-shell. Its channel decides where a newer version lives and the
+	 *  desk cannot tell the channel, so this row never claims an update.
+	 */
+	shell: VersionRowView_Deserialize,
+};
+
+/**
+ *  The Updates pane (0.1.12, S2, S7): the three pieces this machine runs, and
+ *  the one check the app made for them. It is read-only: no update is installed
+ *  from the contract.
+ */
+export type UpdatesView_Serialize = {
+	status: UpdatesStatusView,
+	/**  The desk itself, against the release manifest the updater reads. */
+	desk: VersionRowView_Serialize,
+	/**  pi, against the npm registry's published version. */
+	pi: VersionRowView_Serialize,
+	/**
+	 *  gentle-shell. Its channel decides where a newer version lives and the
+	 *  desk cannot tell the channel, so this row never claims an update.
+	 */
+	shell: VersionRowView_Serialize,
+};
+
+/**
+ *  One version row of the Updates pane: what is installed, what is published,
+ *  and whether the second is newer. `update_available: None` means the
+ *  comparison cannot be made - a probe that failed, a registry that did not
+ *  answer, or gentle-shell's channel, which the desk cannot tell - and it is
+ *  never drawn as "up to date".
+ */
+export type VersionRowView = VersionRowView_Serialize | VersionRowView_Deserialize;
+
+/**
+ *  One version row of the Updates pane: what is installed, what is published,
+ *  and whether the second is newer. `update_available: None` means the
+ *  comparison cannot be made - a probe that failed, a registry that did not
+ *  answer, or gentle-shell's channel, which the desk cannot tell - and it is
+ *  never drawn as "up to date".
+ */
+export type VersionRowView_Deserialize = {
+	current?: string | null,
+	latest?: string | null,
+	update_available?: boolean | null,
+};
+
+/**
+ *  One version row of the Updates pane: what is installed, what is published,
+ *  and whether the second is newer. `update_available: None` means the
+ *  comparison cannot be made - a probe that failed, a registry that did not
+ *  answer, or gentle-shell's channel, which the desk cannot tell - and it is
+ *  never drawn as "up to date".
+ */
+export type VersionRowView_Serialize = {
+	current: string | null,
+	latest: string | null,
+	update_available: boolean | null,
+};
 
 /**
  *  The state the current views render: the foreground chat (as the app names
@@ -1029,6 +1431,16 @@ export type ViewState_Deserialize = {
 	 *  unfiltered count, next to the filtered total each window answers with.
 	 */
 	total_sessions: number,
+	/**
+	 *  How many chats the app has OPEN right now, whatever they are doing:
+	 *  every chat whose child this run started, the foreground one included.
+	 * 
+	 *  The Updates pane's gate reads it (0.1.12, S4): an update runs only with
+	 *  every chat closed, and an idle chat in the background is still a child
+	 *  the update would land under, so the rule counts them all rather than the
+	 *  foreground one alone.
+	 */
+	open_chats: number,
 	/**
 	 *  The foreground chat's messages, oldest first. Message text is the model's
 	 *  whole markdown reply, so the slice carries the last
@@ -1102,6 +1514,27 @@ export type ViewState_Deserialize = {
 	 *  the chat panel, not the window.
 	 */
 	model_chip: ModelChipView_Deserialize,
+	/**
+	 *  How full the foreground chat's context is (0.1.12, S5), from that chat's
+	 *  own `get_session_stats` reply. Every field is null when there is no
+	 *  reading, and null is never drawn as zero.
+	 */
+	context_usage: ContextUsageView_Deserialize,
+	/**
+	 *  The agent profiles the shell keeps (0.1.12, T2), read on the pane's
+	 *  behalf and never written.
+	 */
+	profiles: ProfilesView_Deserialize,
+	/**
+	 *  Where the shell's authentication stands (0.1.12, T3): provider names and
+	 *  their own check, never a key.
+	 */
+	auth: AuthView_Deserialize,
+	/**
+	 *  The versions this machine runs and the newer ones published (0.1.12,
+	 *  S2, S7). Checked once when the app opens.
+	 */
+	updates: UpdatesView_Deserialize,
 	/**
 	 *  Why the last workspace action was refused, as one line of plain text: a
 	 *  name Windows would not accept, a folder that is not there, a folder that
@@ -1192,6 +1625,16 @@ export type ViewState_Serialize = {
 	 */
 	total_sessions: number,
 	/**
+	 *  How many chats the app has OPEN right now, whatever they are doing:
+	 *  every chat whose child this run started, the foreground one included.
+	 * 
+	 *  The Updates pane's gate reads it (0.1.12, S4): an update runs only with
+	 *  every chat closed, and an idle chat in the background is still a child
+	 *  the update would land under, so the rule counts them all rather than the
+	 *  foreground one alone.
+	 */
+	open_chats: number,
+	/**
 	 *  The foreground chat's messages, oldest first. Message text is the model's
 	 *  whole markdown reply, so the slice carries the last
 	 *  [`MESSAGES_PUSHED`](crate::view::MESSAGES_PUSHED) of them and never a
@@ -1264,6 +1707,27 @@ export type ViewState_Serialize = {
 	 *  the chat panel, not the window.
 	 */
 	model_chip: ModelChipView_Serialize,
+	/**
+	 *  How full the foreground chat's context is (0.1.12, S5), from that chat's
+	 *  own `get_session_stats` reply. Every field is null when there is no
+	 *  reading, and null is never drawn as zero.
+	 */
+	context_usage: ContextUsageView_Serialize,
+	/**
+	 *  The agent profiles the shell keeps (0.1.12, T2), read on the pane's
+	 *  behalf and never written.
+	 */
+	profiles: ProfilesView_Serialize,
+	/**
+	 *  Where the shell's authentication stands (0.1.12, T3): provider names and
+	 *  their own check, never a key.
+	 */
+	auth: AuthView_Serialize,
+	/**
+	 *  The versions this machine runs and the newer ones published (0.1.12,
+	 *  S2, S7). Checked once when the app opens.
+	 */
+	updates: UpdatesView_Serialize,
 	/**
 	 *  Why the last workspace action was refused, as one line of plain text: a
 	 *  name Windows would not accept, a folder that is not there, a folder that

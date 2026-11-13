@@ -152,3 +152,121 @@ fn every_child_is_told_it_has_an_interactive_host() {
         )
     );
 }
+
+/// The one value of `name` in `env`, and how many entries carry it: a child can
+/// only hold one, so a duplicate would be a bug the tests must see.
+fn value_of(env: &[(OsString, OsString)], name: &str) -> (Option<OsString>, usize) {
+    let var = OsString::from(name);
+    let values: Vec<&OsString> = env
+        .iter()
+        .filter(|(key, _)| *key == var)
+        .map(|(_, value)| value)
+        .collect();
+    (values.first().map(|value| (*value).clone()), values.len())
+}
+
+#[test]
+fn a_child_of_an_unchanged_spawner_carries_no_mode() {
+    // gentle-pi's own default is organic, so nothing is passed until the user
+    // chooses one: the variable is absent, never set to a value guessed here.
+    let env = spawner().options_for(&ChatKey::New(1), None).env;
+    assert_eq!(value_of(&env, ORCHESTRATOR_MODE_VAR), (None, 0));
+}
+
+#[test]
+fn the_switch_reaches_the_children_started_after_it() {
+    let spawner = spawner();
+
+    spawner.set_orchestrator_mode(Some(OrchestratorMode::Organic));
+    let organic = spawner.options_for(&ChatKey::New(1), None).env;
+    assert_eq!(
+        value_of(&organic, ORCHESTRATOR_MODE_VAR),
+        (Some(OsString::from("organic")), 1)
+    );
+
+    // The same spawner, asked again: the mode is per child, resolved at spawn.
+    spawner.set_orchestrator_mode(Some(OrchestratorMode::FullDelegation));
+    let delegated = spawner.options_for(&ChatKey::New(2), None).env;
+    assert_eq!(
+        value_of(&delegated, ORCHESTRATOR_MODE_VAR),
+        (Some(OsString::from("full-delegation")), 1)
+    );
+}
+
+#[test]
+fn clearing_the_mode_puts_later_children_back_on_the_default() {
+    let spawner = spawner();
+    spawner.set_orchestrator_mode(Some(OrchestratorMode::FullDelegation));
+    assert_eq!(
+        spawner.orchestrator_mode(),
+        Some(OrchestratorMode::FullDelegation)
+    );
+
+    spawner.set_orchestrator_mode(None);
+
+    assert_eq!(spawner.orchestrator_mode(), None);
+    let env = spawner.options_for(&ChatKey::New(3), None).env;
+    assert_eq!(value_of(&env, ORCHESTRATOR_MODE_VAR), (None, 0));
+}
+
+#[test]
+fn the_mode_replaces_an_entry_the_environment_already_had() {
+    // The caller's own environment may name the variable (a developer set it for
+    // the whole run); the switch the user made is the one the child gets, once.
+    let spawner = ProcessSpawner::with_env(
+        crate::launcher::Launcher {
+            program: "gentle-shell".into(),
+            args: vec![],
+        },
+        vec![
+            (
+                OsString::from("GENTLE_SHELL_INTERACTIVE_HOST"),
+                OsString::from("1"),
+            ),
+            (
+                OsString::from(ORCHESTRATOR_MODE_VAR),
+                OsString::from("organic"),
+            ),
+        ],
+    );
+    spawner.set_orchestrator_mode(Some(OrchestratorMode::FullDelegation));
+
+    let env = spawner.options_for(&ChatKey::New(4), None).env;
+
+    assert_eq!(
+        value_of(&env, ORCHESTRATOR_MODE_VAR),
+        (Some(OsString::from("full-delegation")), 1)
+    );
+    assert_eq!(
+        env.len(),
+        3,
+        "interactive host, intercom id and one mode: {env:?}"
+    );
+}
+
+#[test]
+fn the_switch_is_never_set_in_this_process() {
+    // Session-scoped and per child (S1): the spawner carries the mode, and the
+    // process that starts the children keeps its own environment untouched.
+    let before = std::env::var_os(ORCHESTRATOR_MODE_VAR);
+    let spawner = spawner();
+    spawner.set_orchestrator_mode(Some(OrchestratorMode::FullDelegation));
+    let _ = spawner.options_for(&ChatKey::New(5), None);
+    assert_eq!(std::env::var_os(ORCHESTRATOR_MODE_VAR), before);
+}
+
+#[test]
+fn the_two_modes_are_the_two_values_gentle_pi_reads() {
+    assert_eq!(OrchestratorMode::Organic.as_str(), "organic");
+    assert_eq!(OrchestratorMode::FullDelegation.as_str(), "full-delegation");
+    assert_eq!(
+        OrchestratorMode::parse("full-delegation"),
+        Some(OrchestratorMode::FullDelegation)
+    );
+    assert_eq!(
+        OrchestratorMode::parse("organic"),
+        Some(OrchestratorMode::Organic)
+    );
+    assert_eq!(OrchestratorMode::parse("delegation"), None);
+    assert_eq!(OrchestratorMode::parse(""), None);
+}

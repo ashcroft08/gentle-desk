@@ -5,6 +5,7 @@ use gentle_core::chat::{ChatState, Dialog};
 use super::activity::ChatActivity;
 use super::store::Chats;
 use super::ChatId;
+use crate::context::ContextUsage;
 
 impl Chats {
     /// The chat the user is on, if any.
@@ -80,5 +81,13 @@ impl Chats {
         self.entries
             .get(chat)
             .map_or(&[], |entry| entry.state.pending_dialogs.as_slice())
+    }
+
+    /// The context reading that chat's child last reported (0.1.12, S5), `None`
+    /// for a chat that has not answered `get_session_stats` yet.
+    pub fn context(&self, chat: &ChatId) -> Option<&ContextUsage> {
+        self.entries
+            .get(chat)
+            .and_then(|entry| entry.context.as_ref())
     }
 }

@@ -1,8 +1,9 @@
 //! What a chat asks for right after its child came up: its history if it is
 //! stored, its state if it is new, nothing at all otherwise — and, whichever
-//! way the child came up, the questions the model chip needs (0.1.11), so a
-//! chat that is already running answers them again instead of leaving the
-//! chip on a loading line forever.
+//! way the child came up, the session's own questions (0.1.11's model and
+//! thinking level, and 0.1.12's context reading), so a chat that is already
+//! running answers them again instead of leaving a chip on a loading line
+//! forever.
 
 use gentle_app::{ChatCommand, ChatId};
 use gentle_backend::chat_host::Opened;
@@ -25,6 +26,10 @@ fn a_stored_chat_that_just_started_asks_its_history_state_and_both_lists() {
             ChatCommand::Send {
                 chat: chat.clone(),
                 rpc: RpcCommand::GetState,
+            },
+            ChatCommand::Send {
+                chat: chat.clone(),
+                rpc: RpcCommand::GetSessionStats,
             },
             ChatCommand::Send {
                 chat: chat.clone(),
@@ -51,6 +56,10 @@ fn a_new_chat_that_just_started_asks_its_state_and_both_lists() {
             },
             ChatCommand::Send {
                 chat: chat.clone(),
+                rpc: RpcCommand::GetSessionStats,
+            },
+            ChatCommand::Send {
+                chat: chat.clone(),
                 rpc: RpcCommand::GetAvailableModels,
             },
             ChatCommand::Send {
@@ -63,7 +72,7 @@ fn a_new_chat_that_just_started_asks_its_state_and_both_lists() {
 
 /// A chat whose child was already up has its thread on screen, but its chip
 /// was cleared when it left the foreground: the state and both lists are asked
-/// again (R3-003, R4-chip-stuck).
+/// again (R3-003, R4-chip-stuck), and so is the context reading (0.1.12, S5).
 #[test]
 fn an_already_running_chat_still_asks_its_state_and_both_lists() {
     let chat = ChatId::of_session("p.jsonl");
@@ -74,6 +83,10 @@ fn an_already_running_chat_still_asks_its_state_and_both_lists() {
             ChatCommand::Send {
                 chat: chat.clone(),
                 rpc: RpcCommand::GetState,
+            },
+            ChatCommand::Send {
+                chat: chat.clone(),
+                rpc: RpcCommand::GetSessionStats,
             },
             ChatCommand::Send {
                 chat: chat.clone(),

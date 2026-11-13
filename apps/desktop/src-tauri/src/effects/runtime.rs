@@ -13,11 +13,11 @@
 
 use std::ffi::OsString;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, OnceLock};
+use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 
 use gentle_app::ChatCommand;
 use gentle_backend::chat_host::{
-    ChatHost, Clock, Limits, ProcessSpawner, Spawner, SystemClock, TaggedEvent,
+    ChatHost, Clock, Limits, OrchestratorMode, ProcessSpawner, Spawner, SystemClock, TaggedEvent,
 };
 use gentle_backend::home::{with_home_flag, HomeChoice, HomeEnv};
 use gentle_backend::launcher::{self, LauncherEnv};
@@ -57,6 +57,13 @@ pub struct RuntimeExecutor {
     /// The home the user chose on the welcome screen, as the config said when
     /// the app started: a later change takes effect on the next start.
     home_choice: Option<HomeChoice>,
+    /// The spawner once the host was built, so the orchestrator mode can reach
+    /// the children started from now on (0.1.12, S1, T4): the host holds it as
+    /// `Arc<dyn Spawner>`, and this is the same spawner.
+    spawner: Mutex<Option<Arc<ProcessSpawner>>>,
+    /// The orchestrator mode every later child starts with. `None` is
+    /// gentle-pi's own default, which is a run that never switched.
+    mode: Mutex<Option<OrchestratorMode>>,
 }
 
 impl RuntimeExecutor {
@@ -72,6 +79,8 @@ impl RuntimeExecutor {
             holder,
             closed: AtomicBool::new(false),
             home_choice: None,
+            spawner: Mutex::new(None),
+            mode: Mutex::new(None),
         }
     }
 
@@ -79,6 +88,25 @@ impl RuntimeExecutor {
     pub fn with_home_choice(mut self, choice: Option<HomeChoice>) -> Self {
         self.home_choice = choice;
         self
+    }
+
+    /// Sets the orchestrator mode every chat opened from now on starts with
+    /// (0.1.12, S1, T4). Session-scoped: the value lives here and in the
+    /// spawner, never in the app config, and a child already running keeps the
+    /// mode it was started with.
+    pub fn set_orchestrator_mode(&self, mode: Option<OrchestratorMode>) {
+        *lock(&self.mode) = mode;
+        // Cloned out before the call, so no lock is held while the spawner takes
+        // its own.
+        let spawner = lock(&self.spawner).clone();
+        if let Some(spawner) = spawner {
+            spawner.set_orchestrator_mode(mode);
+        }
+    }
+
+    /// The mode later children start with.
+    pub fn orchestrator_mode(&self) -> Option<OrchestratorMode> {
+        *lock(&self.mode)
     }
 
     /// Stops accepting new work: the close flow's first step, and the reason a
@@ -107,7 +135,7 @@ impl RuntimeExecutor {
     /// to the pump exactly once.
     fn runtime(&self) -> Result<Arc<ChatRuntime>, String> {
         self.runtime
-            .get_or_init(|| match build(self.home_choice) {
+            .get_or_init(|| match self.build() {
                 Ok((runtime, events)) => {
                     let runtime = Arc::new(runtime);
                     self.pump.feed(Arc::clone(&runtime), events);
@@ -123,6 +151,27 @@ impl RuntimeExecutor {
                 }
             })
             .clone()
+    }
+
+    /// The host itself, with the spawner this run keeps: building it stores the
+    /// spawner, so a later mode switch reaches the host already running.
+    fn build(&self) -> Result<(ChatRuntime, std::sync::mpsc::Receiver<TaggedEvent>), String> {
+        let spawner = self.spawner()?;
+        let host = ChatHost::with_parts(
+            Limits::default(),
+            spawner as Arc<dyn Spawner>,
+            Arc::new(SystemClock) as Arc<dyn Clock>,
+        );
+        Ok(ChatRuntime::new(host))
+    }
+
+    /// The spawner of this run, built once and remembered. It starts on the mode
+    /// the user already chose, if they chose one before the first chat.
+    fn spawner(&self) -> Result<Arc<ProcessSpawner>, String> {
+        let spawner = Arc::new(spawner(self.home_choice)?);
+        spawner.set_orchestrator_mode(*lock(&self.mode));
+        *lock(&self.spawner) = Some(Arc::clone(&spawner));
+        Ok(spawner)
     }
 }
 
@@ -190,20 +239,6 @@ fn refuse(command: ChatCommand) -> Outcome {
     }
 }
 
-/// The host itself: real children, the searcher's limits, and the launcher plus
-/// the forwarded arguments of this window.
-fn build(
-    home_choice: Option<HomeChoice>,
-) -> Result<(ChatRuntime, std::sync::mpsc::Receiver<TaggedEvent>), String> {
-    let spawner = spawner(home_choice)?;
-    let host = ChatHost::with_parts(
-        Limits::default(),
-        Arc::new(spawner) as Arc<dyn Spawner>,
-        Arc::new(SystemClock) as Arc<dyn Clock>,
-    );
-    Ok(ChatRuntime::new(host))
-}
-
 /// The spawner of one child per chat, with the launcher this run resolves and
 /// the arguments this process was started with (a home flag is added when they
 /// name none).
@@ -222,4 +257,10 @@ fn spawner(choice: Option<HomeChoice>) -> Result<ProcessSpawner, String> {
         NO_HOST.to_owned()
     })?;
     Ok(ProcessSpawner::new(launcher).with_args(args))
+}
+
+/// A lock that survives a poisoned mutex: a thread that died holding one must
+/// not stop every later chat from starting.
+fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
+    mutex.lock().unwrap_or_else(|poison| poison.into_inner())
 }

@@ -11,10 +11,11 @@ use gentle_core::rpc::RpcCommand;
 /// session file yet, so it asks for its state and learns the path from the
 /// reply. A chat whose child was already up has its thread already, but the
 /// chip's data was cleared when it left the foreground, so it asks the state
-/// and both lists again. Either way the model chip's questions go out: the
-/// session's model and thinking level (`get_state`), the models the child
-/// offers (`get_available_models`), and the levels the session's model
-/// supports (`get_available_thinking_levels`). One whose child is still
+/// and both lists again. Either way the session's own questions go out: its
+/// model and thinking level (`get_state`), how full its context is
+/// (`get_session_stats`, 0.1.12), the models the child offers
+/// (`get_available_models`), and the levels the session's model supports
+/// (`get_available_thinking_levels`). One whose child is still
 /// starting is served by the start already on its way, and a start that was
 /// discarded has no child at all: none of them asks for anything. Nothing
 /// here is a `switch_session` or a `new_session` (S1).
@@ -26,6 +27,7 @@ pub fn request_after_open(chat: &ChatId, how: Opened) -> Vec<ChatCommand> {
     let chip = || {
         vec![
             ask(RpcCommand::GetState),
+            ask(RpcCommand::GetSessionStats),
             ask(RpcCommand::GetAvailableModels),
             ask(RpcCommand::GetAvailableThinkingLevels),
         ]

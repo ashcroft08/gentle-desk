@@ -8,6 +8,7 @@
 use std::ffi::OsString;
 use std::io;
 use std::path::Path;
+use std::sync::Mutex;
 
 use crate::launcher::{self, Launcher, LauncherEnv, LauncherError};
 use crate::process::{RpcProcess, SpawnOptions};
@@ -23,6 +24,42 @@ const INTERCOM_ID_VAR: &str = "PI_INTERCOM_STABLE_ID";
 /// What every id this spawner hands out starts with, so an id found in pi's
 /// warning or in a lock file says where it came from.
 const INTERCOM_ID_PREFIX: &str = "gentle-desk-";
+
+/// The variable gentle-pi reads its orchestrator mode from
+/// (lib/orchestrator-mode-policy.ts): `organic` or `full-delegation`, with
+/// `organic` as its own default when the variable is unset. It is passed to the
+/// child and never set in this process, so one chat's switch cannot reach
+/// another process.
+const ORCHESTRATOR_MODE_VAR: &str = "GENTLE_PI_ORCHESTRATOR_MODE";
+
+/// How the orchestrator runs a turn: the two values gentle-pi accepts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OrchestratorMode {
+    /// The orchestrator does the work itself and delegates when it chooses to.
+    Organic,
+    /// The orchestrator delegates and keeps the conversation to itself.
+    FullDelegation,
+}
+
+impl OrchestratorMode {
+    /// The value the environment variable carries.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            OrchestratorMode::Organic => "organic",
+            OrchestratorMode::FullDelegation => "full-delegation",
+        }
+    }
+
+    /// The mode `name` spells, `None` for anything else: gentle-pi's own two
+    /// values, never a third one invented here.
+    pub fn parse(name: &str) -> Option<Self> {
+        match name.trim() {
+            "organic" => Some(OrchestratorMode::Organic),
+            "full-delegation" => Some(OrchestratorMode::FullDelegation),
+            _ => None,
+        }
+    }
+}
 
 /// The intercom id of `key`: the same chat always gets the same id, two chats
 /// get two.
@@ -78,6 +115,12 @@ pub struct ProcessSpawner {
     /// Arguments every child gets before its own (e.g. `--isolated`).
     args: Vec<OsString>,
     env: Vec<(OsString, OsString)>,
+    /// The orchestrator mode every later child is started with (0.1.12, S1, T4).
+    /// Behind a lock because the host holds this spawner through
+    /// `Arc<dyn Spawner>` and the switch arrives after it was built; `None` is
+    /// gentle-pi's own default (`organic`), so nothing is passed until the user
+    /// chooses, and nothing is ever persisted.
+    mode: Mutex<Option<OrchestratorMode>>,
 }
 
 impl ProcessSpawner {
@@ -108,6 +151,7 @@ impl ProcessSpawner {
             launcher,
             args: Vec::new(),
             env,
+            mode: Mutex::new(None),
         }
     }
 
@@ -119,26 +163,52 @@ impl ProcessSpawner {
         self
     }
 
+    /// Sets the orchestrator mode every later child is started with. `None` puts
+    /// new children back on gentle-pi's default by passing no variable at all.
+    ///
+    /// Session-scoped by design (S1): nothing is written to the app config, and
+    /// no variable is set in this process, so the mode belongs to the children
+    /// started from now on and dies with them. A child already running keeps the
+    /// mode it was started with, which is what `applies to chats opened from now
+    /// on` means.
+    pub fn set_orchestrator_mode(&self, mode: Option<OrchestratorMode>) {
+        *lock(&self.mode) = mode;
+    }
+
+    /// The mode later children are started with.
+    pub fn orchestrator_mode(&self) -> Option<OrchestratorMode> {
+        *lock(&self.mode)
+    }
+
     /// The options for one chat: the forwarded arguments, then `--session
     /// <path>` for a saved chat and nothing more for a new one, and the folder
     /// the open named as the working folder. Never a session switch: the session
     /// is chosen at spawn.
     ///
     /// The child's environment is this spawner's plus the intercom id of the
-    /// chat (see [`intercom_id`]): one process per id on pi's side, so sharing
-    /// one id between children would make a chat lose its intercom the moment a
-    /// second one opens. An entry the caller supplied for that variable is
-    /// replaced, never duplicated, because the child can only hold one.
+    /// chat (see [`intercom_id`]) and, when the user chose one, the orchestrator
+    /// mode. One process per intercom id on pi's side, so sharing one id between
+    /// children would make a chat lose its intercom the moment a second one
+    /// opens. An entry the caller supplied for either variable is replaced,
+    /// never duplicated, because a child can only hold one value per name.
     pub fn options_for(&self, key: &ChatKey, folder: Option<&Path>) -> SpawnOptions {
         let mut args = self.args.clone();
         if let ChatKey::Saved(path) = key {
             args.extend([OsString::from("--session"), path.clone().into_os_string()]);
         }
         let mut env = self.env.clone();
-        let id = (OsString::from(INTERCOM_ID_VAR), intercom_id(key));
-        match env.iter_mut().find(|(name, _)| *name == INTERCOM_ID_VAR) {
-            Some(entry) => *entry = id,
-            None => env.push(id),
+        put(
+            &mut env,
+            (OsString::from(INTERCOM_ID_VAR), intercom_id(key)),
+        );
+        if let Some(mode) = self.orchestrator_mode() {
+            put(
+                &mut env,
+                (
+                    OsString::from(ORCHESTRATOR_MODE_VAR),
+                    OsString::from(mode.as_str()),
+                ),
+            );
         }
         SpawnOptions {
             args,
@@ -146,6 +216,21 @@ impl ProcessSpawner {
             cwd: folder.map(Path::to_path_buf),
         }
     }
+}
+
+/// Puts one variable into a child's environment, replacing the entry the caller
+/// supplied for that name: a process can only hold one value per variable.
+fn put(env: &mut Vec<(OsString, OsString)>, entry: (OsString, OsString)) {
+    match env.iter_mut().find(|(name, _)| *name == entry.0) {
+        Some(existing) => *existing = entry,
+        None => env.push(entry),
+    }
+}
+
+/// A lock that survives a poisoned mutex: a thread that died holding the mode
+/// must not make every later spawn panic.
+fn lock<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+    mutex.lock().unwrap_or_else(|poison| poison.into_inner())
 }
 
 impl Spawner for ProcessSpawner {

@@ -9,8 +9,8 @@
 use gentle_app::{ChatId, Input, Intent};
 use gentle_desk_lib::bridge::AppStateHolder;
 use gentle_desk_lib::contract::{
-    InstallView, ListStatusView, ModelChipView, ModelListStatusView, NoticeLevel, ShellView,
-    ThemeView, UiIntent, ViewState,
+    AuthView, ContextUsageView, InstallView, ListStatusView, ModelChipView, ModelListStatusView,
+    NoticeLevel, ProfilesView, ShellView, ThemeView, UiIntent, UpdatesView, ViewState,
 };
 
 #[test]
@@ -93,6 +93,8 @@ fn the_view_state_slice_has_no_invented_fields() {
             list_status: ListStatusView::Loading { done: 0, total: 0 },
             sessions_revision: 0,
             total_sessions: 0,
+            // No chat was started, so the Updates pane's gate is free (S4).
+            open_chats: 0,
             messages: Vec::new(),
             notices: Vec::new(),
             // No chat is open, so no extension is waiting for an answer.
@@ -116,6 +118,15 @@ fn the_view_state_slice_has_no_invented_fields() {
                 thinking_level: None,
                 thinking_levels: Vec::new(),
             },
+            // No chat has answered a statistics ask, so the context chip has no
+            // reading at all - every field null, never a zero (0.1.12, S5).
+            context_usage: ContextUsageView::default(),
+            // No file was read and no check ran before the pane asked, so both
+            // panes start unknown and the next chats start on gentle-pi's own
+            // default mode (0.1.12).
+            profiles: ProfilesView::default(),
+            auth: AuthView::default(),
+            updates: UpdatesView::default(),
             config_notice: None,
             // The shell-owned line a refused workspace action sets: nothing was
             // refused here, so it carries nothing.

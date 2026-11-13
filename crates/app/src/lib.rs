@@ -13,12 +13,14 @@
 //! One file per responsibility: `state` (what the UI renders), `input` (what
 //! goes in and out of `update`), `intents` (user actions), `events` (RPC
 //! events), `notices` (extension notices), `chats` (one state per chat),
-//! `session_prepare` (building the search data of a list, away from the UI
-//! thread), `session_query` (which chats the sidebar shows), `list_status`
-//! (whether that list is complete).
+//! `context` (the context reading a chat's child reports), `session_prepare`
+//! (building the search data of a list, away from the UI thread), `session_query`
+//! (which chats the sidebar shows), `list_status` (whether that list is
+//! complete).
 
 mod chats;
 mod chip;
+mod context;
 mod events;
 mod input;
 mod intents;
@@ -29,6 +31,7 @@ mod session_query;
 mod state;
 
 pub use chats::{ChatActivity, ChatId, Chats};
+pub use context::ContextUsage;
 pub use input::{ChatCommand, Command, Effects, Input, Intent};
 pub use list_status::ListStatus;
 pub use session_prepare::{prepare_sessions, PreparedSessions};

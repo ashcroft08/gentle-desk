@@ -109,6 +109,16 @@ mod encode {
         );
     }
 
+    /// pi's own ask for the session's statistics (rpc-mode.js:488-490): the
+    /// one request whose reply carries `contextUsage`.
+    #[test]
+    fn the_session_stats_ask_is_pis_own_line() {
+        assert_eq!(
+            encode_command(&RpcCommand::GetSessionStats),
+            "{\"type\":\"get_session_stats\"}\n"
+        );
+    }
+
     #[test]
     fn get_messages_and_switch_session_carry_their_fields() {
         let with_id = encode_command(&RpcCommand::GetMessages {
