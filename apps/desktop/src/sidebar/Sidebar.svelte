@@ -176,14 +176,18 @@
     onDelete={confirmDelete}
   />
   <!-- The Settings dialog, the only home the theme picker and the home setting
-       have now (S1), and where the app's name, its running version and the
-       manual update check live (S5, S6). Closing it sends nothing: each section
-       persists through the command it already had. -->
+       have now (S1), and where the app's name and running version live (S5).
+       The three 0.1.12 panes read their own slices from the same push (S1-S4).
+       Closing it sends nothing: each section keeps its own path. -->
   <SettingsDialog
     bind:open={settingsOpen}
     theme={model.view?.theme ?? 'system'}
     shell={model.view?.shell ?? null}
     version={model.view?.app_version ?? null}
+    profiles={model.view?.profiles ?? null}
+    auth={model.view?.auth ?? null}
+    updates={model.view?.updates ?? null}
+    openChats={model.view?.open_chats ?? 0}
   />
   <!-- The footer keeps exactly two things (S1): the run's Preview chip and the
        gear that opens Settings. -->

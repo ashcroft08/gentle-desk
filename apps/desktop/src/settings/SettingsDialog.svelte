@@ -1,43 +1,36 @@
 <script lang="ts">
-  // The Settings dialog (settings-dialog S2-S6, L4): a rail of three sections on
-  // the left and the selected section's content in the pane on the right. The
-  // rail carries the two controls the footer used to hold - the theme picker and
-  // the home setting - plus About and updates: the app's name, the version this
-  // run runs as, and the manual check with its answer drawn in place. The
-  // controls themselves are the same components the footer drew, with the same
-  // props and the same behavior: nothing here redesigns them, it only gives them
-  // a calmer place and one section at a time.
+  // The Settings dialog (settings-dialog S2-S6, L4; 0.1.12 S1-S7): a rail of six
+  // sections on the left and the selected section's content in the pane on the
+  // right. The rail carries the two controls the footer used to hold - the theme
+  // picker and the home setting - then the three 0.1.12 panes, then About: the
+  // app's name and the version this run runs as. The controls themselves are the
+  // same components the footer drew, with the same props and the same behavior:
+  // nothing here redesigns them, it only gives them a calmer place and one
+  // section at a time.
   //
   // The rail is a vertical tablist, the chat header's pattern: one entry is the
   // tab stop and the arrow keys, Home and End walk the rail, so the dialog opens
   // on Appearance and the focus starts there. Only the selected section is
-  // drawn, so nothing off-screen can take a key. Escape, the backdrop and Close
-  // still close the card, and the focus stays inside while it is open.
+  // drawn, so nothing off-screen can take a key, and a pane that reads the
+  // machine (Profiles) only starts reading when it is the one on screen.
   //
   // Closing sends nothing. Each section persists through the command it already
   // had, so Dismiss, Escape and the backdrop only close the card.
-  //
-  // The check is the one the startup runs (`update/plugin`), injected here so a
-  // test drives it with no network; it only REPORTS, never installs (S6).
   import { Dialog } from 'bits-ui'
-  import type { ShellView_Serialize as ShellView, ThemeView } from '../contract/bindings'
+  import type {
+    AuthView_Serialize as AuthView,
+    ProfilesView_Serialize as ProfilesView,
+    ShellView_Serialize as ShellView,
+    ThemeView,
+    UpdatesView_Serialize as UpdatesView,
+  } from '../contract/bindings'
   import Icon from '../icons/Icon.svelte'
   import HomeSetting from '../sidebar/HomeSetting.svelte'
   import ThemePicker from '../sidebar/ThemePicker.svelte'
-  import { checkForUpdate, type CheckResult } from '../update/plugin'
-  import {
-    APP_NAME,
-    CHECK_AVAILABLE,
-    CHECK_FAILED,
-    CHECK_NOW,
-    CHECKING,
-    CLOSE,
-    HOME_EXPLAIN,
-    SETTINGS,
-    UP_TO_DATE,
-    VERSION,
-    VERSION_UNKNOWN,
-  } from './copy'
+  import AccountPane from './AccountPane.svelte'
+  import ProfilesPane from './ProfilesPane.svelte'
+  import UpdatesPane from './UpdatesPane.svelte'
+  import { APP_NAME, CLOSE, HOME_EXPLAIN, SETTINGS, VERSION, VERSION_UNKNOWN } from './copy'
   import {
     DEFAULT_SECTION,
     PANEL_ID,
@@ -49,14 +42,16 @@
     sectionAfter,
     type Section,
   } from './sections'
-  import { checking, notChecked, type CheckState } from './updates'
 
   let {
     open = $bindable(false),
     theme,
     shell,
     version = null,
-    checkUpdate = checkForUpdate,
+    profiles = null,
+    auth = null,
+    updates = null,
+    openChats = 0,
   }: {
     /** Whether the dialog is open. */
     open?: boolean
@@ -66,26 +61,18 @@
     shell: ShellView | null
     /** The version this run runs as (S5), or null while the bridge named none. */
     version?: string | null
-    /** The check the Updates section runs on demand (S6): the startup one. */
-    checkUpdate?: () => Promise<CheckResult>
+    /** The Profiles pane's slice (0.1.12, S1), or null before the first push. */
+    profiles?: ProfilesView | null
+    /** The Account pane's slice (0.1.12, S1), or null before the first push. */
+    auth?: AuthView | null
+    /** The Updates pane's slice (0.1.12, S2), or null before the first check. */
+    updates?: UpdatesView | null
+    /** How many chats are open: the Updates pane's gate (S4). */
+    openChats?: number
   } = $props()
 
   /** The section the pane draws: Appearance on open (L4). */
   let selected = $state<Section>(DEFAULT_SECTION)
-
-  /** The check as the section draws it: nothing asked, in flight, or the answer. */
-  let check = $state<CheckState>(notChecked())
-
-  /** What the result line says for the state the check is in, or '' for none. */
-  function line(state: CheckState): string {
-    if (state.kind === 'checking') return CHECKING
-    if (state.kind === 'available') return CHECK_AVAILABLE(state.version)
-    if (state.kind === 'current') return UP_TO_DATE
-    if (state.kind === 'failed') return CHECK_FAILED(state.message)
-    return ''
-  }
-
-  const result = $derived(line(check))
 
   /** The rail's own title per section: the entry's word is the pane's heading. */
   const title = $derived(SECTION_TITLES[selected])
@@ -97,16 +84,6 @@
     event.preventDefault()
     selected = next
     document.getElementById(TAB_IDS[next])?.focus()
-  }
-
-  /**
-   * Asks the updater once and draws what it answers (S6). A press while the
-   * check runs asks nothing more, so one press is one request.
-   */
-  async function checkNow(): Promise<void> {
-    if (check.kind === 'checking') return
-    check = checking()
-    check = await checkUpdate()
   }
 </script>
 
@@ -155,31 +132,22 @@
                 {#if shell !== null}
                   <HomeSetting {shell} />
                 {/if}
+              {:else if selected === 'updates'}
+                <UpdatesPane {updates} {openChats} />
+              {:else if selected === 'profiles'}
+                <ProfilesPane {profiles} />
+              {:else if selected === 'account'}
+                <AccountPane {auth} />
               {:else}
-                <!-- About and updates (S5, S6): the name, the version this run
-                     runs as, and the one check button with its answer drawn
-                     under it. The check only reports: installing stays the
-                     update notice's own flow, so a found release never
-                     installs itself here. -->
+                <!-- About (S5): the name and the version this run runs as. What
+                     is installed, and whether something newer is out, is the
+                     Updates section's own card. -->
                 <p class="about">
                   <span class="about-name">{APP_NAME}</span>
                   <span class="about-version">
                     {version === null ? VERSION_UNKNOWN : VERSION(version)}
                   </span>
                 </p>
-                <div class="check">
-                  <button
-                    type="button"
-                    class="btn"
-                    disabled={check.kind === 'checking'}
-                    onclick={() => void checkNow()}
-                  >
-                    {CHECK_NOW}
-                  </button>
-                  {#if check.kind !== 'idle'}
-                    <p class="why" role="status">{result}</p>
-                  {/if}
-                </div>
               {/if}
             </div>
           {/key}

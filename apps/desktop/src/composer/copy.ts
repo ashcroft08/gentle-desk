@@ -55,3 +55,39 @@ export const LEVEL_LABEL = 'Thinking level'
 export const MODELS_LOADING = 'Loading models...'
 export const MODELS_EMPTY = 'No models are available for this chat.'
 export const MODELS_UNAVAILABLE = 'Models unavailable:'
+
+// --- the context chip (0.1.12, S5) ---
+
+/**
+ * The chip's accessible name: the number, and what the number is a share of.
+ * The text is the state, so the colour never carries it alone.
+ */
+export const CONTEXT_LABEL = (percent: number): string =>
+  `Context used: ${percent} percent of the model's window`
+
+/** What the chip says when pi reported no percentage: right after a compaction. */
+export const CONTEXT_DASH = '\u2013'
+
+/** The chip's name when there is no percentage to read (the dash state). */
+export const CONTEXT_HIDDEN = 'Context usage is not known right now'
+
+/**
+ * A token count as the hover reads it: `38k`, `200k`, `1.2m`. Rounded, because
+ * the detail is a context, not a measurement.
+ */
+export function formatTokens(count: number): string {
+  if (count >= 1_000_000) return `${Math.round(count / 100_000) / 10}m`
+  if (count >= 1_000) return `${Math.round(count / 1_000)}k`
+  return String(count)
+}
+
+/**
+ * The chip's hover text: the tokens the context holds against the window it
+ * fills. Either number can be missing (pi answers null right after a
+ * compaction), and a missing one is simply not said.
+ */
+export function tokensTitle(tokens: number | null, window: number | null): string {
+  if (tokens === null) return ''
+  if (window === null) return `${formatTokens(tokens)} tokens`
+  return `${formatTokens(tokens)} / ${formatTokens(window)} tokens`
+}

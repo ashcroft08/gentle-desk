@@ -50,10 +50,21 @@ describe('chatOf', () => {
         thinking_level: null,
         thinking_levels: [],
       },
+      // How full its context is: null until the chat's own child answers.
+      contextUsage: { tokens: null, percent: null, window: null },
       fatal: null,
       whatsNew: null,
       shell: { pi_path: null, choice: null, ask: false, launcher_found: true, install: { type: 'Idle' }, restart_needed: false },
     })
+  })
+
+  it("carries the foreground chat's own context reading, nulls included", () => {
+    const state = viewState({
+      foreground_chat: 'chat-1',
+      context_usage: { tokens: 70_000, percent: 35, window: 200_000 },
+    })
+
+    expect(chatOf(state).contextUsage).toEqual({ tokens: 70_000, percent: 35, window: 200_000 })
   })
 
   it('leaves an idle chat unmarked, so its composer is ready', () => {
@@ -103,6 +114,7 @@ describe('chatOf', () => {
       images: [],
       imagesNotice: null,
       modelChip: null,
+      contextUsage: null,
       fatal: null,
       whatsNew: null,
       shell: { pi_path: null, choice: null, ask: false, launcher_found: true, install: { type: 'Idle' }, restart_needed: false },
