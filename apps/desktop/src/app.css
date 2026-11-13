@@ -563,16 +563,16 @@ p {
   padding-left: 16px;
 }
 
-/* The model chip (0.1.11, S7): the two pill dropdowns in their own row BELOW
-   the composer form, right-aligned, and the themed popover listbox they open
-   upward (the row sits at the window's bottom edge). */
+/* The model chip (0.1.11, S7): the two pill dropdowns sit at the right of the
+   bottom row under the composer form, sharing it with the key hints (`.dock-bottom`),
+   and open the themed popover listbox upward (the row is at the window's bottom
+   edge). */
 .chip {
   display: flex;
   justify-content: flex-end;
   align-items: center;
   flex-wrap: nowrap;
   gap: 4px;
-  margin-top: 0;
 }
 
 .pill-select {
