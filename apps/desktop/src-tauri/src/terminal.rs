@@ -94,39 +94,17 @@ pub fn open(action: TerminalActionView, home_args: &[OsString]) -> Result<(), St
     launch(&program, &args)
 }
 
-/// The line `cmd` is given to run `program` and keep the window open afterwards:
-/// `/k ""program" "arg" ..."`. The OUTER pair of quotes is what makes cmd keep a
-/// quoted program path that holds a space (a node under `Program Files`)
-/// intact; every part is quoted and written with Windows separators. A double
-/// quote inside an argument would end the quoting early, so it is refused.
-pub fn console_line(program: &Path, args: &[OsString]) -> Result<String, String> {
-    let mut parts = Vec::with_capacity(args.len() + 1);
-    parts.push(program.as_os_str().to_owned());
-    parts.extend(args.iter().cloned());
-    let mut line = String::from("/k \"");
-    for part in parts {
-        let text = part.to_string_lossy().replace('/', "\\");
-        if text.contains('"') {
-            return Err("The terminal could not be opened: an argument holds a quote".to_owned());
-        }
-        line.push('"');
-        line.push_str(&text);
-        line.push_str("\" ");
-    }
-    // The last part leaves a trailing space; the outer quote closes the line.
-    line.pop();
-    line.push('"');
-    Ok(line)
-}
-
 /// Starts `program` in a terminal window of its own, answering as soon as the
 /// window exists: nothing here waits for the window to close.
 ///
-/// The window is `cmd /k` in a `CREATE_NEW_CONSOLE` console, built with
-/// [`console_line`] and `raw_arg` (the standard `args()` quoting is the one cmd
-/// mangles). `/k` keeps the window open when the command ends, so its output
-/// stays readable: `pi auth login` with no provider used to print one usage line
-/// and take the window with it in 0.6 s.
+/// NO shell in between: `CREATE_NEW_CONSOLE` gives the process its own visible
+/// console and the launcher runs as `Command::new(program).args(args)` - the
+/// shape the settings probes already run, verified from a console-less GUI
+/// process with the real launcher (node under `C:\Program Files\...`, a path
+/// with a space): the interactive shell stays alive with a true TTY. Wrapping
+/// doubled outer quotes once the line carries more than the program
+/// ("network path not found", then a dead prompt), which is why the first
+/// maintainer run saw a window flash and die.
 #[cfg(windows)]
 fn launch(program: &Path, args: &[OsString]) -> Result<(), String> {
     use std::os::windows::process::CommandExt;
@@ -135,9 +113,8 @@ fn launch(program: &Path, args: &[OsString]) -> Result<(), String> {
     /// command exists to open.
     const CREATE_NEW_CONSOLE: u32 = 0x0000_0010;
 
-    let line = console_line(program, args)?;
-    std::process::Command::new("cmd")
-        .raw_arg(line)
+    std::process::Command::new(program)
+        .args(args)
         .creation_flags(CREATE_NEW_CONSOLE)
         .spawn()
         .map(|_| ())
@@ -229,32 +206,6 @@ mod tests {
             os(&["C:/npm/gentle-shell.mjs", "--home", "C:/h", "--link"]),
             "the flags travel as the children get them: `--home` is the one the shell reads first"
         );
-    }
-
-    /// The window runs the command under `cmd /k` so its output (and any error)
-    /// stays readable after it ends. The line is `/k ""program" "arg" ..."` -
-    /// the OUTER pair of quotes is what makes cmd keep the quoted program path
-    /// (`C:\Program Files\...`) intact; separators are Windows ones.
-    #[test]
-    fn the_console_line_keeps_a_spaced_program_and_stays_open() {
-        let line = console_line(
-            Path::new("C:/Program Files/nodejs/node.exe"),
-            &os(&["C:/npm/gentle-shell.mjs", "--isolated", "update"]),
-        )
-        .expect("plain arguments build a line");
-
-        assert_eq!(
-            line,
-            r#"/k ""C:\Program Files\nodejs\node.exe" "C:\npm\gentle-shell.mjs" "--isolated" "update"""#
-        );
-    }
-
-    /// A double quote inside an argument would end the quoting early and let the
-    /// rest run as a second command, so it is refused instead of escaped.
-    #[test]
-    fn an_argument_with_a_quote_is_refused() {
-        let refused = console_line(Path::new("C:/node.exe"), &os(&["a\"b"]));
-        assert!(refused.is_err());
     }
 
     /// The desk's own arguments are not the shell's: only the home flags travel.
