@@ -509,7 +509,8 @@ p {
   display: flex;
   justify-content: flex-end;
   align-items: center;
-  gap: 6px;
+  flex-wrap: nowrap;
+  gap: 4px;
   margin-top: 6px;
 }
 
@@ -521,6 +522,7 @@ p {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  white-space: nowrap;
   border: 0;
   background: transparent;
   border-radius: 10px;
@@ -548,7 +550,10 @@ p {
   position: absolute;
   right: 0;
   bottom: calc(100% + 4px);
-  min-width: 260px;
+  /* Sized to its content: the level list is short, the model list is long
+     but capped, so neither shows empty width around the rows. */
+  width: max-content;
+  max-width: 320px;
   max-height: 300px;
   overflow-y: auto;
   background: var(--surface);
@@ -560,7 +565,7 @@ p {
 }
 
 .popover .filter {
-  width: calc(100% - 12px);
+  width: 200px;
   margin: 2px;
   padding: 6px 8px;
   border: 1px solid var(--border);
