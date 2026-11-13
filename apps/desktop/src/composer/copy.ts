@@ -37,6 +37,10 @@ export const DROP_HINT = 'Drop the images here to attach them.'
  * drawn name adds the file it takes. */
 export const REMOVE_IMAGE = 'Remove'
 
+/** The custom dropdown's filter box and its empty result (S7). */
+export const SEARCH_PLACEHOLDER = 'Search models...'
+export const NOTHING_MATCHES = 'Nothing matches.'
+
 /** Ended: the chat's process is gone until it is restarted. */
 export const ENDED_REASON = "This chat's process exited. Restart it to keep talking."
 

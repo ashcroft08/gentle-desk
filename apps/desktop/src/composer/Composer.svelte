@@ -187,13 +187,15 @@
       oninput={typed}
       onkeydown={keyed}
     ></textarea>
-    <ModelChip {chip} />
     {#if rule.mode === 'stop'}
       <StopButton onStop={stop} />
     {:else}
       <SendButton disabled={rule.disabled} describedBy={SEND_WHY_ID} />
     {/if}
   </form>
+  <!-- The chip lives in its own row BELOW the box (S7): it never competes
+       with what is being typed. -->
+  <ModelChip {chip} />
   {#if rule.reason !== null}
     <!-- The visible reason for a disabled Send, which Send is described by. -->
     <p class="why" id={SEND_WHY_ID}>{rule.reason}</p>

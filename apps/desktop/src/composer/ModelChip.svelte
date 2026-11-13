@@ -1,17 +1,12 @@
 <script lang="ts">
-  // The model chip (0.1.11): the session's model and thinking level as two
-  // pill dropdowns inside the composer bar, right of the box and left of the
-  // send button, the way the user's screenshot shows it. The page never
-  // guesses: what the child did not say is not shown, and a failed ask is a
-  // state, not an error the composer turns into.
-  //
-  // One turn at a time is the composer's business, not the chip's: choosing a
-  // model while the agent works is the child's session change, and pi answers
-  // it or refuses it. The chip renders the refusal as the notice the app
-  // already pushes, not as a disabled control.
+  // The model chip (0.1.11, S7): the session's model and thinking level as
+  // two pill dropdowns in their own row BELOW the composer form. The lists
+  // are the app's own themed popovers, never native select popups. The page
+  // never guesses: what the child did not say is not shown, and a failed ask
+  // is a state, not an error the composer turns into.
   import { dispatchIntent } from '../bridge'
-  import Icon from '../icons/Icon.svelte'
   import type { ModelChipView } from '../contract/bindings'
+  import PillSelect from './PillSelect.svelte'
   import {
     LEVEL_LABEL,
     MODEL_LABEL,
@@ -23,13 +18,24 @@
   let { chip }: { chip: ModelChipView | null } = $props()
 
   const status = $derived(chip?.status.type ?? 'Unknown')
-  const models = $derived(chip?.models ?? [])
-  const current = $derived(chip?.current ?? null)
-  const levels = $derived(chip?.thinking_levels ?? [])
+  const models = $derived(
+    (chip?.models ?? []).map((model) => ({
+      value: `${model.provider}/${model.model_id}`,
+      label: model.name,
+      hint: model.provider,
+    })),
+  )
+  const current = $derived(
+    chip?.current === null || chip?.current === undefined
+      ? null
+      : `${chip.current.provider}/${chip.current.model_id}`,
+  )
+  const levels = $derived(
+    (chip?.thinking_levels ?? []).map((level) => ({ value: level, label: level })),
+  )
   const level = $derived(chip?.thinking_level ?? null)
 
-  function choseModel(event: Event): void {
-    const value = (event.currentTarget as HTMLSelectElement).value
+  function choseModel(value: string): void {
     const slash = value.indexOf('/')
     if (slash <= 0) return
     void dispatchIntent({
@@ -38,8 +44,7 @@
     })
   }
 
-  function choseLevel(event: Event): void {
-    const value = (event.currentTarget as HTMLSelectElement).value
+  function choseLevel(value: string): void {
     if (value === '') return
     void dispatchIntent({ type: 'SelectThinkingLevel', data: { level: value } })
   }
@@ -48,33 +53,9 @@
 {#if chip !== null}
   <div class="chip">
     {#if chip?.status.type === 'Ready' && models.length > 0}
-      <label class="pill">
-        <select
-          aria-label={MODEL_LABEL}
-          value={current === null ? '' : `${current.provider}/${current.model_id}`}
-          onchange={choseModel}
-        >
-          {#if current === null}
-            <option value="" disabled hidden>{MODEL_LABEL}</option>
-          {/if}
-          {#each models as model (model.provider + '/' + model.model_id)}
-            <option value={model.provider + '/' + model.model_id}>{model.name}</option>
-          {/each}
-        </select>
-        <Icon name="chevronDown" size={12} />
-      </label>
+      <PillSelect label={MODEL_LABEL} value={current} options={models} filterable onchange={choseModel} />
       {#if levels.length > 0}
-        <label class="pill level">
-          <select aria-label={LEVEL_LABEL} value={level ?? ''} onchange={choseLevel}>
-            {#if level === null}
-              <option value="" disabled hidden>{LEVEL_LABEL}</option>
-            {/if}
-            {#each levels as option (option)}
-              <option value={option}>{option}</option>
-            {/each}
-          </select>
-          <Icon name="chevronDown" size={12} />
-        </label>
+        <PillSelect label={LEVEL_LABEL} value={level} options={levels} faint onchange={choseLevel} />
       {/if}
     {:else if status === 'Loading' || status === 'Unknown'}
       <p class="state">{MODELS_LOADING}</p>

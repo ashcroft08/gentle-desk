@@ -22,9 +22,13 @@ is written. Backed by the verified facts in the roadmap (2026-11-12 section).
 - S5: The list only contains providers whose auth resolves (auth.json, runtime key,
   or env var). If the list is empty or a request fails, the chip shows that state
   instead of inventing entries; the composer's text entry keeps working.
-- S6: Nothing is persisted by gentle-desk: no gentle-pi JSON is written (roadmap
-  decision kept). The chat sends the commands through the existing runtime path
-  (`runtime` execute.rs is generic; no change there).
+- S7: Placement and dropdown (user decision 2026-11-13, after the working chip):
+  "es mejor poner el selector abajo del cuadro donde se escribe" — the chip's
+  pills live in their own row BELOW the composer form, not inside it. And
+  "desplegable propio con el tema de la app (lista oscura, filtro de búsqueda)" —
+  no native select popups: a custom themed listbox, with a filter input, keyboard
+  navigation (arrows, Enter, Esc) and click-outside close. Same dispatch intents
+  as before; the child's truth and drawn failure states do not change.
 
 ## Tasks
 
@@ -60,6 +64,8 @@ is written. Backed by the verified facts in the roadmap (2026-11-12 section).
       `auto` before measuring; a stubbed scrollHeight (content vs current
       height, as a browser reports) reproduces the stuck-expanded bug RED and
       the fix GREEN. Commit 4719ea4.
+- [ ] T8 (S7) pill row below the composer form + custom themed listbox
+      (filter, keyboard, click-outside) for the model and level pills + tests.
 
 ## Verification plan
 
@@ -115,6 +121,10 @@ is written. Backed by the verified facts in the roadmap (2026-11-12 section).
   acknowledge-approved burned (review-ai.review-acknowledged/v1); three
   informational follow-ups remain: ModelChip.svelte:44, chip.rs:96-99,
   chats/intents.rs:46-49. Delivery follows ordinary repository policy.
+- L13 (design decision after the working chip): "antes de probar, modifica el
+  diseño es mejor poner el selector abajo del cuadro donde se escribe y
+  desplegable propio con el tema de la app (lista oscura, filtro de búsqueda)",
+  then relaunch for review — T8.
   "quiero el diseño de esta forma" (screenshot: the chip inline in the composer
   bar, right-aligned next to the send button, model name bold, level faint,
   chevron) — NEW scope, pending task; the textarea stays expanded after sending

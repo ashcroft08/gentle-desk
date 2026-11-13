@@ -502,48 +502,114 @@ p {
   padding-left: 16px;
 }
 
-/* The model chip (0.1.11): the two pill dropdowns sit inside the composer bar,
-   right of the box and left of the send button, the way the user's screenshot
-   shows it: model name bold, level faint, each with its own chevron. */
+/* The model chip (0.1.11, S7): the two pill dropdowns in their own row BELOW
+   the composer form, right-aligned, and the themed popover listbox they open
+   upward (the row sits at the window's bottom edge). */
 .chip {
   display: flex;
+  justify-content: flex-end;
   align-items: center;
   gap: 6px;
-  margin-left: auto;
+  margin-top: 6px;
 }
 
-.chip .pill {
+.pill-select {
+  position: relative;
+}
+
+.pill {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  position: relative;
+  border: 0;
+  background: transparent;
   border-radius: 10px;
   padding: 3px 6px;
   color: var(--faint);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
 }
 
-.chip .pill:hover {
+.pill:hover {
   background: var(--surface2);
 }
 
-.chip .pill select {
-  appearance: none;
+.pill-select:not(.faint) .pill-value {
+  color: inherit;
+  font-weight: 600;
+}
+
+.pill .ic {
+  flex: none;
+}
+
+.popover {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 4px);
+  min-width: 260px;
+  max-height: 300px;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  padding: 4px;
+  z-index: 30;
+}
+
+.popover .filter {
+  width: calc(100% - 12px);
+  margin: 2px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  outline: none;
+}
+
+.popover .filter:focus {
+  border-color: var(--accent);
+}
+
+.options {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.option {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
   border: 0;
   background: transparent;
   color: inherit;
   font: inherit;
   font-size: 12px;
-  font-weight: 600;
-  padding: 0 2px;
-  max-width: 180px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  cursor: pointer;
 }
 
-.chip .pill.level select {
-  font-weight: 400;
+.option.active {
+  background: var(--surface2);
 }
 
-.chip .pill .ic {
-  flex: none;
+.option[aria-selected='true'] {
+  color: var(--accent);
+}
+
+.option .hint {
+  color: var(--faint);
+  font-size: 11px;
 }
 
 .chip .state {

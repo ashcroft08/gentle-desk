@@ -1,10 +1,8 @@
-// The model chip's drawn behaviour, one test per rule: the list and the levels
-// come from the child's truth, a choice dispatches the intent Rust maps, and
-// each state (loading, empty, failed) is drawn instead of guessed.
-//
-// Every choice leaves through the generated bindings, so what is asserted is
-// the intent Rust would receive.
-
+// The model chip's drawn behaviour (S7): the pills sit in their own row below
+// the composer form; each opens the app's own themed listbox (no native
+// popup), the model list filters as one types, arrows move and Enter chooses,
+// Escape and a click outside close, and each choice dispatches the intent
+// Rust maps. The failure states are drawn, never guessed.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/svelte'
 import type { ModelChipView } from '../contract/bindings'
@@ -20,6 +18,7 @@ const READY: ModelChipView = {
   models: [
     { provider: 'prov', model_id: 'm1', name: 'Model One', reasoning: true },
     { provider: 'prov', model_id: 'm2', name: 'Model Two', reasoning: false },
+    { provider: 'other', model_id: 'm3', name: 'Other Model', reasoning: false },
   ],
   current: { provider: 'prov', model_id: 'm1', name: 'Model One', reasoning: true },
   thinking_level: 'high',
@@ -35,6 +34,20 @@ function intents(): unknown[] {
   return handlerArgs('dispatch_intent').map((args) => args.intent)
 }
 
+function modelPill() {
+  return screen.getByRole('button', { name: 'Model' })
+}
+
+function levelPill() {
+  return screen.getByRole('button', { name: 'Thinking level' })
+}
+
+/** Opens one pill's list and waits for the popover to render. */
+async function openList(pill: HTMLElement) {
+  await fireEvent.click(pill)
+  return screen.getByRole('listbox', { name: pill.getAttribute('aria-label') as string })
+}
+
 beforeEach(() => {
   resetTauriMock()
   setHandler('dispatch_intent', () => Promise.resolve(null))
@@ -45,39 +58,117 @@ afterEach(() => {
 })
 
 describe('model chip', () => {
-  it('draws the current model and level as selected options', () => {
-    chipProp(READY)
-    const model = screen.getByRole('combobox', { name: 'Model' }) as HTMLSelectElement
-    const level = screen.getByRole('combobox', { name: 'Thinking level' }) as HTMLSelectElement
-    expect(model.value).toBe('prov/m1')
-    expect(level.value).toBe('high')
+  it('draws the pills in their own row below the composer form', () => {
+    const { container } = chipProp(READY)
+    const form = container.querySelector('form.composer')
+    const chip = container.querySelector('.chip')
+    expect(form).toBeTruthy()
+    expect(chip).toBeTruthy()
+    expect(form!.compareDocumentPosition(chip as Node) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
-  it('choosing a model dispatches SelectModel with provider and model id', async () => {
+  it('the pills show the current model and level without a list open', () => {
     chipProp(READY)
-    const model = screen.getByRole('combobox', { name: 'Model' })
-    await fireEvent.change(model, { target: { value: 'prov/m2' } })
+    expect(modelPill().getAttribute('aria-expanded')).toBe('false')
+    expect(screen.getByText('Model One')).toBeTruthy()
+    expect(screen.getByText('high')).toBeTruthy()
+    expect(screen.queryByRole('listbox')).toBeNull()
+  })
+
+  it('opening the model pill shows the themed listbox and its filter', async () => {
+    chipProp(READY)
+    const list = await openList(modelPill())
+    expect(modelPill().getAttribute('aria-expanded')).toBe('true')
+    expect(screen.getByPlaceholderText('Search models...')).toBeTruthy()
+    expect(list.querySelectorAll('[role="option"]').length).toBe(3)
+  })
+
+  it('typing filters the model list', async () => {
+    chipProp(READY)
+    const list = await openList(modelPill())
+    const filter = screen.getByPlaceholderText('Search models...') as HTMLInputElement
+    await fireEvent.input(filter, { target: { value: 'other' } })
+    const options = list.querySelectorAll('[role="option"]')
+    expect(options.length).toBe(1)
+    expect(options[0].textContent).toContain('Other Model')
+  })
+
+  it('the filter with no match says so instead of showing an empty list', async () => {
+    chipProp(READY)
+    await openList(modelPill())
+    const filter = screen.getByPlaceholderText('Search models...') as HTMLInputElement
+    await fireEvent.input(filter, { target: { value: 'zzz' } })
+    expect(screen.getByText('Nothing matches.')).toBeTruthy()
+  })
+
+  it('filtering and pressing Enter chooses the first match (SelectModel)', async () => {
+    chipProp(READY)
+    await openList(modelPill())
+    const filter = screen.getByPlaceholderText('Search models...') as HTMLInputElement
+    await fireEvent.input(filter, { target: { value: 'other' } })
+    await fireEvent.keyDown(screen.getByRole('listbox', { name: 'Model' }), { key: 'Enter' })
     expect(intents()).toContainEqual({
       type: 'SelectModel',
-      data: { provider: 'prov', model_id: 'm2' },
+      data: { provider: 'other', model_id: 'm3' },
     })
+    expect(screen.queryByRole('listbox')).toBeNull()
+  })
+
+  it('Enter on the unfiltered list chooses the active (selected) option', async () => {
+    chipProp(READY)
+    await openList(modelPill())
+    await fireEvent.keyDown(screen.getByRole('listbox', { name: 'Model' }), { key: 'Enter' })
+    expect(intents()).toContainEqual({
+      type: 'SelectModel',
+      data: { provider: 'prov', model_id: 'm1' },
+    })
+  })
+
+  it('Escape closes the list', async () => {
+    chipProp(READY)
+    await openList(modelPill())
+    await fireEvent.keyDown(screen.getByRole('listbox', { name: 'Model' }), { key: 'Escape' })
+    expect(screen.queryByRole('listbox')).toBeNull()
+  })
+
+  it('a click outside closes the list', async () => {
+    chipProp(READY)
+    await openList(modelPill())
+    await fireEvent.pointerDown(document, { bubbles: true })
+    expect(screen.queryByRole('listbox')).toBeNull()
   })
 
   it('choosing a level dispatches SelectThinkingLevel', async () => {
     chipProp(READY)
-    const level = screen.getByRole('combobox', { name: 'Thinking level' })
-    await fireEvent.change(level, { target: { value: 'medium' } })
+    await openList(levelPill())
+    const options = screen
+      .getByRole('listbox', { name: 'Thinking level' })
+      .querySelectorAll('[role="option"]')
+    expect(options.length).toBe(3)
+    fireEvent.click(options[1])
     expect(intents()).toContainEqual({ type: 'SelectThinkingLevel', data: { level: 'medium' } })
   })
 
-  it('a loading or unasked chip says so and offers no dropdown', () => {
-    chipProp({ status: { type: 'Loading' }, models: [], current: null, thinking_level: null, thinking_levels: [] })
-    expect(screen.queryByRole('combobox', { name: 'Model' })).toBeNull()
+  it('a loading or unasked chip says so and offers no pills', () => {
+    chipProp({
+      status: { type: 'Loading' },
+      models: [],
+      current: null,
+      thinking_level: null,
+      thinking_levels: [],
+    })
+    expect(screen.queryByRole('button', { name: 'Model' })).toBeNull()
     expect(screen.getByText('Loading models...')).toBeTruthy()
   })
 
   it('an empty list is its own line, not an error', () => {
-    chipProp({ status: { type: 'Empty' }, models: [], current: null, thinking_level: null, thinking_levels: [] })
+    chipProp({
+      status: { type: 'Empty' },
+      models: [],
+      current: null,
+      thinking_level: null,
+      thinking_levels: [],
+    })
     expect(screen.getByText('No models are available for this chat.')).toBeTruthy()
   })
 
@@ -90,11 +181,11 @@ describe('model chip', () => {
       thinking_levels: [],
     })
     expect(screen.getByText(/Models unavailable: child gone/)).toBeTruthy()
-    expect(screen.queryByRole('combobox')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Model' })).toBeNull()
   })
 
   it('no chip draws nothing at all', () => {
     chipProp(null)
-    expect(screen.queryByRole('combobox')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Model' })).toBeNull()
   })
 })
