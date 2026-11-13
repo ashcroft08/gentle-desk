@@ -6,7 +6,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/svelte'
 import type { ModelChipView } from '../contract/bindings'
-import { handlerArgs, resetTauriMock, setHandler, viewState } from '../test-support/tauri-mock'
+import { handlerArgs, resetTauriMock, setHandler } from '../test-support/tauri-mock'
 import Composer from './Composer.svelte'
 
 vi.mock('@tauri-apps/api/core', () => import('../test-support/tauri-mock').then((m) => m.coreModule()))
