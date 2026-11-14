@@ -1862,13 +1862,18 @@ p {
    warning token from there, the danger token from 95%. */
 .settings-pane .ucards {
   /* Bounded on purpose: a machine can have several providers logged in, and the
-     pane must not push its own button off the dialog. The cards scroll here. */
-  max-height: min(46vh, 420px);
-  overflow-y: auto;
-  padding-right: 4px;
+     pane must not push its own button off the dialog. The cards scroll here.
+     The gutter is reserved so the scrollbar never draws over a card's border,
+     and the last few pixels fade so a clipped card reads as "more below"
+     instead of as a broken card. */
   display: flex;
   flex-direction: column;
   gap: 10px;
+  max-height: min(46vh, 420px);
+  overflow-y: auto;
+  padding-right: 10px;
+  scrollbar-gutter: stable;
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 18px), transparent);
 }
 
 .settings-pane .card.usage-provider {
