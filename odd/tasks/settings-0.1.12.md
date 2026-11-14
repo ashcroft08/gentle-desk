@@ -280,3 +280,48 @@ the subscription panel goes to NEXT version's analysis; 0.1.12 ships the four pi
   and the switch, and Account accented the secondary action - and left the tags, notes and tab
   strip as they were. 0.1.12 bumps the version in three files and ships from main; the roadmap
   records it as shipped and lists 0.1.13 candidates.
+
+- L21 (2026-11-13, maintainer gap found on the running app; feat/update-extensions): the
+  Updates pane could update pi and the shell but had NO way to update the installed
+  EXTENSIONS, even though S2 named `pi update --extensions` and `gentle-shell update
+  --extensions` as part of the batch. VERIFIED COMMAND TRUTH (reused, not re-probed): `pi
+  update --extensions` updates the installed packages only; `gentle-shell update` FORWARDS
+  to pi's updater, so pi's own flags pass straight through; and there is NO cheap way to
+  know whether extensions are outdated (no registry check per package), so the action is
+  offered WITHOUT a check - it is idempotent and safe to run any time. WHAT WAS ADDED
+  (Rust): `TerminalActionView::UpdateExtensions` (contract.rs, its doc comment says why it
+  needs no check) and its `action_args` arm returning `["update", "--extensions"]`
+  (terminal.rs, commented with the pass-through reason); bindings regenerated with
+  `GENTLE_DESK_REGEN_BINDINGS=1 cargo test -p gentle-desk-app --test contract_bindings`, so
+  the web union now carries `"UpdateExtensions"`, and the terminal keeps the same home
+  flags the chats' children get. WHAT WAS ADDED (web): a second button "Update
+  extensions" in `UpdatesPane.svelte` - one Svelte snippet rendered in BOTH pane states,
+  so no data drives it - next to Check again (and next to the accent Update when that one
+  shows), DISABLED by the same chats-closed gate (S4) with `aria-describedby` on the gate
+  hint while blocked, opening the terminal through the same `openTerminal` call. Copy in
+  `updates-copy.ts`: `UPDATE_EXTENSIONS` = "Update extensions" and
+  `UPDATE_EXTENSIONS_IN_TERMINAL` = "Update extensions opens a terminal window and updates
+  the packages your shell has installed. There is no way to tell which ones are behind,
+  so this button is always offered and safe to use any time." - no version, no promise, no
+  fake "extensions are behind" state. The gate hint now says the update buttons (plural)
+  come alive, because two of them are gated. TESTS (test-first, RED observed then GREEN):
+  1 new in `terminal.rs` (`update_extensions_is_the_shells_update_with_pis_own_flag`; the
+  RED was the E0599 the missing variant gave); 4 new in `UpdatesPane.test.ts` (always
+  offered with its note next to Check again while everything is up to date; offered before
+  the check answered, and never checking; one click opens the terminal on UpdateExtensions
+  and nothing else; dead with 1 open chat, described by the gate line, opening nothing).
+  The existing Updates and SettingsDialog tests stayed green unchanged because their
+  `name: 'Update'` query is exact and never matches the new button. GATES, all exit 0:
+  cargo fmt --all --check; cargo clippy --workspace --all-targets -- -D warnings; cargo
+  test --workspace; and in apps/desktop npm run lint, npm run check (0 errors, 0
+  warnings), npx vitest run (469/469) and npm run build. RENDER CHECK (the pane dumped
+  from a disposable vitest render into a temp dir, a static page with app.css + theme.css
+  inlined, screenshotted with Chrome `--headless=new`, dark theme, images read):
+  update-available card - the warning tag, the `pi 1.5.2 -> 2.0.5` headline, the quiet
+  versions row and ONE row of three buttons (accent Update, Update extensions, Check
+  again) with the two notes under it; up-to-date card - the success tag, no Update,
+  Update extensions and Check again side by side with only the extensions note; blocked
+  variant - the accent Update and Update extensions both dimmed while Check again stays
+  live, and the tinted gate line saying the update buttons come alive. No layout break,
+  the notes wrap inside the card, the house contrast is kept. The dev-app retest of these
+  two terminal runs stays the maintainer's, as in L19/L20.
