@@ -20,16 +20,17 @@
   import SettingsDialog from '../settings/SettingsDialog.svelte'
   import { SETTINGS } from '../settings/copy'
   import { updateWaiting } from '../update/dot'
+  import { language } from '../i18n/language.svelte'
   import {
-    EMPTY_REASON,
-    EMPTY_TITLE,
     EMPTY_WHY_ID,
     NEW_SESSION_WHY_ID,
-    NO_WORKSPACE_REASON,
-    readingLine,
+    sidebarCopy,
   } from './copy'
 
   const sessions = createSessionsView()
+
+  /** The sidebar's own words in the language this run is set to (0.2.0, S3/D4). */
+  const copy = $derived(sidebarCopy(language.current))
 
   /** Whether the header's New workspace menu is open (the empty prompt opens it). */
   let newWorkspaceOpen = $state(false)
@@ -61,17 +62,19 @@
   )
   const status = $derived(model.view?.list_status ?? null)
   const reading = $derived(
-    status?.type === 'Loading' ? readingLine(status.data.done, status.data.total) : null,
+    status?.type === 'Loading' ? copy.reading(status.data.done, status.data.total) : null,
   )
-  const reason = $derived(currentPath !== null || empty ? null : NO_WORKSPACE_REASON)
+  const reason = $derived(currentPath !== null || empty ? null : copy.noWorkspaceReason)
   const describedBy = $derived(
     currentPath !== null ? null : empty ? EMPTY_WHY_ID : NEW_SESSION_WHY_ID,
   )
   // The gear's dot (0.1.14): an update is waiting for one of the rows a terminal
   // updates. The dot is decoration; the gear's own name carries the same news in
-  // words, so the promise is never the colour alone.
+  // words, so the promise is never the colour alone. The Settings word itself is
+  // the dialog's own (settings/copy.ts), so only the news around it is the
+  // sidebar's to word.
   const updateDot = $derived(updateWaiting(model.view?.updates ?? null))
-  const gearLabel = $derived(updateDot ? `${SETTINGS} - an update is available` : SETTINGS)
+  const gearLabel = $derived(updateDot ? copy.updateWaiting(SETTINGS) : SETTINGS)
 
   // One view, one store: closing the sidebar ends the event listener and drops
   // every cached page.
@@ -146,7 +149,7 @@
   }
 </script>
 
-<aside class="side" aria-label="Workspaces">
+<aside class="side" aria-label={copy.workspaces}>
   <WordMark />
   <NewSessionButton
     enabled={currentPath !== null}
@@ -165,8 +168,8 @@
   {/if}
   {#if empty}
     <EmptyState
-      title={EMPTY_TITLE}
-      reason={EMPTY_REASON}
+      title={copy.emptyTitle}
+      reason={copy.emptyReason}
       reasonId={EMPTY_WHY_ID}
       onNewWorkspace={() => (newWorkspaceOpen = true)}
     />
@@ -213,8 +216,8 @@
   <footer class="foot">
     <span
       class="preview-chip"
-      title="Preview: under active development - fixes ship fast"
-      >Preview</span
+      title={copy.previewTitle}
+      >{copy.preview}</span
     >
     <button
       class="ic"

@@ -4,7 +4,8 @@
   // and the create-folder dialog the second item opens; both commands go through
   // the bridge, never through `invoke` here.
   import { addWorkspace, createWorkspace } from '../bridge'
-  import { WORKSPACE_TITLE } from './copy'
+  import { language } from '../i18n/language.svelte'
+  import { sidebarCopy } from './copy'
   import NewWorkspaceDialog from './NewWorkspaceDialog.svelte'
   import NewWorkspaceMenu from './NewWorkspaceMenu.svelte'
 
@@ -15,13 +16,16 @@
     menuOpen?: boolean
   } = $props()
 
+  /** The section's name in the language this run is set to (0.2.0, S3/D4). */
+  const copy = $derived(sidebarCopy(language.current))
+
   /** The icon, so a closed menu or dialog gives the focus back to it. */
   let trigger = $state<HTMLElement | null>(null)
   let createOpen = $state(false)
 </script>
 
 <div class="wh">
-  <h2>{WORKSPACE_TITLE}</h2>
+  <h2>{copy.workspaceTitle}</h2>
   <NewWorkspaceMenu
     bind:open={menuOpen}
     bind:trigger

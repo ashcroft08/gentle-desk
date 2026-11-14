@@ -7,14 +7,8 @@
   // click while it runs does nothing. A refusal is not drawn here: the dialog
   // closes on the answer and the sidebar's notice line says what happened.
   import { Dialog } from 'bits-ui'
-  import {
-    CANCEL,
-    CREATE_BUSY,
-    CREATE_IDLE,
-    NEW_FOLDER_HINT,
-    NEW_FOLDER_LABEL,
-    NEW_FOLDER_TITLE,
-  } from './copy'
+  import { language } from '../i18n/language.svelte'
+  import { sidebarCopy } from './copy'
 
   let {
     open = $bindable(false),
@@ -32,6 +26,9 @@
   let typed = $state('')
   let busy = $state(false)
   let field = $state<HTMLInputElement | null>(null)
+
+  /** The dialog's own words, in the language this run is set to (0.2.0, S3/D4). */
+  const copy = $derived(sidebarCopy(language.current))
 
   const name = $derived(typed.trim())
   const ready = $derived(name !== '' && !busy)
@@ -68,9 +65,9 @@
       onOpenAutoFocus={(event) => event.preventDefault()}
       onCloseAutoFocus={closedFocus}
     >
-      <Dialog.Title class="dt">{NEW_FOLDER_TITLE}</Dialog.Title>
-      <Dialog.Description class="why">{NEW_FOLDER_HINT}</Dialog.Description>
-      <label for="new-folder-name">{NEW_FOLDER_LABEL}</label>
+      <Dialog.Title class="dt">{copy.newFolderTitle}</Dialog.Title>
+      <Dialog.Description class="why">{copy.newFolderHint}</Dialog.Description>
+      <label for="new-folder-name">{copy.newFolderLabel}</label>
       <input
         id="new-folder-name"
         type="text"
@@ -80,9 +77,9 @@
         bind:value={typed}
       />
       <div class="acts">
-        <Dialog.Close class="btn" type="button">{CANCEL}</Dialog.Close>
+        <Dialog.Close class="btn" type="button">{copy.cancel}</Dialog.Close>
         <button class="btn" type="button" disabled={!ready} aria-busy={busy} onclick={create}>
-          {busy ? CREATE_BUSY : CREATE_IDLE}
+          {busy ? copy.createBusy : copy.createIdle}
         </button>
       </div>
     </Dialog.Content>

@@ -15,18 +15,28 @@
   // display names are written in both languages, so the control reads them from
   // the theme module's dictionary of the reactive language: choosing Español
   // redraws them in the same tick, while the values it sends stay identifiers.
+  // The control's OWN words - the tooltip, the list's name and the prefix of the
+  // button's name - are the sidebar's, so they come from its dictionary in the
+  // same language (T6); the theme names inside them are never translated.
   import { tick } from 'svelte'
   import type { ThemeView } from '../contract/bindings'
   import { dispatchIntent } from '../bridge'
   import Icon from '../icons/Icon.svelte'
   import { language } from '../i18n/language.svelte'
   import { THEMES, themeLabelsCopy, themeSwatch } from '../theme/themes'
+  import { sidebarCopy } from './copy'
   import { movedIndex, trappedIndex } from './theme-keys'
 
   let { theme }: { theme: ThemeView } = $props()
 
   /** The six drawn labels in the language the app's own words are written in. */
   const labels = $derived(themeLabelsCopy(language.current))
+  /**
+   * The control's own words - its tooltip, the list's name and the prefix of its
+   * accessible name - in the same language (0.2.0, S3/D4). The label inside the
+   * name is the theme module's, and the identifiers it sends never move.
+   */
+  const copy = $derived(sidebarCopy(language.current))
 
   /** Whether the list is open. */
   let open = $state(false)
@@ -35,7 +45,7 @@
   /** The list itself, so the focus code reads the options it drew. */
   let list = $state<HTMLUListElement | null>(null)
 
-  const name = $derived(`Theme: ${labels[theme]}`)
+  const name = $derived(copy.themeName(labels[theme]))
   const selected = $derived(Math.max(THEMES.indexOf(theme), 0))
 
   /** The drawn options, in the order `THEMES` names them. */
@@ -135,7 +145,7 @@
     class="ic tip-l"
     type="button"
     id="theme-btn"
-    data-tip="Theme"
+    data-tip={copy.themeTip}
     aria-haspopup="listbox"
     aria-expanded={open}
     aria-label={name}
@@ -150,7 +160,7 @@
       class="tpl"
       id="theme-list"
       role="listbox"
-      aria-label="Theme"
+      aria-label={copy.themeListName}
       tabindex="-1"
       bind:this={list}
       onclick={onListClick}

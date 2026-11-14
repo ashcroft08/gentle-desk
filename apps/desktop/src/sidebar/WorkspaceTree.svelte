@@ -9,6 +9,7 @@
   // The rows themselves carry no key handler, so the roles and markup stay the
   // artboard's (01a).
   import type { ChatActivityView } from '../contract/bindings'
+  import { language } from '../i18n/language.svelte'
   import {
     isWorkspaceRow,
     markKindOf,
@@ -21,6 +22,7 @@
   import type { Viewport } from '../sessions/window'
   import ChatRow from './ChatRow.svelte'
   import WorkspaceHeaderRow from './WorkspaceHeaderRow.svelte'
+  import { sidebarCopy } from './copy'
 
   let {
     rows = [],
@@ -58,6 +60,8 @@
 
   /** The scroll container: it is what the viewport is measured from. */
   let nav: HTMLElement | null = $state(null)
+  /** The tree's own name, in the language this run is set to (0.2.0, S3/D4). */
+  const copy = $derived(sidebarCopy(language.current))
   /** The tree itself: the element the rows are read from and keys are handled on. */
   let tree: HTMLElement | null = $state(null)
   /** The row that holds the one tab stop. */
@@ -144,10 +148,10 @@
   }
 </script>
 
-<nav class="tree" aria-label="Workspaces" bind:this={nav} onscroll={scrolled}>
+<nav class="tree" aria-label={copy.workspaces} bind:this={nav} onscroll={scrolled}>
   <div
     role="tree"
-    aria-label="Workspaces"
+    aria-label={copy.workspaces}
     tabindex="-1"
     bind:this={tree}
     onfocusin={focusMoved}

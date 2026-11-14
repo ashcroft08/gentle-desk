@@ -4,6 +4,14 @@
 // and the app adds no icon dependency and no external URL.
 //
 // Lucide is licensed under the ISC license: https://lucide.dev/license
+//
+// 0.2.0 (S3, D4): the NAME of each chat state is this app's own word, so the six
+// of them are written in BOTH languages below - one English column (the one a bare
+// `Mark` still draws) and a builder that answers the same record for a language.
+// A row that asks for its names redraws them in the same tick the language is
+// told (S2); the shapes and the colour tokens never change.
+
+import type { LanguageView } from '../contract/bindings'
 
 /** One drawn element: a path outline or a circle. */
 export type Shape =
@@ -163,6 +171,28 @@ export const MARK_LABELS: Record<MarkKind, string> = {
   NewReply: 'New reply',
   NeedsAttention: 'Needs attention',
   Ended: 'Ended',
+}
+
+/**
+ * Neutral Spanish: no voseo, no regionalisms, nothing left in English. Every one
+ * of the six is a word of ours, so every one of them changes.
+ */
+const MARK_LABELS_ES: typeof MARK_LABELS = {
+  Working: 'Trabajando',
+  Queued: 'En cola',
+  Opening: 'Abriendo',
+  NewReply: 'Respuesta nueva',
+  NeedsAttention: 'Necesita atención',
+  Ended: 'Terminado',
+}
+
+/**
+ * The six mark names in `language`, the whole record at once (D4). `MARK_LABELS`
+ * stays the English column because it is also the default name a bare `Mark`
+ * draws; a caller that knows the language asks here instead.
+ */
+export function markLabelsCopy(language: LanguageView): typeof MARK_LABELS {
+  return language === 'es' ? MARK_LABELS_ES : MARK_LABELS
 }
 
 /** The one design-system token each mark takes its colour from. */

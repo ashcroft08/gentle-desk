@@ -12,10 +12,14 @@ import { serveSidebar } from '../test-support/sidebar'
 import { setLanguage } from '../i18n/language.svelte'
 import type { ThemeView } from '../contract/bindings'
 import { themeLabelsCopy } from '../theme/themes'
+import { sidebarCopy } from './copy'
 import Sidebar from './Sidebar.svelte'
 
 vi.mock('@tauri-apps/api/core', () => import('../test-support/tauri-mock').then((m) => m.coreModule()))
 vi.mock('@tauri-apps/api/event', () => import('../test-support/tauri-mock').then((m) => m.eventModule()))
+
+/** The picker's own words: the English this file runs in, and the flipped ones. */
+const EN = sidebarCopy('en'), ES = sidebarCopy('es')
 
 /** The six labels the picker draws in the language this file runs in (English). */
 const LABELS = themeLabelsCopy('en')
@@ -74,19 +78,21 @@ async function openSettings(): Promise<void> {
   await screen.findByRole('dialog')
 }
 
-/** The control in the dialog's Appearance section, whatever theme it names. */
-function themeButton(): HTMLElement {
-  return screen.getByRole('button', { name: /^Theme: / })
-}
+/**
+ * The control in the dialog's Appearance section, whatever theme it names: the
+ * prefix is the picker's own word, read from `words` so it follows the language.
+ */
+const themeButton = (words = EN): HTMLElement =>
+  screen.getByRole('button', { name: new RegExp(`^${words.themeName('')}`) })
 
 /** The same control, found by the theme it SHOWS: the drawn name and nothing else. */
 function buttonNamed(name: string): HTMLElement {
   return screen.getByRole('button', { name })
 }
 
-async function openList(): Promise<HTMLElement> {
-  await fireEvent.click(themeButton())
-  return await screen.findByRole('listbox', { name: 'Theme' })
+async function openList(words = EN): Promise<HTMLElement> {
+  await fireEvent.click(themeButton(words))
+  return await screen.findByRole('listbox', { name: words.themeListName })
 }
 
 /** The option the list has moved the focus to. */
@@ -152,14 +158,15 @@ describe('the theme picker', () => {
     setLanguage('es')
     await tick()
 
-    expect(buttonNamed('Theme: Oscuro')).not.toBeNull()
-    const list = await openList()
+    // The control's own word wraps the theme's label, and both flip.
+    expect(buttonNamed(ES.themeName(themeLabelsCopy('es').dark))).not.toBeNull()
+    const list = await openList(ES)
     expect(within(list).getAllByRole('option').map((option) => option.textContent?.trim())).toEqual(
       NAMES_ES,
     )
 
     // The identifier is never translated: the label is only what is drawn.
-    await fireEvent.click(screen.getByRole('option', { name: 'Claro' }))
+    await fireEvent.click(screen.getByRole('option', { name: themeLabelsCopy('es').light }))
     expect(themeIntents()).toEqual(['light'])
 
     setLanguage('en')

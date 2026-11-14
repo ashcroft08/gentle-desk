@@ -9,7 +9,8 @@
   // is not drawn here: a chat that is working asks the user to stop it first, and
   // the sidebar's notice line says so once the dialog is gone.
   import { Dialog } from 'bits-ui'
-  import { CANCEL, DELETE_BODY, DELETE_CONFIRM, DELETE_TITLE } from './copy'
+  import { language } from '../i18n/language.svelte'
+  import { sidebarCopy } from './copy'
 
   let {
     open = $bindable(false),
@@ -27,6 +28,9 @@
   /** Whether an answer is on its way: a second click waits for it, never doubles. */
   let busy = $state(false)
   let cancel = $state<HTMLButtonElement | null>(null)
+
+  /** The dialog's own words, in the language this run is set to (0.2.0, S3/D4). */
+  const copy = $derived(sidebarCopy(language.current))
 
   // An open dialog starts with nothing on its way, and puts the focus on the way
   // out of it (the destructive button is never the one a stray Enter lands on).
@@ -49,15 +53,15 @@
   <Dialog.Portal>
     <Dialog.Overlay class="ovl" />
     <Dialog.Content class="dlg" onOpenAutoFocus={(event) => event.preventDefault()}>
-      <Dialog.Title class="dt">{DELETE_TITLE}</Dialog.Title>
-      <Dialog.Description class="why">{DELETE_BODY}</Dialog.Description>
+      <Dialog.Title class="dt">{copy.deleteTitle}</Dialog.Title>
+      <Dialog.Description class="why">{copy.deleteBody}</Dialog.Description>
       <code>{path}</code>
       <div class="acts">
         <button class="btn" type="button" bind:this={cancel} onclick={() => (open = false)}>
-          {CANCEL}
+          {copy.cancel}
         </button>
         <button class="btn d" type="button" disabled={busy} onclick={remove}>
-          {DELETE_CONFIRM}
+          {copy.deleteConfirm}
         </button>
       </div>
     </Dialog.Content>
