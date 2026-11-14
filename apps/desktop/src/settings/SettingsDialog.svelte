@@ -95,7 +95,10 @@
 <Dialog.Root bind:open>
   <Dialog.Portal>
     <Dialog.Overlay class="ovl" />
-    <Dialog.Content class="dlg settings">
+    <!-- A press on the backdrop does NOT close the dialog: closing is the Close
+     button's job (and Escape's, which the primitive keeps for the keyboard).
+     A mis-click outside must not throw away what the user was reading. -->
+    <Dialog.Content class="dlg settings" interactOutsideBehavior="ignore">
       <Dialog.Title class="dt">{SETTINGS}</Dialog.Title>
 
       <div class="settings-body">
