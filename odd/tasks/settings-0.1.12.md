@@ -386,3 +386,56 @@ the subscription panel goes to NEXT version's analysis; 0.1.12 ships the four pi
   drawn. The floating layer's position is pinned in the proof page (bits-ui measures it from the
   live layout, which a static dump has none of); the card itself is the component's. The dev-app
   retest of Close chat against a real child, and the version bump, stay the maintainer's.
+
+- L23 (2026-11-14, the Usage section: S6's deferred half, delivered): the subscription usage
+  view T7 deferred now has its data surface, so the seventh Settings section exists. DATA
+  SOURCE (verified this session, not re-probed): `pi-usage-sources` (github.com/ashcroft08/
+  pi-usage-sources) gained a headless JSON mode; `node <checkout>/usage-json.ts` prints ONE line,
+  `{"schema":"pi-usage-sources/usage/v1","generatedAt":...,"sources":[{"provider","status",
+  "fetchedAt","limits":[{"name","limitReached","windows":[{"label","usedPercent","resetAt",
+  "windowSeconds"}]}]}]}`, with `plan` when a provider has one and `error` (already redacted)
+  when it failed. Statuses ok / no-data / failed; a run takes ~5 s. WHAT WAS ADDED (Rust):
+  `gentle_runtime::usage` holds both pure rules - the LOCATOR (`package_entry` reads the
+  shell's `settings.json` package list for the entry naming the package, `checkout` turns
+  `git:<host>/<owner>/<repo>` into `<agent home>/git/<host>/<owner>/<repo>` and a local entry
+  into its path, refusing `..`, an empty segment and the `npm:` spelling, and `script` appends
+  `usage-json.ts`) and the PARSER (`parse` refuses a document of another schema or shape, maps
+  ok/no-data/failed, keeps `resetAt: null` as "no countdown", and `reset_label` phrases it with
+  a new `time_ago::time_until` that rounds UP). `settings::usage_view` maps the four locator
+  states (Installed / Missing / Unreadable / Failed) plus `Reading` into `UsageView`, reading
+  the settings and the script through the existing `FileRead` seam and running node through a
+  new `NodeProbe` seam with a 30 s budget (stdout/stderr drained on threads, overrun child
+  killed, non-zero exit is "no document"). `SettingsPaths` carries the agent folder;
+  `Intent::RefreshUsage` + `Bridge::refresh_usage` push Reading, run on a thread named
+  `usage-read`, push the answer. `TerminalActionView::InstallUsageSources` runs
+  `pi install git:github.com/ashcroft08/pi-usage-sources` in the house's terminal window, never
+  silently. NOT at app open: a run costs seconds, so the pane asks once when the section is
+  opened and on "Check again" (the cheap correct answer). WHAT WAS ADDED (web): the seventh
+  rail entry Usage between Account and About (Lucide `gauge`), `settings/usage.ts` (pane states
+  and the gauge rows, reusing the context chip's `toneOf`/`barWidth`), `settings/usage-copy.ts`,
+  and `UsagePane.svelte`: one card per provider with its name, its plan when it has one, one row
+  per limit and window with a bar + percentage + the shell's own "resets in 4h", the warning tag
+  on a limit the provider marked reached, "No data" (never 0%) for a no-credentials provider,
+  and the quiet loading line. Missing package: one line, "Install in terminal" and "Check
+  again"; Unreadable/Failed: `Could not read the usage: <reason>` and the safe retry. Copy says
+  the numbers come from the shell's own sources and that a provider without credentials shows
+  no data. Tests (test-first where a rule is testable, RED observed for the time helper, the
+  settings slice, the terminal arm, the bridge intent and the pane component; the runtime usage
+  rules and the pure web rules were written in the same pass as their tests, so their evidence
+  is GREEN only, reported honestly): 16 in `crates/runtime/src/usage/tests.rs` + 2 for
+  `time_until`, 12 in `settings/usage.rs`, 4 in `tests/usage.rs` (through the real
+  `Bridge::dispatch`, including "an open chat never holds the read"), the terminal arm
+  assertions, 8 in `usage.test.ts`, 8 in `UsagePane.test.ts`, and the dialog's rail/hint/usage
+  tests updated to seven sections. GATES, all exit 0: cargo fmt --all --check; cargo clippy
+  --workspace --all-targets -- -D warnings; cargo test --workspace (1175 passed); and in
+  apps/desktop npm run lint, npm run check (0 errors, 0 warnings), npx vitest run (499/499, 75
+  files) and npm run build. RENDER CHECK (the real pane rendered through Svelte SSR with the
+  project's own vite config, the REAL document captured from `node usage-json.ts` this session,
+  app.css + theme.css inlined, screenshotted with Chrome `--headless=new`, images read, dark and
+  light): four provider cards - opencode-go "No data", antigravity's two week windows at 0%,
+  commandcode (plan "individual goat") at 5%/88% (warning tone) and credits 44%, claude-bridge
+  (plan "pro") at 21% and 96% (danger tone), every row with its right-aligned "resets in ...";
+  the missing state's one line, accent "Install in terminal" and "Check again" with its note;
+  the failed state's reason line, retry and "Checking again is safe." Both themes keep the
+  house contrast and nothing overflows the card. NOT RUN by a writer: the real dev app against
+  the real `node` run (the maintainer's retest), and open_terminal for the install button.

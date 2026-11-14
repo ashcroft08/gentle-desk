@@ -10,7 +10,8 @@
 
 use super::{lock, AppStateHolder};
 use crate::contract::{
-    AuthView, OrchestratorModeView, ProfilesView, UpdatesStatusView, UpdatesView, ViewState,
+    AuthView, OrchestratorModeView, ProfilesView, UpdatesStatusView, UpdatesView, UsageStatusView,
+    UsageView, ViewState,
 };
 
 impl AppStateHolder {
@@ -67,5 +68,23 @@ impl AppStateHolder {
     /// The Updates pane's slice as it stands.
     pub(super) fn updates(&self) -> UpdatesView {
         lock(&self.updates).clone()
+    }
+
+    /// Marks the usage read as running, keeping what it showed: the pane's
+    /// quiet loading line, never a blocking spinner.
+    pub fn note_usage_reading(&self) -> ViewState {
+        lock(&self.usage).status = UsageStatusView::Reading;
+        self.view()
+    }
+
+    /// Records what the usage read answered and answers the slice to push.
+    pub fn note_usage(&self, usage: UsageView) -> ViewState {
+        *lock(&self.usage) = usage;
+        self.view()
+    }
+
+    /// The Usage pane's slice as it stands.
+    pub(super) fn usage(&self) -> UsageView {
+        lock(&self.usage).clone()
     }
 }

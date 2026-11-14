@@ -2,7 +2,8 @@
 // sections hold the controls the footer used to carry, so their labels are the
 // ones those controls already had, and the Shell home section says what the
 // welcome screen says about the two homes (shell-choice S2). The other four
-// sections are the 0.1.12 panes, each with its own copy file beside it.
+// sections are the 0.1.12 panes, each with its own copy file beside it, and the
+// Usage section joined them with its own.
 // Everything here is plain ASCII.
 
 /** The gear's name and the dialog's title: the same word for both (S5, S2). */
@@ -19,6 +20,8 @@ export const HOME_HINT = 'Which pi this shell runs on.'
 export const UPDATES_HINT = 'What this machine runs, and whether something newer is out.'
 export const PROFILES_HINT = 'Your agent profiles, as the terminal keeps them.'
 export const ACCOUNT_HINT = 'Which providers are signed in, and where to sign in or out.'
+export const USAGE_HINT =
+  "What each subscription has used, as the shell's own sources report it."
 export const ABOUT_HINT = 'Which build this is.'
 
 export const APPEARANCE_TITLE = 'Appearance'
@@ -26,6 +29,7 @@ export const HOME_TITLE = 'Shell home'
 export const UPDATES_TITLE = 'Updates'
 export const PROFILES_TITLE = 'Profiles'
 export const ACCOUNT_TITLE = 'Account'
+export const USAGE_TITLE = 'Usage'
 export const ABOUT_TITLE = 'About'
 
 /**

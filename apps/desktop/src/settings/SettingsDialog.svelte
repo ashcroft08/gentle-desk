@@ -1,9 +1,9 @@
 <script lang="ts">
-  // The Settings dialog (settings-dialog S2-S6, L4; 0.1.12 S1-S7): a rail of six
-  // sections on the left and the selected section's content in the pane on the
-  // right. The rail carries the two controls the footer used to hold - the theme
-  // picker and the home setting - then the three 0.1.12 panes, then About: the
-  // app's name and the version this run runs as. The controls themselves are the
+  // The Settings dialog (settings-dialog S2-S6, L4; 0.1.12 S1-S7): a rail of
+  // seven sections on the left and the selected section's content in the pane on
+  // the right. The rail carries the two controls the footer used to hold - the
+  // theme picker and the home setting - then the 0.1.12 panes, then Usage, then
+  // About: the app's name and the version this run runs as. The controls themselves are the
   // same components the footer drew, with the same props and the same behavior:
   // nothing here redesigns them, it only gives them a calmer place and one
   // section at a time.
@@ -23,6 +23,7 @@
     ShellView_Serialize as ShellView,
     ThemeView,
     UpdatesView_Serialize as UpdatesView,
+    UsageView_Serialize as UsageView,
   } from '../contract/bindings'
   import Icon from '../icons/Icon.svelte'
   import HomeSetting from '../sidebar/HomeSetting.svelte'
@@ -30,6 +31,7 @@
   import AccountPane from './AccountPane.svelte'
   import ProfilesPane from './ProfilesPane.svelte'
   import UpdatesPane from './UpdatesPane.svelte'
+  import UsagePane from './UsagePane.svelte'
   import { APP_NAME, CLOSE, HOME_EXPLAIN, SETTINGS, VERSION, VERSION_UNKNOWN } from './copy'
   import {
     DEFAULT_SECTION,
@@ -51,6 +53,7 @@
     profiles = null,
     auth = null,
     updates = null,
+    usage = null,
     openChats = 0,
   }: {
     /** Whether the dialog is open. */
@@ -67,6 +70,8 @@
     auth?: AuthView | null
     /** The Updates pane's slice (0.1.12, S2), or null before the first check. */
     updates?: UpdatesView | null
+    /** The Usage pane's slice, or null before the first read. */
+    usage?: UsageView | null
     /** How many chats are open: the Updates pane's gate (S4). */
     openChats?: number
   } = $props()
@@ -138,6 +143,8 @@
                 <ProfilesPane {profiles} />
               {:else if selected === 'account'}
                 <AccountPane {auth} />
+              {:else if selected === 'usage'}
+                <UsagePane {usage} />
               {:else}
                 <!-- About (S5): the name and the version this run runs as. What
                      is installed, and whether something newer is out, is the

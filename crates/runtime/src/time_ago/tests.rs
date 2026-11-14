@@ -43,3 +43,24 @@ fn older_than_thirty_days_is_months_then_years() {
 fn an_unknown_zero_time_does_not_panic() {
     assert_eq!(time_ago(NOW, 0), "56y");
 }
+
+#[test]
+fn an_until_counts_up_and_never_answers_zero() {
+    let until = |delta: u64| time_until(NOW, NOW + delta);
+
+    // Rounded UP: a countdown that says 3h when it means 3h40m understates the
+    // wait, and a reset under a minute still needs a minute on the clock.
+    assert_eq!(until(30 * SEC), "1m");
+    assert_eq!(until(MIN), "1m");
+    assert_eq!(until(MIN + SEC), "2m");
+    assert_eq!(until(4 * HOUR), "4h");
+    assert_eq!(until(6 * DAY + 3 * HOUR), "7d");
+    assert_eq!(until(31 * DAY), "2mo");
+    assert_eq!(until(400 * DAY), "2y");
+}
+
+#[test]
+fn an_until_that_already_passed_is_now() {
+    assert_eq!(time_until(NOW, NOW), "now");
+    assert_eq!(time_until(NOW, NOW.saturating_sub(HOUR)), "now");
+}

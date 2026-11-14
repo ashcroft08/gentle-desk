@@ -20,7 +20,7 @@ use gentle_runtime::badge::{Badge, BadgeMark};
 use crate::contract::{
     AuthView, ChatActivityMark, ChatActivityView, ContextUsageView, ImageView, ModelChipView,
     ModelChoiceView, ModelListStatusView, NoticeActionView, NoticeLevel, NoticeView, ProfilesView,
-    ShellView, ThemeView, UpdatesView, ViewState, WhatsNewView,
+    ShellView, ThemeView, UpdatesView, UsageView, ViewState, WhatsNewView,
 };
 use crate::images::Images;
 use crate::{dialogs, helper_thread, helpers, sessions, view};
@@ -58,6 +58,9 @@ pub struct ShellParts<'a> {
     pub auth: AuthView,
     /// The versions this machine runs (0.1.12, S2, S7).
     pub updates: UpdatesView,
+    /// The subscription usage the shell's own sources report, read on the Usage
+    /// pane's behalf.
+    pub usage: UsageView,
     /// The images each chat holds or sent.
     pub images: &'a Images,
 }
@@ -78,6 +81,7 @@ pub fn view_state(state: &AppState, sessions_revision: u32, shell: ShellParts<'_
         profiles,
         auth,
         updates,
+        usage,
         images,
     } = shell;
     let helpers_view = helpers::helpers(state);
@@ -121,6 +125,7 @@ pub fn view_state(state: &AppState, sessions_revision: u32, shell: ShellParts<'_
         profiles,
         auth,
         updates,
+        usage,
         config_notice,
         workspace_notice,
         sessions_notice,

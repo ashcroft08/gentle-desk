@@ -59,6 +59,12 @@ pub fn action_args(action: TerminalActionView) -> &'static [&'static str] {
         // `--extensions` flag passes straight through (L5) and the run touches
         // only the packages the shell has installed, never pi itself.
         TerminalActionView::UpdateExtensions => &["update", "--extensions"],
+        // pi's own installer, named explicitly: the maintainer's rule is that an
+        // install is never silent, so the pane hands the exact command to a
+        // terminal window the user reads.
+        TerminalActionView::InstallUsageSources => {
+            &["install", "git:github.com/ashcroft08/pi-usage-sources"]
+        }
     }
 }
 
@@ -122,6 +128,7 @@ pub fn action_label(action: TerminalActionView) -> &'static str {
         TerminalActionView::Logout => "Sign out",
         TerminalActionView::Update => "Update",
         TerminalActionView::UpdateExtensions => "Update extensions",
+        TerminalActionView::InstallUsageSources => "Install usage sources",
     }
 }
 
@@ -134,6 +141,7 @@ fn action_slug(action: TerminalActionView) -> &'static str {
         TerminalActionView::Logout => "logout",
         TerminalActionView::Update => "update",
         TerminalActionView::UpdateExtensions => "update-extensions",
+        TerminalActionView::InstallUsageSources => "install-usage-sources",
     }
 }
 
@@ -305,6 +313,12 @@ mod tests {
             &[] as &[&str]
         );
         assert_eq!(action_args(TerminalActionView::Update), &["update"]);
+        // The maintainer's rule: an install is explicit and never silent, so the
+        // button hands pi the exact command the pane's note names.
+        assert_eq!(
+            action_args(TerminalActionView::InstallUsageSources),
+            &["install", "git:github.com/ashcroft08/pi-usage-sources"]
+        );
     }
 
     /// Extensions are updated by the SAME shell command with pi's own flag
@@ -430,6 +444,10 @@ mod tests {
                 TerminalActionView::UpdateExtensions,
                 "gentle-desk-update-extensions.cmd",
             ),
+            (
+                TerminalActionView::InstallUsageSources,
+                "gentle-desk-install-usage-sources.cmd",
+            ),
         ];
 
         let mut seen = std::collections::BTreeSet::new();
@@ -458,6 +476,7 @@ mod tests {
             TerminalActionView::Logout,
             TerminalActionView::Update,
             TerminalActionView::UpdateExtensions,
+            TerminalActionView::InstallUsageSources,
         ];
 
         let labels: Vec<&str> = actions.iter().copied().map(action_label).collect();
@@ -468,7 +487,8 @@ mod tests {
                 "Sign in",
                 "Sign out",
                 "Update",
-                "Update extensions"
+                "Update extensions",
+                "Install usage sources"
             ]
         );
         for label in labels {
