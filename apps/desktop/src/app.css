@@ -1861,19 +1861,12 @@ p {
    two places that report a percentage read the same: quiet until 75%, the
    warning token from there, the danger token from 95%. */
 .settings-pane .ucards {
-  /* Bounded on purpose: a machine can have several providers logged in, and the
-     pane must not push its own button off the dialog. The cards scroll here.
-     The gutter is reserved so the scrollbar never draws over a card's border,
-     and the last few pixels fade so a clipped card reads as "more below"
-     instead of as a broken card. */
+  /* One column of cards; the PANE scrolls, not this list. An inner scroll cut
+     the last card in half, and fading it only moved the problem to the top
+     edge. The pane's own scroll never slices a card. */
   display: flex;
   flex-direction: column;
   gap: 10px;
-  max-height: min(46vh, 420px);
-  overflow-y: auto;
-  padding-right: 10px;
-  scrollbar-gutter: stable;
-  mask-image: linear-gradient(to bottom, #000 calc(100% - 18px), transparent);
 }
 
 .settings-pane .card.usage-provider {

@@ -88,7 +88,9 @@ describe('the Settings dialog keys', () => {
     expect(intents()).toEqual([])
   })
 
-  it('closes when the pointer lands on the backdrop', async () => {
+  // The maintainer's rule: a press outside must NOT throw the dialog away -
+  // closing is the Close button's job (and Escape's, for the keyboard).
+  it('stays open when the pointer lands on the backdrop', async () => {
     const dialog = await openSettings()
 
     const overlay = document.querySelector('.ovl')
@@ -104,7 +106,8 @@ describe('the Settings dialog keys', () => {
     })
     await fireEvent(overlay as HTMLElement, backdrop)
 
-    await vi.waitFor(() => expect(dialog.isConnected).toBe(false))
+    await new Promise((resolve) => setTimeout(resolve, 60))
+    expect(dialog.isConnected).toBe(true)
     expect(intents()).toEqual([])
   })
 
