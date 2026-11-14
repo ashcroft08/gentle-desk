@@ -23,8 +23,8 @@ const PROFILES = 'Profiles'
 const ACCOUNT = 'Account'
 const USAGE = 'Usage'
 const ABOUT = 'About'
-/** The rail's seven entries, in the order the dialog draws them (0.1.12). */
-const RAIL = [APPEARANCE, HOME, UPDATES, PROFILES, ACCOUNT, USAGE, ABOUT]
+/** The rail's eight entries, in the order the dialog draws them (0.1.12; 0.2.0). */
+const RAIL = [APPEARANCE, HOME, UPDATES, PROFILES, ACCOUNT, USAGE, 'Language', ABOUT]
 const APPEARANCE_HINT = 'The look of this window.'
 const HOME_HINT = 'Which pi this shell runs on.'
 const UPDATES_HINT = 'What this machine runs, and whether something newer is out.'
@@ -57,7 +57,7 @@ describe('the Settings dialog', () => {
     expect(rail(dialog).map((entry) => entry.textContent?.trim())).toEqual(RAIL)
     expect(
       rail(dialog).map((entry) => entry.getAttribute('aria-selected')),
-    ).toEqual(['true', 'false', 'false', 'false', 'false', 'false', 'false'])
+    ).toEqual(['true', 'false', 'false', 'false', 'false', 'false', 'false', 'false'])
     expect(within(dialog).getAllByRole('tabpanel')).toHaveLength(1)
     expect(within(dialog).getByRole('tabpanel', { name: APPEARANCE })).toBeTruthy()
   })

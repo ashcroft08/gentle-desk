@@ -1,12 +1,18 @@
 <script lang="ts">
-  // The Settings dialog (settings-dialog S2-S6, L4; 0.1.12 S1-S7): a rail of
-  // seven sections on the left and the selected section's content in the pane on
-  // the right. The rail carries the two controls the footer used to hold - the
-  // theme picker and the home setting - then the 0.1.12 panes, then Usage, then
-  // About: the app's name and the version this run runs as. The controls themselves are the
+  // The Settings dialog (settings-dialog S2-S6, L4; 0.1.12 S1-S7; 0.2.0 S2/S4):
+  // a rail of eight sections on the left and the selected section's content in
+  // the pane on the right. The rail carries the two controls the footer used to
+  // hold - the theme picker and the home setting - then the 0.1.12 panes, then
+  // Usage, then Language (0.2.0), then About: the app's name and the version
+  // this run runs as. The controls themselves are the
   // same components the footer drew, with the same props and the same behavior:
   // nothing here redesigns them, it only gives them a calmer place and one
   // section at a time.
+  //
+  // The rail's own words are read from the language-keyed dictionary through the
+  // reactive language (0.2.0, D4), so choosing a language in the Language section
+  // redraws the titles and hints in this same tick: that is the visible proof
+  // that a change needs no restart.
   //
   // The rail is a vertical tablist, the chat header's pattern: one entry is the
   // tab stop and the arrow keys, Home and End walk the rail, so the dialog opens
@@ -26,20 +32,28 @@
     UsageView_Serialize as UsageView,
   } from '../contract/bindings'
   import Icon from '../icons/Icon.svelte'
+  import { language } from '../i18n/language.svelte'
   import HomeSetting from '../sidebar/HomeSetting.svelte'
   import ThemePicker from '../sidebar/ThemePicker.svelte'
   import AccountPane from './AccountPane.svelte'
+  import LanguagePane from './LanguagePane.svelte'
   import ProfilesPane from './ProfilesPane.svelte'
   import UpdatesPane from './UpdatesPane.svelte'
   import UsagePane from './UsagePane.svelte'
-  import { APP_NAME, CLOSE, HOME_EXPLAIN, SETTINGS, VERSION, VERSION_UNKNOWN } from './copy'
+  import {
+    APP_NAME,
+    CLOSE,
+    HOME_EXPLAIN,
+    SETTINGS,
+    VERSION,
+    VERSION_UNKNOWN,
+    settingsCopy,
+  } from './copy'
   import {
     DEFAULT_SECTION,
     PANEL_ID,
     RAIL_LABEL,
     SECTIONS,
-    SECTION_HINTS,
-    SECTION_TITLES,
     TAB_IDS,
     sectionAfter,
     type Section,
@@ -79,8 +93,11 @@
   /** The section the pane draws: Appearance on open (L4). */
   let selected = $state<Section>(DEFAULT_SECTION)
 
+  /** The rail's own words in the language the app holds (0.2.0, D4). */
+  const copy = $derived(settingsCopy(language.current))
+
   /** The rail's own title per section: the entry's word is the pane's heading. */
-  const title = $derived(SECTION_TITLES[selected])
+  const title = $derived(copy.titles[selected])
 
   /** A key that walks the rail also selects the entry it lands on, and focuses it. */
   function keyed(event: KeyboardEvent, from: Section): void {
@@ -117,7 +134,7 @@
               onkeydown={(event) => keyed(event, entry.id)}
             >
               <Icon name={entry.icon} size={16} />
-              <span>{entry.title}</span>
+              <span>{copy.titles[entry.id]}</span>
             </button>
           {/each}
         </div>
@@ -131,7 +148,7 @@
           {#key selected}
             <div class="pane-body">
               <h3>{title}</h3>
-              <Dialog.Description class="hint">{SECTION_HINTS[selected]}</Dialog.Description>
+              <Dialog.Description class="hint">{copy.hints[selected]}</Dialog.Description>
 
               {#if selected === 'appearance'}
                 <ThemePicker {theme} />
@@ -148,6 +165,10 @@
                 <AccountPane {auth} />
               {:else if selected === 'usage'}
                 <UsagePane {usage} />
+              {:else if selected === 'language'}
+                <!-- The app's own words (0.2.0, S2): the two languages, each named
+                     in its own language, and the current one marked. -->
+                <LanguagePane />
               {:else}
                 <!-- About (S5): the name and the version this run runs as. What
                      is installed, and whether something newer is out, is the

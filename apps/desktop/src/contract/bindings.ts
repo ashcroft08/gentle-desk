@@ -1204,6 +1204,16 @@ export type UiIntent = { type: "SendPrompt"; data: {
 	theme: ThemeView,
 } } | 
 /**
+ *  Choose the language the app's own words are written in (0.2.0, S2): the
+ *  one tag the picker sent, stored in the app config so it survives the run,
+ *  and re-emitted as the very slice this call answers with - the words change
+ *  in this same tick, with no restart and no webview reload ([`LanguageView`]).
+ *  The same language again changes nothing and saves nothing.
+ */
+{ type: "SetLanguage"; data: {
+	language: LanguageView,
+} } | 
+/**
  *  Choose which home `gentle-shell` runs on (the welcome screen and the
  *  sidebar footer). Remembered in the app config; it applies from the next
  *  start of the app.

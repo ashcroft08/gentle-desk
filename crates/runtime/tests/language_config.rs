@@ -241,3 +241,46 @@ fn a_load_writes_nothing_not_even_the_value_it_read() {
         );
     }
 }
+
+#[test]
+fn setting_a_language_from_none_stores_it_and_answers_true() {
+    let mut config = AppConfig::default();
+    assert_eq!(config.language, None, "nothing is stored yet");
+
+    assert!(
+        config.set_language(Language::Es),
+        "the first choice changed the document"
+    );
+    assert_eq!(config.language, Some(Language::Es));
+}
+
+#[test]
+fn setting_the_same_language_again_answers_false_and_changes_nothing() {
+    let mut config = AppConfig::default();
+    assert!(config.set_language(Language::Es));
+
+    assert!(
+        !config.set_language(Language::Es),
+        "the same choice again changes nothing, so nothing is saved"
+    );
+    assert_eq!(config.language, Some(Language::Es));
+
+    // The other language IS a change, and one choice never keeps the other.
+    assert!(config.set_language(Language::En));
+    assert_eq!(config.language, Some(Language::En));
+}
+
+#[test]
+fn a_language_set_through_the_helper_survives_a_save_and_reload() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = path_in(dir.path());
+    let mut config = AppConfig::default();
+
+    assert!(config.set_language(Language::Es));
+    app_config::save(&path, &config).unwrap();
+    let loaded = app_config::load(&path);
+
+    assert_eq!(loaded.notice, None, "the written file is read, not damaged");
+    assert_eq!(loaded.config.language, Some(Language::Es));
+    assert_eq!(loaded.config, config, "the whole document came back");
+}

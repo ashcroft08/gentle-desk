@@ -39,6 +39,11 @@ fragments in 12 files.
   with the same rule, then reports it once (T3) and Rust persists it through the normal
   config write. A stored preference always wins over a later OS language change; that is
   what makes the choice stable, and it is why Rust never re-detects on every start.
+  ASYMMETRY, adopted in T3 (deviation accepted by the parent): only a DETECTED SPANISH
+  is reported and stored. An English detection stores nothing, because English is
+  exactly what an absent preference already means — storing it would freeze a choice
+  the user never made, and with nothing stored the app keeps following the machine
+  (S1's "el idioma inicial es el del sistema") until a human chooses.
 - D3: Projection mirrors the theme exactly: config.json → `store::load` →
   `ShellParts.language` (apps/desktop/src-tauri/src/state_view.rs:34) →
   `ViewState.language` (contract.rs:930) → bindings. Instant apply reuses the same
@@ -81,19 +86,20 @@ fragments in 12 files.
       Route: writer. Commit fcd18d3 (RED E0609/E0432; GREEN 254 runtime + 361 tauri,
       clippy/fmt/drift guard clean). Web side followed the bindings: the full-fixture
       test-support/view-state.ts gained `language: null` (500 vitest, svelte-check 0).
-- [ ] T3 (S2, S4) walking skeleton, end to end: web i18n core
-      (apps/desktop/src/i18n/language.svelte.ts: reactive language from the view state,
-      `navigator.language` es* fallback while the state carries null, the one-shot boot
-      report, set-language dispatch) + Settings → Language section (settings/sections.ts
-      Section :30, SECTIONS :47-55, titles :58, hints :75, TAB_IDS :86, PANEL_ID :97;
-      SettingsDialog.svelte:108,136-149; settings/copy.ts:18-33) + the Rust write path
-      (intent → store save → re-emitted state). Section titles and hints of the dialog
-      move to the catalog here, so the switch is visibly instant. T2 left off here: the
-      write path needs `AppConfig::set_language` (mirroring `set_theme`'s
-      changed-bool), the intent+command, `bridge/language.rs` beside `bridge/theme.rs`,
-      the command registration, and the web dispatch. Tests: vitest flip → new labels
-      in the same tick; Rust test that a write re-projects. Route: writer. Commit:
-      pending.
+- [x] T3 (S2, S4) walking skeleton, end to end: runtime `AppConfig::set_language`
+      (changed-bool, repeat saves nothing, +3 tests in language_config.rs); Tauri
+      `UiIntent::SetLanguage` answered in `config_intent` through the new
+      bridge/language.rs (the theme's ONE-step update_config mold, re-emitted slice,
+      no command registration needed — dispatch_intent is the only command); bindings
+      regenerated (+10 lines); web `i18n/language.svelte.ts` (self-subscribing,
+      adopts every push, navigator fallback, one-shot Spanish report per D2's
+      asymmetry) + Settings → Language rail entry between Usage and About, the
+      LanguagePane radiogroup (English / Español each in its own language), and the
+      dialog's titles/hints through `settingsCopy(language)` dictionaries. Web tests:
+      8 i18n + 6 settings copy, instant flip in the same tick. Route: writer (T3
+      started with an interaction_required stop: the two rail-count pinning test files
+      joined the surfaces by maintainer approval, placement A). Commit: pending — see
+      Log L4 for the five deviations accepted.
 - [ ] T4 (S3) Rust catalog: the ~62 fragments in crates/runtime/src/app_config/{status,
       store}.rs, helper_text.rs, chat_runtime/execute.rs, time_ago.rs,
       crates/app/src/{chats/*,chip.rs,events.rs} and
@@ -213,10 +219,20 @@ fragments in 12 files.
   (the maintainer's count of 16 predates the settings split), version carried by three
   files. Slice count and surfaces set from those measurements, not re-explored. Delivery
   strategy taken from L1 as `feature-branch-chain`; no separate oversized menu asked.
-- L3 (parent, 2026-11-14, native RDD assessment after T2 landed): the accumulated
-  branch 642bc29..ef7dbb2 assesses **medium** (executable change in bridge.rs; 17
-  files, 1061 lines), `reviewDue: false`, reason `under_budget` — the native review
-  boundary stays pending at 642bc29 and the slice proceeds without review until a
-  later commit reaches the budget or the maintainer asks. Tier, outcome and reason
-  recorded here per commit: 383c76e+97c958a (docs/small), b810658 (tests, covered by
-  the mutation verification), fcd18d3/ef7dbb2 (medium/under_budget, not due).
+- L4 (parent, 2026-11-14): T3 complete, five suites green (runtime 257, tauri 364,
+  vitest 514, svelte-check 0, clippy/fmt/bindings clean). Deviations adjudicated:
+  (1) ACCEPTED and folded into D2 — only a detected Spanish is stored; an English
+  detection stores nothing. (2) ACCEPTED — Spanish copy carries accents; the ASCII
+  note in settings/copy.ts now covers the English column only. (3) ACCEPTED — the
+  rail glyph is the existing message-square; a dedicated language glyph is optional
+  polish for T7, not a gap. (4) RECORDED for T7 — SECTIONS entries no longer carry
+  `title` and SECTION_TITLES/SECTION_HINTS are gone; T7 must not re-add flat
+  constants, the words live in settingsCopy(language). (5) RECORDED for T7 — the
+  dialog's own "Settings" word stays English in this slice. The stale "seven
+  entries" comment in SettingsDialog.test.ts:26 was fixed by the parent (one word).
+  The real-window check the verification plan asks at T3 stays PENDING: it needs the
+  app running on the maintainer's machine — parent to schedule it with the T10 check
+  or ask for a window when the maintainer is at the desk. Mutation risk for the
+  verification of this slice: dispatchIntent not called on choice (silent no-op),
+  adopt() inverted (stored preference ignored), report() firing twice, and the
+  fallback rule drifting from Rust's.

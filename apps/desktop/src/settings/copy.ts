@@ -1,36 +1,88 @@
-// The Settings dialog's words (settings-dialog S2-S6; 0.1.12 S1-S7). The two
-// sections hold the controls the footer used to carry, so their labels are the
-// ones those controls already had, and the Shell home section says what the
-// welcome screen says about the two homes (shell-choice S2). The other four
-// sections are the 0.1.12 panes, each with its own copy file beside it, and the
-// Usage section joined them with its own.
-// Everything here is plain ASCII.
+// The Settings dialog's words (settings-dialog S2-S6; 0.1.12 S1-S7; 0.2.0 S2/S4).
+// The dialog's own rail - each section's title and its one-line hint - is written
+// in BOTH languages here, because it is the section that changes the language:
+// choosing one has to redraw these words in the same tick (0.2.0, S2), so they
+// cannot be a single set of constants (D4).
+//
+// The shape is one dictionary per language and a builder that answers the whole
+// object for a language, so every entry stays a plain string and no string-keyed
+// lookup is introduced. The English column is what the dialog has drawn since
+// settings-dialog L4, unchanged; the Spanish one is neutral - no voseo, no
+// regionalisms - and keeps its accents.
+//
+// The rest of the dialog's words (the two homes' explanation, the app's name, the
+// version line, Close) are still one language each: 0.2.0's T7 migrates the rest
+// of the Settings area, and this slice owns the rail's own words.
+import type { LanguageView } from '../contract/bindings'
+import type { Section } from './sections'
+
+/** The dialog's own words for one language: the rail's titles and hints. */
+export interface SettingsCopy {
+  /** The name of the Language section's choice group. */
+  languageGroup: string
+  /** Each section's word, for the rail entry and the pane's heading. */
+  titles: Record<Section, string>
+  /** Each section's one-line hint, drawn at the top of its pane (L4). */
+  hints: Record<Section, string>
+}
+
+/** English: the words the dialog already drew. */
+const ENGLISH: SettingsCopy = {
+  languageGroup: 'App language',
+  titles: {
+    appearance: 'Appearance',
+    home: 'Shell home',
+    updates: 'Updates',
+    profiles: 'Profiles',
+    account: 'Account',
+    usage: 'Usage',
+    language: 'Language',
+    about: 'About',
+  },
+  hints: {
+    appearance: 'The look of this window.',
+    home: 'Which pi this shell runs on.',
+    updates: 'What this machine runs, and whether something newer is out.',
+    profiles: 'Your agent profiles, as the terminal keeps them.',
+    account: 'Which providers are signed in, and where to sign in or out.',
+    usage: "What each subscription has used, as the shell's own sources report it.",
+    language: 'The words this app says, in English or Spanish.',
+    about: 'Which build this is.',
+  },
+}
+
+/** Neutral Spanish: no voseo, no regionalisms, nothing left in English. */
+const SPANISH: typeof ENGLISH = {
+  languageGroup: 'Idioma de la app',
+  titles: {
+    appearance: 'Apariencia',
+    home: 'Home del shell',
+    updates: 'Actualizaciones',
+    profiles: 'Perfiles',
+    account: 'Cuenta',
+    usage: 'Uso',
+    language: 'Idioma',
+    about: 'Acerca de',
+  },
+  hints: {
+    appearance: 'El aspecto de esta ventana.',
+    home: 'En qué pi corre este shell.',
+    updates: 'Lo que corre en esta máquina y si hay algo más nuevo.',
+    profiles: 'Tus perfiles de agente, tal como los guarda la terminal.',
+    account: 'Qué proveedores tienen sesión abierta y dónde iniciar o cerrar sesión.',
+    usage: 'Lo que consumió cada suscripción, según las propias fuentes del shell.',
+    language: 'Las palabras de esta app, en inglés o en español.',
+    about: 'Qué versión es esta.',
+  },
+}
+
+/** The dialog's own words in `language`, the whole dictionary at once (D4). */
+export function settingsCopy(language: LanguageView): typeof ENGLISH {
+  return language === 'es' ? SPANISH : ENGLISH
+}
 
 /** The gear's name and the dialog's title: the same word for both (S5, S2). */
 export const SETTINGS = 'Settings'
-
-/**
- * Each section's one-line hint (L4): the stacked dialog said what the two
- * sections were about once, above all of them, and the rail replaces that. Each
- * line now stands over the section it is about, so nothing has to be guessed
- * from a shared line.
- */
-export const APPEARANCE_HINT = 'The look of this window.'
-export const HOME_HINT = 'Which pi this shell runs on.'
-export const UPDATES_HINT = 'What this machine runs, and whether something newer is out.'
-export const PROFILES_HINT = 'Your agent profiles, as the terminal keeps them.'
-export const ACCOUNT_HINT = 'Which providers are signed in, and where to sign in or out.'
-export const USAGE_HINT =
-  "What each subscription has used, as the shell's own sources report it."
-export const ABOUT_HINT = 'Which build this is.'
-
-export const APPEARANCE_TITLE = 'Appearance'
-export const HOME_TITLE = 'Shell home'
-export const UPDATES_TITLE = 'Updates'
-export const PROFILES_TITLE = 'Profiles'
-export const ACCOUNT_TITLE = 'Account'
-export const USAGE_TITLE = 'Usage'
-export const ABOUT_TITLE = 'About'
 
 /**
  * The full two-home explanation, the same two answers the welcome screen gives

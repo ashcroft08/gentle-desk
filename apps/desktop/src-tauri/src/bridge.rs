@@ -45,6 +45,7 @@ use crate::workspace;
 mod config;
 mod fatal;
 mod images;
+mod language;
 mod notice;
 mod session_notice;
 mod settings;
@@ -315,15 +316,16 @@ impl AppStateHolder {
 
     /// The intents the reducer has no answer for, answered here: folding a
     /// workspace's chats away is the config's (D8), choosing the theme is the
-    /// config's (the v1 Appearance setting), and a workspace that names no
-    /// folder starts nothing. Answers the slice to push, `None` for the
-    /// reducer's intents.
+    /// config's (the v1 Appearance setting), choosing the language is the
+    /// config's (0.2.0, S4), and a workspace that names no folder starts nothing.
+    /// Answers the slice to push, `None` for the reducer's intents.
     fn config_intent(&self, intent: &UiIntent) -> Option<ViewState> {
         match intent {
             UiIntent::SetWorkspaceCollapsed { path, collapsed } => {
                 Some(workspace::collapse(self, path, *collapsed))
             }
             UiIntent::SetTheme { theme } => Some(self.set_theme(*theme)),
+            UiIntent::SetLanguage { language } => Some(self.set_language(*language)),
             UiIntent::SetShellHome { choice } => Some(self.set_shell_home(*choice)),
             UiIntent::NewChatInWorkspace { path } if path.trim().is_empty() => Some(self.view()),
             _ => None,

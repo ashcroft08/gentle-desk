@@ -128,6 +128,18 @@ impl AppConfig {
         true
     }
 
+    /// Sets the language the app's own words are written in. Answers whether it
+    /// changed: the same language again changes nothing, so nothing is saved and
+    /// no revision moves. The choice is the user's from here on, which is why
+    /// nothing re-detects the system language once this stored value exists.
+    pub fn set_language(&mut self, language: Language) -> bool {
+        if self.language == Some(language) {
+            return false;
+        }
+        self.language = Some(language);
+        true
+    }
+
     /// Sets the chosen home. Answers whether it changed: the same choice again
     /// changes nothing, so nothing is saved and no revision moves.
     pub fn set_shell_home(&mut self, choice: HomeChoice) -> bool {

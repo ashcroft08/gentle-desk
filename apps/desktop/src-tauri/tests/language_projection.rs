@@ -1,24 +1,26 @@
-//! The language preference as the web side sees it (D3, reading side): the
-//! config's stored language projected onto the view state as `null` while it is
-//! unset and as the `"en"`/`"es"` tag once it is stored - the same shape the
-//! theme travels in, and the one the generated bindings declare.
+//! The language preference as the web side sees it (D3): the config's stored
+//! language projected onto the view state as `null` while it is unset and as the
+//! `"en"`/`"es"` tag once it is stored - the same shape the theme travels in, and
+//! the one the generated bindings declare - and the write path that puts it
+//! there, so a choice re-emits the very slice the web side draws (S2).
 //!
 //! Every assertion names the tag literally and asks whether the KEY is there: a
 //! missing `language` is `undefined` on the web side, not `null`, so a projection
 //! that skipped the field while it is unset has to fail here.
 //!
 //! The config file lives in a temporary directory, so the user's own config is
-//! never read. Nothing here writes a preference: the write path is not part of
-//! this slice.
+//! never read.
 
 use std::fs;
 use std::path::Path;
 
 use serde_json::{json, Value};
 
+use gentle_core::i18n::Language;
 use gentle_desk_lib::bridge::AppStateHolder;
-use gentle_desk_lib::config::ConfigSnapshot;
-use gentle_desk_lib::contract::{LanguageView, ThemeView, ViewState};
+use gentle_desk_lib::config::{ConfigSnapshot, ConfigWriter};
+use gentle_desk_lib::contract::{LanguageView, ThemeView, UiIntent, ViewState};
+use gentle_runtime::app_config::{self, AppConfig};
 
 /// The document every release before this feature wrote: no language key.
 const WITHOUT_A_LANGUAGE: &str = r#"{"version":1,"theme":"dark","workspaces":[]}"#;
@@ -145,4 +147,111 @@ fn a_stored_value_that_is_not_a_tag_projects_null_and_the_run_still_boots() {
             "{document} gives the user no config notice"
         );
     }
+}
+
+// The WRITE path of the same preference (D3, S2/S4): choosing a language is one
+// atomic config edit, saved by the one writer and re-emitted as the very slice
+// the web side draws, so the switch needs no restart and no webview reload.
+//
+// A save runs on the writer's own thread, so a test that reads the file back
+// waits for it, bounded.
+
+/// Every wait of the write tests: a save of one small file, never a hang.
+const WAIT: std::time::Duration = std::time::Duration::from_secs(10);
+
+/// How long a file is watched after a change that should not have touched it.
+const SETTLE: std::time::Duration = std::time::Duration::from_millis(100);
+
+/// A holder over the config file at `path`, with the one writer armed.
+fn holder_at(path: &Path) -> AppStateHolder {
+    let holder = AppStateHolder::with_config(ConfigSnapshot::at(Some(path)));
+    holder.arm_config_saves(ConfigWriter::spawn(Some(path.to_path_buf())));
+    holder
+}
+
+/// Waits for what a bounded wait is about, failing the test instead of hanging.
+fn wait_for<T>(what: &str, mut probe: impl FnMut() -> Option<T>) -> T {
+    let deadline = std::time::Instant::now() + WAIT;
+    loop {
+        if let Some(value) = probe() {
+            return value;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "waited {WAIT:?} for {what} and it never came"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+}
+
+#[test]
+fn a_language_intent_stores_the_choice_and_re_emits_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("config.json");
+    fs::write(&path, WITHOUT_A_LANGUAGE).unwrap();
+    let holder = holder_at(&path);
+
+    let pushed = holder.dispatch(UiIntent::SetLanguage {
+        language: LanguageView::Es,
+    });
+
+    // The slice the command returns AND the next push carries: the same one the
+    // web side draws, so the words change in this tick.
+    assert_eq!(pushed.language, Some(LanguageView::Es));
+    assert_eq!(wired_language(&pushed), Some(json!("es")));
+    assert_eq!(wired_language(&holder.view()), Some(json!("es")));
+
+    let loaded = wait_for("the language to reach the config file", || {
+        let loaded = app_config::load(&path);
+        (loaded.config.language == Some(Language::Es)).then_some(loaded)
+    });
+    assert_eq!(loaded.notice, None, "the file was written, not damaged");
+    assert_eq!(loaded.config.language, Some(Language::Es));
+}
+
+#[test]
+fn choosing_the_same_language_again_saves_nothing() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("config.json");
+    let mut saved = AppConfig::default();
+    assert!(saved.set_language(Language::Es));
+    app_config::save(&path, &saved).unwrap();
+    let holder = holder_at(&path);
+
+    let before = holder.view();
+    let written = fs::read(&path).unwrap();
+    let after = holder.dispatch(UiIntent::SetLanguage {
+        language: LanguageView::Es,
+    });
+    std::thread::sleep(SETTLE);
+
+    assert_eq!(
+        after, before,
+        "the same language changes no slice of the state"
+    );
+    assert_eq!(
+        fs::read(&path).unwrap(),
+        written,
+        "and asks for no save at all"
+    );
+}
+
+#[test]
+fn the_chosen_language_survives_a_restart() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("config.json");
+    fs::write(&path, WITHOUT_A_LANGUAGE).unwrap();
+    let holder = holder_at(&path);
+
+    holder.dispatch(UiIntent::SetLanguage {
+        language: LanguageView::Es,
+    });
+    wait_for("the language to reach the config file", || {
+        (app_config::load(&path).config.language == Some(Language::Es)).then_some(())
+    });
+
+    // The next start: the same file, read before the holder exists.
+    let next = AppStateHolder::with_config(ConfigSnapshot::at(Some(&path)));
+
+    assert_eq!(next.view().language, Some(LanguageView::Es));
 }
