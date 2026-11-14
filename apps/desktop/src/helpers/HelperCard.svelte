@@ -2,10 +2,16 @@
   // One helper as a card: the mark whose accessible name is the status label
   // Rust sent, the agent and the task title 01b's row draws, and the counts, the
   // last step and the failure iced's card adds. Nothing here decides: the mark
-  // is the approved status mapping, and every text is Rust's.
+  // is the approved status mapping, and every text is Rust's - except the counts
+  // line, which is this view's own word and so comes from the copy dictionary of
+  // the current language (0.2.0, D4).
   import type { HelperRowView_Serialize as HelperRow } from '../contract/bindings'
   import Mark from '../icons/Mark.svelte'
-  import { cardMeta, markOfStatus } from './copy'
+  import { language } from '../i18n/language.svelte'
+  import { helpersCopy, markOfStatus } from './copy'
+
+  /** The card's own words in the language the panel is drawn in (D4). */
+  const copy = $derived(helpersCopy(language.current))
 
   let {
     row,
@@ -39,7 +45,7 @@
   <div class="body">
     <p class="agent">{row.agent}</p>
     <p class="title">{row.title}</p>
-    <p class="meta">{cardMeta(row.turns, row.tool_calls)}</p>
+    <p class="meta">{copy.cardMeta(row.turns, row.tool_calls)}</p>
     {#if row.last_step !== null}
       <p class="step">{row.last_step}</p>
     {/if}

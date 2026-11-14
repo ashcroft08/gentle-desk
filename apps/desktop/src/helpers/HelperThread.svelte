@@ -14,15 +14,9 @@
   import Mark from '../icons/Mark.svelte'
   import { createMarkdownCache } from '../thread/markdown'
   import { nearBottom, nextScrollTop } from '../thread/scroll'
+  import { language } from '../i18n/language.svelte'
   import HelperThreadItem from './HelperThreadItem.svelte'
-  import {
-    BACK_TO_HELPERS,
-    HELPER_THREAD_LABEL,
-    NO_ACTIVITY,
-    droppedLine,
-    markOfStatus,
-    threadHeading,
-  } from './copy'
+  import { helpersCopy, markOfStatus, threadHeading } from './copy'
 
   let {
     thread,
@@ -36,6 +30,9 @@
 
   /** The one markdown cache of this thread, keyed by the item's place. */
   const cache = createMarkdownCache()
+
+  /** The thread's own words in the language the panel is drawn in (D4). */
+  const copy = $derived(helpersCopy(language.current))
 
   const heading = $derived(threadHeading(thread.agent, thread.title))
 
@@ -80,13 +77,13 @@
   }
 </script>
 
-<section class="ht" aria-label={HELPER_THREAD_LABEL}>
+<section class="ht" aria-label={copy.threadLabel}>
   <div class="bar">
     <button
       class="back"
       type="button"
-      aria-label={BACK_TO_HELPERS}
-      title={BACK_TO_HELPERS}
+      aria-label={copy.back}
+      title={copy.back}
       onclick={onBack}
       bind:this={back}
     >
@@ -98,10 +95,10 @@
   <p class="prompt">{thread.prompt}</p>
   <div class="body" bind:this={box} onscroll={onScroll}>
     {#if thread.dropped > 0}
-      <p class="dropped">{droppedLine(thread.dropped)}</p>
+      <p class="dropped">{copy.droppedLine(thread.dropped)}</p>
     {/if}
     {#if rows.length === 0}
-      <p class="empty">{NO_ACTIVITY}</p>
+      <p class="empty">{copy.noActivity}</p>
     {/if}
     {#each rows as row, index (index)}
       <HelperThreadItem item={row.item} html={row.html} />

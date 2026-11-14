@@ -11,15 +11,22 @@
   // option's text, is the theme's LABEL: the identifiers are lowercase in three
   // cases (`system`, `dark`, `light`) and stay that way in the config, the
   // intent and the `data-theme` attribute, so the drawn word is a display name
-  // kept beside `THEMES` and never a renamed theme.
+  // kept beside `THEMES` and never a renamed theme. Since 0.2.0 (S3, D4) those
+  // display names are written in both languages, so the control reads them from
+  // the theme module's dictionary of the reactive language: choosing Español
+  // redraws them in the same tick, while the values it sends stay identifiers.
   import { tick } from 'svelte'
   import type { ThemeView } from '../contract/bindings'
   import { dispatchIntent } from '../bridge'
   import Icon from '../icons/Icon.svelte'
-  import { THEMES, themeLabel, themeSwatch } from '../theme/themes'
+  import { language } from '../i18n/language.svelte'
+  import { THEMES, themeLabelsCopy, themeSwatch } from '../theme/themes'
   import { movedIndex, trappedIndex } from './theme-keys'
 
   let { theme }: { theme: ThemeView } = $props()
+
+  /** The six drawn labels in the language the app's own words are written in. */
+  const labels = $derived(themeLabelsCopy(language.current))
 
   /** Whether the list is open. */
   let open = $state(false)
@@ -28,7 +35,7 @@
   /** The list itself, so the focus code reads the options it drew. */
   let list = $state<HTMLUListElement | null>(null)
 
-  const name = $derived(`Theme: ${themeLabel(theme)}`)
+  const name = $derived(`Theme: ${labels[theme]}`)
   const selected = $derived(Math.max(THEMES.indexOf(theme), 0))
 
   /** The drawn options, in the order `THEMES` names them. */
@@ -154,7 +161,7 @@
           <!-- The theme's accent as a dot: decoration, so the option's name is
                still only its word. `system` draws the two halves it follows. -->
           <span class="swatch" style:--swatch={themeSwatch(option)} aria-hidden="true"></span>
-          {themeLabel(option)}
+          {labels[option]}
         </li>
       {/each}
     </ul>

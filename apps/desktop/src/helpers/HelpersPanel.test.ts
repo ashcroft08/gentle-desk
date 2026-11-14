@@ -6,18 +6,16 @@ import '../test-support/dom-env'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/svelte'
 import type { HelperRowView_Serialize as HelperRow } from '../contract/bindings'
-import {
-  DOT,
-  HELPERS_LIST_LABEL,
-  NO_HELPERS,
-  cardMeta,
-} from './copy'
+import { DOT, helpersCopy } from './copy'
 import HelpersPanel from './HelpersPanel.svelte'
 import { helperRow, helpersPanel } from '../test-support/helpers'
 import { handlerArgs, resetTauriMock, setHandler, viewState } from '../test-support/tauri-mock'
 
 vi.mock('@tauri-apps/api/core', () => import('../test-support/tauri-mock').then((m) => m.coreModule()))
 vi.mock('@tauri-apps/api/event', () => import('../test-support/tauri-mock').then((m) => m.eventModule()))
+
+/** The panel's own words, as the panel drew them before 0.2.0 (English). */
+const copy = helpersCopy('en')
 
 const STATUSES: [HelperRow['status'], string][] = [
   ['Running', 'running'],
@@ -57,7 +55,7 @@ describe('HelpersPanel', () => {
   it('draws one card per helper, with its status as the mark accessible name', () => {
     draw()
 
-    const list = screen.getByRole('listbox', { name: HELPERS_LIST_LABEL })
+    const list = screen.getByRole('listbox', { name: copy.listLabel })
     const options = within(list).getAllByRole('option')
     expect(options).toHaveLength(6)
     STATUSES.forEach(([, label], index) => {
@@ -86,7 +84,7 @@ describe('HelpersPanel', () => {
   it('says a chat has no helpers with a plain line and no listbox', () => {
     draw({ tasks: [] })
 
-    expect(screen.getByText(NO_HELPERS)).toBeTruthy()
+    expect(screen.getByText(copy.noHelpers)).toBeTruthy()
     expect(screen.queryByRole('listbox')).toBeNull()
   })
 
@@ -150,7 +148,7 @@ describe('HelpersPanel', () => {
     })
 
     const options = screen.getAllByRole('option')
-    expect(options[0].textContent).toContain(cardMeta(4, 3))
+    expect(options[0].textContent).toContain(copy.cardMeta(4, 3))
     expect(options[0].textContent).toContain('grep')
     expect(options[1].textContent).toContain('model quota exceeded')
   })

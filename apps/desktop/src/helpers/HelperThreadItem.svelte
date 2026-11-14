@@ -11,10 +11,13 @@
   //   its output in a monospaced block.
   //
   // Nothing here decides what to show: iced always shows the tools, and the
-  // strings arrive already built by `gentle_runtime::helper_text`.
+  // strings arrive already built by `gentle_runtime::helper_text`. The one word
+  // this item owns - the status of a tool call - comes from the copy dictionary
+  // of the current language (0.2.0, D4).
   import type { HelperThreadItemView as Item } from '../contract/bindings'
   import Markdown from '../thread/Markdown.svelte'
-  import { toolStatusWord } from './copy'
+  import { language } from '../i18n/language.svelte'
+  import { helpersCopy } from './copy'
 
   let {
     item,
@@ -24,6 +27,9 @@
     /** The markdown html of a `Said` item; empty for every other kind. */
     html?: string
   } = $props()
+
+  /** The status word in the language the panel is drawn in (D4). */
+  const copy = $derived(helpersCopy(language.current))
 </script>
 
 {#if item.kind === 'Said'}
@@ -38,7 +44,7 @@
   <div class="ran">
     <p class="head">
       <span class="tool">{item.name}</span>
-      <span class="status" data-status={item.status}>{toolStatusWord(item.status)}</span>
+      <span class="status" data-status={item.status}>{copy.toolStatus(item.status)}</span>
     </p>
     <pre class="detail">{item.args_line}</pre>
     {#if item.output_preview !== ''}

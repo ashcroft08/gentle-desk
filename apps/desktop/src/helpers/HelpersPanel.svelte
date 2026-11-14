@@ -12,7 +12,8 @@
     HelperThreadView as HelperThread,
     HelpersView_Serialize as Helpers,
   } from '../contract/bindings'
-  import { HELPERS_LIST_LABEL, NO_HELPERS } from './copy'
+  import { language } from '../i18n/language.svelte'
+  import { helpersCopy } from './copy'
   import HelperCard from './HelperCard.svelte'
   import HelperThreadView from './HelperThread.svelte'
 
@@ -36,6 +37,9 @@
    * transcript under the selected card.
    */
   const open = $derived(thread !== null && selected !== null && thread.id === selected ? thread : null)
+
+  /** The panel's own words in the language it is drawn in (D4). */
+  const copy = $derived(helpersCopy(language.current))
 
   /** The card the keyboard is on: the selected one, else the first. */
   let focused = $state<string | null>(null)
@@ -112,9 +116,9 @@
     <!-- The counters line is Rust's own text: no counter is spelled again here. -->
     <p class="counters">{helpers.summary_line}</p>
     {#if cards.length === 0}
-      <p class="empty">{NO_HELPERS}</p>
+      <p class="empty">{copy.noHelpers}</p>
     {:else}
-      <div class="list" role="listbox" aria-label={HELPERS_LIST_LABEL} bind:this={list}>
+      <div class="list" role="listbox" aria-label={copy.listLabel} bind:this={list}>
         {#each cards as card (card.id)}
           <HelperCard
             row={card}

@@ -4,33 +4,41 @@
 // lives in the Settings dialog's Appearance section now (settings-dialog S3), so
 // every test here opens that dialog first and then behaves as it always did.
 import '../test-support/dom-env'
-import '../test-support/dom-env'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/svelte'
+import { tick } from 'svelte'
 import { handlerArgs, resetTauriMock, viewState } from '../test-support/tauri-mock'
 import { serveSidebar } from '../test-support/sidebar'
+import { setLanguage } from '../i18n/language.svelte'
 import type { ThemeView } from '../contract/bindings'
+import { themeLabelsCopy } from '../theme/themes'
 import Sidebar from './Sidebar.svelte'
 
 vi.mock('@tauri-apps/api/core', () => import('../test-support/tauri-mock').then((m) => m.coreModule()))
 vi.mock('@tauri-apps/api/event', () => import('../test-support/tauri-mock').then((m) => m.eventModule()))
 
+/** The six labels the picker draws in the language this file runs in (English). */
+const LABELS = themeLabelsCopy('en')
+
 /**
  * The six options 01a draws, each label beside the theme identifier it stands
- * for: quoted so a change of copy, or a label leaking into an intent, is a
- * change here.
+ * for: quoted so a label leaking into an intent is a change here. The words are
+ * the theme module's own dictionary (0.2.0, D4); the identifiers never move.
  */
 const OPTIONS: readonly (readonly [ThemeView, string])[] = [
-  ['system', 'System'],
-  ['dark', 'Dark'],
-  ['Gentle', 'Gentle'],
-  ['Gentleman-Cute', 'Gentleman-Cute'],
-  ['Gentleman-Sexy', 'Gentleman-Sexy'],
-  ['light', 'Light'],
+  ['system', LABELS.system],
+  ['dark', LABELS.dark],
+  ['Gentle', LABELS.Gentle],
+  ['Gentleman-Cute', LABELS['Gentleman-Cute']],
+  ['Gentleman-Sexy', LABELS['Gentleman-Sexy']],
+  ['light', LABELS.light],
 ]
 
 /** The six labels the list draws, in the drawn order. */
 const NAMES = OPTIONS.map(([, label]) => label)
+
+/** The same six in Spanish: what a flipped picker must draw. */
+const NAMES_ES = OPTIONS.map(([theme]) => themeLabelsCopy('es')[theme])
 
 /** The label the control names one theme with. */
 function labelFor(theme: ThemeView): string {
@@ -133,6 +141,28 @@ describe('the theme picker', () => {
     await fireEvent.click(screen.getByRole('option', { name: 'Dark' }))
 
     expect(themeIntents()).toEqual(['dark'])
+  })
+
+  it('flips its labels in the same tick, and still sends the identifier, never the label', async () => {
+    await mountSidebar('dark')
+    expect(buttonNamed('Theme: Dark')).not.toBeNull()
+
+    // No push and no restart: the picker reads the same reactive language the
+    // Settings rail sets, so one local write redraws its words.
+    setLanguage('es')
+    await tick()
+
+    expect(buttonNamed('Theme: Oscuro')).not.toBeNull()
+    const list = await openList()
+    expect(within(list).getAllByRole('option').map((option) => option.textContent?.trim())).toEqual(
+      NAMES_ES,
+    )
+
+    // The identifier is never translated: the label is only what is drawn.
+    await fireEvent.click(screen.getByRole('option', { name: 'Claro' }))
+    expect(themeIntents()).toEqual(['light'])
+
+    setLanguage('en')
   })
 
   it('draws a quiet color swatch beside every row', async () => {

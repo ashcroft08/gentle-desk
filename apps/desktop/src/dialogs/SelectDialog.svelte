@@ -5,8 +5,9 @@
   // the focus is on, and a click answers the one clicked.
   import { Dialog } from 'bits-ui'
   import type { DialogAnswer, DialogView } from '../contract/bindings'
+  import { language } from '../i18n/language.svelte'
   import { CANCELLED, valueAnswer } from './answer'
-  import { CANCEL } from './copy'
+  import { dialogsCopy } from './copy'
 
   let {
     dialog,
@@ -15,6 +16,9 @@
     dialog: Extract<DialogView, { kind: 'Select' }>
     onAnswer: (answer: DialogAnswer) => void
   } = $props()
+
+  /** The Cancel word in the language the dialog is drawn in (D4). */
+  const copy = $derived(dialogsCopy(language.current))
 
   /** The options' buttons, for the focus and the arrow keys. */
   let buttons = $state<HTMLButtonElement[]>([])
@@ -64,5 +68,5 @@
   {/each}
 </div>
 <div class="acts">
-  <button class="btn" type="button" onclick={() => onAnswer(CANCELLED)}>{CANCEL}</button>
+  <button class="btn" type="button" onclick={() => onAnswer(CANCELLED)}>{copy.cancel}</button>
 </div>
