@@ -325,3 +325,64 @@ the subscription panel goes to NEXT version's analysis; 0.1.12 ships the four pi
   live, and the tinted gate line saying the update buttons come alive. No layout break,
   the notes wrap inside the card, the house contrast is kept. The dev-app retest of these
   two terminal runs stays the maintainer's, as in L19/L20.
+
+- L22 (2026-11-14, maintainer gap found on the running app; feat/close-chat-and-update-dot,
+  0.1.14): TWO related pieces reported together. (a) The Updates pane's chats-closed gate (S4)
+  said "close every chat" but the desk had NO way to close one: the maintainer had to quit the
+  app to satisfy it. (b) The app only ever told him an update existed once he opened Settings ->
+  Updates. WHAT WAS ADDED (piece a, Rust): `Intent::CloseChat(ChatId)` and
+  `ChatCommand::CloseProcess { chat }`, applied in `chats::intents::close_chat`; `Chats::close`
+  removes the chat's entry, its foreground mark and its own queued prompt (the queue FIRST, so
+  `set_queued` cannot re-create the entry it is dropping), and answers whether the app knew the
+  chat - a chat this run never opened emits no command and no notice. `ChatRuntime::close` +
+  `ChatCommand::CloseProcess` in `chat_runtime::execute` (new `Outcome::Closed { chat }`) stop
+  ONE child through the public `ChatHost::close`, on the command's own worker thread because the
+  host's grace is up to 2 s; the shell folds the outcome as `Input::ChatClosed { expected: true }`
+  (idempotent with the child's own closed event, so no death notice for a chat the user put
+  away). A chat that is working is REFUSED, never yanked mid-turn, with the delete flow's own
+  sentence: `chats::WORKING_CHAT` ("This chat is working. Stop it first") is shared, and
+  `close_working()` / `chat_delete::working_child()` only add the verb ("then close it." / "then
+  delete it."), so the row menu never grows a second wording. Refusal is a Warning notice;
+  closing is NOT deleting - nothing on disk is written and the session list keeps its row, so the
+  row opens the chat again with a fresh child through `--session`. WHAT WAS ADDED (piece a, web):
+  "Close chat" as the row menu's second item (Rename, Close chat, Delete - Delete stays last and
+  red) through `onClose` -> `WorkspaceTree` -> `Sidebar::closeChat` ->
+  `UiIntent::CloseChat`, so it rides the existing intent dispatch and is windowless-testable;
+  bindings regenerated. The gate hint now names the way out: "Updates need every chat closed. 1
+  chat is open - Close chat in its row menu, and the update buttons come alive." WHAT WAS ADDED
+  (piece b, web only): the footer's gear draws a 6px accent dot when any row a terminal updates
+  (`pi`, `shell`) has `update_available === true` - rule in `update/dot.ts::updateWaiting`, the
+  app's own row excluded because the banner at the top already installs that one - and no number
+  and no word on the bar; the dot is `aria-hidden` decoration and the gear's own accessible name
+  carries the news ("Settings - an update is available"), because an inner label inside a
+  labelled button is discarded by the name computation. NOT DONE, by the parent's fallback: the
+  "one info notice per check" half. Reasons, all structural: the drawn notice strip drops every
+  Info notice (`notices/visible.ts`), the notice list and its text are Rust-owned while the
+  wording must come from the pane's own `HEADLINE` helper (`settings/updates-copy.ts`), and no
+  `UiIntent` can open a Settings SECTION - `settingsOpen` and the selected section are view-local
+  (`sidebar/Sidebar.svelte`, `settings/SettingsDialog.svelte`) - so an "Open Settings - Updates"
+  action needs a new cross-component channel, not an extension of `NoticeView.action`. TESTS
+  (test-first, RED observed then GREEN): RED was 12 E0599s (missing intent, command, `WORKING_CHAT`,
+  `close_working`) and 3 failing vitest files (missing `update/dot`). 6 in
+  `crates/app/tests/chat_close.rs` (open set drops + `CloseProcess` + foreground cleared; the
+  other chats and their children untouched; session list and file untouched; the working refusal
+  with the shared sentence; a queued prompt of the closed chat never goes out when a slot frees;
+  an unopened chat changes nothing); 3 in `chat_runtime::tests::calls` (only that child stops and
+  the others still take commands; a closed chat starts a fresh child on reopen; closing a chat
+  with no child is not an error); 3 in `src-tauri/tests/chat_close.rs` (a REAL temp session file
+  survives the intent, `open_chats` 0, revision unmoved; the working refusal keeps it open; an
+  unopened chat asks for nothing); 6 in `update/dot.test.ts`, 3 in `sidebar/UpdateDot.test.ts`, 3
+  in `sidebar/CloseChat.test.ts` (item order, one `CloseChat` intent, keyboard reach) plus the
+  existing menu test updated to the three items. GATES, all exit 0: cargo fmt --all --check; cargo
+  clippy --workspace --all-targets -- -D warnings; cargo test --workspace (1138 passed); and in
+  apps/desktop npm run lint, npm run check (0 errors, 0 warnings), npx vitest run (481/481, 73
+  files) and npm run build. RENDER CHECK (the real Sidebar dumped from a disposable vitest render
+  into a temp dir outside the repo, a static page with theme.css + app.css + the injected
+  component styles, screenshotted with Chrome `--headless=new`, dark theme, images read):
+  foot-with-dot - Preview and the gear with the 6px accent dot on its upper-right, the icon and
+  the row above it untouched; foot-without-dot - the same footer with no dot; 3x zoom - the dot
+  is round, accent, clear of the gear's stroke; menu-close-chat - the card under the row with
+  Rename / Close chat / Delete, labels whole, Delete still the red one, and the footer dot still
+  drawn. The floating layer's position is pinned in the proof page (bits-ui measures it from the
+  live layout, which a static dump has none of); the card itself is the component's. The dev-app
+  retest of Close chat against a real child, and the version bump, stay the maintainer's.

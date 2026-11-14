@@ -37,4 +37,18 @@ impl ChatRuntime {
     pub fn shutdown(&self) {
         self.host.shutdown();
     }
+
+    /// Stops one chat's child, if it has one, and forgets it in the host: the
+    /// chat's next open starts a fresh child through `--session`, exactly as a
+    /// reopen after a death does (0.1.14).
+    ///
+    /// The chat's session file is untouched - this is the child going away, not
+    /// the chat - and no other chat is read or written. A chat the host does not
+    /// know, and one whose child already went, answer `false`: closing is safe
+    /// to ask for twice. Blocking for as long as the child takes its grace
+    /// period (2 s), so the caller runs it off the window's thread.
+    pub fn close(&self, chat: &ChatId) -> bool {
+        let key = self.keys().key_of(chat);
+        key.is_some_and(|key| self.host.close(&key))
+    }
 }

@@ -80,7 +80,11 @@ describe("The chat row's actions menu", () => {
     const menu = await openRowMenu()
 
     const items = within(menu).getAllByRole('menuitem')
-    expect(items.map((item) => item.textContent?.trim())).toEqual(['Rename', 'Delete'])
+    expect(items.map((item) => item.textContent?.trim())).toEqual([
+      'Rename',
+      'Close chat',
+      'Delete',
+    ])
   })
 })
 

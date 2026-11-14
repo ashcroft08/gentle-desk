@@ -8,11 +8,11 @@ use gentle_core::rpc::{RpcCommand, UiAnswer};
 
 use super::queue;
 use super::ChatId;
-use crate::chats::push_death_notice;
+use crate::chats::{close_working, push_death_notice};
 use crate::input::{ChatCommand, Command, Effects, Intent};
 use crate::intents::dialog_id;
-use crate::notices::drop_restart_notice;
-use crate::state::{push_user_message, AppState, ModelsStatus};
+use crate::notices::{drop_restart_notice, push_notice};
+use crate::state::{push_user_message, AppState, ModelsStatus, NoticeLevel};
 
 /// Applies `intent` if it belongs to the per-chat model, answering the effects
 /// for one chat's child (and the shared ones it asks for). Answers `None` when
@@ -22,6 +22,7 @@ pub(crate) fn apply(state: &mut AppState, intent: &Intent) -> Option<Effects> {
         Intent::OpenChat(chat) => Some(for_chat(open(state, chat.clone()))),
         Intent::OpenNewChat => Some(for_chat(open(state, ChatId::fresh()))),
         Intent::RestartChat(chat) => Some(for_chat(open(state, chat.clone()))),
+        Intent::CloseChat(chat) => Some(for_chat(close_chat(state, chat))),
         Intent::SendPrompt(text) => send_prompt(state, text).map(for_chat),
         Intent::Abort => {
             // The Abort of a chat that only waits for a slot cancels its own
@@ -136,6 +137,27 @@ fn open(state: &mut AppState, chat: ChatId) -> Vec<ChatCommand> {
     state.thinking_level = None;
     state.thinking_levels = Vec::new();
     vec![ChatCommand::OpenProcess { chat }]
+}
+
+/// Closes `chat` (0.1.14): its child is stopped and the chat leaves the open
+/// set, while the session list keeps its row and the file on disk is untouched.
+///
+/// A chat that is running a turn is refused with the delete flow's own rule and
+/// words ([`close_working`], the same sentence `chat_delete` refuses with): its
+/// child is mid-turn, and stopping it is the user's (S4), so the row menu asks
+/// for that first rather than pulling the child out from under the turn.
+///
+/// A chat this run never opened has no child to stop and no place to leave, so
+/// nothing at all happens - no command and no notice.
+fn close_chat(state: &mut AppState, chat: &ChatId) -> Vec<ChatCommand> {
+    if state.chats.is_working(chat) {
+        push_notice(state, NoticeLevel::Warning, close_working());
+        return Vec::new();
+    }
+    if !state.chats.close(chat) {
+        return Vec::new();
+    }
+    vec![ChatCommand::CloseProcess { chat: chat.clone() }]
 }
 
 /// Sends a command to the foreground chat. `None` with none, so the single-chat

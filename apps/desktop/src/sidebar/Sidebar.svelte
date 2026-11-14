@@ -19,6 +19,7 @@
   import Icon from '../icons/Icon.svelte'
   import SettingsDialog from '../settings/SettingsDialog.svelte'
   import { SETTINGS } from '../settings/copy'
+  import { updateWaiting } from '../update/dot'
   import {
     EMPTY_REASON,
     EMPTY_TITLE,
@@ -66,6 +67,11 @@
   const describedBy = $derived(
     currentPath !== null ? null : empty ? EMPTY_WHY_ID : NEW_SESSION_WHY_ID,
   )
+  // The gear's dot (0.1.14): an update is waiting for one of the rows a terminal
+  // updates. The dot is decoration; the gear's own name carries the same news in
+  // words, so the promise is never the colour alone.
+  const updateDot = $derived(updateWaiting(model.view?.updates ?? null))
+  const gearLabel = $derived(updateDot ? `${SETTINGS} - an update is available` : SETTINGS)
 
   // One view, one store: closing the sidebar ends the event listener and drops
   // every cached page.
@@ -92,6 +98,17 @@
   function newChatAt(path: string): void {
     clickedPath = path
     void dispatchIntent({ type: 'NewChatInWorkspace', data: { path } })
+  }
+
+  /**
+   * A row's Close chat (0.1.14): the chat stops its child and leaves the open
+   * set, and the session list keeps its row - closing is not deleting, so there
+   * is no dialog and nothing on disk changes. A chat that is working is refused
+   * by the state, which draws the reason as a notice.
+   */
+  function closeChat(row: ChatRow): void {
+    clickedChat = null
+    void dispatchIntent({ type: 'CloseChat', data: { chat_id: row.id } })
   }
 
   /**
@@ -165,6 +182,7 @@
       onNewChat={newChatAt}
       onOpen={open}
       onRename={rename}
+      onClose={closeChat}
       onDelete={askDelete}
     />
   {/if}
@@ -200,11 +218,15 @@
     <button
       class="ic"
       type="button"
-      aria-label={SETTINGS}
-      title={SETTINGS}
+      aria-label={gearLabel}
+      title={gearLabel}
       onclick={() => (settingsOpen = true)}
     >
       <Icon name="settings" />
+      {#if updateDot}
+        <!-- A dot, never a number: the gear's name above says it in words. -->
+        <span class="dot" aria-hidden="true"></span>
+      {/if}
     </button>
   </footer>
 </aside>

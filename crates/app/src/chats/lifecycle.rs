@@ -96,6 +96,23 @@ impl Chats {
         &mut self.entries.entry(chat.clone()).or_default().state
     }
 
+    /// Takes a chat off the open set (0.1.14): its entry, its place as the
+    /// foreground chat, and any prompt of its own that was still waiting for a
+    /// working slot. Nothing on disk changes and no other chat is read or
+    /// written, so the session list keeps its row and the row opens the chat
+    /// again - which asks the host for a fresh child, exactly as a reopen does.
+    /// Answers whether this app had heard of the chat at all.
+    pub fn close(&mut self, chat: &ChatId) -> bool {
+        // The queue first: forgetting a waiting prompt marks the chat it belonged
+        // to, so the entry has to be gone after that, never before it.
+        queue::drop_of(self, chat);
+        let known = self.entries.remove(chat).is_some();
+        if self.foreground.as_ref() == Some(chat) {
+            self.foreground = None;
+        }
+        known
+    }
+
     /// Records the context reading one chat's child just reported (0.1.12, S5).
     /// Only that chat changes: a reply of a background child is kept for when
     /// the user returns to it.

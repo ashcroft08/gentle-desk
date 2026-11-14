@@ -12,6 +12,9 @@
   // and it is DEAD while any chat is open (S4), with the reason written under
   // it: a chat whose child is mid-turn must not have its pi change underneath.
   // "Check again" only ever asks for a check; no update is installed from here.
+  // It sits FIRST in the row and wears no accent (L22): the two buttons after it
+  // open a terminal window, so the cheap one must not be the middle of the row
+  // a hand lands on by accident.
   //
   // "Update extensions" sits beside them and is the one action NO data drives:
   // the shell's own updater with pi's `--extensions` flag passed through only
@@ -96,6 +99,7 @@
       <p class="versions">{versions}</p>
     {/if}
     <div class="acts">
+      <button class="btn" type="button" onclick={check}>{CHECK_AGAIN}</button>
       {#if card.available && card.terminal}
         <button
           class="btn accent"
@@ -106,7 +110,6 @@
         >
       {/if}
       {@render extensionsButton()}
-      <button class="btn" type="button" onclick={check}>{CHECK_AGAIN}</button>
     </div>
     {#if blocked}
       <p class="gate" id={hintId} role="status">{hint}</p>
@@ -135,7 +138,7 @@
     <p class="versions">{versions}</p>
   {/if}
   <div class="acts">
-    <button class="btn accent" type="button" onclick={check}>{CHECK_AGAIN}</button>
+    <button class="btn" type="button" onclick={check}>{CHECK_AGAIN}</button>
     {@render extensionsButton()}
   </div>
   {#if blocked}

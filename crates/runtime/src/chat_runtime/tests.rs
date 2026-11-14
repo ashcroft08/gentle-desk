@@ -49,6 +49,12 @@ fn send(chat: &ChatId) -> ChatCommand {
     }
 }
 
+/// The user's Close chat: this chat's child is stopped and nothing of another
+/// chat's changes.
+fn closing(chat: &ChatId) -> ChatCommand {
+    ChatCommand::CloseProcess { chat: chat.clone() }
+}
+
 fn tagged(key: ChatKey, event: ProcessEvent) -> TaggedEvent {
     TaggedEvent {
         key,

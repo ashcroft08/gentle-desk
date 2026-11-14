@@ -185,7 +185,7 @@ impl ChatExecutor for RuntimeExecutor {
         }
         let folder = match &command {
             ChatCommand::OpenProcess { chat } => self.folders.take(chat),
-            ChatCommand::Send { .. } => None,
+            ChatCommand::Send { .. } | ChatCommand::CloseProcess { .. } => None,
         };
         // The chat's attached images are merged in HERE, beside the folder and
         // never through `crates/app`: `ChatCommand` carries no image, and the
@@ -196,6 +196,9 @@ impl ChatExecutor for RuntimeExecutor {
             Err(message) => match command {
                 ChatCommand::OpenProcess { chat } => Outcome::OpenFailed { chat, message },
                 ChatCommand::Send { chat, .. } => Outcome::SendFailed { chat, message },
+                // A run with no host has no children, so the chat is already
+                // closed: the slice needs no failure line for it.
+                ChatCommand::CloseProcess { chat } => Outcome::Closed { chat },
             },
         }
     }
@@ -236,6 +239,9 @@ fn refuse(command: ChatCommand) -> Outcome {
     match command {
         ChatCommand::OpenProcess { chat } => Outcome::OpenFailed { chat, message },
         ChatCommand::Send { chat, .. } => Outcome::SendFailed { chat, message },
+        // The app is going away, and the close flow stops every child: this is
+        // the one command that asks for what is already happening.
+        ChatCommand::CloseProcess { chat } => Outcome::Closed { chat },
     }
 }
 

@@ -26,6 +26,15 @@
 //! console IS the visible terminal, and the launcher runs inside it. Nothing is
 //! written to the process environment (`set_var`), so the desk's own environment
 //! stays exactly what it was.
+//!
+//! The window has to STAY OPEN (L22): the maintainer pressed Update extensions,
+//! the shell answered in a fraction of a second and Windows Terminal took the
+//! tab away before anything could be read. So the program is never handed to
+//! `wt.exe` directly: a one-action wrapper cmd ([`wrapper_script`], in
+//! [`wrapper_path`]) runs it, echoes a blank line and waits on `pause`, and the
+//! tab wears the action's own name ([`action_label`]) so a window left open is
+//! still identifiable. The `CREATE_NEW_CONSOLE` fallback spawns the program
+//! itself and never the wrapper: a cmd file is not the program.
 
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
@@ -98,19 +107,82 @@ pub fn open(action: TerminalActionView, home_args: &[OsString]) -> Result<(), St
         format!("The terminal could not be opened: gentle-shell could not be found ({error})")
     })?;
     let (program, args) = command_for(action, &launcher, home_args);
-    launch(&program, &args)
+    launch(action, &program, &args)
 }
 
-/// The arguments Windows Terminal gets: one new window, one tab, then the
-/// program and its own arguments after `--`. Pure, so the shape is pinned by a
-/// test.
-pub fn windows_terminal_args(program: &Path, args: &[OsString]) -> Vec<OsString> {
-    let mut argv: Vec<OsString> = ["-w", "-1", "new-tab", "--"]
+/// The plain label one action's window and tab wear, in the pane's own words:
+/// the user pressed a button named this, so the window says the same thing.
+/// ASCII, no file, no product's command line.
+pub fn action_label(action: TerminalActionView) -> &'static str {
+    match action {
+        TerminalActionView::Profiles => "Profiles",
+        // The buttons are pi's own `/login` and `/logout` inside the shell, so
+        // the labels are the words those buttons would wear.
+        TerminalActionView::Login => "Sign in",
+        TerminalActionView::Logout => "Sign out",
+        TerminalActionView::Update => "Update",
+        TerminalActionView::UpdateExtensions => "Update extensions",
+    }
+}
+
+/// The wrapper's file name for `action`: one file per action, so two windows
+/// opened in a row never race on one script.
+fn action_slug(action: TerminalActionView) -> &'static str {
+    match action {
+        TerminalActionView::Profiles => "profiles",
+        TerminalActionView::Login => "login",
+        TerminalActionView::Logout => "logout",
+        TerminalActionView::Update => "update",
+        TerminalActionView::UpdateExtensions => "update-extensions",
+    }
+}
+
+/// Where `action`'s wrapper cmd is written: the app's own temp directory, never
+/// beside the app or the user's files. Its content is [`wrapper_script`], and
+/// the file is rewritten on every run.
+pub fn wrapper_path(action: TerminalActionView) -> PathBuf {
+    std::env::temp_dir().join(format!("gentle-desk-{}.cmd", action_slug(action)))
+}
+
+/// The wrapper cmd's content: honest quoting (every part in double quotes,
+/// separators turned into backslashes), then the blank line and `pause` that
+/// keep the window open after a command that exits in a fraction of a second.
+///
+/// Pure, and it answers the content rather than writing it, so the shape is
+/// pinned by tests. A part carrying a double quote is REFUSED: cmd would end
+/// the quoted part there and run whatever follows (the rule the earlier
+/// `console_line` had). Every line is CRLF, cmd's own ending, and the content
+/// is ASCII.
+pub fn wrapper_script(program: &Path, args: &[OsString]) -> Result<String, String> {
+    let mut line = quote_part(&program.to_string_lossy())?;
+    for arg in args {
+        line.push(' ');
+        line.push_str(&quote_part(&arg.to_string_lossy())?);
+    }
+
+    Ok(format!("@echo off\r\n{line}\r\necho.\r\npause\r\n"))
+}
+
+/// One part of the wrapper's command line, in double quotes, with the
+/// separators cmd wants.
+fn quote_part(part: &str) -> Result<String, String> {
+    if part.contains('"') {
+        return Err(format!(
+            "The terminal could not be opened: {part} carries a double quote, which a cmd line cannot pass on"
+        ));
+    }
+    Ok(format!("\"{}\"", part.replace('/', "\\")))
+}
+
+/// The arguments Windows Terminal gets: one new window, one tab wearing the
+/// action's label, then the wrapper cmd after `--`. Pure, so the shape is
+/// pinned by a test.
+pub fn windows_terminal_args(action: TerminalActionView, wrapper: &Path) -> Vec<OsString> {
+    let mut argv: Vec<OsString> = ["-w", "-1", "new-tab", "--title", action_label(action), "--"]
         .iter()
         .map(OsString::from)
         .collect();
-    argv.push(program.as_os_str().to_owned());
-    argv.extend(args.iter().cloned());
+    argv.push(wrapper.as_os_str().to_owned());
     argv
 }
 
@@ -134,14 +206,19 @@ fn windows_terminal() -> Option<PathBuf> {
 /// exists: nothing here waits for the window to close.
 ///
 /// Windows Terminal is used when it is installed: it owns a real terminal and
-/// starts the program itself, so no `cmd` parses the line and no console
-/// handles are inherited from this GUI process. Measured in this app: a child
-/// started with `CREATE_NEW_CONSOLE` from the console-less app exits at once
-/// with code 0 and prints nothing, while the very same command stays alive in a
-/// terminal of its own. When `wt.exe` is missing, the direct spawn with its own
-/// console is the fallback.
+/// starts the program itself, so no `cmd` of this process parses the line and
+/// no console handles are inherited from this GUI process. Measured in this
+/// app: a child started with `CREATE_NEW_CONSOLE` from the console-less app
+/// exits at once with code 0 and prints nothing, while the very same command
+/// stays alive in a terminal of its own. When `wt.exe` is missing, the direct
+/// spawn with its own console is the fallback.
+///
+/// Windows Terminal closes a tab the moment its command exits, which is why the
+/// program is handed over INSIDE a wrapper cmd: `pause` holds the window open
+/// and the output stays readable (L22). The wrapper is a cmd file, so the
+/// fallback never uses it - it spawns `program` itself.
 #[cfg(windows)]
-fn launch(program: &Path, args: &[OsString]) -> Result<(), String> {
+fn launch(action: TerminalActionView, program: &Path, args: &[OsString]) -> Result<(), String> {
     use std::os::windows::process::CommandExt;
 
     /// `CREATE_NEW_CONSOLE`: the fallback console that is visible on its own.
@@ -151,8 +228,16 @@ fn launch(program: &Path, args: &[OsString]) -> Result<(), String> {
     const DETACHED_PROCESS: u32 = 0x0000_0008;
 
     if let Some(wt) = windows_terminal() {
+        let script = wrapper_script(program, args)?;
+        let wrapper = wrapper_path(action);
+        std::fs::write(&wrapper, script).map_err(|error| {
+            format!(
+                "The terminal could not be opened: {} could not be written ({error})",
+                wrapper.display()
+            )
+        })?;
         let started = std::process::Command::new(wt)
-            .args(windows_terminal_args(program, args))
+            .args(windows_terminal_args(action, &wrapper))
             .creation_flags(DETACHED_PROCESS)
             .spawn();
         if started.is_ok() {
@@ -170,9 +255,10 @@ fn launch(program: &Path, args: &[OsString]) -> Result<(), String> {
 
 /// Everywhere else there is no console flag to set: the launcher is started as
 /// it is and inherits the terminal the app was started from. The desktop app
-/// ships on Windows, where the console above is what makes the window visible.
+/// ships on Windows, where the console above is what makes the window visible,
+/// so no wrapper is written here.
 #[cfg(not(windows))]
-fn launch(program: &Path, args: &[OsString]) -> Result<(), String> {
+fn launch(_action: TerminalActionView, program: &Path, args: &[OsString]) -> Result<(), String> {
     std::process::Command::new(program)
         .args(args)
         .spawn()
@@ -267,13 +353,137 @@ mod tests {
         );
     }
 
-    /// Windows Terminal gets one new window and one tab, then `--` and the
-    /// program with its own arguments: nothing is parsed by cmd.
+    /// The wrapper cmd runs: the program and every argument, each in double
+    /// quotes (a path with a space is exactly what broke the earlier attempts)
+    /// and with forward slashes turned into backslashes, which cmd wants.
     #[test]
-    fn windows_terminal_opens_one_tab_on_the_program() {
-        let argv = windows_terminal_args(
+    fn the_wrapper_quotes_every_part_and_turns_slashes_into_backslashes() {
+        let script = wrapper_script(
             Path::new("C:/Program Files/nodejs/node.exe"),
-            &os(&["C:/npm/gentle-shell.mjs", "--link"]),
+            &os(&[
+                "C:/npm/gentle-shell.mjs",
+                "--home",
+                "C:/Users/josep/.pi/agent",
+            ]),
+        )
+        .expect("a quoted line is written");
+
+        assert_eq!(
+            script,
+            "@echo off\r\n\
+             \"C:\\Program Files\\nodejs\\node.exe\" \"C:\\npm\\gentle-shell.mjs\" \
+             \"--home\" \"C:\\Users\\josep\\.pi\\agent\"\r\n\
+             echo.\r\n\
+             pause\r\n"
+        );
+    }
+
+    /// The window has to stay open after a command that exits in a fraction of
+    /// a second, so the wrapper ends with the blank line and `pause`. Every
+    /// line ends in CRLF, cmd's own ending, and nothing outside ASCII.
+    #[test]
+    fn the_wrapper_waits_for_a_key_before_it_closes() {
+        let script = wrapper_script(Path::new("C:/node/node.exe"), &os(&["update"])).unwrap();
+
+        assert_eq!(
+            script.split("\r\n").collect::<Vec<_>>(),
+            vec![
+                "@echo off",
+                "\"C:\\node\\node.exe\" \"update\"",
+                "echo.",
+                "pause",
+                ""
+            ],
+            "`pause` is the last thing cmd reads, and the only line ending is CRLF"
+        );
+        assert!(script.is_ascii(), "a cmd file is ASCII: {script:?}");
+    }
+
+    /// A double quote in a part cannot be passed on: cmd would end the quoted
+    /// part there and run whatever follows. The same rule the earlier
+    /// `console_line` had, refused rather than mangled.
+    #[test]
+    fn a_part_with_a_double_quote_is_refused() {
+        let error = wrapper_script(Path::new("C:/node/node.exe"), &os(&["C:/a\"b.mjs"]))
+            .expect_err("an argument with a double quote is refused");
+        assert!(
+            error.contains("double quote"),
+            "the reason names what cannot be passed on: {error}"
+        );
+        assert!(
+            wrapper_script(Path::new("C:/no\"de/node.exe"), &[]).is_err(),
+            "the program itself is checked too"
+        );
+    }
+
+    /// Every action gets its own cmd file in the app's temp directory, so two
+    /// windows never race on one file and nothing is written beside the app.
+    #[test]
+    fn each_action_writes_its_own_cmd_in_the_temp_directory() {
+        let temp = std::env::temp_dir();
+        let expected = [
+            (TerminalActionView::Profiles, "gentle-desk-profiles.cmd"),
+            (TerminalActionView::Login, "gentle-desk-login.cmd"),
+            (TerminalActionView::Logout, "gentle-desk-logout.cmd"),
+            (TerminalActionView::Update, "gentle-desk-update.cmd"),
+            (
+                TerminalActionView::UpdateExtensions,
+                "gentle-desk-update-extensions.cmd",
+            ),
+        ];
+
+        let mut seen = std::collections::BTreeSet::new();
+        for (action, name) in expected {
+            let path = wrapper_path(action);
+            assert_eq!(path.parent(), Some(temp.as_path()), "{action:?}");
+            assert_eq!(
+                path.file_name().and_then(|name| name.to_str()),
+                Some(name),
+                "one file per action, named after it"
+            );
+            assert!(
+                seen.insert(path),
+                "{action:?} shares a file with another action"
+            );
+        }
+    }
+
+    /// The tab says what ran, in the pane's own words: a plain label, one per
+    /// action, so a window left open over lunch is still identifiable.
+    #[test]
+    fn every_action_has_a_plain_tab_label() {
+        let actions = [
+            TerminalActionView::Profiles,
+            TerminalActionView::Login,
+            TerminalActionView::Logout,
+            TerminalActionView::Update,
+            TerminalActionView::UpdateExtensions,
+        ];
+
+        let labels: Vec<&str> = actions.iter().copied().map(action_label).collect();
+        assert_eq!(
+            labels,
+            vec![
+                "Profiles",
+                "Sign in",
+                "Sign out",
+                "Update",
+                "Update extensions"
+            ]
+        );
+        for label in labels {
+            assert!(label.is_ascii() && !label.is_empty(), "{label:?}");
+        }
+    }
+
+    /// Windows Terminal gets one new window, one tab with the action's title,
+    /// then `--` and the WRAPPER cmd: nothing is parsed by this process, and
+    /// cmd is what keeps the window open after the program exits.
+    #[test]
+    fn windows_terminal_opens_one_titled_tab_on_the_wrapper() {
+        let argv = windows_terminal_args(
+            TerminalActionView::UpdateExtensions,
+            Path::new("C:/tmp/gentle-desk-update-extensions.cmd"),
         );
 
         assert_eq!(
@@ -282,10 +492,10 @@ mod tests {
                 "-w",
                 "-1",
                 "new-tab",
+                "--title",
+                "Update extensions",
                 "--",
-                "C:/Program Files/nodejs/node.exe",
-                "C:/npm/gentle-shell.mjs",
-                "--link"
+                "C:/tmp/gentle-desk-update-extensions.cmd"
             ])
         );
     }

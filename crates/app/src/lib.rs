@@ -30,7 +30,7 @@ mod session_prepare;
 mod session_query;
 mod state;
 
-pub use chats::{ChatActivity, ChatId, Chats};
+pub use chats::{close_working, ChatActivity, ChatId, Chats, WORKING_CHAT};
 pub use context::ContextUsage;
 pub use input::{ChatCommand, Command, Effects, Input, Intent};
 pub use list_status::ListStatus;

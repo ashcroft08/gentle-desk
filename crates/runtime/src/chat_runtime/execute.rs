@@ -20,6 +20,10 @@ pub enum Outcome {
     Sent,
     /// The command did not reach a child (none, still starting, or a broken pipe).
     SendFailed { chat: ChatId, message: String },
+    /// The chat's child is gone, because this command stopped it (or because it
+    /// had none). The chat itself is unchanged: its next open starts a fresh
+    /// child through `--session` (0.1.14).
+    Closed { chat: ChatId },
 }
 
 impl ChatRuntime {
@@ -38,6 +42,12 @@ impl ChatRuntime {
         match command {
             ChatCommand::OpenProcess { chat } => self.open(chat, folder),
             ChatCommand::Send { chat, rpc } => self.send(chat, &rpc),
+            // The child is stopped here, on the caller's thread: the host's grace
+            // is up to 2 s and nothing of the window may wait on it (0.1.14).
+            ChatCommand::CloseProcess { chat } => {
+                self.close(&chat);
+                Outcome::Closed { chat }
+            }
         }
     }
 

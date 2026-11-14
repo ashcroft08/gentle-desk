@@ -49,6 +49,14 @@ pub enum Intent {
     /// (S3). This is the action of the death notice; it works on any chat, not
     /// only the foreground one.
     RestartChat(ChatId),
+    /// Close that chat: stop its child and take the chat off the open set, which
+    /// is the set the Updates pane's chats-closed gate counts (0.1.14). The chat
+    /// is NOT deleted: nothing on disk changes and the session list keeps its
+    /// row, so the row opens the chat again (through `OpenChat`, which starts a
+    /// fresh child through `--session`). A chat that is running a turn is
+    /// refused with the delete flow's own rule and words: the child is mid-turn
+    /// and stopping it is the user's (S4).
+    CloseChat(ChatId),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -164,13 +172,20 @@ pub enum ChatCommand {
     OpenProcess { chat: ChatId },
     /// Route one RPC command to that chat's child and no other.
     Send { chat: ChatId, rpc: RpcCommand },
+    /// Stop that chat's child and forget it in the host (0.1.14). The chat's
+    /// session file is untouched: this is the child going away, not the chat. A
+    /// chat with no child (never opened, already gone) is simply closed, so the
+    /// command is safe to run twice.
+    CloseProcess { chat: ChatId },
 }
 
 impl ChatCommand {
     /// The chat this command is for.
     pub fn chat(&self) -> &ChatId {
         match self {
-            Self::OpenProcess { chat } | Self::Send { chat, .. } => chat,
+            Self::OpenProcess { chat } | Self::Send { chat, .. } | Self::CloseProcess { chat } => {
+                chat
+            }
         }
     }
 }
