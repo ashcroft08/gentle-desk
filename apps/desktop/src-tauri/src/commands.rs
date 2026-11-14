@@ -31,7 +31,7 @@ use crate::close::{self, BridgeSteps, CloseFlow, CLOSING};
 use crate::config::{ConfigSnapshot, ConfigWriter};
 use crate::contract::{
     OrchestratorModeView, StateChanged, TerminalActionView, UiIntent, UpdatesStatusView,
-    UpdatesView, ViewState,
+    UpdatesView, UsageStatusView, UsageView, ViewState,
 };
 use crate::effects::{self, Ran, RuntimeExecutor};
 use crate::events::{EventPump, Push};
@@ -244,6 +244,13 @@ impl Bridge {
         self
     }
 
+    /// The usage sources' run, instead of `node usage-json.ts`: no test starts a
+    /// script or needs node installed.
+    pub fn with_node_probe(mut self, node: crate::settings::NodeProbe) -> Self {
+        self.settings.node = node;
+        self
+    }
+
     /// Whether [`UiIntent::RestartApp`] asked for a relaunch: the flag the close
     /// flow's last step reads (`close::exit_step`).
     pub fn relaunch_requested(&self) -> bool {
@@ -440,6 +447,7 @@ impl Bridge {
             UiIntent::RefreshProfiles => return self.refresh_profiles(),
             UiIntent::RefreshAuth => return self.refresh_auth(),
             UiIntent::CheckUpdates => return self.check_updates(),
+            UiIntent::RefreshUsage => return self.refresh_usage(),
             UiIntent::SetOrchestratorMode { mode } => return self.set_orchestrator_mode(*mode),
             _ => {}
         }
@@ -680,6 +688,47 @@ impl Bridge {
     pub fn start_updates(&self, desk_endpoint: Option<&str>) {
         *lock(&self.desk_endpoint) = desk_endpoint.map(str::to_owned);
         self.run_update_check(self.emitter());
+    }
+
+    /// The Usage pane's read: where the shell's own usage sources stand, and -
+    /// when they are installed - what the one document they print says.
+    ///
+    /// The locator and the run are both work: the answer to the click says the
+    /// read is running, and the read's own thread pushes what it found, so the
+    /// window keeps drawing while `node` works (up to the seam's 30 s budget).
+    /// Nothing here looks at a chat, so no open chat can hold this read back,
+    /// and nothing is written: the sources own their own credentials.
+    pub fn refresh_usage(&self) -> Result<ViewState, String> {
+        self.accepting_work()?;
+        let emit = self.emitter();
+        let view = self.holder.note_usage_reading();
+        emit_view(&emit, &view)?;
+        let files = Arc::clone(&self.settings.files);
+        let node = Arc::clone(&self.settings.node);
+        let home = self.settings.paths.agent.clone();
+        let holder = Arc::clone(&self.holder);
+        let thread_emit = Arc::clone(&emit);
+        let spawned = std::thread::Builder::new()
+            .name("usage-read".to_owned())
+            .spawn(move || {
+                let answered = settings::usage_view(
+                    &files,
+                    home.as_deref(),
+                    &node,
+                    gentle_runtime::clock::now_ms(),
+                );
+                push(&thread_emit, holder.note_usage(answered));
+            });
+        if spawned.is_err() {
+            // No thread to read on: the pane says the read could not run rather
+            // than staying on "Reading...".
+            let view = self.holder.note_usage(UsageView {
+                status: UsageStatusView::Failed("the usage read could not start".to_owned()),
+                ..UsageView::default()
+            });
+            push(&emit, view);
+        }
+        Ok(view)
     }
 
     /// The mode the chats opened from now on start with (0.1.12, S1, T4). The

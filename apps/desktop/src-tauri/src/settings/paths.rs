@@ -33,6 +33,10 @@ pub struct SettingsPaths {
     /// `auth.json` in the agent directory of this run's home, `None` when no
     /// agent directory resolves.
     pub auth: Option<PathBuf>,
+    /// The agent directory itself, `None` when no home resolves: the Usage pane
+    /// reads the shell's `settings.json` from here and locates the sources'
+    /// checkout under it (`<agent>/git/<host>/<owner>/<repo>`).
+    pub agent: Option<PathBuf>,
     /// The home flags the children get, reused by every shell run of the pane so
     /// the check reads the same store the chats do.
     pub home_args: Vec<OsString>,
@@ -68,7 +72,8 @@ pub fn resolve(choice: Option<HomeChoice>) -> SettingsPaths {
         // chains beside the profiles (lib/model-fallback-store.ts:33-35).
         profiles: config.as_ref().map(|dir| dir.join(PROFILES_FILE)),
         fallbacks: config.as_deref().map(|dir| dir.join(FALLBACKS_FILE)),
-        auth: agent.map(|dir| dir.join("auth.json")),
+        auth: agent.as_ref().map(|dir| dir.join("auth.json")),
+        agent,
         home_args,
     }
 }

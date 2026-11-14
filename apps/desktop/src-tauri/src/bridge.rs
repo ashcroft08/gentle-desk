@@ -29,7 +29,9 @@ use gentle_runtime::app_config::{self, folder_key};
 use gentle_runtime::clock::now_ms;
 
 use crate::config::{ConfigSnapshot, ConfigWriter};
-use crate::contract::{AuthView, ProfilesView, SessionsWindow, UiIntent, UpdatesView, ViewState};
+use crate::contract::{
+    AuthView, ProfilesView, SessionsWindow, UiIntent, UpdatesView, UsageView, ViewState,
+};
 use crate::images::Images;
 use crate::sessions::cache::TreeCache;
 use crate::sessions::revision;
@@ -124,6 +126,9 @@ pub struct AppStateHolder {
     auth: Mutex<AuthView>,
     /// The Updates pane's slice (0.1.12, S2, S7): the last check's answer.
     updates: Mutex<UpdatesView>,
+    /// The Usage pane's slice: the subscription usage the shell's own sources
+    /// reported when the pane last asked, and whether that read is running.
+    usage: Mutex<UsageView>,
     /// The run's one fatal failure, as `ViewState.fatal` carries it: the
     /// launcher could not be resolved, so no chat can start (`bridge::fatal`).
     fatal: Mutex<Option<String>>,
@@ -291,6 +296,7 @@ impl AppStateHolder {
             profiles: self.profiles(),
             auth: self.auth(),
             updates: self.updates(),
+            usage: self.usage(),
             images: &self.images,
         }
     }

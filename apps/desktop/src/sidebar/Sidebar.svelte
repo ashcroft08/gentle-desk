@@ -205,6 +205,7 @@
     profiles={model.view?.profiles ?? null}
     auth={model.view?.auth ?? null}
     updates={model.view?.updates ?? null}
+    usage={model.view?.usage ?? null}
     openChats={model.view?.open_chats ?? 0}
   />
   <!-- The footer keeps exactly two things (S1): the run's Preview chip and the
