@@ -305,6 +305,17 @@ fragments in 12 files.
   feature incomplete. New rulings: NO_PATH_NOTICE joins ruling 1 (the missing folder
   is the one that would name the language); the config save-failure line is cataloged
   (language in hand); the un-drawn usage-sources line joins anyway (cheap, same file).
+- L9 (parent, 2026-11-14): the accumulated branch reached reviewDue=true, nativeRisk
+  high (hot_path: auth in settings/auth.rs). The offered review.start failed
+  preflight THREE times with lens_context_budget_exceeded — full branch (216 paths),
+  then the smallest natural candidate containing the hot path (81d9e0f..7381e70: 36
+  paths, 1739 lines) with three lenses, with requestContextPath omitted, and with a
+  single lens. No authority was created (retry-safe, nothing to abandon); the
+  provider offers no continuation beyond splitting, and no smaller natural candidate
+  exists. Outcome: Needs your decision — the maintainer investigates the review
+  authority, disables the review switch for this clone, or defers review to a smaller
+  PR chain. Preserved verbatim: the three failure envelopes name lineage
+  review-93f4c464349be318 and next_action stop.
 - L8 (parent, 2026-11-14): T11's two widening rounds approved by the parent as
   mechanical-only (7 call-site paths, then the 2 fixture files), within S3's mandate —
   the sets carried zero design ambiguity and the alternative was shipping half-English
