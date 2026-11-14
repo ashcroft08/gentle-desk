@@ -164,18 +164,17 @@ fragments in 12 files.
       Ajustes/Enviar/Hilo del chat/Instalar actualización in one tick, and back; bit
       under a composerCopy mutation, reverted). Audit tables in the T9 report. Route:
       writer. Commit: pending.
-- [ ] T11 (S3, from the T9 audit; Log L7) T4b — the audit's 12 Rust producer groups
-      localized: config.rs NO_PATH_NOTICE stays English (joins ruling 1 — the folder
-      that would name the language is the one missing), config/writer.rs:220 save
-      failure cataloged (language in hand — a plain gap), settings/usage.rs:60/67
-      included though not drawn (same file, cheap), the rest of the 13-path list
-      threaded as T4 was (settings/auth.rs, settings/profiles.rs, settings.rs,
-      commands.rs:431/731, shell_install.rs ×6, close.rs CLOSING,
-      crates/runtime/src/usage.rs validation sentences ×13, crates/runtime/src/
-      profiles.rs ×8, gentle-core chat/history.rs:59 + chat/reducer.rs:140
-      "unknown model error"). Parent approved the widening 2026-11-14 (within S3's
-      mandate and T4's already-approved threading kind). Route: writer. Commit:
-      pending.
+- [x] T11 (S3, from the T9 audit; Log L7) T4b — DONE. The audit's 12 Rust producer
+      groups localized: 38 new catalog messages (95 total in messages.rs) and the
+      threading reaching every draw site the audit traced (config save, install ×6,
+      the three Settings probes/views, both document readers as whole sentences, the
+      close gates, the chat reducer's unknown-model-error). Language is read at call
+      time (a switch applies to the next read, S2). Two channel-level Spanish pins,
+      both mutation-proven and reverted (config save → config_notice in Spanish;
+      reduce_chat(Es) → "error desconocido del modelo"). The 7+2 call-site paths the
+      survey needed beyond the 13 were approved by the parent as mechanical-only
+      (Log L8). Route: writer. Commit df6740e (RED 78×E0425; GREEN 152/260/215/370/15,
+      0 failed; clippy -D warnings across five crates; fmt clean).
 - [ ] T10 (S5) close: version 0.2.0 in apps/desktop/package.json,
       apps/desktop/src-tauri/Cargo.toml and apps/desktop/src-tauri/tauri.conf.json, the
       what's-new entry, the shipped note in odd/tasks/tauri-settings-roadmap.md, then
@@ -306,3 +305,15 @@ fragments in 12 files.
   feature incomplete. New rulings: NO_PATH_NOTICE joins ruling 1 (the missing folder
   is the one that would name the language); the config save-failure line is cataloged
   (language in hand); the un-drawn usage-sources line joins anyway (cheap, same file).
+- L8 (parent, 2026-11-14): T11's two widening rounds approved by the parent as
+  mechanical-only (7 call-site paths, then the 2 fixture files), within S3's mandate —
+  the sets carried zero design ambiguity and the alternative was shipping half-English
+  draw sites the spec excludes. Accepted deviations: the catalog shape for the usage
+  refusals (one whole sentence each — nesting translated fragments is ungrammatical);
+  close::CLOSING became closing(language) -> String (a const cannot be localized);
+  Installer::install(language) is the trait's carrier; Settings views take the language
+  LAST matching T4's usage::view shape (catalog functions keep Language first); the two
+  Spanish channel pins live beside their English siblings. Final by-design-English
+  statement is in the T11 report: ruling-1 family (NO_PATH_NOTICE, damaged-config
+  notice), ruling 2 (prompt line), shell/pi passthrough, and the OS's/JSON's own words
+  interpolated into localized sentences.
