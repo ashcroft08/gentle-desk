@@ -13,6 +13,9 @@
 //! - login / logout: the shell's own `auth login` / `auth logout`.
 //! - update: the shell's own `update`, which forwards to pi's updater (L5), run
 //!   from a terminal because S4 lets an update run only with every chat closed.
+//! - update extensions: the same command with pi's `--extensions` flag passed
+//!   through, so only the installed packages are touched; idempotent, which is
+//!   why it needs no check.
 //!
 //! Every one of them is started with the SAME home flags the chats' children get
 //! (the desk's own other arguments are not passed on) and through the resolved
@@ -43,6 +46,10 @@ pub fn action_args(action: TerminalActionView) -> &'static [&'static str] {
         TerminalActionView::Login => &[],
         TerminalActionView::Logout => &[],
         TerminalActionView::Update => &["update"],
+        // `gentle-shell update` FORWARDS to pi's updater, so pi's own
+        // `--extensions` flag passes straight through (L5) and the run touches
+        // only the packages the shell has installed, never pi itself.
+        TerminalActionView::UpdateExtensions => &["update", "--extensions"],
     }
 }
 
@@ -212,6 +219,18 @@ mod tests {
             &[] as &[&str]
         );
         assert_eq!(action_args(TerminalActionView::Update), &["update"]);
+    }
+
+    /// Extensions are updated by the SAME shell command with pi's own flag
+    /// appended: `gentle-shell update` forwards to pi's updater, so
+    /// `--extensions` passes straight through and only the packages the shell
+    /// has installed are touched (`--self` stays pi's default).
+    #[test]
+    fn update_extensions_is_the_shells_update_with_pis_own_flag() {
+        assert_eq!(
+            action_args(TerminalActionView::UpdateExtensions) as &[&str],
+            &["update", "--extensions"] as &[&str]
+        );
     }
 
     /// The command line is the launcher's own arguments, then the home flags,

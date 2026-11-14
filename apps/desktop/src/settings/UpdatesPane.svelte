@@ -12,6 +12,12 @@
   // and it is DEAD while any chat is open (S4), with the reason written under
   // it: a chat whose child is mid-turn must not have its pi change underneath.
   // "Check again" only ever asks for a check; no update is installed from here.
+  //
+  // "Update extensions" sits beside them and is the one action NO data drives:
+  // the shell's own updater with pi's `--extensions` flag passed through only
+  // touches the packages the shell has installed, and nothing can tell which of
+  // them are behind, so there is no check to wait for and it is drawn in every
+  // state, safe to press any time. It obeys the same chats-closed gate.
   import { dispatchIntent, openTerminal } from '../bridge'
   import type { UpdatesView_Serialize as UpdatesView } from '../contract/bindings'
   import { cardOf } from './updates'
@@ -24,6 +30,8 @@
     UNKNOWN_VERSION,
     UPDATE,
     UPDATE_AVAILABLE,
+    UPDATE_EXTENSIONS,
+    UPDATE_EXTENSIONS_IN_TERMINAL,
     UPDATE_IN_TERMINAL,
     UP_TO_DATE,
     VERSIONS,
@@ -54,7 +62,25 @@
     if (blocked) return
     terminalError = await openTerminal('Update')
   }
+
+  /** The same terminal path, with pi's `--extensions` flag passed through. */
+  async function extensions(): Promise<void> {
+    if (blocked) return
+    terminalError = await openTerminal('UpdateExtensions')
+  }
 </script>
+
+<!-- The extensions button is drawn in every state of the pane, because nothing
+     the check says drives it; only the chats-closed gate can hold it back. -->
+{#snippet extensionsButton()}
+  <button
+    class="btn"
+    type="button"
+    disabled={blocked}
+    aria-describedby={blocked ? hintId : undefined}
+    onclick={() => void extensions()}>{UPDATE_EXTENSIONS}</button
+  >
+{/snippet}
 
 {#if card.checked}
   <div class="card updates">
@@ -79,15 +105,18 @@
           onclick={() => void update()}>{UPDATE}</button
         >
       {/if}
+      {@render extensionsButton()}
       <button class="btn" type="button" onclick={check}>{CHECK_AGAIN}</button>
     </div>
-    {#if card.available && card.terminal}
-      {#if blocked}
-        <p class="gate" id={hintId} role="status">{hint}</p>
-      {:else}
+    {#if blocked}
+      <p class="gate" id={hintId} role="status">{hint}</p>
+    {:else}
+      {#if card.available && card.terminal}
         <p class="note">{UPDATE_IN_TERMINAL}</p>
       {/if}
-    {:else if card.appOnly}
+      <p class="note">{UPDATE_EXTENSIONS_IN_TERMINAL}</p>
+    {/if}
+    {#if card.appOnly}
       <p class="note">{APP_UPDATES_ITSELF}</p>
     {/if}
     {#if terminalError !== null}
@@ -107,5 +136,11 @@
   {/if}
   <div class="acts">
     <button class="btn accent" type="button" onclick={check}>{CHECK_AGAIN}</button>
+    {@render extensionsButton()}
   </div>
+  {#if blocked}
+    <p class="gate" id={hintId} role="status">{hint}</p>
+  {:else}
+    <p class="note">{UPDATE_EXTENSIONS_IN_TERMINAL}</p>
+  {/if}
 {/if}
