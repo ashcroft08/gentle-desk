@@ -53,10 +53,12 @@ export const APP_UPDATES_ITSELF = 'This app updates itself: use the update banne
 
 /**
  * Why the update buttons are dead while a chat is open (S4): the rule, the
- * count that blocks them, and what makes them come alive.
+ * count that blocks them, and the way out. 0.1.14 added Close chat to the chat
+ * row's own menu, so the hint names it: before that the desk had no way to
+ * close a chat and the gate could not be satisfied without quitting the app.
  */
 export function gateHint(openChats: number): string {
   const chats = openChats === 1 ? '1 chat is' : `${openChats} chats are`
-  const them = openChats === 1 ? 'it' : 'them'
-  return `Updates need every chat closed. ${chats} open - close ${them} and the update buttons come alive.`
+  const their = openChats === 1 ? 'its' : 'their'
+  return `Updates need every chat closed. ${chats} open - Close chat in ${their} row menu, and the update buttons come alive.`
 }

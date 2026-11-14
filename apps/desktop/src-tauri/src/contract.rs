@@ -174,6 +174,14 @@ pub enum UiIntent {
     RestartChat {
         chat_id: String,
     },
+    /// Close one chat (0.1.14): stop that chat's child and take it off the open
+    /// set, which is what the Updates pane's chats-closed gate counts. NOT a
+    /// delete: nothing on disk changes and the session list keeps its row, so
+    /// the row opens the chat again. A chat that is running a turn is refused,
+    /// with the same rule and words the delete flow refuses with.
+    CloseChat {
+        chat_id: String,
+    },
     /// Copy one message's raw markdown: the message is named by the id the
     /// thread was given ([`MessageView::id`]), and the copy itself is the
     /// shell's side effect, never the view's.
