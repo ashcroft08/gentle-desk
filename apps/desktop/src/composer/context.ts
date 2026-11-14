@@ -13,9 +13,14 @@
 //
 // The colour is the reader's own scale, not pi's: quiet until 75%, the warning
 // token from 75% (plan ahead), the danger token from 95% (about to compact).
+//
+// The two sentences the chip says are the composer's own words, so they arrive in
+// the copy dictionary of the language the chip is drawn in (0.2.0, S3/D4): a plain
+// function cannot read the reactive language, and passing the dictionary keeps the
+// component's one reactive read in the component (the `notices/action.ts` mold).
 
 import type { ContextUsageView_Serialize as ContextUsageView } from '../contract/bindings'
-import { CONTEXT_DASH, CONTEXT_HIDDEN, CONTEXT_LABEL, tokensTitle } from './copy'
+import { CONTEXT_DASH, type ComposerCopy, tokensTitle } from './copy'
 
 /** Which of the three drawn states the chip is in. */
 export type ContextChipState =
@@ -36,19 +41,19 @@ export function toneOf(percent: number): ContextTone {
   return 'normal'
 }
 
-/** The chip's whole state, from the reading Rust pushed. */
-export function chipOf(usage: ContextUsageView | null): ContextChipState {
+/** The chip's whole state, from the reading Rust pushed and the drawn language. */
+export function chipOf(usage: ContextUsageView | null, copy: ComposerCopy): ContextChipState {
   if (usage === null) return { kind: 'hidden' }
   const { tokens, percent, window } = usage
   if (tokens === null && percent === null && window === null) return { kind: 'hidden' }
   const title = tokensTitle(tokens, window)
-  if (percent === null) return { kind: 'unknown', label: CONTEXT_HIDDEN, title }
+  if (percent === null) return { kind: 'unknown', label: copy.contextHidden, title }
   const rounded = Math.round(percent)
   return {
     kind: 'reading',
     percent: rounded,
     tone: toneOf(rounded),
-    label: CONTEXT_LABEL(rounded),
+    label: copy.contextLabel(rounded),
     title,
   }
 }

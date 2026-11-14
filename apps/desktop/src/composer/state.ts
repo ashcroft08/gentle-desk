@@ -7,9 +7,13 @@
 // and the line below the box says why. The text itself is never touched by any of it: a disabled Send
 // keeps the draft, and the reducer refuses a prompt for exactly these states, so
 // the view and the state tell the user the same story.
+//
+// The two reasons are the composer's own words, so they arrive in the copy
+// dictionary of the language the composer is drawn in (0.2.0, S3/D4): this module
+// keeps the rule, the dictionary keeps the words.
 
 import type { ChatActivityMark } from '../contract/bindings'
-import { ENDED_REASON, OPENING_REASON } from './copy'
+import type { ComposerCopy } from './copy'
 
 /** Which of the two actions the composer shows. */
 export type ComposerMode = 'send' | 'stop'
@@ -23,7 +27,8 @@ export type ComposerState = {
 }
 
 /**
- * The composer for a chat with `mark` (its activity, `null` when idle).
+ * The composer for a chat with `mark` (its activity, `null` when idle), in the
+ * language of `copy`.
  *
  * Working turns the button into Stop, because the one thing a running turn takes
  * is a stop. A queued chat shows the same Stop, as iced does: its prompt waits
@@ -32,15 +37,15 @@ export type ComposerState = {
  * prompt yet, and an ended chat takes none until it is restarted; each says so. A finished reply and a pending dialog
  * change nothing here: both leave the composer ready for the next prompt.
  */
-export function composerStateOf(mark: ChatActivityMark | null): ComposerState {
+export function composerStateOf(mark: ChatActivityMark | null, copy: ComposerCopy): ComposerState {
   switch (mark) {
     case 'Working':
     case 'Queued':
       return { mode: 'stop', disabled: false, reason: null }
     case 'Opening':
-      return { mode: 'send', disabled: true, reason: OPENING_REASON }
+      return { mode: 'send', disabled: true, reason: copy.openingReason }
     case 'Ended':
-      return { mode: 'send', disabled: true, reason: ENDED_REASON }
+      return { mode: 'send', disabled: true, reason: copy.endedReason }
     default:
       return { mode: 'send', disabled: false, reason: null }
   }

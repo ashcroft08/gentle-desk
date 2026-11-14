@@ -8,11 +8,15 @@
   // of null is NOT zero - a chat that just compacted draws a dash, and a chat
   // with no reading at all draws nothing (the rules live in `./context`).
   import type { ContextUsageView_Serialize as ContextUsageView } from '../contract/bindings'
+  import { language } from '../i18n/language.svelte'
   import { barWidth, chipOf } from './context'
+  import { composerCopy } from './copy'
 
   let { usage }: { usage: ContextUsageView | null } = $props()
 
-  const chip = $derived(chipOf(usage))
+  /** The chip's own words in the language the app holds (0.2.0, D4). */
+  const copy = $derived(composerCopy(language.current))
+  const chip = $derived(chipOf(usage, copy))
 </script>
 
 {#if chip.kind === 'reading'}

@@ -4,6 +4,10 @@
 import { describe, expect, it } from 'vitest'
 import type { ContextUsageView_Serialize as ContextUsageView } from '../contract/bindings'
 import { barWidth, chipOf, toneOf } from './context'
+import { composerCopy } from './copy'
+
+/** The dictionary a run that has not been told otherwise draws its words from. */
+const EN = composerCopy('en')
 
 function usage(over: Partial<ContextUsageView> = {}): ContextUsageView {
   return { tokens: null, percent: null, window: null, ...over }
@@ -13,7 +17,7 @@ const READING = usage({ tokens: 70_000, percent: 35, window: 200_000 })
 
 describe('the context chip', () => {
   it('draws the percentage pi computed, in the quiet tone', () => {
-    const chip = chipOf(READING)
+    const chip = chipOf(READING, EN)
 
     expect(chip).toMatchObject({ kind: 'reading', percent: 35, tone: 'normal' })
     expect(chip.kind === 'reading' && chip.label).toContain('35')
@@ -28,7 +32,7 @@ describe('the context chip', () => {
   })
 
   it('rounds the percentage it draws, so the number and the bar agree', () => {
-    const chip = chipOf(usage({ tokens: 1200, percent: 34.6, window: 3500 }))
+    const chip = chipOf(usage({ tokens: 1200, percent: 34.6, window: 3500 }), EN)
     expect(chip).toMatchObject({ kind: 'reading', percent: 35 })
     expect(barWidth(35)).toBe('35%')
     expect(barWidth(104)).toBe('100%')
@@ -37,22 +41,22 @@ describe('the context chip', () => {
 
   it('draws a dash when only the window is known, never a zero', () => {
     // The state pi answers right after a compaction.
-    const chip = chipOf(usage({ tokens: null, percent: null, window: 200_000 }))
+    const chip = chipOf(usage({ tokens: null, percent: null, window: 200_000 }), EN)
 
     expect(chip.kind).toBe('unknown')
     expect(chip.kind === 'unknown' && chip.label).not.toContain('0')
   })
 
   it('draws nothing at all when there is no reading', () => {
-    expect(chipOf(null).kind).toBe('hidden')
-    expect(chipOf(usage()).kind).toBe('hidden')
+    expect(chipOf(null, EN).kind).toBe('hidden')
+    expect(chipOf(usage(), EN).kind).toBe('hidden')
   })
 
   it('keeps the tokens and the window as the chip hover, not in the way', () => {
-    expect(chipOf(READING)).toMatchObject({ title: '70k / 200k tokens' })
+    expect(chipOf(READING, EN)).toMatchObject({ title: '70k / 200k tokens' })
     // A known token count without a window still says what it can.
-    expect(chipOf(usage({ tokens: 950 }))).toMatchObject({ title: '950 tokens' })
+    expect(chipOf(usage({ tokens: 950 }), EN)).toMatchObject({ title: '950 tokens' })
     // A compaction leaves nothing to describe, so there is no hover text.
-    expect(chipOf(usage({ window: 200_000 }))).toMatchObject({ title: '' })
+    expect(chipOf(usage({ window: 200_000 }), EN)).toMatchObject({ title: '' })
   })
 })

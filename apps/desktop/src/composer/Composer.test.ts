@@ -12,13 +12,17 @@ import { tick } from 'svelte'
 import type { ChatActivityMark } from '../contract/bindings'
 import { handlerArgs, resetTauriMock, setHandler, viewState } from '../test-support/tauri-mock'
 import Composer from './Composer.svelte'
-import { ENDED_REASON, OPENING_REASON } from './copy'
+import { composerCopy } from './copy'
 
 vi.mock('@tauri-apps/api/core', () => import('../test-support/tauri-mock').then((m) => m.coreModule()))
 vi.mock('@tauri-apps/api/event', () => import('../test-support/tauri-mock').then((m) => m.eventModule()))
 vi.mock('@tauri-apps/api/webview', () => import('../test-support/webview').then((m) => m.webviewModule()))
 
 const MESSAGE = 'Message'
+
+// The two reasons read through the dictionary, in English: what a run that has not
+// been told otherwise draws.
+const { endedReason: ENDED_REASON, openingReason: OPENING_REASON } = composerCopy('en')
 
 type Props = { chat: string | null; mark?: ChatActivityMark | null }
 

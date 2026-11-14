@@ -6,7 +6,8 @@
   // same intent the old select dispatched.
   import { untrack } from 'svelte'
   import Icon from '../icons/Icon.svelte'
-  import { NOTHING_MATCHES, SEARCH_PLACEHOLDER } from './copy'
+  import { language } from '../i18n/language.svelte'
+  import { composerCopy } from './copy'
 
   export type PillOption = { value: string; label: string; hint?: string }
 
@@ -29,6 +30,9 @@
     faint?: boolean
     onchange: (value: string) => void
   } = $props()
+
+  /** The two words the popover draws, in the language the app holds (0.2.0, D4). */
+  const copy = $derived(composerCopy(language.current))
 
   let open = $state(false)
   let filter = $state('')
@@ -159,7 +163,7 @@
         <input
           class="filter"
           type="text"
-          placeholder={SEARCH_PLACEHOLDER}
+          placeholder={copy.searchPlaceholder}
           bind:this={filterBox}
           bind:value={filter}
           oninput={() => (active = 0)}
@@ -185,7 +189,7 @@
           </li>
         {/each}
         {#if visible.length === 0}
-          <li class="none">{NOTHING_MATCHES}</li>
+          <li class="none">{copy.nothingMatches}</li>
         {/if}
       </ul>
     </div>

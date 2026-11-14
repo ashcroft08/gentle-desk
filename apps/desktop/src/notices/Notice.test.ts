@@ -4,8 +4,10 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/svelte'
+import { tick } from 'svelte'
 import { handlerArgs, plainNotice, resetTauriMock, restartNotice, setHandler, viewState } from '../test-support/tauri-mock'
 import type { NoticeActionView, NoticeView_Serialize } from '../contract/bindings'
+import { setLanguage } from '../i18n/language.svelte'
 import Notice from './Notice.svelte'
 
 vi.mock('@tauri-apps/api/core', () => import('../test-support/tauri-mock').then((m) => m.coreModule()))
@@ -84,5 +86,25 @@ describe('a notice', () => {
 
     expect(card.textContent).toContain(TEXT)
     expect(within(card).getAllByRole('button')).toHaveLength(1)
+  })
+
+  it('names the level mark in the language of the card, not in English by default', async () => {
+    // 0.2.0 (S3, D4): a bare Mark would draw MARK_LABELS' English column in both
+    // languages, so the card hands its own language down to the picture.
+    setLanguage('en')
+    const card = draw(plainNotice(10, TEXT, 'Warning'))
+    expect(within(card).getByRole('img', { name: 'Needs attention' })).toBeTruthy()
+
+    setLanguage('es')
+    await tick()
+
+    expect(within(card).getByRole('img', { name: 'Necesita atención' })).toBeTruthy()
+
+    cleanup()
+    render(Notice, { props: { notice: plainNotice(11, TEXT, 'Error') } })
+    const error = screen.getByRole('alert')
+    expect(within(error).getByRole('img', { name: 'Terminado' })).toBeTruthy()
+
+    setLanguage('en')
   })
 })

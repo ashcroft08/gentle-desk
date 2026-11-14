@@ -6,22 +6,13 @@
   // so the window says it is applying the choice and takes both answers away
   // meanwhile. The keyboard starts on the recommended answer.
   import { dispatchIntent } from '../bridge'
-  import {
-    APPLYING,
-    FOUND_TITLE,
-    INTRO,
-    LINK_BADGE,
-    LINK_PATH,
-    LINK_POINTS,
-    LINK_TITLE,
-    SEPARATE_PATH,
-    SEPARATE_POINTS,
-    SEPARATE_TITLE,
-    SKIP_NOTE,
-    TITLE,
-  } from './copy'
+  import { language } from '../i18n/language.svelte'
+  import { welcomeCopy } from './copy'
 
   let { piPath }: { piPath: string } = $props()
+
+  /** The screen's own words in the language the app holds (0.2.0, S3/D4). */
+  const copy = $derived(welcomeCopy(language.current))
 
   let recommended: HTMLButtonElement | null = $state(null)
   /** Set by the first click: the answer is on its way and cannot change. */
@@ -42,56 +33,56 @@
 
 <main class="welcome" aria-labelledby="welcome-title">
   <div class="welcome-card">
-    <h1 id="welcome-title">{TITLE}</h1>
-    <p class="welcome-intro">{INTRO}</p>
+    <h1 id="welcome-title">{copy.title}</h1>
+    <p class="welcome-intro">{copy.intro}</p>
 
-    <section class="welcome-found" aria-label={FOUND_TITLE}>
-      <h2>{FOUND_TITLE}</h2>
+    <section class="welcome-found" aria-label={copy.foundTitle}>
+      <h2>{copy.foundTitle}</h2>
       <p class="welcome-path">{piPath}</p>
     </section>
 
     <div class="welcome-choices">
       <section class="welcome-choice welcome-pick" aria-labelledby="welcome-link">
         <h2 id="welcome-link">
-          {LINK_TITLE}<span class="welcome-badge">{LINK_BADGE}</span>
+          {copy.linkTitle}<span class="welcome-badge">{copy.linkBadge}</span>
         </h2>
         <ul>
-          {#each LINK_POINTS as point (point)}
+          {#each copy.linkPoints as point (point)}
             <li>{point}</li>
           {/each}
         </ul>
-        <p class="welcome-where">{LINK_PATH}</p>
+        <p class="welcome-where">{copy.linkPath}</p>
         <button type="button" class="welcome-go" bind:this={recommended}
           disabled={applying}
           onclick={() => choose('link')}
         >
-          {LINK_TITLE}
+          {copy.linkTitle}
         </button>
       </section>
 
       <section class="welcome-choice" aria-labelledby="welcome-separate">
-        <h2 id="welcome-separate">{SEPARATE_TITLE}</h2>
+        <h2 id="welcome-separate">{copy.separateTitle}</h2>
         <ul>
-          {#each SEPARATE_POINTS as point (point)}
+          {#each copy.separatePoints as point (point)}
             <li>{point}</li>
           {/each}
         </ul>
-        <p class="welcome-where">{SEPARATE_PATH}</p>
+        <p class="welcome-where">{copy.separatePath}</p>
         <button
           type="button"
           class="welcome-go welcome-quiet"
           disabled={applying}
           onclick={() => choose('isolated')}
         >
-          {SEPARATE_TITLE}
+          {copy.separateTitle}
         </button>
       </section>
     </div>
 
     {#if applying}
-      <p class="welcome-applying" role="status">{APPLYING}</p>
+      <p class="welcome-applying" role="status">{copy.applying}</p>
     {:else}
-      <p class="welcome-skip">{SKIP_NOTE}</p>
+      <p class="welcome-skip">{copy.skipNote}</p>
     {/if}
   </div>
 </main>

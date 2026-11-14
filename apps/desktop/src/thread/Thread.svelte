@@ -5,9 +5,10 @@
   // rule (stick to the bottom while the reader is there, leave them be if they
   // scrolled up).
   import type { ChatActivityMark, MessageView } from '../contract/bindings'
+  import { language } from '../i18n/language.svelte'
   import Activity from './Activity.svelte'
   import Message from './Message.svelte'
-  import { REPLYING_STATUS, THREAD_LABEL } from './copy'
+  import { threadCopy } from './copy'
   import { createMarkdownCache } from './markdown'
   import { nearBottom, nextScrollTop } from './scroll'
 
@@ -34,6 +35,9 @@
     /** What the chat is doing: the activity line under the last message follows it. */
     mark?: ChatActivityMark | null
   } = $props()
+
+  /** The thread's own words in the language the app holds (0.2.0, S3/D4). */
+  const copy = $derived(threadCopy(language.current))
 
   /** The one cache of this thread: per message id, only the growing tail renders. */
   const cache = createMarkdownCache()
@@ -108,7 +112,7 @@
   }
 </script>
 
-<section class="thread" aria-label={THREAD_LABEL} bind:this={box} onscroll={onScroll}>
+<section class="thread" aria-label={copy.threadLabel} bind:this={box} onscroll={onScroll}>
   <div class="thread-in">
     {#each rows as row (row.message.id)}
       <Message message={row.message} html={row.html} />
@@ -118,6 +122,6 @@
   {#if streaming}
     <!-- The only live region of the thread: the reply bodies stay out of it, so
          a screen reader is never made to re-read the whole answer per delta. -->
-    <p class="vh" role="status" aria-live="polite">{REPLYING_STATUS}</p>
+    <p class="vh" role="status" aria-live="polite">{copy.replying}</p>
   {/if}
 </section>

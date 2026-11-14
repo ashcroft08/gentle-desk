@@ -22,16 +22,10 @@
     ModelChipView,
   } from '../contract/bindings'
   import Icon from '../icons/Icon.svelte'
+  import { language } from '../i18n/language.svelte'
   import ContextChip from './ContextChip.svelte'
   import ModelChip from './ModelChip.svelte'
-  import {
-    DROP_HINT,
-    KEYS_HINT,
-    MESSAGE_LABEL,
-    MESSAGE_PLACEHOLDER,
-    REMOVE_IMAGE,
-    SEND_WHY_ID,
-  } from './copy'
+  import { SEND_WHY_ID, composerCopy } from './copy'
   import { watchDrops } from './drop'
   import { fittedHeight, shouldSend } from './keys'
   import SendButton from './SendButton.svelte'
@@ -61,6 +55,9 @@
     contextUsage?: ContextUsageView | null
   } = $props()
 
+  /** The composer's own words in the language the app holds (0.2.0, S3/D4). */
+  const copy = $derived(composerCopy(language.current))
+
   /** The drafts, one per chat id, kept for as long as the box is on screen. */
   let drafts = $state<Record<string, string>>({})
   /** The textarea itself, for the focus and the height measurement. */
@@ -70,7 +67,7 @@
   /** Whether files are being dragged over the window: the composer says so. */
   let dropping = $state(false)
 
-  const rule = $derived(composerStateOf(mark))
+  const rule = $derived(composerStateOf(mark, copy))
   const text = $derived(chat === null ? '' : (drafts[chat] ?? ''))
 
   /** Whether a send would do anything: a chat, an unlocked composer, real text. */
@@ -164,7 +161,7 @@
 <div class="composer-dock">
   {#if dropping}
     <!-- Where the files go while they are still in the air. -->
-    <p class="drop">{DROP_HINT}</p>
+    <p class="drop">{copy.dropHint}</p>
   {/if}
   {#if images.length > 0}
     <!-- What the chat holds before the send: the same thumbnails the sent
@@ -176,7 +173,7 @@
           <button
             class="take"
             type="button"
-            aria-label={`${REMOVE_IMAGE} ${image.name}`}
+            aria-label={`${copy.removeImage} ${image.name}`}
             onclick={() => take(image.id)}
           >
             <Icon name="x" size={12} />
@@ -189,8 +186,8 @@
     <textarea
       id="msg"
       rows="1"
-      aria-label={MESSAGE_LABEL}
-      placeholder={MESSAGE_PLACEHOLDER}
+      aria-label={copy.messageLabel}
+      placeholder={copy.messagePlaceholder}
       bind:this={box}
       value={text}
       oninput={typed}
@@ -214,7 +211,7 @@
        context chip sits beside the model pills (0.1.12, S5), and the pills take
        the right, so no blank row is left under the box. -->
   <div class="dock-bottom">
-    <p class="keys">{KEYS_HINT}</p>
+    <p class="keys">{copy.keysHint}</p>
     <ContextChip usage={contextUsage} />
     <ModelChip {chip} />
   </div>

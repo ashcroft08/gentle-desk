@@ -6,16 +6,14 @@
   // is a state, not an error the composer turns into.
   import { dispatchIntent } from '../bridge'
   import type { ModelChipView } from '../contract/bindings'
+  import { language } from '../i18n/language.svelte'
   import PillSelect from './PillSelect.svelte'
-  import {
-    LEVEL_LABEL,
-    MODEL_LABEL,
-    MODELS_EMPTY,
-    MODELS_LOADING,
-    MODELS_UNAVAILABLE,
-  } from './copy'
+  import { composerCopy } from './copy'
 
   let { chip }: { chip: ModelChipView | null } = $props()
+
+  /** The chip's own words in the language the app holds (0.2.0, D4). */
+  const copy = $derived(composerCopy(language.current))
 
   const status = $derived(chip?.status.type ?? 'Unknown')
   const models = $derived(
@@ -53,16 +51,16 @@
 {#if chip !== null}
   <div class="chip">
     {#if chip?.status.type === 'Ready' && models.length > 0}
-      <PillSelect label={MODEL_LABEL} value={current} options={models} filterable onchange={choseModel} />
+      <PillSelect label={copy.modelLabel} value={current} options={models} filterable onchange={choseModel} />
       {#if levels.length > 0}
-        <PillSelect label={LEVEL_LABEL} value={level} options={levels} faint onchange={choseLevel} />
+        <PillSelect label={copy.levelLabel} value={level} options={levels} faint onchange={choseLevel} />
       {/if}
     {:else if status === 'Loading' || status === 'Unknown'}
-      <p class="state">{MODELS_LOADING}</p>
+      <p class="state">{copy.modelsLoading}</p>
     {:else if status === 'Empty'}
-      <p class="state">{MODELS_EMPTY}</p>
+      <p class="state">{copy.modelsEmpty}</p>
     {:else if chip?.status.type === 'Failed'}
-      <p class="state" role="status">{MODELS_UNAVAILABLE} {chip.status.data}</p>
+      <p class="state" role="status">{copy.modelsUnavailable} {chip.status.data}</p>
     {/if}
   </div>
 {/if}

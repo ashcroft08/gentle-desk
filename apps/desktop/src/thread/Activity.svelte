@@ -4,12 +4,15 @@
   // turn. Three dots pulse next to the word; a screen reader skips them. Every
   // other mark draws nothing.
   import type { ChatActivityMark } from '../contract/bindings'
-  import { OPENING_STATUS, WORKING_STATUS } from './copy'
+  import { language } from '../i18n/language.svelte'
+  import { threadCopy } from './copy'
 
   let { mark = null }: { mark?: ChatActivityMark | null } = $props()
 
+  /** The line's own words in the language the app holds (0.2.0, S3/D4). */
+  const copy = $derived(threadCopy(language.current))
   const text = $derived(
-    mark === 'Opening' ? OPENING_STATUS : mark === 'Working' ? WORKING_STATUS : null,
+    mark === 'Opening' ? copy.opening : mark === 'Working' ? copy.working : null,
   )
 </script>
 
