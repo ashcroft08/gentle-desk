@@ -139,6 +139,24 @@ describe('the Updates pane', () => {
     expect(within(pane).getByRole('button', { name: CHECK_AGAIN })).toBeTruthy()
   })
 
+  it('puts the check before the two terminal actions, with no accent on it', () => {
+    // The two terminal buttons open a window that now stays open; the check is
+    // the cheap one, so it sits first and wears no accent: a hand landing on
+    // the middle of the row must not start an update.
+    const pane = draw()
+    const row = pane.querySelector('.acts') as HTMLElement
+    const names = [...row.querySelectorAll('button')].map((button) =>
+      button.textContent?.replace(/\s+/g, ' ').trim(),
+    )
+
+    expect(names).toEqual([CHECK_AGAIN, UPDATE, UPDATE_EXTENSIONS])
+    const check = within(pane).getByRole('button', { name: CHECK_AGAIN })
+    expect(check.classList.contains('accent')).toBe(false)
+    expect([...row.querySelectorAll('.accent')].map((button) => button.textContent?.trim())).toEqual([
+      UPDATE,
+    ])
+  })
+
   it('checks nothing before the app has checked, and never calls the registry', () => {
     const pane = draw(updates({ status: 'Unknown' }))
     expect(pane.querySelector('.card')).toBeNull()
