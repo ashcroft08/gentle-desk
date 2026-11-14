@@ -213,3 +213,10 @@ fragments in 12 files.
   (the maintainer's count of 16 predates the settings split), version carried by three
   files. Slice count and surfaces set from those measurements, not re-explored. Delivery
   strategy taken from L1 as `feature-branch-chain`; no separate oversized menu asked.
+- L3 (parent, 2026-11-14, native RDD assessment after T2 landed): the accumulated
+  branch 642bc29..ef7dbb2 assesses **medium** (executable change in bridge.rs; 17
+  files, 1061 lines), `reviewDue: false`, reason `under_budget` — the native review
+  boundary stays pending at 642bc29 and the slice proceeds without review until a
+  later commit reaches the budget or the maintainer asks. Tier, outcome and reason
+  recorded here per commit: 383c76e+97c958a (docs/small), b810658 (tests, covered by
+  the mutation verification), fcd18d3/ef7dbb2 (medium/under_budget, not due).
