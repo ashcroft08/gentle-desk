@@ -79,6 +79,53 @@ calendar one. Version numbers never repeat or go down (updater compares them).
   `GENTLE_SHELL_INTERACTIVE_HOST` set; it is a new surface and a child that ignores it
   must degrade to today's behaviour, never break.
 
+## 0.2.x: removing a workspace, and deleting its chats (agreed 2026-11-14)
+
+Target after the 0.2.0 language work (new UI must be born bilingual). Nothing here is
+built or started; this records the decision and the measurements so it is not
+re-argued.
+
+- The premise, corrected: chats do not live in the workspace folder. They live in pi's
+  session store (`<agent-dir>/sessions/<encoded-workspace-path>/<timestamp>_<id>.jsonl`,
+  here `C:\Users\josep\.pi\agent\sessions`), indexed by the workspace's path. So
+  removing a workspace entry cannot delete chats by itself, and deleting the folder from
+  disk would only orphan them: still on disk, unreachable from the UI.
+- Measured on the maintainer's machine (2026-11-14): 12 chats, 36 MB in total; the three
+  largest are 10.8 MB, 6.4 MB and 5.9 MB, all from ONE project; this repo's own
+  workspace holds 2 chats, 1.7 MB. A long agent session carries its tool output, so a
+  single chat can outweigh a whole workspace list. Size is therefore shown in megabytes
+  next to the count, not only a count.
+- Decision (maintainer): "si quitas un workspace, debes eliminar los chats ya que eso
+  ocupa espacio del usuario" was raised, and the agreed shape is the opt-in checkbox in
+  the removal dialog — NOT an automatic consequence. Removing a workspace only forgets
+  the bookmark; deleting its chats is a second, explicit, destructive choice with the
+  number and the size in front of the user (`[ ] Also delete those 2 chats (1.7 MB)`),
+  and the primary button becomes `Remove and delete 2 chats` only when it is checked.
+  Rationale: removing a workspace is usually temporary (another drive, another phase),
+  and chat history is the one artifact that cannot be regenerated; the app owns
+  bookmarks, not the user's conversations.
+- Dialog design (maintainer): "mejorar el diseño del modal ya que una card dentro del
+  modal no se ve bien". Anatomy: the title is the question (`Remove this workspace?` /
+  `Delete this chat?`); one consequence line in the user's words, with the scope in
+  bold (`Delete 37 chats`), never the words "chat file"; NO inner card and no boxed
+  path; the destructive button is last, red, and labelled with its scope; actions
+  right-aligned. Where a path is shown, it is plain monospaced text with the middle
+  elided (`C:\…\gentle-desk`), or behind a `Show file paths` disclosure. The workspace
+  path IS the identity and belongs in the first sentence; a chat's internal
+  `<timestamp>_<id>.jsonl` name is noise and moves to a row-menu `Copy file path`.
+- Not a check to touch config: removing a workspace that has an open chat must first
+  close that chat's child process and drop its cached session (process-per-chat,
+  sessions-cache, refresh-watcher), or the app is left with children pointing at a
+  folder no longer in the list. That teardown is the real work of the safe half and
+  needs its own spec before any code.
+- Open decisions for when it is picked up: whether a bulk delete moves the files to the
+  OS trash instead of unlinking them (reversible, and it costs a new `trash`
+  dependency, so an explicit maintainer decision), and whether the orphan case (a
+  workspace folder deleted outside the app) gets its own Settings view (`Unused chats:
+  N chats, M MB — Review`), which is where space reclamation honestly belongs.
+- Visual work goes through the gentle-design canvas before `SettingsDialog`/`dialogs`
+  change, not by hand in Svelte.
+
 ## Old roadmap (superseded by the version plan)
 
 - v1 (now 0.1.10): Appearance only, plus a Ctrl+K palette with gentle-desk's OWN actions
