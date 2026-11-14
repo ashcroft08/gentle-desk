@@ -63,6 +63,9 @@ export function viewState(overrides: Partial<ViewState_Serialize> = {}): ViewSta
       pi: { current: null, latest: null, update_available: null },
       shell: { current: null, latest: null, update_available: null },
     },
+    // Nothing asked the shell's usage sources anything yet: the pane says it is
+    // reading and asks for its one read when the section is opened.
+    usage: { status: { type: 'Unknown' }, providers: [] },
     fatal: null,
     config_notice: null,
     workspace_notice: null,

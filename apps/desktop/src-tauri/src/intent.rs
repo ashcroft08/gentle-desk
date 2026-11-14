@@ -67,6 +67,7 @@ pub fn to_intent(state: &gentle_app::AppState, intent: UiIntent) -> Option<gentl
         UiIntent::RefreshProfiles
         | UiIntent::RefreshAuth
         | UiIntent::CheckUpdates
+        | UiIntent::RefreshUsage
         | UiIntent::SetOrchestratorMode { .. } => return None,
     })
 }

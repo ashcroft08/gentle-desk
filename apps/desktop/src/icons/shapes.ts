@@ -58,6 +58,9 @@ export type IconName =
   // rows are the agents a profile routes, and its `key` for Account.
   | 'users'
   | 'key'
+  // The 0.1.12 rail's Usage entry joined them: Lucide's `gauge`, the needle and
+  // the dial's arc, for the one section about shares of a plan.
+  | 'gauge'
   // The model chip's two dropdowns (0.1.11): Lucide's `chevron-down`.
   | 'chevronDown'
   // The sidebar collapse toggle (responsive-sidebar S1): Lucide's `menu`.
@@ -121,6 +124,8 @@ export const ICON_SHAPES: Record<IconName, IconShape[]> = {
     path('m21 2-9.6 9.6'),
     path('m15.5 7.5 3 3L22 7l-3-3'),
   ],
+  // The rail's Usage entry (0.1.12): Lucide's `gauge`, the needle and the arc.
+  gauge: [path('m12 14 4-4'), path('M3.34 19a10 10 0 1 1 17.32 0')],
 }
 
 /** The six chat states a session row can mark, as the contract names them. */

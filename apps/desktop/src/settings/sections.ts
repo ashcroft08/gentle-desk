@@ -1,8 +1,8 @@
-// The Settings dialog's rail (settings-dialog L4; 0.1.12 S1-S7): the six sections
+// The Settings dialog's rail (settings-dialog L4; 0.1.12 S1-S7): the seven sections
 // as entries in a left rail, the selected entry highlighted, and that section's
 // content in the pane on the right. The order here is the order the rail draws
 // and the first one is the section the dialog opens on. Each entry's glyph
-// carries no meaning on its own - the entry's word is its name - and the six
+// carries no meaning on its own - the entry's word is its name - and the seven
 // follow the house style the settings gear set: Lucide outline geometry on one
 // 24x24 grid.
 //
@@ -22,10 +22,19 @@ import {
   PROFILES_TITLE,
   UPDATES_HINT,
   UPDATES_TITLE,
+  USAGE_HINT,
+  USAGE_TITLE,
 } from './copy'
 
-/** The six sections, as the dialog names them. */
-export type Section = 'appearance' | 'home' | 'updates' | 'profiles' | 'account' | 'about'
+/** The seven sections, as the dialog names them. */
+export type Section =
+  | 'appearance'
+  | 'home'
+  | 'updates'
+  | 'profiles'
+  | 'account'
+  | 'usage'
+  | 'about'
 
 /** One rail entry: the section it draws, its word and its glyph. */
 export interface SectionEntry {
@@ -41,6 +50,7 @@ export const SECTIONS: SectionEntry[] = [
   { id: 'updates', title: UPDATES_TITLE, icon: 'restart' },
   { id: 'profiles', title: PROFILES_TITLE, icon: 'users' },
   { id: 'account', title: ACCOUNT_TITLE, icon: 'key' },
+  { id: 'usage', title: USAGE_TITLE, icon: 'gauge' },
   { id: 'about', title: ABOUT_TITLE, icon: 'info' },
 ]
 
@@ -51,6 +61,7 @@ export const SECTION_TITLES: Record<Section, string> = {
   updates: UPDATES_TITLE,
   profiles: PROFILES_TITLE,
   account: ACCOUNT_TITLE,
+  usage: USAGE_TITLE,
   about: ABOUT_TITLE,
 }
 
@@ -67,6 +78,7 @@ export const SECTION_HINTS: Record<Section, string> = {
   updates: UPDATES_HINT,
   profiles: PROFILES_HINT,
   account: ACCOUNT_HINT,
+  usage: USAGE_HINT,
   about: ABOUT_HINT,
 }
 
@@ -77,6 +89,7 @@ export const TAB_IDS: Record<Section, string> = {
   updates: 'settings-tab-updates',
   profiles: 'settings-tab-profiles',
   account: 'settings-tab-account',
+  usage: 'settings-tab-usage',
   about: 'settings-tab-about',
 }
 

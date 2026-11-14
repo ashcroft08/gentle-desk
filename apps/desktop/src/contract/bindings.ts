@@ -1126,7 +1126,14 @@ export type TerminalActionView =
  *  to run any time, and offered without a check (nothing can say which
  *  extensions are behind).
  */
-"UpdateExtensions";
+"UpdateExtensions" | 
+/**
+ *  The shell's own install of the usage sources
+ *  (`pi install git:github.com/ashcroft08/pi-usage-sources`): the one way
+ *  the Usage pane offers to add them, EXPLICIT and in a terminal window the
+ *  user reads - never a silent install from the desk.
+ */
+"InstallUsageSources";
 
 /**
  *  The six themes the whole window can be set to (the v1 Appearance setting),
@@ -1291,6 +1298,15 @@ export type UiIntent = { type: "SendPrompt"; data: {
  */
 { type: "CheckUpdates" } | 
 /**
+ *  Read the subscription usage the shell's own sources report, and run them
+ *  if they are installed: what the Usage pane asks for when it appears and
+ *  on "Check again". This is the ONE run the pane makes, on the intent's own
+ *  thread, because a run takes seconds and the keyboard must not wait.
+ *  Nothing of it reads a chat, so no open chat can hold it back. The answer
+ *  travels back on [`ViewState::usage`].
+ */
+{ type: "RefreshUsage" } | 
+/**
  *  Choose the orchestrator mode of the chats opened from now on (0.1.12,
  *  S1, T4). Session-scoped: the mode is passed to each child through
  *  `GENTLE_PI_ORCHESTRATOR_MODE` and is never stored in the config, so a new
@@ -1351,6 +1367,161 @@ export type UpdatesView_Serialize = {
 	 *  desk cannot tell the channel, so this row never claims an update.
 	 */
 	shell: VersionRowView_Serialize,
+};
+
+/**
+ *  One named limit of a provider, with its windows. `limit_reached` is the
+ *  provider's own mark: the pane draws it beside the limit's name.
+ */
+export type UsageLimitView = UsageLimitView_Serialize | UsageLimitView_Deserialize;
+
+/**
+ *  One named limit of a provider, with its windows. `limit_reached` is the
+ *  provider's own mark: the pane draws it beside the limit's name.
+ */
+export type UsageLimitView_Deserialize = {
+	name: string,
+	limit_reached: boolean,
+	windows: UsageWindowView_Deserialize[],
+};
+
+/**
+ *  One named limit of a provider, with its windows. `limit_reached` is the
+ *  provider's own mark: the pane draws it beside the limit's name.
+ */
+export type UsageLimitView_Serialize = {
+	name: string,
+	limit_reached: boolean,
+	windows: UsageWindowView_Serialize[],
+};
+
+/**
+ *  How one provider of the usage document stands: the three statuses the
+ *  shell's own sources print. `NoData` is drawn as "no data" and never as a
+ *  zero percent, and `Failed` carries the source's own redacted reason.
+ */
+export type UsageProviderStatusView = "Ok" | "NoData" | "Failed";
+
+/**
+ *  One provider of the subscription usage view: its name, how its last read
+ *  stands, the plan when it reports one, the source's own failure reason, and
+ *  its limits.
+ */
+export type UsageProviderView = UsageProviderView_Serialize | UsageProviderView_Deserialize;
+
+/**
+ *  One provider of the subscription usage view: its name, how its last read
+ *  stands, the plan when it reports one, the source's own failure reason, and
+ *  its limits.
+ */
+export type UsageProviderView_Deserialize = {
+	provider: string,
+	status: UsageProviderStatusView,
+	plan?: string | null,
+	error?: string | null,
+	limits: UsageLimitView_Deserialize[],
+};
+
+/**
+ *  One provider of the subscription usage view: its name, how its last read
+ *  stands, the plan when it reports one, the source's own failure reason, and
+ *  its limits.
+ */
+export type UsageProviderView_Serialize = {
+	provider: string,
+	status: UsageProviderStatusView,
+	plan: string | null,
+	error: string | null,
+	limits: UsageLimitView_Serialize[],
+};
+
+/**
+ *  Where the subscription usage stands, in the four states the pane draws plus
+ *  the two waiting ones. `Installed` is the only one that carries providers.
+ */
+export type UsageStatusView = 
+/**  Not read yet. */
+{ type: "Unknown" } | 
+/**  The read is running: the pane says so quietly and never blocks. */
+{ type: "Reading" } | 
+/**  The sources are installed and answered: `providers` is what they said. */
+{ type: "Installed" } | 
+/**
+ *  The sources are not installed for this shell; the string is why (a
+ *  plain sentence, never a file name).
+ */
+{ type: "Missing"; data: string } | 
+/**
+ *  Something that had to be read could not be: the shell's settings, or the
+ *  installed sources' own folder. The string is why.
+ */
+{ type: "Unreadable"; data: string } | 
+/**
+ *  The sources ran and their answer could not be used: a run that failed, a
+ *  document of another shape. The string is why.
+ */
+{ type: "Failed"; data: string };
+
+/**
+ *  The Usage pane's slice (settings-0.1.12 S6's deferred half): the
+ *  subscription usage the shell's own sources report, read-only and never
+ *  written. Nothing here touches a chat.
+ */
+export type UsageView = UsageView_Serialize | UsageView_Deserialize;
+
+/**
+ *  The Usage pane's slice (settings-0.1.12 S6's deferred half): the
+ *  subscription usage the shell's own sources report, read-only and never
+ *  written. Nothing here touches a chat.
+ */
+export type UsageView_Deserialize = {
+	status: UsageStatusView,
+	providers: UsageProviderView_Deserialize[],
+};
+
+/**
+ *  The Usage pane's slice (settings-0.1.12 S6's deferred half): the
+ *  subscription usage the shell's own sources report, read-only and never
+ *  written. Nothing here touches a chat.
+ */
+export type UsageView_Serialize = {
+	status: UsageStatusView,
+	providers: UsageProviderView_Serialize[],
+};
+
+/**
+ *  One usage window: its label as the provider names it ("5h", "week"), the
+ *  share of it used, and the countdown to its reset when the provider reports
+ *  one. `resets_in` is already a phrase ("resets in 4h", "resets now"), built
+ *  by [`gentle_runtime::usage::reset_label`]: `None` is a provider that reports
+ *  no reset time, never a countdown into the past.
+ */
+export type UsageWindowView = UsageWindowView_Serialize | UsageWindowView_Deserialize;
+
+/**
+ *  One usage window: its label as the provider names it ("5h", "week"), the
+ *  share of it used, and the countdown to its reset when the provider reports
+ *  one. `resets_in` is already a phrase ("resets in 4h", "resets now"), built
+ *  by [`gentle_runtime::usage::reset_label`]: `None` is a provider that reports
+ *  no reset time, never a countdown into the past.
+ */
+export type UsageWindowView_Deserialize = {
+	label: string,
+	used_percent: number | null,
+	resets_in?: string | null,
+};
+
+/**
+ *  One usage window: its label as the provider names it ("5h", "week"), the
+ *  share of it used, and the countdown to its reset when the provider reports
+ *  one. `resets_in` is already a phrase ("resets in 4h", "resets now"), built
+ *  by [`gentle_runtime::usage::reset_label`]: `None` is a provider that reports
+ *  no reset time, never a countdown into the past.
+ */
+export type UsageWindowView_Serialize = {
+	label: string,
+	used_percent: number | null,
+	resets_in: string | null,
 };
 
 /**
@@ -1560,6 +1731,11 @@ export type ViewState_Deserialize = {
 	 */
 	updates: UpdatesView_Deserialize,
 	/**
+	 *  The subscription usage the shell's own sources report, read when the
+	 *  Usage section is opened and never from a chat.
+	 */
+	usage: UsageView_Deserialize,
+	/**
 	 *  Why the last workspace action was refused, as one line of plain text: a
 	 *  name Windows would not accept, a folder that is not there, a folder that
 	 *  already holds files (Q6). `None` when nothing was refused, and cleared by
@@ -1752,6 +1928,11 @@ export type ViewState_Serialize = {
 	 *  S2, S7). Checked once when the app opens.
 	 */
 	updates: UpdatesView_Serialize,
+	/**
+	 *  The subscription usage the shell's own sources report, read when the
+	 *  Usage section is opened and never from a chat.
+	 */
+	usage: UsageView_Serialize,
 	/**
 	 *  Why the last workspace action was refused, as one line of plain text: a
 	 *  name Windows would not accept, a folder that is not there, a folder that

@@ -233,6 +233,13 @@ pub enum UiIntent {
     /// runs once when it opens. It only ever CHECKS: no update is installed
     /// from here. The answer travels back on [`ViewState::updates`].
     CheckUpdates,
+    /// Read the subscription usage the shell's own sources report, and run them
+    /// if they are installed: what the Usage pane asks for when it appears and
+    /// on "Check again". This is the ONE run the pane makes, on the intent's own
+    /// thread, because a run takes seconds and the keyboard must not wait.
+    /// Nothing of it reads a chat, so no open chat can hold it back. The answer
+    /// travels back on [`ViewState::usage`].
+    RefreshUsage,
     /// Choose the orchestrator mode of the chats opened from now on (0.1.12,
     /// S1, T4). Session-scoped: the mode is passed to each child through
     /// `GENTLE_PI_ORCHESTRATOR_MODE` and is never stored in the config, so a new
@@ -372,6 +379,11 @@ pub enum TerminalActionView {
     /// to run any time, and offered without a check (nothing can say which
     /// extensions are behind).
     UpdateExtensions,
+    /// The shell's own install of the usage sources
+    /// (`pi install git:github.com/ashcroft08/pi-usage-sources`): the one way
+    /// the Usage pane offers to add them, EXPLICIT and in a terminal window the
+    /// user reads - never a silent install from the desk.
+    InstallUsageSources,
 }
 
 /// How one provider's `auth check` stands: the four states the shell reports.
@@ -456,6 +468,81 @@ pub struct UpdatesView {
     /// gentle-shell. Its channel decides where a newer version lives and the
     /// desk cannot tell the channel, so this row never claims an update.
     pub shell: VersionRowView,
+}
+
+/// How one provider of the usage document stands: the three statuses the
+/// shell's own sources print. `NoData` is drawn as "no data" and never as a
+/// zero percent, and `Failed` carries the source's own redacted reason.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub enum UsageProviderStatusView {
+    Ok,
+    NoData,
+    Failed,
+}
+
+/// One usage window: its label as the provider names it ("5h", "week"), the
+/// share of it used, and the countdown to its reset when the provider reports
+/// one. `resets_in` is already a phrase ("resets in 4h", "resets now"), built
+/// by [`gentle_runtime::usage::reset_label`]: `None` is a provider that reports
+/// no reset time, never a countdown into the past.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+pub struct UsageWindowView {
+    pub label: String,
+    pub used_percent: f64,
+    pub resets_in: Option<String>,
+}
+
+/// One named limit of a provider, with its windows. `limit_reached` is the
+/// provider's own mark: the pane draws it beside the limit's name.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+pub struct UsageLimitView {
+    pub name: String,
+    pub limit_reached: bool,
+    pub windows: Vec<UsageWindowView>,
+}
+
+/// One provider of the subscription usage view: its name, how its last read
+/// stands, the plan when it reports one, the source's own failure reason, and
+/// its limits.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+pub struct UsageProviderView {
+    pub provider: String,
+    pub status: UsageProviderStatusView,
+    pub plan: Option<String>,
+    pub error: Option<String>,
+    pub limits: Vec<UsageLimitView>,
+}
+
+/// Where the subscription usage stands, in the four states the pane draws plus
+/// the two waiting ones. `Installed` is the only one that carries providers.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(tag = "type", content = "data")]
+pub enum UsageStatusView {
+    /// Not read yet.
+    #[default]
+    Unknown,
+    /// The read is running: the pane says so quietly and never blocks.
+    Reading,
+    /// The sources are installed and answered: `providers` is what they said.
+    Installed,
+    /// The sources are not installed for this shell; the string is why (a
+    /// plain sentence, never a file name).
+    Missing(String),
+    /// Something that had to be read could not be: the shell's settings, or the
+    /// installed sources' own folder. The string is why.
+    Unreadable(String),
+    /// The sources ran and their answer could not be used: a run that failed, a
+    /// document of another shape. The string is why.
+    Failed(String),
+}
+
+/// The Usage pane's slice (settings-0.1.12 S6's deferred half): the
+/// subscription usage the shell's own sources report, read-only and never
+/// written. Nothing here touches a chat.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, Type)]
+pub struct UsageView {
+    pub status: UsageStatusView,
+    pub providers: Vec<UsageProviderView>,
 }
 
 /// How full the foreground chat's context is (0.1.12, S5): pi's own
@@ -939,6 +1026,9 @@ pub struct ViewState {
     /// The versions this machine runs and the newer ones published (0.1.12,
     /// S2, S7). Checked once when the app opens.
     pub updates: UpdatesView,
+    /// The subscription usage the shell's own sources report, read when the
+    /// Usage section is opened and never from a chat.
+    pub usage: UsageView,
     /// Why the last workspace action was refused, as one line of plain text: a
     /// name Windows would not accept, a folder that is not there, a folder that
     /// already holds files (Q6). `None` when nothing was refused, and cleared by

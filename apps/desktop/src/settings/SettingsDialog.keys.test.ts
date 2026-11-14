@@ -39,6 +39,7 @@ describe('the Settings dialog keys', () => {
       '-1',
       '-1',
       '-1',
+      '-1',
     ])
 
     await fireEvent.keyDown(within(dialog).getByRole('tab', { name: APPEARANCE }), {

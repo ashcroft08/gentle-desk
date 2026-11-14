@@ -1,8 +1,8 @@
-// The Settings dialog (settings-dialog S2-S6, L4; 0.1.12 S1-S7): a rail of six
-// sections on the left and the selected section's content in the pane on the
-// right - the two controls that left the footer (the theme picker and the home
-// setting), the Updates, Profiles and Account panes (0.1.12) and About: the
-// app's name and the version this run runs as.
+// The Settings dialog (settings-dialog S2-S6, L4; 0.1.12 S1-S7): a rail of
+// seven sections on the left and the selected section's content in the pane on
+// the right - the two controls that left the footer (the theme picker and the
+// home setting), the Updates, Profiles and Account panes (0.1.12), Usage and
+// About: the app's name and the version this run runs as.
 // Its closing keys, its focus and the keyboard walk of the rail are
 // SettingsDialog.keys.test.ts's; this file is about what the pane draws.
 import '../test-support/dom-env'
@@ -21,14 +21,16 @@ const HOME = 'Shell home'
 const UPDATES = 'Updates'
 const PROFILES = 'Profiles'
 const ACCOUNT = 'Account'
+const USAGE = 'Usage'
 const ABOUT = 'About'
-/** The rail's six entries, in the order the dialog draws them (0.1.12). */
-const RAIL = [APPEARANCE, HOME, UPDATES, PROFILES, ACCOUNT, ABOUT]
+/** The rail's seven entries, in the order the dialog draws them (0.1.12). */
+const RAIL = [APPEARANCE, HOME, UPDATES, PROFILES, ACCOUNT, USAGE, ABOUT]
 const APPEARANCE_HINT = 'The look of this window.'
 const HOME_HINT = 'Which pi this shell runs on.'
 const UPDATES_HINT = 'What this machine runs, and whether something newer is out.'
 const PROFILES_HINT = 'Your agent profiles, as the terminal keeps them.'
 const ACCOUNT_HINT = 'Which providers are signed in, and where to sign in or out.'
+const USAGE_HINT = "What each subscription has used, as the shell's own sources report it."
 const ABOUT_HINT = 'Which build this is.'
 /** The generic line the stacked dialog drew under its title: it is gone now. */
 const OLD_HINT = 'The look of this window, and the home gentle shell runs on.'
@@ -48,14 +50,14 @@ beforeEach(() => {
 })
 
 describe('the Settings dialog', () => {
-  it('opens from the footer gear with the six sections in its rail and Appearance first', async () => {
+  it('opens from the footer gear with the seven sections in its rail and Appearance first', async () => {
     const dialog = await openSettings()
 
     expect(within(dialog).getByRole('heading', { level: 2, name: TITLE })).toBeTruthy()
     expect(rail(dialog).map((entry) => entry.textContent?.trim())).toEqual(RAIL)
     expect(
       rail(dialog).map((entry) => entry.getAttribute('aria-selected')),
-    ).toEqual(['true', 'false', 'false', 'false', 'false', 'false'])
+    ).toEqual(['true', 'false', 'false', 'false', 'false', 'false', 'false'])
     expect(within(dialog).getAllByRole('tabpanel')).toHaveLength(1)
     expect(within(dialog).getByRole('tabpanel', { name: APPEARANCE })).toBeTruthy()
   })
@@ -71,6 +73,7 @@ describe('the Settings dialog', () => {
       [UPDATES, UPDATES_HINT],
       [PROFILES, PROFILES_HINT],
       [ACCOUNT, ACCOUNT_HINT],
+      [USAGE, USAGE_HINT],
       [ABOUT, ABOUT_HINT],
     ]) {
       await pick(dialog, name)
@@ -166,6 +169,46 @@ describe('the Settings dialog', () => {
     await pick(dialog, ABOUT)
 
     expect(within(pane(dialog)).getByText(VERSION_UNKNOWN)).toBeTruthy()
+  })
+
+  it('draws the pushed usage, which no open chat can hold back', async () => {
+    const dialog = await openSettings({}, VERSION, {
+      // Chats open: the Updates pane's gate counts them, the Usage pane's read
+      // reads nothing from a chat and must not care.
+      open_chats: 2,
+      usage: {
+        status: { type: 'Installed' },
+        providers: [
+          { provider: 'opencode-go', status: 'NoData', plan: null, error: null, limits: [] },
+          {
+            provider: 'commandcode',
+            status: 'Ok',
+            plan: 'individual goat',
+            error: null,
+            limits: [
+              {
+                name: 'command code',
+                limit_reached: false,
+                windows: [{ label: '5h', used_percent: 4.7, resets_in: 'resets in 2h' }],
+              },
+            ],
+          },
+        ],
+      },
+    })
+
+    await pick(dialog, USAGE)
+    const usage = pane(dialog)
+
+    expect(usage.textContent).toContain('opencode-go')
+    expect(usage.textContent).toContain('Plan: individual goat')
+    expect(usage.textContent).toContain('5%')
+    expect(usage.textContent).toContain('resets in 2h')
+    // No gate: its one button is alive with two chats open, and no chat line is
+    // drawn here.
+    const again = within(usage).getByRole('button', { name: 'Check again' })
+    expect((again as HTMLButtonElement).disabled).toBe(false)
+    expect(usage.textContent).not.toContain('chats are open')
   })
 
   it('draws the pushed update check, with Update dead while a chat is open', async () => {

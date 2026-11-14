@@ -3,11 +3,12 @@
 //! pieces this machine runs have newer versions published.
 //!
 //! Every read is a SEAM of its own - a file reader, a per-provider check, a
-//! version probe and one GET - so the bridge can be driven windowless and no
-//! test of it reaches the network, a launcher or the user's own files. The rules
-//! those seams feed are pure and live in `gentle_runtime` (`profiles`, `auth`,
-//! `updates`); this module only turns their answers into the contract's views
-//! and supplies the real implementations.
+//! version probe, one GET and one run of the usage sources' script - so the
+//! bridge can be driven windowless and no test of it reaches the network, a
+//! launcher or the user's own files. The rules those seams feed are pure and
+//! live in `gentle_runtime` (`profiles`, `auth`, `updates`, `usage`); this
+//! module only turns their answers into the contract's views and supplies the
+//! real implementations.
 //!
 //! Nothing here writes anything: gentle-desk reads gentle-pi's files and never
 //! edits them, which is the standing decision of the settings roadmap.
@@ -25,12 +26,14 @@ mod auth;
 mod paths;
 mod profiles;
 mod updates;
+mod usage;
 mod web;
 
 pub use auth::view as auth_view;
 pub use paths::SettingsPaths;
 pub use profiles::view as profiles_view;
 pub use updates::{view as updates_view, PI_REGISTRY};
+pub use usage::view as usage_view;
 
 /// Reads one file of the machine. `Ok(None)` is a file that is not there - an
 /// auth store nobody has written yet is not a failure - and `Err` is a file that
@@ -78,6 +81,10 @@ pub struct SettingsSeams {
     pub versions: VersionProbe,
     /// The release manifest and the registry, one GET each.
     pub web: WebGet,
+    /// One run of the usage sources' own script (`node usage-json.ts`), which
+    /// prints the subscription usage as one document. A run that cannot start,
+    /// exits non-zero or outruns its budget is the `Err`.
+    pub node: NodeProbe,
 }
 
 impl SettingsSeams {
@@ -92,6 +99,7 @@ impl SettingsSeams {
             probe: provider_probe(Arc::clone(&home_args)),
             versions: version_probe(home_args),
             web: web_get(),
+            node: usage::node_probe(),
         }
     }
 }
@@ -138,6 +146,12 @@ pub fn provider_args(home_args: &[OsString], provider: &str) -> Vec<OsString> {
     }
     args
 }
+
+/// Runs the usage sources' own headless script with `node`, answering the one
+/// document line it prints. A run that could not start, exit or finish inside
+/// the budget is the `Err`, which the pane draws as the reason it could not read
+/// the usage.
+pub type NodeProbe = Arc<dyn Fn(&std::path::Path) -> Result<String, String> + Send + Sync>;
 
 /// The real version probe: `gentle-shell --version`, which prints the shell's
 /// version and the version of the pi it runs, with the same home flags.

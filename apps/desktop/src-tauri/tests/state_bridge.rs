@@ -10,7 +10,7 @@ use gentle_app::{ChatId, Input, Intent};
 use gentle_desk_lib::bridge::AppStateHolder;
 use gentle_desk_lib::contract::{
     AuthView, ContextUsageView, InstallView, ListStatusView, ModelChipView, ModelListStatusView,
-    NoticeLevel, ProfilesView, ShellView, ThemeView, UiIntent, UpdatesView, ViewState,
+    NoticeLevel, ProfilesView, ShellView, ThemeView, UiIntent, UpdatesView, UsageView, ViewState,
 };
 
 #[test]
@@ -127,6 +127,9 @@ fn the_view_state_slice_has_no_invented_fields() {
             profiles: ProfilesView::default(),
             auth: AuthView::default(),
             updates: UpdatesView::default(),
+            // Nothing asked the shell's usage sources anything yet, so the
+            // Usage pane has no reading and draws its quiet line.
+            usage: UsageView::default(),
             config_notice: None,
             // The shell-owned line a refused workspace action sets: nothing was
             // refused here, so it carries nothing.
