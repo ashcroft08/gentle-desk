@@ -14,13 +14,14 @@
 //! version this run runs as, and the notes it follows (`bridge::whats_new`).
 
 use gentle_app::{AppState, ModelsStatus};
+use gentle_core::i18n::Language;
 use gentle_runtime::app_config::Theme;
 use gentle_runtime::badge::{Badge, BadgeMark};
 
 use crate::contract::{
-    AuthView, ChatActivityMark, ChatActivityView, ContextUsageView, ImageView, ModelChipView,
-    ModelChoiceView, ModelListStatusView, NoticeActionView, NoticeLevel, NoticeView, ProfilesView,
-    ShellView, ThemeView, UpdatesView, UsageView, ViewState, WhatsNewView,
+    AuthView, ChatActivityMark, ChatActivityView, ContextUsageView, ImageView, LanguageView,
+    ModelChipView, ModelChoiceView, ModelListStatusView, NoticeActionView, NoticeLevel, NoticeView,
+    ProfilesView, ShellView, ThemeView, UpdatesView, UsageView, ViewState, WhatsNewView,
 };
 use crate::images::Images;
 use crate::{dialogs, helper_thread, helpers, sessions, view};
@@ -49,6 +50,10 @@ pub struct ShellParts<'a> {
     pub fatal: Option<String>,
     /// The theme this run holds, as the app config remembers it.
     pub theme: Theme,
+    /// The language this run holds, as the app config remembers it: `None` while
+    /// no preference is stored, which is when the web side starts from the
+    /// system's own locale.
+    pub language: Option<Language>,
     /// The shell and home this run sees.
     pub shell: ShellView,
     /// The agent profiles read for the Profiles pane (0.1.12, T2), and the mode
@@ -77,6 +82,7 @@ pub fn view_state(state: &AppState, sessions_revision: u32, shell: ShellParts<'_
         app_version,
         fatal,
         theme,
+        language,
         shell,
         profiles,
         auth,
@@ -91,6 +97,7 @@ pub fn view_state(state: &AppState, sessions_revision: u32, shell: ShellParts<'_
         .map(|chat| chat.as_str().to_owned());
     ViewState {
         theme: view_theme(theme),
+        language: view_language(language),
         shell,
         foreground_chat: foreground.clone(),
         foreground_title: state
@@ -201,6 +208,17 @@ fn view_theme(theme: Theme) -> ThemeView {
         Theme::GentlemanSexy => ThemeView::GentlemanSexy,
         Theme::Light => ThemeView::Light,
     }
+}
+
+/// The language as the contract names it: the two tags are the ones the config
+/// stores and the web's dictionaries are keyed by, so the value never travels as
+/// a string that could drift from them. `None` while no preference is stored,
+/// which is what the web side paints the system's own locale for.
+fn view_language(language: Option<Language>) -> Option<LanguageView> {
+    language.map(|language| match language {
+        Language::En => LanguageView::En,
+        Language::Es => LanguageView::Es,
+    })
 }
 
 /// The marks of the chats with something to show, in id order. The rule that

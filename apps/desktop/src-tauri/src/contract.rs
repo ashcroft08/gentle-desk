@@ -62,6 +62,18 @@ pub enum ThemeView {
     Light,
 }
 
+/// The two languages the app's own words can be written in (0.2.0, S4), named
+/// exactly as the config file stores them and as the web's dictionaries are
+/// keyed: one spelling for the stored value, the contract and the copy module,
+/// so no side translates a language's own name.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub enum LanguageView {
+    #[serde(rename = "en")]
+    En,
+    #[serde(rename = "es")]
+    Es,
+}
+
 /// The two homes the welcome screen offers for `gentle-shell` (shell-choice S2),
 /// spelled the way the app config stores them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
@@ -932,6 +944,12 @@ pub struct ViewState {
     /// it ([`ThemeView`]): the page paints its `data-theme` from it, and the
     /// window's own chrome follows it. `System` until the user chooses.
     pub theme: ThemeView,
+    /// The language the app's own words are written in, as the app config
+    /// remembers it ([`LanguageView`]): `null` while no preference is stored,
+    /// which is when the web side starts from the system's own locale, and the
+    /// `"en"`/`"es"` tag once one is. Like the theme, the change is pushed
+    /// through the same re-emit, so switching needs no restart.
+    pub language: Option<LanguageView>,
     /// The shell and home this run sees (shell-choice).
     pub shell: ShellView,
     pub foreground_chat: Option<String>,

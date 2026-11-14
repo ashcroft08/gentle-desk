@@ -543,6 +543,14 @@ export type InstallView = { type: "Idle" } | { type: "Running" } | { type: "Done
 } };
 
 /**
+ *  The two languages the app's own words can be written in (0.2.0, S4), named
+ *  exactly as the config file stores them and as the web's dictionaries are
+ *  keyed: one spelling for the stored value, the contract and the copy module,
+ *  so no side translates a language's own name.
+ */
+export type LanguageView = "en" | "es";
+
+/**
  *  How complete the session list is, matching `gentle_app::ListStatus` one to
  *  one. `Loading` carries how far the first pass got, so the sidebar can say it
  *  is still reading; only `Complete` lets an empty list call itself empty.
@@ -1598,6 +1606,14 @@ export type ViewState_Deserialize = {
 	 *  window's own chrome follows it. `System` until the user chooses.
 	 */
 	theme: ThemeView,
+	/**
+	 *  The language the app's own words are written in, as the app config
+	 *  remembers it ([`LanguageView`]): `null` while no preference is stored,
+	 *  which is when the web side starts from the system's own locale, and the
+	 *  `"en"`/`"es"` tag once one is. Like the theme, the change is pushed
+	 *  through the same re-emit, so switching needs no restart.
+	 */
+	language?: LanguageView | null,
 	/**  The shell and home this run sees (shell-choice). */
 	shell: ShellView_Deserialize,
 	foreground_chat?: string | null,
@@ -1796,6 +1812,14 @@ export type ViewState_Serialize = {
 	 *  window's own chrome follows it. `System` until the user chooses.
 	 */
 	theme: ThemeView,
+	/**
+	 *  The language the app's own words are written in, as the app config
+	 *  remembers it ([`LanguageView`]): `null` while no preference is stored,
+	 *  which is when the web side starts from the system's own locale, and the
+	 *  `"en"`/`"es"` tag once one is. Like the theme, the change is pushed
+	 *  through the same re-emit, so switching needs no restart.
+	 */
+	language: LanguageView | null,
 	/**  The shell and home this run sees (shell-choice). */
 	shell: ShellView_Serialize,
 	foreground_chat: string | null,

@@ -77,6 +77,9 @@ fn the_view_state_slice_has_no_invented_fields() {
         ViewState {
             // A run that chose no theme follows the reader's own setting.
             theme: ThemeView::System,
+            // No language was chosen yet, so the web side starts from the
+            // system's own locale.
+            language: None,
             // No pi found, nothing chosen, so nothing is asked.
             shell: ShellView {
                 pi_path: None,

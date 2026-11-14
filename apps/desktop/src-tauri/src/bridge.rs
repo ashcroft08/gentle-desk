@@ -25,6 +25,7 @@ use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use gentle_app::{Command, SessionItem};
+use gentle_core::i18n::Language;
 use gentle_runtime::app_config::{self, folder_key};
 use gentle_runtime::clock::now_ms;
 
@@ -292,6 +293,7 @@ impl AppStateHolder {
             app_version: self.app_version(),
             fatal: self.fatal(),
             theme: self.theme_value(),
+            language: self.language_value(),
             shell: self.shell_view(),
             profiles: self.profiles(),
             auth: self.auth(),
@@ -332,6 +334,14 @@ impl AppStateHolder {
     /// lock is taken, as the config notice is.
     fn theme_value(&self) -> app_config::Theme {
         self.config_snapshot().config.theme
+    }
+
+    /// The language this run holds, taken off the config lock before any state
+    /// lock is taken, as the theme is. `None` while no preference is stored: this
+    /// never detects the system language, and it never writes one, so a load
+    /// leaves the file exactly as it found it.
+    fn language_value(&self) -> Option<Language> {
+        self.config_snapshot().config.language
     }
 
     /// The flattened tree of the revision the state is at: built once per
