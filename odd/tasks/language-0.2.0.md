@@ -33,9 +33,12 @@ fragments in 12 files.
   the config and the view state.
 - D2: The config field is additive and optional (`language: Option<Language>`, serde
   default, `skip_serializing_if = "Option::is_none"` in `DocumentRef`, CONFIG_VERSION
-  stays 1). Effective language = the stored value, else the OS locale detected once and
-  persisted on the next normal config write, so a later OS language change does not
-  override a stored preference.
+  stays 1), and a stored value that does not parse reads as `None` instead of breaking
+  boot. The OS locale is read with no new dependency: while the stored value is absent
+  the contract carries `language: null` and the web paints from `navigator.language`
+  with the same rule, then reports it once (T3) and Rust persists it through the normal
+  config write. A stored preference always wins over a later OS language change; that is
+  what makes the choice stable, and it is why Rust never re-detects on every start.
 - D3: Projection mirrors the theme exactly: config.json → `store::load` →
   `ShellParts.language` (apps/desktop/src-tauri/src/state_view.rs:34) →
   `ViewState.language` (contract.rs:930) → bindings. Instant apply reuses the same
@@ -56,26 +59,39 @@ fragments in 12 files.
 
 ## Tasks
 
-- [ ] T1 (S1) gentle-core: `Language`, `detect_from_locale` and `as_str`/`parse` in
+- [x] T1 (S1) gentle-core: `Language`, `detect_from_locale` and `as_str`/`parse` in
       crates/gentle-core/src/i18n/ + module wiring in lib.rs; no OS read and no new
       dependency here. Tests pin es-ES/es-419/es-MX/es-AR/es_AR/ES-ar → Es,
       en-US/de/fr/empty/whitespace/"e" → En, the as_str/parse round trip and the serde
-      form "en"/"es". Route: writer. Commit: pending.
-- [ ] T2 (S1, S4) config and projection: `language` field in
+      form "en"/"es". Route: writer. Commit 383c76e (RED E0432 unresolved import;
+      GREEN 128 passed / 0 failed, clippy and fmt clean).
+- [x] T2 (S1, S4) config and projection: `language` field in
       crates/runtime/src/app_config/{config.rs,store.rs} (serde default, DocumentRef
-      mirror) with detect-and-persist on first load; `ShellParts.language` →
-      `ViewState.language` in apps/desktop/src-tauri/src/{state_view.rs,contract.rs};
-      bindings regenerated through GENTLE_DESK_REGEN_BINDINGS. Tests: config round-trip
-      and missing-field default, stored value wins over the locale, projection carries
-      "en"/"es". Route: writer. Commit: pending.
+      mirror, an unparsable stored value reading as `None`) and `ShellParts.language` →
+      `ViewState.language` (`Option<Language>` as `"en"`/`"es"`/`null`) in
+      apps/desktop/src-tauri/src/{state_view.rs,contract.rs,bridge.rs}; bindings
+      regenerated through GENTLE_DESK_REGEN_BINDINGS. Load never writes. Tests: config
+      round-trip, missing and malformed field → None, the projection carrying
+      null/"en"/"es", the wire key's PRESENCE (`.get`, not indexing — serde_json's
+      Index answers Null for a missing key too), the literal variant per input (no
+      tautological mapping), an unrelated save keeping the stored language, and the
+      byte-identity of the document an unset preference writes. Two mutation rounds
+      proved the pins bite (skip_serializing_if on ViewState.language → 2 failed;
+      view_language variant swap → 3 failed; both reverted, grep-verified clean).
+      Route: writer. Commit fcd18d3 (RED E0609/E0432; GREEN 254 runtime + 361 tauri,
+      clippy/fmt/drift guard clean). Web side followed the bindings: the full-fixture
+      test-support/view-state.ts gained `language: null` (500 vitest, svelte-check 0).
 - [ ] T3 (S2, S4) walking skeleton, end to end: web i18n core
       (apps/desktop/src/i18n/language.svelte.ts: reactive language from the view state,
-      `navigator.language` es* fallback until the first state arrives, set-language
-      dispatch) + Settings → Language section (settings/sections.ts Sections :30,
-      SECTIONS :47-55, titles :58, hints :75, TAB_IDS :86, PANEL_ID :97;
+      `navigator.language` es* fallback while the state carries null, the one-shot boot
+      report, set-language dispatch) + Settings → Language section (settings/sections.ts
+      Section :30, SECTIONS :47-55, titles :58, hints :75, TAB_IDS :86, PANEL_ID :97;
       SettingsDialog.svelte:108,136-149; settings/copy.ts:18-33) + the Rust write path
-      that re-emits the state. Section titles and hints of the dialog move to the
-      catalog here, so the switch is visibly instant. Tests: vitest flip → new labels
+      (intent → store save → re-emitted state). Section titles and hints of the dialog
+      move to the catalog here, so the switch is visibly instant. T2 left off here: the
+      write path needs `AppConfig::set_language` (mirroring `set_theme`'s
+      changed-bool), the intent+command, `bridge/language.rs` beside `bridge/theme.rs`,
+      the command registration, and the web dispatch. Tests: vitest flip → new labels
       in the same tick; Rust test that a write re-projects. Route: writer. Commit:
       pending.
 - [ ] T4 (S3) Rust catalog: the ~62 fragments in crates/runtime/src/app_config/{status,
