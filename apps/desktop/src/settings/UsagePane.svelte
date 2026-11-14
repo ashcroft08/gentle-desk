@@ -84,6 +84,10 @@
   {#if pane.providers.length === 0}
     <p class="quiet">{NO_PROVIDERS}</p>
   {:else}
+    <!-- A bounded list: the pane must not grow the dialog with every provider a
+         machine happens to have logged in, so the cards scroll inside it and
+         the button under them stays where it is. -->
+    <div class="ucards">
     {#each pane.providers as provider (provider.provider)}
       <div class="card usage-provider">
         <div class="head">
@@ -129,6 +133,7 @@
         {/if}
       </div>
     {/each}
+    </div>
   {/if}
 
   <div class="acts">

@@ -61,13 +61,45 @@ export function paneOf(usage: UsageView | null): UsagePaneState {
   if (usage === null) return { kind: 'reading' }
   const status = usage.status
   if (status.type === 'Installed') {
-    return { kind: 'installed', providers: usage.providers.map(providerRow) }
+    return { kind: 'installed', providers: worthDrawing(usage.providers.map(providerRow)) }
   }
   if (status.type === 'Missing') return { kind: 'missing' }
   if (status.type === 'Unreadable') return { kind: 'unreadable', reason: status.data }
   if (status.type === 'Failed') return { kind: 'failed', reason: status.data }
   // `Unknown` and `Reading` are both "nothing to draw yet".
   return { kind: 'reading' }
+}
+
+/** The highest percentage a provider reported, which is how the cards sort. */
+function peakOf(provider: UsageProviderRow): number {
+  return provider.limits.reduce(
+    (peak, limit) => Math.max(peak, ...limit.windows.map((window) => window.percent)),
+    0,
+  )
+}
+
+/**
+ * What the pane actually draws: the providers that HAVE a reading.
+ *
+ * The shell's own panel lists a provider only once its source answered with
+ * numbers, so a provider that answered "no data" (a machine without that
+ * provider's credentials) is not drawn at all here either - the maintainer saw
+ * the pane list providers he has never signed in to, which is noise, not
+ * information. A provider that FAILED stays, with its reason: that one is worth
+ * reading, because it explains missing numbers. The cards then sort by what is
+ * actually being spent, so the reading that matters is the first one: peak
+ * usage first, then the quiet ones, then failures.
+ */
+export function worthDrawing(providers: UsageProviderRow[]): UsageProviderRow[] {
+  return providers
+    .filter((provider) => provider.status !== 'NoData')
+    .sort((left, right) => {
+      const failed = Number(left.status === 'Failed') - Number(right.status === 'Failed')
+      if (failed !== 0) return failed
+      const peak = peakOf(right) - peakOf(left)
+      if (peak !== 0) return peak
+      return left.provider.localeCompare(right.provider)
+    })
 }
 
 /** One provider and its limits. */

@@ -1860,6 +1860,17 @@ p {
    chip's language (a small bar and the rounded share) worn at card size, so the
    two places that report a percentage read the same: quiet until 75%, the
    warning token from there, the danger token from 95%. */
+.settings-pane .ucards {
+  /* Bounded on purpose: a machine can have several providers logged in, and the
+     pane must not push its own button off the dialog. The cards scroll here. */
+  max-height: min(46vh, 420px);
+  overflow-y: auto;
+  padding-right: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 .settings-pane .card.usage-provider {
   width: 100%;
   box-sizing: border-box;

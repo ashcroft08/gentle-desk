@@ -20,7 +20,6 @@ import {
   INSTALL,
   LIMIT_REACHED,
   MISSING,
-  NO_DATA,
   NO_PROVIDERS,
   READING,
 } from './usage-copy'
@@ -93,14 +92,16 @@ describe('the Usage pane', () => {
   it('draws each provider with its plan and one gauge row per window', () => {
     const pane = draw()
 
+    // Only the providers with a reading are drawn (the fixture's opencode-go
+    // answered no data, as a machine without that credential does), and the one
+    // spending most comes first.
     const cards = [...pane.querySelectorAll('.usage-provider')]
     expect(cards.map((card) => card.querySelector('.uname')?.textContent)).toEqual([
-      'opencode-go',
       'commandcode',
     ])
-    expect(cards[1].textContent).toContain('Plan: individual goat')
+    expect(cards[0].textContent).toContain('Plan: individual goat')
 
-    const rows = [...cards[1].querySelectorAll('.uwindow')]
+    const rows = [...cards[0].querySelectorAll('.uwindow')]
     expect(rows.map((row) => row.querySelector('.ulabel')?.textContent)).toEqual([
       '5h',
       'week',
@@ -114,16 +115,18 @@ describe('the Usage pane', () => {
       (rows[1].querySelector('.ubar i') as HTMLElement).style.width,
     ).toBe('88%')
     // The provider's own mark reaches the row.
-    expect(cards[1].querySelector('.tag')?.textContent).toBe(LIMIT_REACHED)
+    expect(cards[0].querySelector('.tag')?.textContent).toBe(LIMIT_REACHED)
   })
 
-  it('draws a provider with no credentials as no data, never as 0%', () => {
+  it('does not list a provider with no credentials, and never draws it as 0%', () => {
     const pane = draw()
 
-    const card = pane.querySelector('.usage-provider') as HTMLElement
-    expect(card.textContent).toContain(NO_DATA)
-    expect(card.querySelector('.upercent')).toBeNull()
-    expect(card.querySelector('.ubar')).toBeNull()
+    const names = [...pane.querySelectorAll('.uname')].map((name) => name.textContent)
+    expect(names).not.toContain('opencode-go')
+    // And no drawn card turns a missing reading into a zero.
+    for (const percent of pane.querySelectorAll('.upercent')) {
+      expect(percent.textContent).not.toBe('0%')
+    }
   })
 
   it('says the sources are not installed, and installs only through the terminal', async () => {

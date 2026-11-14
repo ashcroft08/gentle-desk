@@ -200,7 +200,10 @@ describe('the Settings dialog', () => {
     await pick(dialog, USAGE)
     const usage = pane(dialog)
 
-    expect(usage.textContent).toContain('opencode-go')
+    // The fixture's opencode-go answered no data, so it is not listed: only a
+    // provider with a reading reaches the pane (the shell's own rule).
+    expect(usage.textContent).toContain('commandcode')
+    expect(usage.textContent).not.toContain('opencode-go')
     expect(usage.textContent).toContain('Plan: individual goat')
     expect(usage.textContent).toContain('5%')
     expect(usage.textContent).toContain('resets in 2h')

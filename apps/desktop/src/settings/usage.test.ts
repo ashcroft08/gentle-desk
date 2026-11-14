@@ -49,11 +49,12 @@ describe('the Usage pane state', () => {
 
     expect(state.kind).toBe('installed')
     if (state.kind !== 'installed') return
+    // Both cards report the same peak here, and the tie breaks by provider name.
     expect(state.providers.map((row) => row.provider)).toEqual([
-      'commandcode',
       'claude-bridge',
+      'commandcode',
     ])
-    expect(state.providers[1].plan).toBe('pro')
+    expect(state.providers[0].plan).toBe('pro')
   })
 
   it('rounds a share and gives the gauge the house tone and a clamped width', () => {
@@ -123,14 +124,38 @@ describe('the Usage pane state', () => {
     expect(state.providers[0].limits[0].windows.map((window) => window.label)).toEqual(['week'])
   })
 
-  it('keeps a no-data provider as no data, with no window to read as zero', () => {
+  // The shell's own panel never lists a provider whose source answered "no
+  // data"; the maintainer saw this pane name providers he has never signed in
+  // to. Only a reading is drawn.
+  it('does not draw a provider that answered no data', () => {
     const state = paneOf(
-      usage({ providers: [provider({ provider: 'opencode-go', status: 'NoData', plan: null, limits: [] })] }),
+      usage({
+        providers: [
+          provider({ provider: 'opencode-go', status: 'NoData', plan: null, limits: [] }),
+          provider({ provider: 'commandcode' }),
+        ],
+      }),
     )
     if (state.kind !== 'installed') throw new Error('installed expected')
 
-    expect(state.providers[0].status).toBe('NoData')
-    expect(state.providers[0].limits).toEqual([])
+    expect(state.providers.map((row) => row.provider)).toEqual(['commandcode'])
+  })
+
+  // What is actually being spent comes first: a card at 88% matters more than
+  // one at 0%, and a failure goes last because it is a note, not a reading.
+  it('sorts by peak usage, quiet ones after, failures last', () => {
+    const state = paneOf(
+      usage({
+        providers: [
+          provider({ provider: 'quiet', limits: [{ name: 'l', limit_reached: false, windows: [{ label: 'week', used_percent: 0, resets_in: null }] }] }),
+          provider({ provider: 'busy', limits: [{ name: 'l', limit_reached: false, windows: [{ label: 'week', used_percent: 91, resets_in: null }] }] }),
+          provider({ provider: 'broken', status: 'Failed', error: 'boom', limits: [] }),
+        ],
+      }),
+    )
+    if (state.kind !== 'installed') throw new Error('installed expected')
+
+    expect(state.providers.map((row) => row.provider)).toEqual(['busy', 'quiet', 'broken'])
   })
 
   it('keeps a failed provider and its own reason', () => {
