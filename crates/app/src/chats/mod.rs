@@ -90,7 +90,10 @@ pub(crate) fn apply_event(
     event: &RpcEvent,
     now_ms: Option<u64>,
 ) -> (AppState, Effects) {
-    let (commands, chat_commands) = state.chats.apply(&chat, event, now_ms);
+    // The language of this run's own words, read before the chats borrow the
+    // state: the fold words the one text it produces itself (0.2.0, S3).
+    let language = state.language();
+    let (commands, chat_commands) = state.chats.apply(language, &chat, event, now_ms);
     if let Some((level, text)) = notice_from(event) {
         push_notice(&mut state, level, text);
     }

@@ -18,6 +18,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
 use gentle_app::{ChatId, Input, Intent};
+use gentle_core::i18n::Language;
 use gentle_desk_lib::commands::{Bridge, Emit};
 use gentle_desk_lib::contract::{InstallView, UiIntent, ViewState};
 use gentle_desk_lib::shell_install::Installer;
@@ -184,7 +185,7 @@ impl FakeInstall {
 }
 
 impl Installer for FakeInstall {
-    fn install(&self) -> Result<(), String> {
+    fn install(&self, _language: Language) -> Result<(), String> {
         self.runs.fetch_add(1, Ordering::SeqCst);
         if self.outcome.is_ok() {
             if let Some(found) = self.provides.as_ref() {

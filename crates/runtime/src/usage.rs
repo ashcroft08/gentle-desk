@@ -143,63 +143,61 @@ pub struct Document {
     pub providers: Vec<Provider>,
 }
 
-/// Reads the package's document, strictly.
+/// Reads the package's document, strictly, in `language`.
 ///
-/// Refused with a plain reason, never guessed: something that is not a JSON
+/// Refused with a plain sentence, never guessed: something that is not a JSON
 /// object, the wrong schema string, a `sources` list that is not a list, a
 /// provider whose fields this reader cannot use, and a status this reader does
 /// not know. A provider the package reported as `failed` or `no-data` is a
 /// STATUS, not a refusal: those are answers.
-pub fn parse(text: &str) -> Result<Document, String> {
+pub fn parse(language: Language, text: &str) -> Result<Document, String> {
     let document: Value =
-        serde_json::from_str(text).map_err(|_| unreadable(&format!("schema \"{SCHEMA}\"")))?;
+        serde_json::from_str(text).map_err(|_| messages::usage_sources_schema(language, SCHEMA))?;
     if !document.is_object() {
-        return Err(unreadable(&format!("schema \"{SCHEMA}\"")));
+        return Err(messages::usage_sources_schema(language, SCHEMA));
     }
     match document.get("schema").and_then(Value::as_str) {
         Some(SCHEMA) => {}
-        Some(other) => return Err(unreadable(&format!("schema \"{other}\""))),
-        None => return Err(unreadable(&format!("schema \"{SCHEMA}\""))),
+        Some(other) => return Err(messages::usage_sources_schema(language, other)),
+        None => return Err(messages::usage_sources_schema(language, SCHEMA)),
     }
     let sources = document
         .get("sources")
         .and_then(Value::as_array)
-        .ok_or_else(|| unreadable("a document with no provider list"))?;
+        .ok_or_else(|| messages::usage_sources_no_provider_list(language))?;
     let providers = sources
         .iter()
         .enumerate()
-        .map(|(index, source)| provider(source, index + 1))
+        .map(|(index, source)| provider(language, source, index + 1))
         .collect::<Result<Vec<_>, _>>()?;
     Ok(Document { providers })
 }
 
-/// The one refusal sentence: what the pane could not read, and that it read
-/// nothing of it.
-fn unreadable(what: &str) -> String {
-    format!("the usage sources answered {what} this pane does not read")
-}
-
 /// One provider of `sources`, `position` being its 1-based place in the list so
 /// a refusal can name which one it was.
-fn provider(source: &Value, position: usize) -> Result<Provider, String> {
+fn provider(language: Language, source: &Value, position: usize) -> Result<Provider, String> {
     let provider = match source.get("provider").and_then(Value::as_str) {
         Some(name) if !name.trim().is_empty() => name.to_owned(),
-        _ => return Err(unreadable(&format!("provider {position} with no name"))),
+        _ => {
+            return Err(messages::usage_sources_provider_without_name(
+                language, position,
+            ))
+        }
     };
     let status = match source.get("status").and_then(Value::as_str) {
         Some("ok") => ProviderStatus::Ok,
         Some("no-data") => ProviderStatus::NoData,
         Some("failed") => ProviderStatus::Failed,
-        Some(other) => return Err(unreadable(&format!("status \"{other}\""))),
-        None => return Err(unreadable("status \"unknown\"")),
+        Some(other) => return Err(messages::usage_sources_status(language, other)),
+        None => return Err(messages::usage_sources_status(language, "unknown")),
     };
     let limits = source
         .get("limits")
         .and_then(Value::as_array)
-        .ok_or_else(|| unreadable(&format!("provider {provider} with no limit list")))?
+        .ok_or_else(|| messages::usage_sources_provider_without_limits(language, &provider))?
         .iter()
         .enumerate()
-        .map(|(index, entry)| limit(entry, &provider, index + 1))
+        .map(|(index, entry)| limit(language, entry, &provider, index + 1))
         .collect::<Result<Vec<_>, _>>()?;
     Ok(Provider {
         provider,
@@ -213,21 +211,30 @@ fn provider(source: &Value, position: usize) -> Result<Provider, String> {
 }
 
 /// One limit of `provider`, `position` being its 1-based place in the list.
-fn limit(limit: &Value, provider: &str, position: usize) -> Result<Limit, String> {
+fn limit(
+    language: Language,
+    limit: &Value,
+    provider: &str,
+    position: usize,
+) -> Result<Limit, String> {
     let name = match limit.get("name").and_then(Value::as_str) {
         Some(name) if !name.trim().is_empty() => name.to_owned(),
-        _ => return Err(unreadable(&format!("a limit of {provider} with no name"))),
+        _ => {
+            return Err(messages::usage_sources_limit_without_name(
+                language, provider,
+            ))
+        }
     };
     let limit_reached = limit
         .get("limitReached")
         .and_then(Value::as_bool)
-        .ok_or_else(|| unreadable(&format!("a limit of {provider} with no reach mark")))?;
+        .ok_or_else(|| messages::usage_sources_limit_without_reach_mark(language, provider))?;
     let windows = limit
         .get("windows")
         .and_then(Value::as_array)
-        .ok_or_else(|| unreadable(&format!("limit {position} of {provider} with no windows")))?
+        .ok_or_else(|| messages::usage_sources_limit_without_windows(language, position, provider))?
         .iter()
-        .map(|entry| window(entry, provider, &name))
+        .map(|entry| window(language, entry, provider, &name))
         .collect::<Result<Vec<_>, _>>()?;
     Ok(Limit {
         name,
@@ -237,13 +244,18 @@ fn limit(limit: &Value, provider: &str, position: usize) -> Result<Limit, String
 }
 
 /// One window of `limit` of `provider`.
-fn window(window: &Value, provider: &str, limit: &str) -> Result<Window, String> {
+fn window(
+    language: Language,
+    window: &Value,
+    provider: &str,
+    limit: &str,
+) -> Result<Window, String> {
     let label = match window.get("label").and_then(Value::as_str) {
         Some(label) if !label.trim().is_empty() => label.to_owned(),
         _ => {
-            return Err(unreadable(&format!(
-                "a window of {provider} ({limit}) with no label"
-            )))
+            return Err(messages::usage_sources_window_without_label(
+                language, provider, limit,
+            ))
         }
     };
     let used_percent = window
@@ -251,9 +263,7 @@ fn window(window: &Value, provider: &str, limit: &str) -> Result<Window, String>
         .and_then(Value::as_f64)
         .filter(|percent| percent.is_finite())
         .ok_or_else(|| {
-            unreadable(&format!(
-                "a window of {provider} ({limit}) with no percentage"
-            ))
+            messages::usage_sources_window_without_percentage(language, provider, limit)
         })?;
     // The package keeps an explicit null for a provider that reports no reset,
     // so `null` is a real answer and a missing field is not.
@@ -262,7 +272,7 @@ fn window(window: &Value, provider: &str, limit: &str) -> Result<Window, String>
         Some(value) => Some(
             value
                 .as_u64()
-                .ok_or_else(|| unreadable(&format!("a reset time of {provider}")))?,
+                .ok_or_else(|| messages::usage_sources_without_reset_time(language, provider))?,
         ),
     };
     Ok(Window {

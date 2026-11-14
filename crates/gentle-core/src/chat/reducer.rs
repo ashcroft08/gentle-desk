@@ -4,6 +4,7 @@ use serde_json::Value;
 
 use super::state::{ChatMessage, ChatRole, ChatState, Dialog};
 use crate::helpers::fold_widget;
+use crate::i18n::{messages, Language};
 use crate::rpc::{AssistantMessageEvent, RpcEvent, RpcMessage, UiRequest};
 
 /// Folds one decoded RPC event into chat state.
@@ -11,13 +12,23 @@ use crate::rpc::{AssistantMessageEvent, RpcEvent, RpcMessage, UiRequest};
 /// Pure: same inputs, same output, no I/O and no `now()`. It takes and returns
 /// the state by value so the caller decides where the new state lives, and
 /// events the chat view does not use return the state untouched.
-pub fn reduce_chat(state: ChatState, event: &RpcEvent) -> ChatState {
-    reduce_chat_at(state, event, None)
+pub fn reduce_chat(language: Language, state: ChatState, event: &RpcEvent) -> ChatState {
+    reduce_chat_at(language, state, event, None)
 }
 
 /// [`reduce_chat`] with the wall-clock time (epoch ms) the event arrived at,
 /// which the caller supplies so this stays pure. Only helper bookkeeping uses it.
-pub fn reduce_chat_at(state: ChatState, event: &RpcEvent, now_ms: Option<u64>) -> ChatState {
+///
+/// The language comes first, as every catalog message does: the one text this
+/// fold words itself is the provider's unspoken error
+/// (`messages::unknown_model_error`), and the shell that holds the config hands
+/// it in (0.2.0, S3).
+pub fn reduce_chat_at(
+    language: Language,
+    state: ChatState,
+    event: &RpcEvent,
+    now_ms: Option<u64>,
+) -> ChatState {
     match event {
         RpcEvent::AgentStart => ChatState {
             working: true,
@@ -29,7 +40,7 @@ pub fn reduce_chat_at(state: ChatState, event: &RpcEvent, now_ms: Option<u64>) -
         },
         RpcEvent::MessageStart(message) => open_assistant_message(state, message),
         RpcEvent::MessageUpdate(delta) => apply_assistant_message_event(state, delta),
-        RpcEvent::MessageEnd(message) => close_assistant_message(state, message),
+        RpcEvent::MessageEnd(message) => close_assistant_message(language, state, message),
         RpcEvent::ToolExecutionStart { .. }
         | RpcEvent::ToolExecutionUpdate { .. }
         | RpcEvent::ToolExecutionEnd { .. } => ChatState {
@@ -90,7 +101,11 @@ fn append_to_last_assistant(state: ChatState, delta: &str) -> ChatState {
     ChatState { messages, ..state }
 }
 
-fn close_assistant_message(state: ChatState, message: &RpcMessage) -> ChatState {
+fn close_assistant_message(
+    language: Language,
+    state: ChatState,
+    message: &RpcMessage,
+) -> ChatState {
     if message.role != "assistant" {
         return state;
     }
@@ -111,7 +126,7 @@ fn close_assistant_message(state: ChatState, message: &RpcMessage) -> ChatState 
 
     // A provider failure arrives as an ordinary-looking assistant message;
     // flag it (and keep it even when empty) so the UI can show it as a failure.
-    if let Some(error) = model_error(message) {
+    if let Some(error) = model_error(language, message) {
         last.error = Some(error);
         last.streaming = false;
         return ChatState { messages, ..state };
@@ -132,12 +147,18 @@ fn close_assistant_message(state: ChatState, message: &RpcMessage) -> ChatState 
 }
 
 /// The provider's error text when this message ended with `stopReason: "error"`.
-fn model_error(message: &RpcMessage) -> Option<String> {
+///
+/// A provider that said nothing gets the app's own two words, worded in the
+/// language the shell handed the fold.
+fn model_error(language: Language, message: &RpcMessage) -> Option<String> {
     if message.raw.get("stopReason").and_then(Value::as_str) != Some("error") {
         return None;
     }
     let text = message.raw.get("errorMessage").and_then(Value::as_str);
-    Some(text.unwrap_or("unknown model error").to_owned())
+    Some(
+        text.unwrap_or(messages::unknown_model_error(language))
+            .to_owned(),
+    )
 }
 
 /// The concatenated `{"type":"text"}` blocks of `content`, or `None` when

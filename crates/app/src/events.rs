@@ -16,8 +16,9 @@ pub(crate) fn apply_event(
 ) -> (AppState, Vec<Command>) {
     let notice = notice_from(event);
     let mut commands = Vec::new();
+    let language = state.language();
     let mut state = AppState {
-        chat: reduce_chat_at(state.chat, event, now_ms),
+        chat: reduce_chat_at(language, state.chat, event, now_ms),
         ..state
     };
     if let Some((level, text)) = notice {
@@ -49,7 +50,10 @@ fn apply_response(state: &mut AppState, response: &RpcResponse, commands: &mut V
                 commands.push(Command::Send(RpcCommand::GetAvailableThinkingLevels));
             }
         }
-        ("get_messages", Ok(data)) => state.chat.messages = messages_from_history(data),
+        ("get_messages", Ok(data)) => {
+            let language = state.language();
+            state.chat.messages = messages_from_history(language, data);
+        }
         ("set_model", Ok(data)) => {
             // The chip's new model owns the levels list and the current
             // level: ask for both again (R3-002).

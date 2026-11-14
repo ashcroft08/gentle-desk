@@ -1,5 +1,6 @@
 use super::*;
 use gentle_core::chat::reduce_chat;
+use gentle_core::i18n::Language;
 use gentle_core::rpc::{decode_line, Decoded};
 
 /// Feeds raw JSONL lines through the real decoder and reducer, rendering after each.
@@ -11,7 +12,7 @@ fn run(lines: &[&str]) -> Vec<Out> {
         let Decoded::Event(event) = decode_line(line) else {
             panic!("not an event: {line}")
         };
-        state = reduce_chat(state, &event);
+        state = reduce_chat(Language::En, state, &event);
         out.extend(renderer.render(&state));
     }
     out

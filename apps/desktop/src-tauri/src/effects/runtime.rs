@@ -26,7 +26,7 @@ use gentle_runtime::chat_runtime::{ChatRuntime, Outcome};
 
 use super::ChatExecutor;
 use crate::bridge::AppStateHolder;
-use crate::close::CLOSING;
+use crate::close::closing;
 use crate::events::EventPump;
 use crate::images;
 use crate::pending::PendingFolders;
@@ -178,7 +178,7 @@ impl ChatExecutor for RuntimeExecutor {
         // closing answers the closing line without resolving a launcher, building
         // a host or starting a child.
         if self.is_closed() {
-            return refuse(command);
+            return refuse(self.holder.language(), command);
         }
         let folder = match &command {
             ChatCommand::OpenProcess { chat } => self.folders.take(chat),
@@ -230,9 +230,10 @@ impl RuntimeExecutor {
 }
 
 /// The outcome of a command that arrived after the close: the failed open or
-/// failed send the reducer already knows, carrying [`CLOSING`].
-fn refuse(command: ChatCommand) -> Outcome {
-    let message = CLOSING.to_owned();
+/// failed send the reducer already knows, carrying [`closing`]'s line in the
+/// language this run speaks (0.2.0, S3).
+fn refuse(language: Language, command: ChatCommand) -> Outcome {
+    let message = closing(language);
     match command {
         ChatCommand::OpenProcess { chat } => Outcome::OpenFailed { chat, message },
         ChatCommand::Send { chat, .. } => Outcome::SendFailed { chat, message },

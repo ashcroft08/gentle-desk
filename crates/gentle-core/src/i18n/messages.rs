@@ -27,6 +27,14 @@
 //! - `Attached image: <path>`, which travels INSIDE the prompt handed to pi:
 //!   translating it would change the model's input, so it is prompt content and
 //!   not a message (D7).
+//!
+//! One more joins them for the same reason as the damaged config (0.2.0, T4b,
+//! Log L7):
+//!
+//! - the no-config-path notice (`config::NO_PATH_NOTICE`), which says the
+//!   settings folder could not be found. That folder is the one that would have
+//!   held the preference, so the run that reports it has no language to report
+//!   it in.
 
 use super::Language;
 use crate::helpers::HelperStatus;
@@ -570,5 +578,430 @@ pub fn image_weight(language: Language, name: &str, megabytes: u64) -> String {
         Language::Es => format!(
             "{name} no se adjuntó: un mensaje admite como máximo {megabytes} MB de imágenes."
         ),
+    }
+}
+
+// --- A config that could not be saved (tauri: config::writer) ---------------
+
+/// "The app config file could not be saved: Access is denied. (os error 5)"
+///
+/// Worded in the language of the snapshot the writer tried to save: the config
+/// was read, so the preference is in hand (unlike the no-path notice above).
+pub fn config_save_failed(language: Language, error: &str) -> String {
+    match language {
+        Language::En => format!("The app config file could not be saved: {error}"),
+        Language::Es => {
+            format!("No se pudo guardar el archivo de configuración de la app: {error}")
+        }
+    }
+}
+
+// --- Installing gentle-shell (tauri: shell_install) -------------------------
+
+/// "could not start the install": no thread could be started for it.
+pub const fn install_could_not_start(language: Language) -> &'static str {
+    match language {
+        Language::En => "could not start the install",
+        Language::Es => "no se pudo iniciar la instalación",
+    }
+}
+
+/// "could not start npm.cmd: Access is denied. (os error 5)"
+pub fn install_command_could_not_start(language: Language, program: &str, error: &str) -> String {
+    match language {
+        Language::En => format!("could not start {program}: {error}"),
+        Language::Es => format!("no se pudo iniciar {program}: {error}"),
+    }
+}
+
+/// "the install did not finish in 20 minutes and was stopped"
+pub const fn install_did_not_finish(language: Language) -> &'static str {
+    match language {
+        Language::En => "the install did not finish in 20 minutes and was stopped",
+        Language::Es => "la instalación no terminó en 20 minutos y se detuvo",
+    }
+}
+
+/// "could not wait for the install: Access is denied. (os error 5)"
+pub fn install_wait_failed(language: Language, error: &str) -> String {
+    match language {
+        Language::En => format!("could not wait for the install: {error}"),
+        Language::Es => format!("no se pudo esperar a la instalación: {error}"),
+    }
+}
+
+/// "no exit code": a process a signal ended, which has no code to name.
+pub const fn no_exit_code(language: Language) -> &'static str {
+    match language {
+        Language::En => "no exit code",
+        Language::Es => "sin código de salida",
+    }
+}
+
+/// "exit code 2"
+pub fn exit_code(language: Language, code: i32) -> String {
+    match language {
+        Language::En => format!("exit code {code}"),
+        Language::Es => format!("código de salida {code}"),
+    }
+}
+
+/// "the install ended with exit code 2\nnpm said no": the code this catalog
+/// worded, then the end of the command's own output, which travels as it
+/// arrived (D7).
+pub fn install_ended(language: Language, code: &str, tail: &str) -> String {
+    match language {
+        Language::En => format!("the install ended with {code}\n{tail}"),
+        Language::Es => format!("la instalación terminó con {code}\n{tail}"),
+    }
+}
+
+// --- The Settings panes' reads (tauri: settings) ----------------------------
+
+/// "C:/h/auth.json could not be read: Access is denied. (os error 5)"
+pub fn file_could_not_be_read(language: Language, path: &str, error: &str) -> String {
+    match language {
+        Language::En => format!("{path} could not be read: {error}"),
+        Language::Es => format!("no se pudo leer {path}: {error}"),
+    }
+}
+
+/// "gentle-shell could not be resolved: not found": the launcher the whole
+/// settings area runs is not on this machine.
+pub fn shell_could_not_be_resolved(language: Language, error: &str) -> String {
+    match language {
+        Language::En => format!("gentle-shell could not be resolved: {error}"),
+        Language::Es => format!("no se pudo resolver gentle-shell: {error}"),
+    }
+}
+
+/// "gentle-shell could not run: Access is denied. (os error 5)"
+pub fn shell_could_not_run(language: Language, error: &str) -> String {
+    match language {
+        Language::En => format!("gentle-shell could not run: {error}"),
+        Language::Es => format!("no se pudo ejecutar gentle-shell: {error}"),
+    }
+}
+
+/// "the shell's agent folder could not be found on this machine": the Account
+/// and Usage panes read the same folder, so they say the same sentence.
+pub const fn shell_agent_folder_missing(language: Language) -> &'static str {
+    match language {
+        Language::En => "the shell's agent folder could not be found on this machine",
+        Language::Es => "no se encontró la carpeta del agente de la shell en esta máquina",
+    }
+}
+
+/// "gentle-pi's config folder could not be found on this machine"
+pub const fn agent_profiles_folder_missing(language: Language) -> &'static str {
+    match language {
+        Language::En => "gentle-pi's config folder could not be found on this machine",
+        Language::Es => "no se encontró la carpeta de configuración de gentle-pi en esta máquina",
+    }
+}
+
+// --- Running the usage sources (tauri: settings::usage) ---------------------
+
+/// "the usage sources are not installed for this shell"
+pub const fn usage_sources_not_installed(language: Language) -> &'static str {
+    match language {
+        Language::En => "the usage sources are not installed for this shell",
+        Language::Es => "las fuentes de uso no están instaladas para esta shell",
+    }
+}
+
+/// "the usage read could not start": no thread could be started for it.
+pub const fn usage_read_could_not_start(language: Language) -> &'static str {
+    match language {
+        Language::En => "the usage read could not start",
+        Language::Es => "no se pudo iniciar la lectura de uso",
+    }
+}
+
+/// "could not start (Access is denied. (os error 5))"
+pub fn usage_sources_could_not_start(language: Language, error: &str) -> String {
+    match language {
+        Language::En => format!("could not start ({error})"),
+        Language::Es => format!("no se pudo iniciar ({error})"),
+    }
+}
+
+/// "did not answer within 30 seconds"
+pub fn usage_sources_did_not_answer(language: Language, seconds: u64) -> String {
+    match language {
+        Language::En => format!("did not answer within {seconds} seconds"),
+        Language::Es => format!("no respondió en {seconds} segundos"),
+    }
+}
+
+/// "could not run (Access is denied. (os error 5))"
+pub fn usage_sources_could_not_run(language: Language, error: &str) -> String {
+    match language {
+        Language::En => format!("could not run ({error})"),
+        Language::Es => format!("no se pudo ejecutar ({error})"),
+    }
+}
+
+/// "stopped without printing a document (exit code 1)": what stands in the
+/// brackets is the code this catalog worded, or the script's own dying words,
+/// which travel as they arrived (D7).
+pub fn usage_sources_stopped(language: Language, what: &str) -> String {
+    match language {
+        Language::En => format!("stopped without printing a document ({what})"),
+        Language::Es => format!("se detuvo sin imprimir un documento ({what})"),
+    }
+}
+
+// --- The usage document's refusals (runtime::usage) -------------------------
+//
+// One WHOLE sentence per refusal, instead of the fragment the reader composed
+// into "the usage sources answered {what} this pane does not read": the join
+// sits in the middle of the sentence, and a Spanish column that nests an
+// English-shaped clause reads as no sentence at all. The English is the text
+// the old composition produced, byte for byte.
+
+/// The usage sources answered a document of another schema.
+pub fn usage_sources_schema(language: Language, schema: &str) -> String {
+    match language {
+        Language::En => {
+            format!("the usage sources answered schema \"{schema}\" this pane does not read")
+        }
+        Language::Es => format!(
+            "las fuentes de uso respondieron el esquema \"{schema}\", que este panel no lee"
+        ),
+    }
+}
+
+/// The usage sources answered a provider with a status this pane does not know.
+pub fn usage_sources_status(language: Language, status: &str) -> String {
+    match language {
+        Language::En => {
+            format!("the usage sources answered status \"{status}\" this pane does not read")
+        }
+        Language::Es => {
+            format!("las fuentes de uso respondieron el estado \"{status}\", que este panel no lee")
+        }
+    }
+}
+
+/// The usage document carries no `sources` list.
+pub const fn usage_sources_no_provider_list(language: Language) -> &'static str {
+    match language {
+        Language::En => {
+            "the usage sources answered a document with no provider list this pane does not read"
+        }
+        Language::Es => {
+            "las fuentes de uso respondieron un documento sin lista de proveedores, \
+             que este panel no lee"
+        }
+    }
+}
+
+/// The provider at 1-based `position` has no name.
+pub fn usage_sources_provider_without_name(language: Language, position: usize) -> String {
+    match language {
+        Language::En => format!(
+            "the usage sources answered provider {position} with no name this pane does not read"
+        ),
+        Language::Es => format!(
+            "las fuentes de uso respondieron un proveedor {position} sin nombre, \
+             que este panel no lee"
+        ),
+    }
+}
+
+/// `provider` has no `limits` list.
+pub fn usage_sources_provider_without_limits(language: Language, provider: &str) -> String {
+    match language {
+        Language::En => format!(
+            "the usage sources answered provider {provider} with no limit list this pane does \
+             not read"
+        ),
+        Language::Es => format!(
+            "las fuentes de uso respondieron un proveedor {provider} sin lista de límites, \
+             que este panel no lee"
+        ),
+    }
+}
+
+/// A limit of `provider` has no name.
+pub fn usage_sources_limit_without_name(language: Language, provider: &str) -> String {
+    match language {
+        Language::En => format!(
+            "the usage sources answered a limit of {provider} with no name this pane does not read"
+        ),
+        Language::Es => format!(
+            "las fuentes de uso respondieron un límite de {provider} sin nombre, \
+             que este panel no lee"
+        ),
+    }
+}
+
+/// A limit of `provider` has no `limitReached` mark.
+pub fn usage_sources_limit_without_reach_mark(language: Language, provider: &str) -> String {
+    match language {
+        Language::En => format!(
+            "the usage sources answered a limit of {provider} with no reach mark this pane does \
+             not read"
+        ),
+        Language::Es => format!(
+            "las fuentes de uso respondieron un límite de {provider} sin marca de alcanzado, \
+             que este panel no lee"
+        ),
+    }
+}
+
+/// The limit at 1-based `position` of `provider` has no `windows` list.
+pub fn usage_sources_limit_without_windows(
+    language: Language,
+    position: usize,
+    provider: &str,
+) -> String {
+    match language {
+        Language::En => format!(
+            "the usage sources answered limit {position} of {provider} with no windows this \
+             pane does not read"
+        ),
+        Language::Es => format!(
+            "las fuentes de uso respondieron el límite {position} de {provider} sin ventanas, \
+             que este panel no lee"
+        ),
+    }
+}
+
+/// A window of `limit` of `provider` has no label.
+pub fn usage_sources_window_without_label(
+    language: Language,
+    provider: &str,
+    limit: &str,
+) -> String {
+    match language {
+        Language::En => format!(
+            "the usage sources answered a window of {provider} ({limit}) with no label this \
+             pane does not read"
+        ),
+        Language::Es => format!(
+            "las fuentes de uso respondieron una ventana de {provider} ({limit}) sin etiqueta, \
+             que este panel no lee"
+        ),
+    }
+}
+
+/// A window of `limit` of `provider` has no `usedPercent`.
+pub fn usage_sources_window_without_percentage(
+    language: Language,
+    provider: &str,
+    limit: &str,
+) -> String {
+    match language {
+        Language::En => format!(
+            "the usage sources answered a window of {provider} ({limit}) with no percentage \
+             this pane does not read"
+        ),
+        Language::Es => format!(
+            "las fuentes de uso respondieron una ventana de {provider} ({limit}) sin \
+             porcentaje, que este panel no lee"
+        ),
+    }
+}
+
+/// A window of `provider` names a `resetAt` this pane cannot read.
+pub fn usage_sources_without_reset_time(language: Language, provider: &str) -> String {
+    match language {
+        Language::En => {
+            format!("the usage sources answered a reset time of {provider} this pane does not read")
+        }
+        Language::Es => format!(
+            "las fuentes de uso respondieron una hora de reinicio de {provider}, \
+             que este panel no lee"
+        ),
+    }
+}
+
+// --- The profiles files' refusals (runtime::profiles) -----------------------
+//
+// The name in `{:?}` is quoted by the format itself, exactly as the English pin
+// quoted it before this catalog existed.
+
+/// "profiles.json is not readable: Access is denied. (os error 5)"
+pub fn profiles_file_unreadable(language: Language, file: &str, error: &str) -> String {
+    match language {
+        Language::En => format!("{file} is not readable: {error}"),
+        Language::Es => format!("no se puede leer {file}: {error}"),
+    }
+}
+
+/// "profiles.json is not a gentle-pi.agent_model_profiles document, it says
+/// \"other\""
+pub fn profiles_not_a_document(language: Language, file: &str, kind: &str, says: &str) -> String {
+    match language {
+        Language::En => format!("{file} is not a {kind} document, it says {says:?}"),
+        Language::Es => format!("{file} no es un documento {kind}, dice {says:?}"),
+    }
+}
+
+/// "profiles.json is version 2, this view reads version 1"
+pub fn profiles_wrong_version(
+    language: Language,
+    file: &str,
+    version: u64,
+    expected: u64,
+) -> String {
+    match language {
+        Language::En => {
+            format!("{file} is version {version}, this view reads version {expected}")
+        }
+        Language::Es => {
+            format!("{file} tiene la versión {version}, esta vista lee la versión {expected}")
+        }
+    }
+}
+
+/// "profile-fallbacks.json names a profile no reader accepts: \"bad name\""
+pub fn profiles_name_refused(language: Language, file: &str, name: &str) -> String {
+    match language {
+        Language::En => format!("{file} names a profile no reader accepts: {name:?}"),
+        Language::Es => format!("{file} nombra un perfil que ningún lector acepta: {name:?}"),
+    }
+}
+
+/// "profile-fallbacks.json: \"work\" names the agent \"bad agent\""
+pub fn profiles_agent_refused(
+    language: Language,
+    file: &str,
+    profile: &str,
+    agent: &str,
+) -> String {
+    match language {
+        Language::En => format!("{file}: {profile:?} names the agent {agent:?}"),
+        Language::Es => format!("{file}: {profile:?} nombra el agente {agent:?}"),
+    }
+}
+
+/// "profile-fallbacks.json: \"work\"/\"agent\" is not a chain"
+pub fn profiles_not_a_chain(language: Language, file: &str, profile: &str, agent: &str) -> String {
+    match language {
+        Language::En => format!("{file}: {profile:?}/{agent:?} is not a chain"),
+        Language::Es => format!("{file}: {profile:?}/{agent:?} no es una cadena"),
+    }
+}
+
+// --- The model's own error, and the close (gentle-core::chat, tauri::close) --
+
+/// "unknown model error": the provider ended a turn on an error and said
+/// nothing about it. The text it did send travels as it arrived (D7).
+pub const fn unknown_model_error(language: Language) -> &'static str {
+    match language {
+        Language::En => "unknown model error",
+        Language::Es => "error desconocido del modelo",
+    }
+}
+
+/// "the app is closing": the one line a chat command answers once the close has
+/// stopped new work.
+pub const fn closing(language: Language) -> &'static str {
+    match language {
+        Language::En => "the app is closing",
+        Language::Es => "la app se está cerrando",
     }
 }

@@ -543,3 +543,351 @@ fn a_composed_sentence_keeps_its_join() {
         "Delete chat builds the sentence the catalog holds whole"
     );
 }
+
+// --- T4b: the audit's twelve producer groups (0.2.0, S3, Log L7) ------------
+
+/// A save that failed names the disk's own reason, worded in the language the
+/// snapshot it tried to write carried.
+#[test]
+fn a_failed_config_save_carries_the_disk_reason() {
+    pair(
+        "config_save_failed",
+        &messages::config_save_failed(Language::En, "Access is denied. (os error 5)"),
+        "The app config file could not be saved: Access is denied. (os error 5)",
+        &messages::config_save_failed(Language::Es, "Access is denied. (os error 5)"),
+        "No se pudo guardar el archivo de configuración de la app: Access is denied. (os error 5)",
+    );
+}
+
+/// Installing gentle-shell: the permission screen's start refusal, then every
+/// way the command itself can end without an install.
+#[test]
+fn the_install_says_why_it_did_not_install() {
+    pair(
+        "install_could_not_start",
+        messages::install_could_not_start(Language::En),
+        "could not start the install",
+        messages::install_could_not_start(Language::Es),
+        "no se pudo iniciar la instalación",
+    );
+    pair(
+        "install_command_could_not_start",
+        &messages::install_command_could_not_start(Language::En, "npm.cmd", "denied"),
+        "could not start npm.cmd: denied",
+        &messages::install_command_could_not_start(Language::Es, "npm.cmd", "denied"),
+        "no se pudo iniciar npm.cmd: denied",
+    );
+    pair(
+        "install_did_not_finish",
+        messages::install_did_not_finish(Language::En),
+        "the install did not finish in 20 minutes and was stopped",
+        messages::install_did_not_finish(Language::Es),
+        "la instalación no terminó en 20 minutos y se detuvo",
+    );
+    pair(
+        "install_wait_failed",
+        &messages::install_wait_failed(Language::En, "denied"),
+        "could not wait for the install: denied",
+        &messages::install_wait_failed(Language::Es, "denied"),
+        "no se pudo esperar a la instalación: denied",
+    );
+    // The exit code is one message for both things that need it: the install
+    // and the usage sources' run.
+    pair(
+        "no_exit_code",
+        messages::no_exit_code(Language::En),
+        "no exit code",
+        messages::no_exit_code(Language::Es),
+        "sin código de salida",
+    );
+    pair(
+        "exit_code",
+        &messages::exit_code(Language::En, 2),
+        "exit code 2",
+        &messages::exit_code(Language::Es, 2),
+        "código de salida 2",
+    );
+    pair(
+        "install_ended",
+        &messages::install_ended(
+            Language::En,
+            &messages::exit_code(Language::En, 2),
+            "npm said no",
+        ),
+        "the install ended with exit code 2\nnpm said no",
+        &messages::install_ended(
+            Language::Es,
+            &messages::exit_code(Language::Es, 2),
+            "npm said no",
+        ),
+        "la instalación terminó con código de salida 2\nnpm said no",
+    );
+}
+
+/// The Settings dialog's reads: a file, the launcher, and the two folders a
+/// pane needs before it can read anything at all.
+#[test]
+fn the_settings_reads_carry_their_reason() {
+    pair(
+        "file_could_not_be_read",
+        &messages::file_could_not_be_read(
+            Language::En,
+            "C:/h/auth.json",
+            "Access is denied. (os error 5)",
+        ),
+        "C:/h/auth.json could not be read: Access is denied. (os error 5)",
+        &messages::file_could_not_be_read(
+            Language::Es,
+            "C:/h/auth.json",
+            "Access is denied. (os error 5)",
+        ),
+        "no se pudo leer C:/h/auth.json: Access is denied. (os error 5)",
+    );
+    pair(
+        "shell_could_not_be_resolved",
+        &messages::shell_could_not_be_resolved(Language::En, "not found"),
+        "gentle-shell could not be resolved: not found",
+        &messages::shell_could_not_be_resolved(Language::Es, "not found"),
+        "no se pudo resolver gentle-shell: not found",
+    );
+    pair(
+        "shell_could_not_run",
+        &messages::shell_could_not_run(Language::En, "denied"),
+        "gentle-shell could not run: denied",
+        &messages::shell_could_not_run(Language::Es, "denied"),
+        "no se pudo ejecutar gentle-shell: denied",
+    );
+    pair(
+        "shell_agent_folder_missing",
+        messages::shell_agent_folder_missing(Language::En),
+        "the shell's agent folder could not be found on this machine",
+        messages::shell_agent_folder_missing(Language::Es),
+        "no se encontró la carpeta del agente de la shell en esta máquina",
+    );
+    pair(
+        "agent_profiles_folder_missing",
+        messages::agent_profiles_folder_missing(Language::En),
+        "gentle-pi's config folder could not be found on this machine",
+        messages::agent_profiles_folder_missing(Language::Es),
+        "no se encontró la carpeta de configuración de gentle-pi en esta máquina",
+    );
+}
+
+/// The usage sources: the package that is not installed, the read that never
+/// started, and every way the run itself ends without a document.
+#[test]
+fn the_usage_run_says_why_it_has_no_document() {
+    pair(
+        "usage_sources_not_installed",
+        messages::usage_sources_not_installed(Language::En),
+        "the usage sources are not installed for this shell",
+        messages::usage_sources_not_installed(Language::Es),
+        "las fuentes de uso no están instaladas para esta shell",
+    );
+    pair(
+        "usage_read_could_not_start",
+        messages::usage_read_could_not_start(Language::En),
+        "the usage read could not start",
+        messages::usage_read_could_not_start(Language::Es),
+        "no se pudo iniciar la lectura de uso",
+    );
+    pair(
+        "usage_sources_could_not_start",
+        &messages::usage_sources_could_not_start(Language::En, "denied"),
+        "could not start (denied)",
+        &messages::usage_sources_could_not_start(Language::Es, "denied"),
+        "no se pudo iniciar (denied)",
+    );
+    pair(
+        "usage_sources_did_not_answer",
+        &messages::usage_sources_did_not_answer(Language::En, 30),
+        "did not answer within 30 seconds",
+        &messages::usage_sources_did_not_answer(Language::Es, 30),
+        "no respondió en 30 segundos",
+    );
+    pair(
+        "usage_sources_could_not_run",
+        &messages::usage_sources_could_not_run(Language::En, "denied"),
+        "could not run (denied)",
+        &messages::usage_sources_could_not_run(Language::Es, "denied"),
+        "no se pudo ejecutar (denied)",
+    );
+    pair(
+        "usage_sources_stopped",
+        &messages::usage_sources_stopped(Language::En, "exit code 1"),
+        "stopped without printing a document (exit code 1)",
+        &messages::usage_sources_stopped(Language::Es, "exit code 1"),
+        "se detuvo sin imprimir un documento (exit code 1)",
+    );
+}
+
+/// The usage document's refusals: one whole sentence each, so the Spanish reads
+/// as a sentence and not as an English clause inside a translated frame.
+#[test]
+fn every_usage_document_refusal_is_one_whole_sentence() {
+    pair(
+        "usage_sources_schema",
+        &messages::usage_sources_schema(Language::En, "pi-usage-sources/usage/v1"),
+        "the usage sources answered schema \"pi-usage-sources/usage/v1\" this pane does not read",
+        &messages::usage_sources_schema(Language::Es, "pi-usage-sources/usage/v1"),
+        "las fuentes de uso respondieron el esquema \"pi-usage-sources/usage/v1\", que este panel no lee",
+    );
+    pair(
+        "usage_sources_status",
+        &messages::usage_sources_status(Language::En, "paused"),
+        "the usage sources answered status \"paused\" this pane does not read",
+        &messages::usage_sources_status(Language::Es, "paused"),
+        "las fuentes de uso respondieron el estado \"paused\", que este panel no lee",
+    );
+    pair(
+        "usage_sources_no_provider_list",
+        messages::usage_sources_no_provider_list(Language::En),
+        "the usage sources answered a document with no provider list this pane does not read",
+        messages::usage_sources_no_provider_list(Language::Es),
+        "las fuentes de uso respondieron un documento sin lista de proveedores, que este panel no lee",
+    );
+    pair(
+        "usage_sources_provider_without_name",
+        &messages::usage_sources_provider_without_name(Language::En, 2),
+        "the usage sources answered provider 2 with no name this pane does not read",
+        &messages::usage_sources_provider_without_name(Language::Es, 2),
+        "las fuentes de uso respondieron un proveedor 2 sin nombre, que este panel no lee",
+    );
+    pair(
+        "usage_sources_provider_without_limits",
+        &messages::usage_sources_provider_without_limits(Language::En, "claude-bridge"),
+        "the usage sources answered provider claude-bridge with no limit list this pane does not read",
+        &messages::usage_sources_provider_without_limits(Language::Es, "claude-bridge"),
+        "las fuentes de uso respondieron un proveedor claude-bridge sin lista de límites, que este panel no lee",
+    );
+    pair(
+        "usage_sources_limit_without_name",
+        &messages::usage_sources_limit_without_name(Language::En, "claude-bridge"),
+        "the usage sources answered a limit of claude-bridge with no name this pane does not read",
+        &messages::usage_sources_limit_without_name(Language::Es, "claude-bridge"),
+        "las fuentes de uso respondieron un límite de claude-bridge sin nombre, que este panel no lee",
+    );
+    pair(
+        "usage_sources_limit_without_reach_mark",
+        &messages::usage_sources_limit_without_reach_mark(Language::En, "claude-bridge"),
+        "the usage sources answered a limit of claude-bridge with no reach mark this pane does not read",
+        &messages::usage_sources_limit_without_reach_mark(Language::Es, "claude-bridge"),
+        "las fuentes de uso respondieron un límite de claude-bridge sin marca de alcanzado, que este panel no lee",
+    );
+    pair(
+        "usage_sources_limit_without_windows",
+        &messages::usage_sources_limit_without_windows(Language::En, 1, "claude-bridge"),
+        "the usage sources answered limit 1 of claude-bridge with no windows this pane does not read",
+        &messages::usage_sources_limit_without_windows(Language::Es, 1, "claude-bridge"),
+        "las fuentes de uso respondieron el límite 1 de claude-bridge sin ventanas, que este panel no lee",
+    );
+    pair(
+        "usage_sources_window_without_label",
+        &messages::usage_sources_window_without_label(Language::En, "claude-bridge", "week"),
+        "the usage sources answered a window of claude-bridge (week) with no label this pane does not read",
+        &messages::usage_sources_window_without_label(Language::Es, "claude-bridge", "week"),
+        "las fuentes de uso respondieron una ventana de claude-bridge (week) sin etiqueta, que este panel no lee",
+    );
+    pair(
+        "usage_sources_window_without_percentage",
+        &messages::usage_sources_window_without_percentage(Language::En, "claude-bridge", "week"),
+        "the usage sources answered a window of claude-bridge (week) with no percentage this pane does not read",
+        &messages::usage_sources_window_without_percentage(Language::Es, "claude-bridge", "week"),
+        "las fuentes de uso respondieron una ventana de claude-bridge (week) sin porcentaje, que este panel no lee",
+    );
+    pair(
+        "usage_sources_without_reset_time",
+        &messages::usage_sources_without_reset_time(Language::En, "claude-bridge"),
+        "the usage sources answered a reset time of claude-bridge this pane does not read",
+        &messages::usage_sources_without_reset_time(Language::Es, "claude-bridge"),
+        "las fuentes de uso respondieron una hora de reinicio de claude-bridge, que este panel no lee",
+    );
+}
+
+/// The two profiles files: a read that failed, a document of another kind or
+/// version, and the three names gentle-pi's own rules refuse.
+#[test]
+fn every_profiles_file_refusal_says_which_file_and_why() {
+    pair(
+        "profiles_file_unreadable",
+        &messages::profiles_file_unreadable(Language::En, "profiles.json", "denied"),
+        "profiles.json is not readable: denied",
+        &messages::profiles_file_unreadable(Language::Es, "profiles.json", "denied"),
+        "no se puede leer profiles.json: denied",
+    );
+    pair(
+        "profiles_not_a_document",
+        &messages::profiles_not_a_document(
+            Language::En,
+            "profile-fallbacks.json",
+            "gentle-pi.profile_model_fallbacks",
+            "other.kind",
+        ),
+        "profile-fallbacks.json is not a gentle-pi.profile_model_fallbacks document, it says \"other.kind\"",
+        &messages::profiles_not_a_document(
+            Language::Es,
+            "profile-fallbacks.json",
+            "gentle-pi.profile_model_fallbacks",
+            "other.kind",
+        ),
+        "profile-fallbacks.json no es un documento gentle-pi.profile_model_fallbacks, dice \"other.kind\"",
+    );
+    pair(
+        "profiles_wrong_version",
+        &messages::profiles_wrong_version(Language::En, "profiles.json", 2, 1),
+        "profiles.json is version 2, this view reads version 1",
+        &messages::profiles_wrong_version(Language::Es, "profiles.json", 2, 1),
+        "profiles.json tiene la versión 2, esta vista lee la versión 1",
+    );
+    pair(
+        "profiles_name_refused",
+        &messages::profiles_name_refused(Language::En, "profile-fallbacks.json", "bad name"),
+        "profile-fallbacks.json names a profile no reader accepts: \"bad name\"",
+        &messages::profiles_name_refused(Language::Es, "profile-fallbacks.json", "bad name"),
+        "profile-fallbacks.json nombra un perfil que ningún lector acepta: \"bad name\"",
+    );
+    pair(
+        "profiles_agent_refused",
+        &messages::profiles_agent_refused(
+            Language::En,
+            "profile-fallbacks.json",
+            "work",
+            "bad agent",
+        ),
+        "profile-fallbacks.json: \"work\" names the agent \"bad agent\"",
+        &messages::profiles_agent_refused(
+            Language::Es,
+            "profile-fallbacks.json",
+            "work",
+            "bad agent",
+        ),
+        "profile-fallbacks.json: \"work\" nombra el agente \"bad agent\"",
+    );
+    pair(
+        "profiles_not_a_chain",
+        &messages::profiles_not_a_chain(Language::En, "profile-fallbacks.json", "work", "agent"),
+        "profile-fallbacks.json: \"work\"/\"agent\" is not a chain",
+        &messages::profiles_not_a_chain(Language::Es, "profile-fallbacks.json", "work", "agent"),
+        "profile-fallbacks.json: \"work\"/\"agent\" no es una cadena",
+    );
+}
+
+/// The two words the app adds to a provider's own error, and the line a command
+/// answers once the window is closing.
+#[test]
+fn the_rest_of_the_apps_own_words_read_in_both_languages() {
+    pair(
+        "unknown_model_error",
+        messages::unknown_model_error(Language::En),
+        "unknown model error",
+        messages::unknown_model_error(Language::Es),
+        "error desconocido del modelo",
+    );
+    pair(
+        "closing",
+        messages::closing(Language::En),
+        "the app is closing",
+        messages::closing(Language::Es),
+        "la app se está cerrando",
+    );
+}

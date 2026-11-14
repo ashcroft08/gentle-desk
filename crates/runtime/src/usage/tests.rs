@@ -129,7 +129,7 @@ fn the_script_sits_in_the_checkout() {
 
 #[test]
 fn the_real_document_reads_as_its_four_providers() {
-    let document = parse(DOCUMENT).expect("the real document is this reader's");
+    let document = parse(Language::En, DOCUMENT).expect("the real document is this reader's");
 
     let names: Vec<&str> = document
         .providers
@@ -162,7 +162,7 @@ fn the_real_document_reads_as_its_four_providers() {
 
 #[test]
 fn a_no_data_provider_is_no_data_and_never_zero() {
-    let document = parse(DOCUMENT).expect("the real document is this reader's");
+    let document = parse(Language::En, DOCUMENT).expect("the real document is this reader's");
     let opencode = &document.providers[0];
 
     assert_eq!(opencode.status, ProviderStatus::NoData);
@@ -175,6 +175,7 @@ fn a_no_data_provider_is_no_data_and_never_zero() {
 #[test]
 fn a_reset_time_that_is_null_is_no_countdown() {
     let document = parse(
+        Language::En,
         r#"{"schema":"pi-usage-sources/usage/v1","generatedAt":1,"sources":[
             {"provider":"p","status":"ok","fetchedAt":1,"limits":[
                 {"name":"l","limitReached":false,"windows":[
@@ -191,6 +192,7 @@ fn a_reset_time_that_is_null_is_no_countdown() {
 #[test]
 fn a_failed_provider_carries_the_reason_the_package_redacted() {
     let document = parse(
+        Language::En,
         r#"{"schema":"pi-usage-sources/usage/v1","generatedAt":1,"sources":[
             {"provider":"claude-bridge","status":"failed","error":"timed out after 10000ms",
              "fetchedAt":1,"limits":[]}]}"#,
@@ -207,8 +209,11 @@ fn a_failed_provider_carries_the_reason_the_package_redacted() {
 
 #[test]
 fn a_document_of_another_schema_is_refused_and_named() {
-    let error = parse(r#"{"schema":"someone/else","generatedAt":1,"sources":[]}"#)
-        .expect_err("another schema is not this pane's document");
+    let error = parse(
+        Language::En,
+        r#"{"schema":"someone/else","generatedAt":1,"sources":[]}"#,
+    )
+    .expect_err("another schema is not this pane's document");
     assert!(error.contains("someone/else"), "{error}");
 }
 
@@ -223,7 +228,7 @@ fn a_document_of_another_shape_is_refused() {
         r#"{"schema":"pi-usage-sources/usage/v1","sources":{}}"#,
     ] {
         assert!(
-            parse(body).is_err(),
+            parse(Language::En, body).is_err(),
             "this shape is refused, never guessed: {body}"
         );
     }
@@ -253,7 +258,7 @@ fn a_provider_of_another_shape_is_refused() {
     ] {
         let body = format!("{head}{source}{tail}");
         assert!(
-            parse(&body).is_err(),
+            parse(Language::En, &body).is_err(),
             "this provider is refused, never guessed: {source}"
         );
     }

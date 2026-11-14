@@ -1,6 +1,7 @@
 //! Rebuilding the thread from a `get_messages` response (reopening a session).
 
 use gentle_core::chat::{messages_from_history, ChatMessage, ChatRole};
+use gentle_core::i18n::Language;
 use serde_json::json;
 
 fn msg(id: &str, role: ChatRole, text: &str) -> ChatMessage {
@@ -21,7 +22,7 @@ fn user_and_assistant_text_become_messages_with_contiguous_ids() {
         {"role": "user", "content": "plain string"},
     ]});
     assert_eq!(
-        messages_from_history(&data),
+        messages_from_history(Language::En, &data),
         vec![
             msg("msg-0", ChatRole::User, "hola"),
             msg("msg-1", ChatRole::Assistant, "**ey**"),
@@ -38,7 +39,7 @@ fn system_messages_and_tool_results_are_not_shown() {
         {"role": "toolResult", "content": [{"type": "text", "text": "output"}]},
         {"role": "assistant", "content": [{"type": "text", "text": "a"}]},
     ]});
-    let texts: Vec<_> = messages_from_history(&data)
+    let texts: Vec<_> = messages_from_history(Language::En, &data)
         .into_iter()
         .map(|m| m.text)
         .collect();
@@ -53,7 +54,10 @@ fn text_blocks_are_concatenated_and_other_blocks_ignored() {
         {"type": "toolCall", "id": "t", "name": "bash"},
         {"type": "text", "text": "dos"},
     ]}]});
-    assert_eq!(messages_from_history(&data)[0].text, "uno dos");
+    assert_eq!(
+        messages_from_history(Language::En, &data)[0].text,
+        "uno dos"
+    );
 }
 
 #[test]
@@ -63,7 +67,7 @@ fn an_assistant_turn_with_only_tools_is_dropped_like_the_live_reducer_does() {
         {"role": "assistant", "content": [{"type": "toolCall", "id": "t", "name": "bash"}]},
         {"role": "assistant", "content": [{"type": "text", "text": "listo"}]},
     ]});
-    let ids: Vec<_> = messages_from_history(&data)
+    let ids: Vec<_> = messages_from_history(Language::En, &data)
         .into_iter()
         .map(|m| (m.id, m.text))
         .collect();
@@ -79,7 +83,7 @@ fn an_assistant_turn_with_only_tools_is_dropped_like_the_live_reducer_does() {
 #[test]
 fn a_failed_assistant_message_is_kept_and_flagged_even_without_text() {
     let data = json!({"messages": [{"role": "assistant", "content": [], "stopReason": "error", "errorMessage": "quota"}]});
-    let messages = messages_from_history(&data);
+    let messages = messages_from_history(Language::En, &data);
     assert_eq!(messages.len(), 1);
     assert_eq!(messages[0].error.as_deref(), Some("quota"));
 }
@@ -92,6 +96,9 @@ fn malformed_data_gives_an_empty_thread() {
         json!({"messages": "no"}),
         json!({"messages": [1, "x", null]}),
     ] {
-        assert!(messages_from_history(&data).is_empty(), "{data}");
+        assert!(
+            messages_from_history(Language::En, &data).is_empty(),
+            "{data}"
+        );
     }
 }

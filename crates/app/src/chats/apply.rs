@@ -2,6 +2,7 @@
 //! release of the working queue the fold itself may free (S7).
 
 use gentle_core::chat::{messages_from_history, reduce_chat_at};
+use gentle_core::i18n::Language;
 use gentle_core::rpc::{RpcCommand, RpcEvent};
 
 use super::queue;
@@ -17,6 +18,7 @@ impl Chats {
     /// the same fold, with the check and the mark side by side.
     pub(crate) fn apply(
         &mut self,
+        language: Language,
         chat: &ChatId,
         event: &RpcEvent,
         now_ms: Option<u64>,
@@ -31,7 +33,7 @@ impl Chats {
         // slot; end events of an idle chat free nothing.
         let was_working = self.is_working(chat);
         let entry = self.entries.entry(chat.clone()).or_default();
-        entry.state = reduce_chat_at(std::mem::take(&mut entry.state), event, now_ms);
+        entry.state = reduce_chat_at(language, std::mem::take(&mut entry.state), event, now_ms);
         // A turn that ends while the user is elsewhere leaves a reply to read.
         let ended = matches!(event, RpcEvent::AgentEnd { .. } | RpcEvent::AgentSettled);
         if ended && !foreground {
@@ -63,7 +65,7 @@ impl Chats {
                 match (response.command.as_str(), &response.outcome) {
                     ("get_messages", Ok(data)) => {
                         let entry = self.entries.entry(chat.clone()).or_default();
-                        entry.state.messages = messages_from_history(data);
+                        entry.state.messages = messages_from_history(language, data);
                     }
                     // A reply without a reading (an older child, a failure)
                     // changes nothing: the chip keeps what it knew.

@@ -16,6 +16,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use gentle_app::{ChatCommand, Input};
+use gentle_core::i18n::Language;
 use gentle_desk_lib::bridge::AppStateHolder;
 use gentle_desk_lib::config::{ConfigSnapshot, ConfigWriter};
 use gentle_desk_lib::contract::{ChatActivityMark, ChatActivityView, UiIntent};
@@ -331,6 +332,47 @@ fn a_save_that_fails_sets_the_notice_and_the_run_keeps_the_value() {
     assert!(
         header(&holder.sessions_window(0, MAX_WINDOW).rows[0]).collapsed,
         "the run keeps the value it holds in memory"
+    );
+}
+
+/// The same failed save on a run that stores Spanish: the writer words its one
+/// line in the language of the snapshot it was handed (0.2.0, S3/T4b), and it
+/// reaches the very notice the window draws. The language needs no second
+/// channel because the snapshot already carries it.
+#[test]
+fn a_save_that_fails_speaks_the_language_the_config_holds() {
+    let dir = tempfile::tempdir().unwrap();
+    let repo = folder(dir.path(), "repo");
+    // The config's parent is a FILE, so no config file can be created there.
+    let blocked = dir.path().join("blocked-es");
+    fs::write(&blocked, b"a file, not a folder").unwrap();
+    let path = blocked.join("config.json");
+
+    let writer = ConfigWriter::spawn(Some(path));
+    let holder = Arc::new(AppStateHolder::default());
+    let mut saved = AppConfig {
+        language: Some(Language::Es),
+        ..AppConfig::default()
+    };
+    assert!(saved.add_workspace(&repo));
+    holder.replace_config(saved);
+    holder.arm_config_saves(writer.clone());
+    let holder_for_failure = Arc::clone(&holder);
+    writer.on_failure(Arc::new(move |message: String| {
+        holder_for_failure.note_config_problem(message);
+    }));
+
+    holder.dispatch(UiIntent::SetWorkspaceCollapsed {
+        path: repo.clone(),
+        collapsed: true,
+    });
+
+    let notice = wait_for("the failed save to be reported in Spanish", || {
+        holder.view().config_notice.clone()
+    });
+    assert!(
+        notice.starts_with("No se pudo guardar el archivo de configuración de la app:"),
+        "the stored language words the line, got {notice:?}"
     );
 }
 

@@ -10,7 +10,7 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use gentle_core::i18n::Language;
+use gentle_core::i18n::{messages, Language};
 use gentle_runtime::usage as rule;
 
 use super::{FileRead, NodeProbe};
@@ -48,30 +48,28 @@ pub fn view(
     language: Language,
 ) -> UsageView {
     let Some(home) = home else {
-        return unreadable(
-            "the shell's agent folder could not be found on this machine".to_owned(),
-        );
+        return unreadable(messages::shell_agent_folder_missing(language).to_owned());
     };
-    let settings = match files(&home.join(SETTINGS_FILE)) {
+    let settings = match files(&home.join(SETTINGS_FILE), language) {
         Ok(text) => text,
         Err(reason) => return unreadable(reason),
     };
     let Some(script) = rule::script(settings.as_deref(), home) else {
-        return missing("the usage sources are not installed for this shell");
+        return missing(language);
     };
     // The checkout is read for the script's presence only: a folder pi has not
     // cloned, or one without the headless entry point, is the same missing
     // package to the pane.
-    match files(&script) {
+    match files(&script, language) {
         Ok(Some(_)) => {}
-        Ok(None) => return missing("the usage sources are not installed for this shell"),
+        Ok(None) => return missing(language),
         Err(reason) => return unreadable(reason),
     }
-    let stdout = match node(&script) {
+    let stdout = match node(&script, language) {
         Ok(stdout) => stdout,
         Err(reason) => return failed(reason),
     };
-    match rule::parse(&stdout) {
+    match rule::parse(language, &stdout) {
         Ok(document) => UsageView {
             status: UsageStatusView::Installed,
             providers: document
@@ -84,9 +82,11 @@ pub fn view(
     }
 }
 
-fn missing(reason: &str) -> UsageView {
+fn missing(language: Language) -> UsageView {
     UsageView {
-        status: UsageStatusView::Missing(reason.to_owned()),
+        status: UsageStatusView::Missing(
+            messages::usage_sources_not_installed(language).to_owned(),
+        ),
         providers: Vec::new(),
     }
 }
@@ -140,7 +140,7 @@ fn provider_view(now_ms: u64, language: Language, provider: rule::Provider) -> U
 
 /// The real node run: `node <script>`, with the budget above.
 pub fn node_probe() -> NodeProbe {
-    Arc::new(|script: &Path| run(script, NODE_BUDGET))
+    Arc::new(|script: &Path, language: Language| run(language, script, NODE_BUDGET))
 }
 
 /// Runs the sources' script and answers the document line it printed.
@@ -150,7 +150,7 @@ pub fn node_probe() -> NodeProbe {
 /// and an overrun process is stopped rather than left behind. Its answer is read
 /// on threads of its own while it works, so a long document cannot fill a pipe
 /// and deadlock the run.
-fn run(script: &Path, budget: Duration) -> Result<String, String> {
+fn run(language: Language, script: &Path, budget: Duration) -> Result<String, String> {
     use std::process::{Command, Stdio};
 
     let mut child = Command::new("node")
@@ -159,7 +159,7 @@ fn run(script: &Path, budget: Duration) -> Result<String, String> {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .map_err(|error| format!("could not start ({error})"))?;
+        .map_err(|error| messages::usage_sources_could_not_start(language, &error.to_string()))?;
     let stdout = child.stdout.take().map(drained);
     let stderr = child.stderr.take().map(drained);
     let deadline = Instant::now() + budget;
@@ -172,27 +172,34 @@ fn run(script: &Path, budget: Duration) -> Result<String, String> {
                     // behind a pane that has already given up on it.
                     let _ = child.kill();
                     let _ = child.wait();
-                    return Err(format!(
-                        "did not answer within {} seconds",
-                        budget.as_secs()
+                    return Err(messages::usage_sources_did_not_answer(
+                        language,
+                        budget.as_secs(),
                     ));
                 }
                 std::thread::sleep(POLL);
             }
-            Err(error) => return Err(format!("could not run ({error})")),
+            Err(error) => {
+                return Err(messages::usage_sources_could_not_run(
+                    language,
+                    &error.to_string(),
+                ))
+            }
         }
     };
     let out = joined(stdout);
     let err = joined(stderr);
     if !status.success() {
-        let code = status
-            .code()
-            .map_or_else(|| "no exit code".to_owned(), |code| code.to_string());
-        return Err(if err.trim().is_empty() {
-            format!("stopped without printing a document ({code})")
+        let code = status.code().map_or_else(
+            || messages::no_exit_code(language).to_owned(),
+            |code| code.to_string(),
+        );
+        let what = if err.trim().is_empty() {
+            code
         } else {
-            format!("stopped without printing a document ({})", err.trim())
-        });
+            err.trim().to_owned()
+        };
+        return Err(messages::usage_sources_stopped(language, &what));
     }
     Ok(out)
 }
@@ -250,7 +257,7 @@ mod tests {
     /// A file reader that answers by file name - the shell's settings and the
     /// sources' own script - and records every path it was asked about.
     fn files(settings: Option<&'static str>, script: Option<&'static str>, log: Asked) -> FileRead {
-        Arc::new(move |path: &Path| {
+        Arc::new(move |path: &Path, _language: Language| {
             log.lock()
                 .expect("the log is not poisoned")
                 .push(path.display().to_string());
@@ -268,12 +275,12 @@ mod tests {
 
     /// A reader that fails every path, as a file the user cannot read does.
     fn unreadable(reason: &'static str) -> FileRead {
-        Arc::new(move |_path: &Path| Err(reason.to_owned()))
+        Arc::new(move |_path: &Path, _language: Language| Err(reason.to_owned()))
     }
 
     /// A node run that answers `answer` and counts how often it was asked.
     fn node(answer: Result<&'static str, &'static str>, ran: Arc<AtomicUsize>) -> NodeProbe {
-        Arc::new(move |_script: &Path| {
+        Arc::new(move |_script: &Path, _language: Language| {
             ran.fetch_add(1, Ordering::SeqCst);
             answer.map(str::to_owned).map_err(str::to_owned)
         })
@@ -451,7 +458,7 @@ mod tests {
         let tally = Arc::new(AtomicUsize::new(0));
         let fail_after_settings: FileRead = {
             let count = Arc::clone(&tally);
-            Arc::new(move |path: &Path| {
+            Arc::new(move |path: &Path, _language: Language| {
                 let seen = count.fetch_add(1, Ordering::SeqCst);
                 if seen == 0 {
                     Ok(Some(SETTINGS.to_owned()))

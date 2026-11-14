@@ -17,6 +17,7 @@
 
 use std::path::Path;
 
+use gentle_core::i18n::{messages, Language};
 use gentle_runtime::profiles::ORCHESTRATOR_ROLE;
 use gentle_runtime::profiles::{self as rule, FallbackStep, Profile};
 
@@ -40,11 +41,16 @@ const FALLBACK_ROLE: &str = "fallback";
 /// The chain file is never a reason to fail the pane: it is the sibling's, so a
 /// missing, unreadable or refused document simply leaves the FALLBACK row
 /// undrawn - which is what gentle-pi does with it too.
+///
+/// `language` is the language this run speaks (0.2.0, S3): the one sentence this
+/// pane words itself, and every refusal the files' rules answer with, come out
+/// in it.
 pub fn view(
     read: &FileRead,
     path: Option<&Path>,
     fallbacks: Option<&Path>,
     mode: OrchestratorModeView,
+    language: Language,
 ) -> ProfilesView {
     let mut view = ProfilesView {
         status: ProfilesStatusView::Unknown,
@@ -54,11 +60,11 @@ pub fn view(
     };
     let Some(path) = path else {
         view.status = ProfilesStatusView::Failed(
-            "gentle-pi's config folder could not be found on this machine".to_owned(),
+            messages::agent_profiles_folder_missing(language).to_owned(),
         );
         return view;
     };
-    let text = match read(path) {
+    let text = match read(path, language) {
         Ok(Some(text)) => text,
         Ok(None) => {
             view.status = ProfilesStatusView::Ready;
@@ -69,9 +75,9 @@ pub fn view(
             return view;
         }
     };
-    match rule::parse(&text) {
+    match rule::parse(language, &text) {
         Ok(mut profiles) => {
-            rule::attach_fallbacks(&mut profiles, &chains(read, fallbacks));
+            rule::attach_fallbacks(&mut profiles, &chains(read, fallbacks, language));
             view_of(&profiles, mode)
         }
         Err(reason) => ProfilesView {
@@ -86,12 +92,12 @@ pub fn view(
 /// document is an empty set of chains: no file, a file that cannot be read, and
 /// a document of another kind, version or step shape. The desk never invents a
 /// fallback to fill the row.
-fn chains(read: &FileRead, path: Option<&Path>) -> rule::Fallbacks {
+fn chains(read: &FileRead, path: Option<&Path>, language: Language) -> rule::Fallbacks {
     let Some(path) = path else {
         return rule::Fallbacks::default();
     };
-    match read(path) {
-        Ok(Some(text)) => rule::parse_fallbacks(&text).unwrap_or_default(),
+    match read(path, language) {
+        Ok(Some(text)) => rule::parse_fallbacks(language, &text).unwrap_or_default(),
         _ => rule::Fallbacks::default(),
     }
 }
@@ -239,7 +245,7 @@ mod tests {
     fn files(profiles: &str, fallbacks: Option<&str>) -> FileRead {
         let profiles = profiles.to_owned();
         let fallbacks = fallbacks.map(str::to_owned);
-        Arc::new(move |path: &Path| {
+        Arc::new(move |path: &Path, _language: Language| {
             if path.file_name().and_then(|name| name.to_str()) == Some("profile-fallbacks.json") {
                 return Ok(fallbacks.clone());
             }
@@ -254,7 +260,7 @@ mod tests {
 
     /// A reader of a machine where neither file was ever written.
     fn no_file() -> FileRead {
-        Arc::new(|_path: &Path| Ok(None))
+        Arc::new(|_path: &Path, _language: Language| Ok(None))
     }
 
     #[test]
@@ -266,6 +272,7 @@ mod tests {
             Some(&path),
             None,
             OrchestratorModeView::FullDelegation,
+            Language::En,
         );
 
         assert_eq!(view.status, ProfilesStatusView::Ready);
@@ -301,6 +308,7 @@ mod tests {
             Some(&PathBuf::from("C:/pi/gentle-ai/profiles.json")),
             Some(&PathBuf::from("C:/pi/gentle-ai/profile-fallbacks.json")),
             OrchestratorModeView::Organic,
+            Language::En,
         );
         assert_eq!(view.status, ProfilesStatusView::Ready);
         assert!(view.profiles.is_empty());
@@ -315,6 +323,7 @@ mod tests {
             Some(&PathBuf::from("p.json")),
             None,
             OrchestratorModeView::Organic,
+            Language::En,
         );
         match view.status {
             ProfilesStatusView::Failed(reason) => assert!(reason.contains("not a"), "{reason}"),
@@ -325,12 +334,14 @@ mod tests {
 
     #[test]
     fn a_read_that_failed_says_why() {
-        let failing: FileRead = Arc::new(|_path: &Path| Err("permission denied".to_owned()));
+        let failing: FileRead =
+            Arc::new(|_path: &Path, _language: Language| Err("permission denied".to_owned()));
         let view = view(
             &failing,
             Some(&PathBuf::from("p.json")),
             None,
             OrchestratorModeView::Organic,
+            Language::En,
         );
         assert_eq!(
             view.status,
@@ -340,7 +351,13 @@ mod tests {
 
     #[test]
     fn no_config_folder_is_said_plainly() {
-        let view = view(&reader(DOCUMENT), None, None, OrchestratorModeView::Organic);
+        let view = view(
+            &reader(DOCUMENT),
+            None,
+            None,
+            OrchestratorModeView::Organic,
+            Language::En,
+        );
         match view.status {
             ProfilesStatusView::Failed(reason) => {
                 assert!(reason.contains("config folder"), "{reason}")
@@ -366,6 +383,7 @@ mod tests {
             Some(&profiles_path),
             Some(&fallbacks_path),
             OrchestratorModeView::Organic,
+            Language::En,
         );
 
         assert_eq!(view.status, ProfilesStatusView::Ready);
@@ -397,6 +415,7 @@ mod tests {
             Some(&profiles_path),
             Some(&fallbacks_path),
             OrchestratorModeView::Organic,
+            Language::En,
         );
 
         assert_eq!(view.status, ProfilesStatusView::Ready);
@@ -424,6 +443,7 @@ mod tests {
                 Some(&profiles_path),
                 Some(&fallbacks_path),
                 OrchestratorModeView::Organic,
+                Language::En,
             );
             assert_eq!(
                 view.status,
@@ -453,6 +473,7 @@ mod tests {
             Some(&profiles_path),
             Some(&fallbacks_path),
             OrchestratorModeView::Organic,
+            Language::En,
         );
 
         let fallback = fallback(&view).expect("the orchestrator's chain is the row");
@@ -470,6 +491,7 @@ mod tests {
             Some(&profiles_path),
             Some(&fallbacks_path),
             OrchestratorModeView::Organic,
+            Language::En,
         );
 
         assert_eq!(view.status, ProfilesStatusView::Ready);
@@ -492,6 +514,7 @@ mod tests {
             Some(&profiles_path),
             Some(&fallbacks_path),
             OrchestratorModeView::Organic,
+            Language::En,
         );
 
         let fallback = fallback(&view).expect("the chain is drawn");
@@ -519,6 +542,7 @@ mod tests {
             Some(&profiles_path),
             Some(&fallbacks_path),
             OrchestratorModeView::Organic,
+            Language::En,
         );
 
         let rows: Vec<&ProfileRoleView> = view.profiles[0]

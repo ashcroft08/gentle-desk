@@ -7,6 +7,7 @@
 
 use std::fs;
 
+use gentle_core::i18n::Language;
 use gentle_desk_lib::shell_install::{CommandInstaller, Installer};
 
 #[test]
@@ -26,13 +27,13 @@ fs.writeFileSync({:?}, JSON.stringify(process.argv.slice(2)))
     .unwrap();
 
     std::env::set_var("GENTLE_DESK_NPM", &script);
-    assert_eq!(CommandInstaller::npm().install(), Ok(()));
+    assert_eq!(CommandInstaller::npm().install(Language::En), Ok(()));
     let argv: Vec<String> = serde_json::from_slice(&fs::read(&record).unwrap()).unwrap();
     assert_eq!(argv, ["install", "-g", "gentle-pi"]);
 
     let missing = dir.path().join("no-such-npm.exe");
     std::env::set_var("GENTLE_DESK_NPM", &missing);
-    let error = CommandInstaller::npm().install().unwrap_err();
+    let error = CommandInstaller::npm().install(Language::En).unwrap_err();
     assert!(error.contains("could not start"), "{error}");
     assert!(error.contains("no-such-npm"), "{error}");
 

@@ -5,6 +5,7 @@
 //! installer runs a command and says what went wrong in a bounded message.
 //! Nothing here installs anything: the command under test is `node`.
 
+use gentle_core::i18n::Language;
 use gentle_desk_lib::bridge::AppStateHolder;
 use gentle_desk_lib::commands::after_install;
 use gentle_desk_lib::contract::InstallView;
@@ -129,7 +130,7 @@ fn a_failed_install_never_claims_the_launcher_is_there() {
 fn the_installer_reports_success_of_the_command() {
     let installer = CommandInstaller::new("node", ["-e", "process.exit(0)"]);
 
-    assert_eq!(installer.install(), Ok(()));
+    assert_eq!(installer.install(Language::En), Ok(()));
 }
 
 #[test]
@@ -142,7 +143,7 @@ fn the_installer_reports_the_last_lines_of_a_failed_command() {
         ],
     );
 
-    let error = installer.install().unwrap_err();
+    let error = installer.install(Language::En).unwrap_err();
 
     assert!(error.contains("npm ERR! code E404"), "{error}");
     assert!(error.contains('3'), "the exit code is named: {error}");
@@ -152,7 +153,7 @@ fn the_installer_reports_the_last_lines_of_a_failed_command() {
 fn a_command_that_cannot_start_says_so() {
     let installer = CommandInstaller::new("definitely-not-a-real-program-xyz", ["install"]);
 
-    let error = installer.install().unwrap_err();
+    let error = installer.install(Language::En).unwrap_err();
 
     assert!(error.contains("could not start"), "{error}");
 }
@@ -164,7 +165,7 @@ fn a_failure_message_stays_small_whatever_the_command_prints() {
         ["-e", "for (let i = 0; i < 5000; i++) console.error('line ' + i + ' ' + 'x'.repeat(80)); process.exit(1)"],
     );
 
-    let error = installer.install().unwrap_err();
+    let error = installer.install(Language::En).unwrap_err();
 
     assert!(error.len() <= 2_100, "{} bytes", error.len());
     assert!(error.contains("line 4999"), "the end of the output is kept");
@@ -182,6 +183,7 @@ mod a_timed_out_install_stops_the_whole_tree {
     use std::process::Command;
     use std::time::{Duration, Instant};
 
+    use gentle_core::i18n::Language;
     use gentle_desk_lib::shell_install::{CommandInstaller, Installer};
 
     /// The stop this test waits for, instead of the app's twenty minutes.
@@ -253,7 +255,7 @@ setInterval(() => {}, 1000);
         let installer =
             CommandInstaller::new("node", [script.into_os_string()]).with_timeout(TIMEOUT);
 
-        let error = installer.install().unwrap_err();
+        let error = installer.install(Language::En).unwrap_err();
 
         assert!(error.contains("was stopped"), "{error}");
         let (child, grandchild) = pids(&pids_file);
