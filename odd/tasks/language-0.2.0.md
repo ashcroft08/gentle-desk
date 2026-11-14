@@ -138,9 +138,15 @@ fragments in 12 files.
       draws in notices/Notice.svelte (T5-owned) and chat/ViewTabs.svelte (T8) until
       those slices pass markLabelsCopy(language.current)[kind]. Route: writer. Commit
       802864c (RED 7; GREEN 558/0, svelte-check 0, eslint 0).
-- [ ] T7 (S3) settings area: settings/{copy.ts,account-copy.ts,profiles-copy.ts,
-      updates-copy.ts,usage-copy.ts}, SettingsDialog.svelte and its panes. Route:
-      writer. Commit: pending.
+- [x] T7 (S3) settings area: the five copy modules (copy/account/profiles/updates/usage)
+      become D4 builders with both columns (~68 entries, 7 builders), every pane and the
+      dialog read through them, profile-tabs and the rail label join their owners, and
+      the T6 gear seam is CLOSED (Sidebar.svelte:78 derives the dialog's word; mutation
+      proof attached). settings/** has zero hardcoded UI words left. The orchestrator
+      mode words are translated (Orgánico / Delegación total) while Fallback/pi/shell
+      and the pi document's mode values stay — flagged for the maintainer's T10 native
+      read. Route: writer. Commit de5322d (RED 45; GREEN 594/0, svelte-check 0,
+      eslint 0).
 - [ ] T8 (S3) the rest: composer/, thread/, chat/, install/, update/, welcome/,
       whats-new/ and components/. Route: writer. Commit: pending.
 - [ ] T9 (S3) test sweep: the ~45 vitest files that assert English and the ~12 that
