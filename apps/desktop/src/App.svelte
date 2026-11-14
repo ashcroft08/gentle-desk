@@ -25,6 +25,7 @@
   import UpdateNotice from './update/UpdateNotice.svelte'
   import { downloadAndInstall, findUpdate } from './update/plugin'
   import { stillIdle, available, downloading, dismissed, failed, ready, type UpdateState } from './update/state'
+  import { updateCopy } from './update/copy'
   import { createThreadView } from './thread/view'
   import MissingShell from './install/MissingShell.svelte'
   import Welcome from './welcome/Welcome.svelte'
@@ -39,6 +40,9 @@
   const shownNotices = $derived(visibleNotices(chat.notices))
   // The shell's own words, in the language this run is set to (0.2.0, S3/D4).
   const copy = $derived(appCopy(language.current))
+  // The update line's own words: the retry's reason is one of them (0.2.0, T9),
+  // because the sentence it completes is the line's (`update/copy.ts`).
+  const updateWords = $derived(updateCopy(language.current))
 
   // The active view is the shell's own choice, never Rust's state: it survives a
   // push and a chat switch, and the next start begins on Chat.
@@ -93,7 +97,7 @@
   async function retry(): Promise<void> {
     const found = pending ?? (await findUpdate())
     if (found === null) {
-      update = failed(update, 'no newer version was found')
+      update = failed(update, updateWords.noNewerVersion)
       return
     }
     pending = found

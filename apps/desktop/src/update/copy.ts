@@ -24,6 +24,12 @@ export interface UpdateCopy {
   ready: (version: string) => string
   /** The install failed; `version` is null when no release was ever named. */
   failed: (version: string | null, message: string) => string
+  /**
+   * The one reason the line spells itself: a retry asked the release server and
+   * found nothing newer to install. The plugin's own messages stay as they
+   * arrive (D7), so this is the only failure that needs a word of ours.
+   */
+  noNewerVersion: string
   /** The three answers the line offers. */
   install: string
   retry: string
@@ -40,6 +46,7 @@ const ENGLISH: UpdateCopy = {
   ready: (version) => `Version ${version} is installed. Open the app again to use it.`,
   failed: (version, message) =>
     `The update${version === null ? '' : ` to version ${version}`} could not be installed: ${message}`,
+  noNewerVersion: 'no newer version was found',
   install: 'Install update',
   retry: 'Try again',
   dismiss: 'Not now',
@@ -56,6 +63,7 @@ const SPANISH: typeof ENGLISH = {
   ready: (version) => `La versión ${version} está instalada. Abre la app de nuevo para usarla.`,
   failed: (version, message) =>
     `No se pudo instalar la actualización${version === null ? '' : ` a la versión ${version}`}: ${message}`,
+  noNewerVersion: 'no se encontró una versión más nueva',
   install: 'Instalar actualización',
   retry: 'Reintentar',
   dismiss: 'Ahora no',

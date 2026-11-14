@@ -12,6 +12,7 @@ import { updateCopy } from './copy'
 
 /** The English words, exactly as the line drew them before 0.2.0. */
 const ENGLISH = {
+  noNewerVersion: 'no newer version was found',
   install: 'Install update',
   retry: 'Try again',
   dismiss: 'Not now',
@@ -19,6 +20,7 @@ const ENGLISH = {
 
 /** The Spanish words: neutral Spanish, no voseo, no regionalisms, accents kept. */
 const SPANISH = {
+  noNewerVersion: 'no se encontró una versión más nueva',
   install: 'Instalar actualización',
   retry: 'Reintentar',
   dismiss: 'Ahora no',
