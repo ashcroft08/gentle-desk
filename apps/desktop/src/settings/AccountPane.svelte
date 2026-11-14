@@ -100,8 +100,8 @@
 {/if}
 
 <div class="acts">
-  <button class="btn" type="button" onclick={() => void open('Login')}>{OPEN_SHELL}</button>
-  <button class="btn accent" type="button" onclick={check}>{CHECK_AGAIN}</button>
+  <button class="btn accent" type="button" onclick={() => void open('Login')}>{OPEN_SHELL}</button>
+  <button class="btn" type="button" onclick={check}>{CHECK_AGAIN}</button>
 </div>
 <p class="note">{NOTE}</p>
 {#if terminalError !== null}
