@@ -31,4 +31,4 @@ export const TRY_AGAIN = 'Try again'
 /** The one action, and the note that says it opens a terminal. */
 export const EDIT_IN_TERMINAL = 'Edit in terminal'
 export const EDIT_NOTE =
-  'Edits, creates and switches profiles - the panel refreshes when the terminal closes.'
+  'Opens the shell: type /gentle:profiles there to edit, create and switch profiles - the panel refreshes when the terminal closes.'

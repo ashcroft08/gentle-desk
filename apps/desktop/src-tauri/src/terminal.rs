@@ -3,13 +3,13 @@
 //!
 //! Four jobs travel this way:
 //!
-//! - profiles: the shell's interactive screen, `/gentle:profiles`, named as the
-//!   opening prompt. The screen is a TUI its own extension draws, reachable only
-//!   by naming that command once the terminal is up, so the command is passed to
-//!   the launcher as its positional prompt: that is the smallest thing that
-//!   opens the right screen (no new subcommand, and no keystrokes typed into
-//!   someone's window after it opens). There `n` creates a profile and `u` uses
-//!   one in the session (L9), and the desk never writes the file.
+//! - profiles: the shell's INTERACTIVE screen, opened with no opening prompt.
+//!   The maintainer's first run showed pi's extension erroring on a
+//!   prompt-started profiles screen (`saveFirst` undefined — the screen needs
+//!   the interactive context pi builds after startup), so the desk opens the
+//!   shell and the user names `/gentle:profiles` in the window; the panel's
+//!   note already says so. There `n` creates a profile and `u` uses one in the
+//!   session (L9), and the desk never writes the file.
 //! - login / logout: the shell's own `auth login` / `auth logout`.
 //! - update: the shell's own `update`, which forwards to pi's updater (L5), run
 //!   from a terminal because S4 lets an update run only with every chat closed.
@@ -32,12 +32,16 @@ use gentle_backend::launcher::{self, Launcher, LauncherEnv};
 use crate::contract::TerminalActionView;
 
 /// What one action asks the shell to do: the arguments after the launcher's own
-/// and the home flags.
+/// and the home flags. Profiles opens the INTERACTIVE shell with no opening
+/// prompt: the maintainer's first run showed pi's extension erroring on a
+/// prompt-started profiles screen (`saveFirst` undefined — the screen needs the
+/// interactive context pi builds after startup), so the desk opens the shell
+/// and the user names the command; the panel's note already says so.
 pub fn action_args(action: TerminalActionView) -> &'static [&'static str] {
     match action {
-        TerminalActionView::Profiles => &["/gentle:profiles"],
-        TerminalActionView::Login => &["auth", "login"],
-        TerminalActionView::Logout => &["auth", "logout"],
+        TerminalActionView::Profiles => &[],
+        TerminalActionView::Login => &[],
+        TerminalActionView::Logout => &[],
         TerminalActionView::Update => &["update"],
     }
 }
@@ -90,19 +94,66 @@ pub fn open(action: TerminalActionView, home_args: &[OsString]) -> Result<(), St
     launch(&program, &args)
 }
 
-/// Starts `program` in a terminal window of its own, answering as soon as the
-/// window exists: nothing here waits for the window to close.
+/// The arguments Windows Terminal gets: one new window, one tab, then the
+/// program and its own arguments after `--`. Pure, so the shape is pinned by a
+/// test.
+pub fn windows_terminal_args(program: &Path, args: &[OsString]) -> Vec<OsString> {
+    let mut argv: Vec<OsString> = ["-w", "-1", "new-tab", "--"]
+        .iter()
+        .map(OsString::from)
+        .collect();
+    argv.push(program.as_os_str().to_owned());
+    argv.extend(args.iter().cloned());
+    argv
+}
+
+/// `wt.exe` on this machine: the Windows Terminal this user has, when it is
+/// installed. `LOCALAPPDATA`'s alias is the documented place; `PATH` is looked
+/// at too, because a machine may have it either way.
+fn windows_terminal() -> Option<PathBuf> {
+    if let Some(base) = std::env::var_os("LOCALAPPDATA") {
+        let candidate = PathBuf::from(base).join("Microsoft/WindowsApps/wt.exe");
+        if candidate.is_file() {
+            return Some(candidate);
+        }
+    }
+    let path = std::env::var_os("PATH")?;
+    std::env::split_paths(&path)
+        .map(|dir| dir.join("wt.exe"))
+        .find(|candidate| candidate.is_file())
+}
+
+/// Opens `program` in a terminal window, answering as soon as the window
+/// exists: nothing here waits for the window to close.
+///
+/// Windows Terminal is used when it is installed: it owns a real terminal and
+/// starts the program itself, so no `cmd` parses the line and no console
+/// handles are inherited from this GUI process. Measured in this app: a child
+/// started with `CREATE_NEW_CONSOLE` from the console-less app exits at once
+/// with code 0 and prints nothing, while the very same command stays alive in a
+/// terminal of its own. When `wt.exe` is missing, the direct spawn with its own
+/// console is the fallback.
 #[cfg(windows)]
 fn launch(program: &Path, args: &[OsString]) -> Result<(), String> {
     use std::os::windows::process::CommandExt;
 
-    /// `CREATE_NEW_CONSOLE`: the new console is the visible terminal this
-    /// command exists to open.
+    /// `CREATE_NEW_CONSOLE`: the fallback console that is visible on its own.
     const CREATE_NEW_CONSOLE: u32 = 0x0000_0010;
+    /// `DETACHED_PROCESS`: Windows Terminal must not borrow this process's
+    /// console, because a GUI process has none to give.
+    const DETACHED_PROCESS: u32 = 0x0000_0008;
 
-    std::process::Command::new("cmd")
-        .arg("/c")
-        .arg(program)
+    if let Some(wt) = windows_terminal() {
+        let started = std::process::Command::new(wt)
+            .args(windows_terminal_args(program, args))
+            .creation_flags(DETACHED_PROCESS)
+            .spawn();
+        if started.is_ok() {
+            return Ok(());
+        }
+    }
+
+    std::process::Command::new(program)
         .args(args)
         .creation_flags(CREATE_NEW_CONSOLE)
         .spawn()
@@ -138,16 +189,28 @@ mod tests {
         args.iter().map(OsString::from).collect()
     }
 
-    /// Each button names the shell's own command, and the profiles screen is the
-    /// slash command the shell already answers to.
+    /// Each button names the shell's own command. Profiles opens the shell
+    /// INTERACTIVE with no opening prompt: pi's extension errors on a
+    /// prompt-started profiles screen (the maintainer's run:
+    /// `saveFirst` undefined), so the user names the command in the window.
     #[test]
     fn every_action_names_the_shells_own_command() {
         assert_eq!(
-            action_args(TerminalActionView::Profiles),
-            &["/gentle:profiles"]
+            action_args(TerminalActionView::Profiles) as &[&str],
+            &[] as &[&str]
         );
-        assert_eq!(action_args(TerminalActionView::Login), &["auth", "login"]);
-        assert_eq!(action_args(TerminalActionView::Logout), &["auth", "logout"]);
+        // `pi auth login|logout` REQUIRE a provider (`Usage: pi auth login
+        // <provider>`, exit 1 in 0.6 s - the window blinked away). Sign-in and
+        // sign-out are pi's own `/login` and `/logout` inside the shell, which
+        // ask for the provider themselves, so these open the shell too.
+        assert_eq!(
+            action_args(TerminalActionView::Login) as &[&str],
+            &[] as &[&str]
+        );
+        assert_eq!(
+            action_args(TerminalActionView::Logout) as &[&str],
+            &[] as &[&str]
+        );
         assert_eq!(action_args(TerminalActionView::Update), &["update"]);
     }
 
@@ -155,13 +218,16 @@ mod tests {
     /// then the action: the same shape every other shell run of the pane has.
     #[test]
     fn the_command_is_the_launcher_then_the_home_flags_then_the_action() {
-        let (program, args) =
-            command_for(TerminalActionView::Login, &launcher(), &os(&["--isolated"]));
+        let (program, args) = command_for(
+            TerminalActionView::Update,
+            &launcher(),
+            &os(&["--isolated"]),
+        );
 
         assert_eq!(program, PathBuf::from("C:/node/node.exe"));
         assert_eq!(
             args,
-            os(&["C:/npm/gentle-shell.mjs", "--isolated", "auth", "login"])
+            os(&["C:/npm/gentle-shell.mjs", "--isolated", "update"])
         );
     }
 
@@ -177,14 +243,31 @@ mod tests {
 
         assert_eq!(
             args,
-            os(&[
-                "C:/npm/gentle-shell.mjs",
-                "--home",
-                "C:/h",
-                "--link",
-                "/gentle:profiles"
-            ]),
+            os(&["C:/npm/gentle-shell.mjs", "--home", "C:/h", "--link"]),
             "the flags travel as the children get them: `--home` is the one the shell reads first"
+        );
+    }
+
+    /// Windows Terminal gets one new window and one tab, then `--` and the
+    /// program with its own arguments: nothing is parsed by cmd.
+    #[test]
+    fn windows_terminal_opens_one_tab_on_the_program() {
+        let argv = windows_terminal_args(
+            Path::new("C:/Program Files/nodejs/node.exe"),
+            &os(&["C:/npm/gentle-shell.mjs", "--link"]),
+        );
+
+        assert_eq!(
+            argv,
+            os(&[
+                "-w",
+                "-1",
+                "new-tab",
+                "--",
+                "C:/Program Files/nodejs/node.exe",
+                "C:/npm/gentle-shell.mjs",
+                "--link"
+            ])
         );
     }
 

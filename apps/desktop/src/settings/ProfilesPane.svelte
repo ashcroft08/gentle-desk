@@ -109,6 +109,19 @@
 </script>
 
 <!-- The two sub-tabs (L17): the pair the pane switches between, one tab stop. -->
+<!-- The file's own state, above the tabs: both tabs read the same document, so
+     the reading, the failure and the empty case are the pane's, not a tab's. -->
+{#if profiles === null || profiles.status.type === 'Unknown'}
+  <p class="quiet">{READING}</p>
+{:else if failed !== null}
+  <!-- The file is there and cannot be used: say why, and that a read is safe. -->
+  <p class="quiet" role="status">{FAILED(failed)}</p>
+  <p class="quiet">{RETRY_SAFE}</p>
+  <button class="btn" type="button" onclick={read}>{TRY_AGAIN}</button>
+{:else if active === null}
+  <p class="quiet">{NO_PROFILES}</p>
+{/if}
+
 <div class="subtabs" role="tablist" aria-label={PROFILE_TABS_LABEL}>
   {#each PROFILE_TABS as item (item)}
     <button
@@ -125,19 +138,6 @@
     </button>
   {/each}
 </div>
-
-<!-- The file's own state, above the pair: both tabs read the same document, so
-     the reading, the failure and the empty case are the pane's, not a tab's. -->
-{#if profiles === null || profiles.status.type === 'Unknown'}
-  <p class="quiet">{READING}</p>
-{:else if failed !== null}
-  <!-- The file is there and cannot be used: say why, and that a read is safe. -->
-  <p class="quiet" role="status">{FAILED(failed)}</p>
-  <p class="quiet">{RETRY_SAFE}</p>
-  <button class="btn" type="button" onclick={read}>{TRY_AGAIN}</button>
-{:else if active === null}
-  <p class="quiet">{NO_PROFILES}</p>
-{/if}
 
 <!-- Profile (L17): the switch of the chats opened from now on, the active
      profile's card, and the one action - the terminal. -->
