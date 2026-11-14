@@ -28,6 +28,11 @@ calendar one. Version numbers never repeat or go down (updater compares them).
   through Windows Terminal. See odd/tasks/settings-0.1.12.md (L19 closes it).
 - 0.1.13 (SHIPPED 2026-11-14): the context chip reads at a glance (#153) and the Updates
   pane's Update extensions action (#154).
+- 0.1.14 (SHIPPED 2026-11-14): Close chat in the row menu (the Updates gate is
+  satisfiable without quitting), a dot on the gear when pi or the shell is behind, the
+  **Usage** section drawing the subscription numbers through `pi-usage-sources`' headless
+  JSON mode, terminal windows that wait with a titled tab, and a Settings dialog that no
+  longer closes on a press outside.
 - 0.2.0 (next, when the maintainer says): **language** - English and Spanish for the app's own
   words. Everything user-facing already lives in 15 copy modules (~174 exports) on the web side
   and in ~41 Rust strings that reach the UI; the work is a keyed catalog, Rust strings as codes
