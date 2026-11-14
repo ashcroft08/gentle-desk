@@ -17,10 +17,20 @@ calendar one. Version numbers never repeat or go down (updater compares them).
   on feat/model-selector-0.1.11 (13 feature commits + review corrections; native
   review approved twice, including the design slice; see
   odd/tasks/model-selector-0.1.11.md).
-- 0.1.12: read-only profiles view (read profiles.json), auth status via
-  `gentle-shell auth check --json`, "Open in terminal" buttons for login/logout and
-  profile editing, organic vs full-delegation switch via the
-  GENTLE_PI_ORCHESTRATOR_MODE env var at child launch (session-scoped, not persisted).
+- 0.1.12: SHIPPED 2026-11-13 as a 3-PR chain (#146 context seam, #147 settings reads +
+  orchestrator mode + terminals, #148 web panes + context chip + update gate, #150 the
+  terminal fix and the Unverified word): read-only profiles view (active profile, real
+  fallback chains from `profile-fallbacks.json`, agent table), auth status from the store's
+  provider NAMES with a per-provider `auth check --provider X --json --no-refresh`, Updates
+  checked automatically at open against the npm registry with the chats-closed gate, the
+  organic vs full-delegation switch via `GENTLE_PI_ORCHESTRATOR_MODE` (session-scoped, not
+  persisted), a per-chat context chip from RPC `get_session_stats`, and "Open in terminal"
+  through Windows Terminal. See odd/tasks/settings-0.1.12.md (L19 closes it).
+- 0.1.13 (candidates): a Settings preference for how the terminal opens (new window,
+  tab, maximized - today Windows Terminal decides), the Updates pane's empty state (a
+  quiet versions row while nothing has been checked), and the subscription usage panel
+  once gentle-pi exposes it (`get_usage` RPC or `/gentle:usage --json`; today the numbers
+  live only in the child's memory, so the desk cannot read them).
 - 0.2.0 (optional, user decision): profile and subagent editing in the GUI. Blocked on
   gentle-pi adding text subcommands such as `/gentle:profiles use <name>` and
   `/gentle:profiles mode <name> <mode>`.

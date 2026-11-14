@@ -50,6 +50,12 @@ It does not reimplement the agent: it starts `gentle-shell --mode rpc` for each 
 
 The app needs `gentle-shell` on the machine. If it is missing, the app says so and offers to install it, [only when you press the button](#first-start-which-home).
 
+### Requirements
+
+- **Windows 10 or 11, x64.**
+- **Node and npm**: the app installs `gentle-shell` with `npm install -g gentle-pi`, and only when you press the button.
+- **Windows Terminal**, for the buttons that open a shell. Without it those buttons still work: they open a plain console window instead.
+
 ## What you get
 
 ### Your workspaces and your chats, in one tree
@@ -66,6 +72,30 @@ The app needs `gentle-shell` on the machine. If it is missing, the app says so a
 ### Images, by drag and drop
 
 Drag saved image files (png, jpg, jpeg, webp, gif; up to 8 and 64 MB per message) onto the message box. Each one shows a thumbnail you can remove before sending, the sent message keeps the thumbnails, and the model receives the picture itself, not only its path. A screenshot that is only on the clipboard cannot be pasted: save it as a file first, like in the terminal.
+
+### Settings, in six sections
+
+The gear at the bottom of the sidebar opens Settings: **Appearance** (the theme), **Shell home** (which pi this window runs on), **Updates**, **Profiles**, **Account**, and **About** (the name and the version this run runs as). The arrow keys walk the rail.
+
+<img width="100%" src="docs/assets/screenshots/settings-profiles.png" alt="The Settings dialog open over a chat: a rail of six sections on the left, and the Profiles section on the right with a Profile and Agents pair of tabs, the Orchestrator mode switch on Organic, a card naming the active profile with its orchestrator and fallback models, and an Edit in terminal button">
+
+**Profiles** is read-only. It draws the orchestrator-mode switch for the chats opened from now on (Organic or Full delegation, never stored), the active profile with its orchestrator and fallback routes, and an Agents tab with one row per agent, its model and its effort. Profiles are created, edited and switched in the shell, so the pane's one button opens a terminal there.
+
+<img width="100%" src="docs/assets/screenshots/settings-account.png" alt="The Account section of the Settings dialog: one row naming the provider commandcode, tagged Signed in (not checkable), with Open shell to sign in or out and Check again buttons under it">
+
+**Account** names each provider the shell is signed in to and what the check said about it (Connected, Signed in (not checkable), Not ready). It shows names only, never a credential, and its button opens the shell to sign in or out.
+
+<img width="100%" src="docs/assets/screenshots/settings-updates.png" alt="The Updates section of the Settings dialog: a card tagged Everything is up to date, the line This app 0.1.12, pi 1.5.2 and shell 4.7.0, and a Check again button">
+
+**Updates** checks once when the app opens and again only when you ask it to. It compares pi against the npm registry and shows the versions this machine runs; when something is behind, Update runs the shell's own update in a terminal window and stays dead until every chat is closed.
+
+The buttons that open a shell - Edit in terminal, Open shell to sign in or out, Update - use **Windows Terminal** when it is installed.
+
+### How full the chat is
+
+<img width="100%" src="docs/assets/screenshots/context-chip.png" alt="A chat open with the workspace tree on the left and the conversation on the right, the composer at the bottom: the message box, the keys hint, and a context chip reading 6% beside the model DeepSeek V4.1 Flash (latest) and the thinking level high">
+
+The composer shows how much of the model's window the chat is using, as a percentage beside the model pills, with the token count on hover. It takes the warning tone from 75% and the danger tone from 95%, and a chat that just compacted shows a dash instead of a number.
 
 ### The rest of the conversation
 
@@ -90,7 +120,7 @@ At the first start the app looks, for existence only and never at the contents, 
 - **pi found, nothing chosen yet and `gentle-shell` resolved:** a welcome screen asks whether to use your pi ("Use my pi setup", `--link`) or keep gentle shell separate (`--isolated`, `~/.gentle-shell/agent`). While the launcher is missing the install screen is what you see, and the question comes once it resolves. The app saves the answer and starts again so it applies at once. The app never touches your pi files, with two exceptions, both from a chat row's own menu: the name you give a chat on rename, appended to that chat's own session file as one `session_info` line, which is where pi reads a chat's title; and a chat you delete, whose session file is removed after a dialog that names the file.
 - **No pi:** the question is skipped and gentle shell runs in its own space.
 
-You can change the choice later with the **My pi / Separate** control in the sidebar footer; it applies after **Restart now**.
+You can change the choice later in **Settings → Shell home**; it applies after **Restart now**.
 
 <p align="right"><a href="#top">Back to top</a></p>
 
