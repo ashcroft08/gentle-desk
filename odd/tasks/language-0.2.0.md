@@ -147,12 +147,27 @@ fragments in 12 files.
       and the pi document's mode values stay — flagged for the maintainer's T10 native
       read. Route: writer. Commit de5322d (RED 45; GREEN 594/0, svelte-check 0,
       eslint 0).
-- [ ] T8 (S3) the rest: composer/, thread/, chat/, install/, update/, welcome/,
-      whats-new/ and components/. Route: writer. Commit: pending.
-- [ ] T9 (S3) test sweep: the ~45 vitest files that assert English and the ~12 that
-      hardcode copy literals read through the catalog instead of literals; Spanish
-      coverage where a Rust-generated string reaches the UI. Route: writer. Commit:
-      pending.
+- [x] T8 (S3) the rest: composer (20 entries), thread (8), chat (new copy.ts; the words
+      left the rules module tabs.ts with a pointer comment), install (14 + elapsed),
+      update (7), welcome (10 + the two 3-point lists), whats-new (4; the release body
+      from latest.json stays released content, D7), and the bare <Mark> draws closed:
+      Notice.svelte passes markLabelsCopy[mark]; ViewTabs keeps its count sentence via
+      chatCopy().workingBadge (translating the sentence, not the mark — passing
+      markLabelsCopy would silently drop the count). Sentence helpers take the
+      dictionary as a parameter (composerStateOf, chipOf, sinceLabel). Route: writer.
+      Commit 04f613c (RED 1 suite + 37 tests; GREEN 633/0, svelte-check 0, eslint 0).
+- [ ] T9 (S3) bilingual completion audit (RE-SCOPED, Log L6): the original sweep
+      (routing ~45 English-asserting test files through the catalog) is obsolete — the
+      pattern that emerged makes the pre-existing English literals THE pin (they pass
+      unchanged by design) and gives each area its own copy + flip tests asserting the
+      Spanish column. The audit instead: (1) grep the whole web src for any REMAINING
+      app-owned English word drawn outside the dictionaries, excluding the D7 families
+      (child/shell passthrough, released content) and the two Rust-ruled exceptions;
+      (2) one app-level flip: with a stored "es", the major surfaces (rail, dialog,
+      composer, thread, welcome) draw Spanish in the same tick; (3) the T8 sweep list
+      read through builders only where a file would otherwise break (expected: none);
+      (4) the same audit for Rust producers (string literals outside messages.rs, minus
+      the two rulings). Route: writer. Commit: pending.
 - [ ] T10 (S5) close: version 0.2.0 in apps/desktop/package.json,
       apps/desktop/src-tauri/Cargo.toml and apps/desktop/src-tauri/tauri.conf.json, the
       what's-new entry, the shipped note in odd/tasks/tauri-settings-roadmap.md, then
@@ -266,3 +281,11 @@ fragments in 12 files.
   verification of this slice: dispatchIntent not called on choice (silent no-op),
   adopt() inverted (stored preference ignored), report() firing twice, and the
   fallback rule drifting from Rust's.
+- L6 (parent, 2026-11-14): T9 re-scoped. The original "test sweep" description was
+  written before the catalog pattern emerged; routing every English-asserting test
+  through the builder would be churn without value, because the byte-identical English
+  pins ARE the preservation evidence and every area now owns copy + flip tests. T9's
+  remaining value is the completion audit (grep for drawn app words outside the
+  dictionaries, one app-level flip, the Rust-producer equivalent). T8's ViewTabs
+  deviation accepted: the badge's accessible name carries the count, so the count
+  sentence moved into chatCopy() rather than the generic mark label.
