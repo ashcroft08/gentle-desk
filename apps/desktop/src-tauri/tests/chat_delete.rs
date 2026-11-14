@@ -17,7 +17,7 @@ use std::sync::{Mutex, MutexGuard};
 use gentle_app::{ChatId, Input, Intent, SessionItem};
 use gentle_backend::session_delete::{SessionRemovals, MISSING_SESSION};
 use gentle_desk_lib::bridge::AppStateHolder;
-use gentle_desk_lib::chat_delete::{self, workspace_gone, WORKING_CHILD};
+use gentle_desk_lib::chat_delete::{self, working_child, workspace_gone};
 use gentle_desk_lib::chat_rename::WorkingChats;
 use gentle_desk_lib::sessions::view::NEW_CHAT_TITLE;
 use gentle_runtime::app_config::AppConfig;
@@ -129,8 +129,13 @@ fn a_working_chat_is_refused_with_one_notice_and_its_file_is_untouched() {
     assert!(disk.calls().is_empty(), "the removal never ran");
     assert_eq!(
         deleted.view.sessions_notice.as_deref(),
-        Some(WORKING_CHILD),
+        Some(working_child().as_str()),
         "the reason reaches the user as a notice"
+    );
+    assert_eq!(
+        working_child(),
+        "This chat is working. Stop it first, then delete it.",
+        "the delete flow's words are unchanged: Close chat shares their sentence, not the other way round"
     );
     assert_eq!(
         deleted.view.sessions_revision, before_view.sessions_revision,

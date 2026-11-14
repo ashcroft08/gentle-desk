@@ -33,6 +33,7 @@
     onNewChat,
     onOpen,
     onRename,
+    onClose,
     onDelete,
   }: {
     rows?: TreeRow[]
@@ -49,6 +50,8 @@
     onOpen: (row: ChatRowData) => void
     /** The name a chat row's inline input committed, to send as the rename. */
     onRename: (row: ChatRowData, name: string) => void
+    /** A chat row's Close chat: stop its child, leave its row and its file. */
+    onClose: (row: ChatRowData) => void
     /** A chat row's Delete: the sidebar opens the confirm dialog that names it. */
     onDelete: (row: ChatRowData) => void
   } = $props()
@@ -176,6 +179,7 @@
           onHover={(key) => (hoveredKey = key)}
           onKeydown={keydown}
           onRename={onRename}
+          onClose={onClose}
           onDelete={onDelete}
         />
       {/if}

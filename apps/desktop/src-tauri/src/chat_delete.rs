@@ -39,8 +39,12 @@ use crate::commands::{emit_state, Bridge};
 use crate::contract::ViewState;
 
 /// The one line a user reads when they asked to delete a chat that is mid-turn.
-/// The delete never stops the child itself (S-T3.5): the user does.
-pub const WORKING_CHILD: &str = "This chat is working. Stop it first, then delete it.";
+/// The delete never stops the child itself (S-T3.5): the user does. Its rule and
+/// its words are shared with Close chat (0.1.14), which says the same sentence
+/// with its own verb, so a row menu never grows a second wording.
+pub fn working_child() -> String {
+    format!("{}, then delete it.", gentle_app::WORKING_CHAT)
+}
 
 /// What the user reads when the last chat of a derived workspace is deleted and
 /// that workspace was the current one: its row is gone from the tree.
@@ -77,7 +81,7 @@ pub fn delete(
     }
     if working.is_working(session) {
         return Deleted {
-            view: holder.note_sessions_problem(WORKING_CHILD.to_owned()),
+            view: holder.note_sessions_problem(working_child()),
             removed: false,
         };
     }

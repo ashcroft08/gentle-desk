@@ -3,14 +3,17 @@
   // and the mark its activity calls for (reusing `Mark`, so the state is always
   // a shape and a name, never colour alone). Selected means foreground.
   //
-  // The row's own "..." menu (T2, S4) offers Rename and Delete. Rename turns the
-  // title into an input, like the states board's inline rename: Enter commits,
-  // Escape cancels, and the typed name goes to Rust as the rename command (the
-  // title the state carries moves on the next push, when the session list reads
-  // the appended name back). Delete opens the sidebar's confirm dialog, which
-  // names the real file before the delete command runs (T3); the item stays
-  // enabled always, because only the chat's WORKING state refuses a delete, and
-  // that refusal is the command's to say.
+  // The row's own "..." menu (T2, S4) offers Rename, Close chat and Delete.
+  // Rename turns the title into an input, like the states board's inline rename:
+  // Enter commits, Escape cancels, and the typed name goes to Rust as the rename
+  // command (the title the state carries moves on the next push, when the
+  // session list reads the appended name back). Close chat (0.1.14) stops the
+  // chat's child and takes it off the open set, leaving its row and its file
+  // alone - it is the way out of the Updates pane's chats-closed gate. Delete
+  // opens the sidebar's confirm dialog, which names the real file before the
+  // delete command runs (T3). The two items stay enabled always, because only
+  // the chat's WORKING state refuses them, and that refusal is the state's to
+  // say (one sentence, shared by both).
   import { DropdownMenu } from 'bits-ui'
   import Icon from '../icons/Icon.svelte'
   import Mark from '../icons/Mark.svelte'
@@ -28,6 +31,7 @@
     onHover,
     onKeydown,
     onRename,
+    onClose,
     onDelete,
   }: {
     row: ChatRow
@@ -45,6 +49,8 @@
     onKeydown: (event: KeyboardEvent) => void
     /** The name the user typed for this chat, once they pressed Enter. */
     onRename: (row: ChatRow, name: string) => void
+    /** This chat's Close chat: stop its child and take it off the open set. */
+    onClose: (row: ChatRow) => void
     /** This chat's Delete: the sidebar opens the confirm dialog that names it. */
     onDelete: (row: ChatRow) => void
   } = $props()
@@ -157,6 +163,7 @@
         collisionPadding={12}
       >
         <DropdownMenu.Item onSelect={startRename}>Rename</DropdownMenu.Item>
+        <DropdownMenu.Item onSelect={() => onClose(row)}>Close chat</DropdownMenu.Item>
         <DropdownMenu.Item class="d" onSelect={() => onDelete(row)}>Delete</DropdownMenu.Item>
       </DropdownMenu.Content>
     </DropdownMenu.Portal>

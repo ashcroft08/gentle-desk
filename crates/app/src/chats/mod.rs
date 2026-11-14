@@ -40,6 +40,20 @@ use crate::{
     ChatCommand,
 };
 
+/// The one sentence a user reads when they ask a chat that is mid-turn to go
+/// away, whichever action they took (0.1.14): the rule (stop it first) and the
+/// words are the delete flow's (T3, S4), so the row menu never grows a second
+/// wording for the same refusal. Each action closes the sentence with its own
+/// verb.
+pub const WORKING_CHAT: &str = "This chat is working. Stop it first";
+
+/// What Close chat answers a chat that is mid-turn: [`WORKING_CHAT`] with this
+/// action's verb. The delete flow says the same sentence, ending in
+/// "then delete it." (`chat_delete::working_child`).
+pub fn close_working() -> String {
+    format!("{WORKING_CHAT}, then close it.")
+}
+
 /// Applies the boot's working cap for every chat at once (S7).
 pub(crate) fn set_working_cap(state: &mut AppState, cap: usize) {
     queue::set_cap(&mut state.chats, cap);

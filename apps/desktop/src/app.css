@@ -1062,6 +1062,21 @@ p {
   color: var(--text);
 }
 
+/* The gear's update dot (0.1.14): 6px of accent on the icon's corner when a row
+   a terminal updates is behind. A dot, never a number and never a word on the
+   bar; it is decoration (the gear's own name says it in words) and takes no
+   click of its own. */
+.foot .ic .dot {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  pointer-events: none;
+}
+
 .tp {
   position: relative;
 }
