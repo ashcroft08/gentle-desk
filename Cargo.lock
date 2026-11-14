@@ -1003,7 +1003,7 @@ dependencies = [
 
 [[package]]
 name = "gentle-desk-app"
-version = "0.1.12"
+version = "0.1.13"
 dependencies = [
  "arboard",
  "base64 0.21.7",

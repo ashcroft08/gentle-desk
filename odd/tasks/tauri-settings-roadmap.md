@@ -26,11 +26,23 @@ calendar one. Version numbers never repeat or go down (updater compares them).
   organic vs full-delegation switch via `GENTLE_PI_ORCHESTRATOR_MODE` (session-scoped, not
   persisted), a per-chat context chip from RPC `get_session_stats`, and "Open in terminal"
   through Windows Terminal. See odd/tasks/settings-0.1.12.md (L19 closes it).
-- 0.1.13 (candidates): a Settings preference for how the terminal opens (new window,
-  tab, maximized - today Windows Terminal decides), the Updates pane's empty state (a
-  quiet versions row while nothing has been checked), and the subscription usage panel
-  once gentle-pi exposes it (`get_usage` RPC or `/gentle:usage --json`; today the numbers
-  live only in the child's memory, so the desk cannot read them).
+- 0.1.13 (SHIPPED 2026-11-14): the context chip reads at a glance (#153) and the Updates
+  pane's Update extensions action (#154).
+- 0.2.0 (next, when the maintainer says): **language** - English and Spanish for the app's own
+  words. Everything user-facing already lives in 15 copy modules (~174 exports) on the web side
+  and in ~41 Rust strings that reach the UI; the work is a keyed catalog, Rust strings as codes
+  with parameters, the Spanish catalog, and a Language section with its stored preference.
+  Not a patch: it is a capability jump, which is what a minor bump marks.
+- Dropped on 2026-11-14, by the maintainer: a preference for how the terminal opens (Windows
+  Terminal already honours the user's own settings; configuring over it is ceremony) and the
+  Updates pane's empty state (the "not checked yet" line lives under a second; a failure already
+  says why, so a placeholder would only hide a gap nobody sees).
+- Profile editing: RESOLVED without a GUI - the Profiles pane's Edit in terminal opens the shell
+  and the maintainer types `/gentle:profiles` there. Editing models inside the pane (clicking a
+  field) is a luxury, not a need, and is not planned.
+- Blocked on gentle-pi, the only one left: the **subscription usage panel** (the Alt+U overlay's
+  percentages). That data lives only in the child's memory today, so gentle-pi must expose it
+  (`get_usage` RPC or `/gentle:usage --json`) before the desk can draw it.
 - 0.2.0 (optional, user decision): profile and subagent editing in the GUI. Blocked on
   gentle-pi adding text subcommands such as `/gentle:profiles use <name>` and
   `/gentle:profiles mode <name> <mode>`.
