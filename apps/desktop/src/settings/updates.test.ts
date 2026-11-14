@@ -6,6 +6,10 @@
 import { describe, expect, it } from 'vitest'
 import type { UpdatesView_Serialize as UpdatesView } from '../contract/bindings'
 import { cardOf } from './updates'
+import { updatesCopy } from './updates-copy'
+
+/** The card's labels in English, read through the dictionary (0.2.0, D4). */
+const drawn = (view: UpdatesView | null) => cardOf(view, updatesCopy('en'))
 
 function updates(over: Partial<UpdatesView> = {}): UpdatesView {
   return {
@@ -19,17 +23,17 @@ function updates(over: Partial<UpdatesView> = {}): UpdatesView {
 
 describe('the Updates card', () => {
   it('draws nothing before the check the app runs at open has answered', () => {
-    const nothing = cardOf(null)
+    const nothing = drawn(null)
     expect(nothing.checked).toBe(false)
     expect(nothing.versions).toEqual([])
 
-    const unknown = cardOf(updates({ status: 'Unknown' }))
+    const unknown = drawn(updates({ status: 'Unknown' }))
     expect(unknown.checked).toBe(false)
     expect(unknown.available).toBe(false)
   })
 
   it('keeps the versions it had while a check is on its way', () => {
-    const card = cardOf(updates({ status: 'Checking' }))
+    const card = drawn(updates({ status: 'Checking' }))
 
     expect(card.checking).toBe(true)
     expect(card.checked).toBe(false)
@@ -37,7 +41,7 @@ describe('the Updates card', () => {
   })
 
   it('names every row that is behind, and only those', () => {
-    const card = cardOf(
+    const card = drawn(
       updates({
         shell: { current: '4.7.0', latest: '4.8.0', update_available: true },
       }),
@@ -51,7 +55,7 @@ describe('the Updates card', () => {
   })
 
   it('is up to date only when no row claims an update', () => {
-    const card = cardOf(
+    const card = drawn(
       updates({ pi: { current: '2.0.5', latest: '2.0.5', update_available: false } }),
     )
 
@@ -62,7 +66,7 @@ describe('the Updates card', () => {
   })
 
   it('never reads a row it could not compare as up to date', () => {
-    const card = cardOf(
+    const card = drawn(
       updates({ pi: { current: '1.5.2', latest: null, update_available: null } }),
     )
 
@@ -72,11 +76,11 @@ describe('the Updates card', () => {
   })
 
   it('hands the terminal only what a terminal window updates', () => {
-    const both = cardOf(updates())
+    const both = drawn(updates())
     expect(both.terminal).toBe(true)
     expect(both.appOnly).toBe(false)
 
-    const app = cardOf(
+    const app = drawn(
       updates({
         desk: { current: '0.1.11', latest: '0.1.12', update_available: true },
         pi: { current: '2.0.5', latest: '2.0.5', update_available: false },

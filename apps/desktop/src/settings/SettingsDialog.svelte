@@ -40,19 +40,10 @@
   import ProfilesPane from './ProfilesPane.svelte'
   import UpdatesPane from './UpdatesPane.svelte'
   import UsagePane from './UsagePane.svelte'
-  import {
-    APP_NAME,
-    CLOSE,
-    HOME_EXPLAIN,
-    SETTINGS,
-    VERSION,
-    VERSION_UNKNOWN,
-    settingsCopy,
-  } from './copy'
+  import { settingsCopy } from './copy'
   import {
     DEFAULT_SECTION,
     PANEL_ID,
-    RAIL_LABEL,
     SECTIONS,
     TAB_IDS,
     sectionAfter,
@@ -116,12 +107,12 @@
      button's job (and Escape's, which the primitive keeps for the keyboard).
      A mis-click outside must not throw away what the user was reading. -->
     <Dialog.Content class="dlg settings" interactOutsideBehavior="ignore">
-      <Dialog.Title class="dt">{SETTINGS}</Dialog.Title>
+      <Dialog.Title class="dt">{copy.settings}</Dialog.Title>
 
       <div class="settings-body">
         <!-- The rail (L4): one entry per section, the selected one highlighted.
              The entry's word is its name; the glyph is decoration. -->
-        <div class="settings-rail" role="tablist" aria-label={RAIL_LABEL} aria-orientation="vertical">
+        <div class="settings-rail" role="tablist" aria-label={copy.railLabel} aria-orientation="vertical">
           {#each SECTIONS as entry (entry.id)}
             <button
               type="button"
@@ -153,7 +144,7 @@
               {#if selected === 'appearance'}
                 <ThemePicker {theme} />
               {:else if selected === 'home'}
-                <p class="why">{HOME_EXPLAIN}</p>
+                <p class="why">{copy.homeExplain}</p>
                 {#if shell !== null}
                   <HomeSetting {shell} />
                 {/if}
@@ -174,9 +165,9 @@
                      is installed, and whether something newer is out, is the
                      Updates section's own card. -->
                 <p class="about">
-                  <span class="about-name">{APP_NAME}</span>
+                  <span class="about-name">{copy.appName}</span>
                   <span class="about-version">
-                    {version === null ? VERSION_UNKNOWN : VERSION(version)}
+                    {version === null ? copy.versionUnknown : copy.version(version)}
                   </span>
                 </p>
               {/if}
@@ -186,7 +177,7 @@
       </div>
 
       <div class="acts">
-        <Dialog.Close class="btn" type="button">{CLOSE}</Dialog.Close>
+        <Dialog.Close class="btn" type="button">{copy.close}</Dialog.Close>
       </div>
     </Dialog.Content>
   </Dialog.Portal>

@@ -8,16 +8,10 @@ import { cleanup, fireEvent, render, within } from '@testing-library/svelte'
 import type { AuthView_Serialize as AuthView } from '../contract/bindings'
 import { handlerArgs, resetTauriMock, setHandler } from '../test-support/tauri-mock'
 import AccountPane from './AccountPane.svelte'
-import {
-  CHECK_AGAIN,
-  CONNECTED,
-  FAILED,
-  OPEN_SHELL,
-  NOT_READY,
-  NO_PROVIDERS,
-  READING,
-  RETRY_SAFE,
-} from './account-copy'
+import { accountCopy } from './account-copy'
+
+/** The pane's own words in English, read through the dictionary (0.2.0, D4). */
+const copy = accountCopy('en')
 
 vi.mock('@tauri-apps/api/core', () => import('../test-support/tauri-mock').then((m) => m.coreModule()))
 vi.mock('@tauri-apps/api/event', () => import('../test-support/tauri-mock').then((m) => m.eventModule()))
@@ -64,29 +58,29 @@ describe('the Account pane', () => {
       'anthropic',
       'commandcode',
     ])
-    expect(rows[0].textContent).toContain(CONNECTED)
+    expect(rows[0].textContent).toContain(copy.connected)
     expect(rows[0].querySelector('.tag')?.classList.contains('ok')).toBe(true)
-    expect(rows[1].textContent).toContain(NOT_READY)
+    expect(rows[1].textContent).toContain(copy.notReady)
     expect(rows[1].textContent).toContain('OAuth token expired')
   })
 
   it('says no provider is signed in when the store is empty', () => {
     const pane = draw(auth({ providers: [] }))
-    expect(within(pane).getByText(NO_PROVIDERS)).toBeTruthy()
+    expect(within(pane).getByText(copy.noProviders)).toBeTruthy()
   })
 
   it('says why the store could not be read, and that checking again is safe', () => {
     const pane = draw(auth({ status: { type: 'Failed', data: 'permission denied' } }))
 
-    expect(within(pane).getByText(FAILED('permission denied'))).toBeTruthy()
-    expect(within(pane).getByText(RETRY_SAFE)).toBeTruthy()
-    expect(within(pane).getByRole('button', { name: CHECK_AGAIN })).toBeTruthy()
+    expect(within(pane).getByText(copy.failed('permission denied'))).toBeTruthy()
+    expect(within(pane).getByText(copy.retrySafe)).toBeTruthy()
+    expect(within(pane).getByRole('button', { name: copy.checkAgain })).toBeTruthy()
   })
 
   it('says it is reading while the first answer is on its way', () => {
-    expect(within(draw(null)).getByText(READING)).toBeTruthy()
+    expect(within(draw(null)).getByText(copy.reading)).toBeTruthy()
     expect(
-      within(draw(auth({ status: { type: 'Unknown' } }))).getByText(READING),
+      within(draw(auth({ status: { type: 'Unknown' } }))).getByText(copy.reading),
     ).toBeTruthy()
   })
 
@@ -95,7 +89,7 @@ describe('the Account pane', () => {
 
     // The pane reads once on open, so the click is one more check, not the first.
     const before = checks()
-    await fireEvent.click(within(pane).getByRole('button', { name: CHECK_AGAIN }))
+    await fireEvent.click(within(pane).getByRole('button', { name: copy.checkAgain }))
     expect(checks()).toBe(before + 1)
   })
 
@@ -118,7 +112,7 @@ describe('the Account pane', () => {
   it('opens the shell in a terminal window with one button, and says what to type', async () => {
     const pane = draw()
 
-    await fireEvent.click(within(pane).getByRole('button', { name: OPEN_SHELL }))
+    await fireEvent.click(within(pane).getByRole('button', { name: copy.openShell }))
     expect(handlerArgs('open_terminal')).toEqual([{ action: 'Login' }])
     expect(within(pane).queryByRole('button', { name: /sign out in terminal/i })).toBeNull()
     expect(pane.textContent).toContain('/login')

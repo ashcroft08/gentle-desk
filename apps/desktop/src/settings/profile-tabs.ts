@@ -3,21 +3,16 @@
 // agent table took the second. The pair is the chat header's tablist pattern
 // (chat/tabs.ts): one tab stop, the arrow keys walk the pair and wrap, Home and
 // End jump to the ends, and each tab names the panel it controls.
+//
+// The tabs' own words are NOT here (0.2.0, D5): the rail is drawn in the language
+// the app holds, so `profiles-copy.ts` - the module that owns the pane's area -
+// keeps them, and this module keeps the order, the ids and the walking.
 
 /** The two views the Profiles pane switches between. */
 export type ProfileTab = 'profile' | 'agents'
 
 /** The tabs in the order the pane draws them: the Profile first (L17). */
 export const PROFILE_TABS: ProfileTab[] = ['profile', 'agents']
-
-/** The tablist's accessible name: the pane's own title already says Profiles. */
-export const PROFILE_TABS_LABEL = 'Profile details'
-
-/** Each tab's own word. */
-export const PROFILE_TAB_COPY: Record<ProfileTab, string> = {
-  profile: 'Profile',
-  agents: 'Agents',
-}
 
 /** The id of each tab, so its panel can name it with `aria-labelledby`. */
 export const PROFILE_TAB_IDS: Record<ProfileTab, string> = {

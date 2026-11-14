@@ -23,36 +23,25 @@
   // state, safe to press any time. It obeys the same chats-closed gate.
   import { dispatchIntent, openTerminal } from '../bridge'
   import type { UpdatesView_Serialize as UpdatesView } from '../contract/bindings'
+  import { language } from '../i18n/language.svelte'
   import { cardOf } from './updates'
-  import {
-    APP_UPDATES_ITSELF,
-    CHECKING,
-    CHECK_AGAIN,
-    HEADLINE,
-    NOT_CHECKED,
-    UNKNOWN_VERSION,
-    UPDATE,
-    UPDATE_AVAILABLE,
-    UPDATE_EXTENSIONS,
-    UPDATE_EXTENSIONS_IN_TERMINAL,
-    UPDATE_IN_TERMINAL,
-    UP_TO_DATE,
-    VERSIONS,
-    gateHint,
-  } from './updates-copy'
+  import { updatesCopy } from './updates-copy'
 
   let { updates, openChats = 0 }: { updates: UpdatesView | null; openChats?: number } = $props()
+
+  /** The pane's own words in the language the app holds (0.2.0, D4). */
+  const copy = $derived(updatesCopy(language.current))
 
   /** What the terminal said when it could not open, or `null`. */
   let terminalError = $state<string | null>(null)
 
-  const card = $derived(cardOf(updates))
+  const card = $derived(cardOf(updates, copy))
   const blocked = $derived(openChats > 0)
-  const hint = $derived(gateHint(openChats))
+  const hint = $derived(copy.gateHint(openChats))
   const hintId = 'updates-gate'
   const versions = $derived(
-    VERSIONS(
-      card.versions.map((line) => `${line.label} ${line.version ?? UNKNOWN_VERSION}`),
+    copy.versions(
+      card.versions.map((line) => `${line.label} ${line.version ?? copy.unknownVersion}`),
     ),
   )
   const showVersions = $derived(card.versions.some((line) => line.version !== null))
@@ -81,7 +70,7 @@
     type="button"
     disabled={blocked}
     aria-describedby={blocked ? hintId : undefined}
-    onclick={() => void extensions()}>{UPDATE_EXTENSIONS}</button
+    onclick={() => void extensions()}>{copy.updateExtensions}</button
   >
 {/snippet}
 
@@ -89,24 +78,24 @@
   <div class="card updates">
     <div class="head">
       <span class="tag {card.available ? 'warn' : 'ok'}">
-        {card.available ? UPDATE_AVAILABLE : UP_TO_DATE}
+        {card.available ? copy.updateAvailable : copy.upToDate}
       </span>
       {#each card.headlines as row (row.label)}
-        <p class="headline">{HEADLINE(row.label, row.current, row.latest)}</p>
+        <p class="headline">{copy.headline(row.label, row.current, row.latest)}</p>
       {/each}
     </div>
     {#if showVersions}
       <p class="versions">{versions}</p>
     {/if}
     <div class="acts">
-      <button class="btn" type="button" onclick={check}>{CHECK_AGAIN}</button>
+      <button class="btn" type="button" onclick={check}>{copy.checkAgain}</button>
       {#if card.available && card.terminal}
         <button
           class="btn accent"
           type="button"
           disabled={blocked}
           aria-describedby={blocked ? hintId : undefined}
-          onclick={() => void update()}>{UPDATE}</button
+          onclick={() => void update()}>{copy.update}</button
         >
       {/if}
       {@render extensionsButton()}
@@ -115,12 +104,12 @@
       <p class="gate" id={hintId} role="status">{hint}</p>
     {:else}
       {#if card.available && card.terminal}
-        <p class="note">{UPDATE_IN_TERMINAL}</p>
+        <p class="note">{copy.updateInTerminal}</p>
       {/if}
-      <p class="note">{UPDATE_EXTENSIONS_IN_TERMINAL}</p>
+      <p class="note">{copy.updateExtensionsInTerminal}</p>
     {/if}
     {#if card.appOnly}
-      <p class="note">{APP_UPDATES_ITSELF}</p>
+      <p class="note">{copy.appUpdatesItself}</p>
     {/if}
     {#if terminalError !== null}
       <p class="quiet" role="status">{terminalError}</p>
@@ -130,20 +119,20 @@
   <!-- Before the first answer, and while a check runs: a quiet line, the
        versions already known, and the check button. The pane never waits. -->
   {#if card.checking}
-    <p class="quiet" role="status">{CHECKING}</p>
+    <p class="quiet" role="status">{copy.checking}</p>
   {:else}
-    <p class="quiet">{NOT_CHECKED}</p>
+    <p class="quiet">{copy.notChecked}</p>
   {/if}
   {#if showVersions}
     <p class="versions">{versions}</p>
   {/if}
   <div class="acts">
-    <button class="btn" type="button" onclick={check}>{CHECK_AGAIN}</button>
+    <button class="btn" type="button" onclick={check}>{copy.checkAgain}</button>
     {@render extensionsButton()}
   </div>
   {#if blocked}
     <p class="gate" id={hintId} role="status">{hint}</p>
   {:else}
-    <p class="note">{UPDATE_EXTENSIONS_IN_TERMINAL}</p>
+    <p class="note">{copy.updateExtensionsInTerminal}</p>
   {/if}
 {/if}

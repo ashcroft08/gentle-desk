@@ -23,36 +23,20 @@
     OrchestratorModeView,
     ProfilesView_Serialize as ProfilesView,
   } from '../contract/bindings'
+  import { language } from '../i18n/language.svelte'
   import {
     PROFILE_PANEL_IDS,
     PROFILE_TABS,
-    PROFILE_TABS_LABEL,
-    PROFILE_TAB_COPY,
     PROFILE_TAB_IDS,
     profileTabAfter,
     type ProfileTab,
   } from './profile-tabs'
-  import {
-    ACTIVE_NOTE,
-    AGENT_COLUMN,
-    EDIT_IN_TERMINAL,
-    EDIT_NOTE,
-    EFFORT_COLUMN,
-    FALLBACK_LABEL,
-    FAILED,
-    MODE_FULL_DELEGATION,
-    MODE_LABEL,
-    MODE_NOTE,
-    MODE_ORGANIC,
-    MODEL_COLUMN,
-    NO_PROFILES,
-    ORCHESTRATOR_LABEL,
-    READING,
-    RETRY_SAFE,
-    TRY_AGAIN,
-  } from './profiles-copy'
+  import { profilesCopy } from './profiles-copy'
 
   let { profiles }: { profiles: ProfilesView | null } = $props()
+
+  /** The pane's own words in the language the app holds (0.2.0, D4). */
+  const copy = $derived(profilesCopy(language.current))
 
   /** The tab the pane draws: the Profile, so the first view is the short one. */
   let tab = $state<ProfileTab>('profile')
@@ -112,17 +96,17 @@
 <!-- The file's own state, above the tabs: both tabs read the same document, so
      the reading, the failure and the empty case are the pane's, not a tab's. -->
 {#if profiles === null || profiles.status.type === 'Unknown'}
-  <p class="quiet">{READING}</p>
+  <p class="quiet">{copy.reading}</p>
 {:else if failed !== null}
   <!-- The file is there and cannot be used: say why, and that a read is safe. -->
-  <p class="quiet" role="status">{FAILED(failed)}</p>
-  <p class="quiet">{RETRY_SAFE}</p>
-  <button class="btn" type="button" onclick={read}>{TRY_AGAIN}</button>
+  <p class="quiet" role="status">{copy.failed(failed)}</p>
+  <p class="quiet">{copy.retrySafe}</p>
+  <button class="btn" type="button" onclick={read}>{copy.tryAgain}</button>
 {:else if active === null}
-  <p class="quiet">{NO_PROFILES}</p>
+  <p class="quiet">{copy.noProfiles}</p>
 {/if}
 
-<div class="subtabs" role="tablist" aria-label={PROFILE_TABS_LABEL}>
+<div class="subtabs" role="tablist" aria-label={copy.tabsLabel}>
   {#each PROFILE_TABS as item (item)}
     <button
       type="button"
@@ -134,7 +118,7 @@
       onclick={() => (tab = item)}
       onkeydown={(event) => keyed(event, item)}
     >
-      {PROFILE_TAB_COPY[item]}
+      {copy.tabs[item]}
     </button>
   {/each}
 </div>
@@ -149,39 +133,39 @@
   hidden={tab !== 'profile'}
 >
   <div class="mode">
-    <span class="mode-label" id="profiles-mode">{MODE_LABEL}</span>
+    <span class="mode-label" id="profiles-mode">{copy.modeLabel}</span>
     <div class="seg" role="radiogroup" aria-labelledby="profiles-mode">
       <button
         type="button"
         role="radio"
         aria-checked={mode === 'organic'}
-        onclick={() => choose('organic')}>{MODE_ORGANIC}</button
+        onclick={() => choose('organic')}>{copy.modeOrganic}</button
       >
       <button
         type="button"
         role="radio"
         aria-checked={mode === 'full-delegation'}
-        onclick={() => choose('full-delegation')}>{MODE_FULL_DELEGATION}</button
+        onclick={() => choose('full-delegation')}>{copy.modeFullDelegation}</button
       >
     </div>
-    <p class="mode-note">{MODE_NOTE}</p>
+    <p class="mode-note">{copy.modeNote}</p>
   </div>
 
   {#if active !== null}
     <div class="profile">
       <p class="pname">{active.name}</p>
-      <p class="pmark">{ACTIVE_NOTE}</p>
+      <p class="pmark">{copy.activeNote}</p>
       <dl class="routes">
         {#if active.orchestrator !== null}
           <div class="pair orchestrator">
-            <dt>{ORCHESTRATOR_LABEL}</dt>
+            <dt>{copy.orchestratorLabel}</dt>
             <dd class="mono">{active.orchestrator.model ?? ''}</dd>
             <dd class="think">{active.orchestrator.thinking ?? ''}</dd>
           </div>
         {/if}
         {#if fallback !== null}
           <div class="pair fallback">
-            <dt>{FALLBACK_LABEL}</dt>
+            <dt>{copy.fallbackLabel}</dt>
             <dd class="mono">{fallback.model ?? ''}</dd>
             <dd class="think">{fallback.thinking ?? ''}</dd>
           </div>
@@ -192,10 +176,10 @@
 
   <div class="acts">
     <button class="btn accent" type="button" onclick={() => void edit()}>
-      {EDIT_IN_TERMINAL}
+      {copy.editInTerminal}
     </button>
   </div>
-  <p class="note">{EDIT_NOTE}</p>
+  <p class="note">{copy.editNote}</p>
   {#if terminalError !== null}
     <p class="quiet" role="status">{terminalError}</p>
   {/if}
@@ -214,9 +198,9 @@
     <table class="agents">
       <thead>
         <tr>
-          <th scope="col">{AGENT_COLUMN}</th>
-          <th scope="col">{MODEL_COLUMN}</th>
-          <th scope="col" class="effort">{EFFORT_COLUMN}</th>
+          <th scope="col">{copy.agentColumn}</th>
+          <th scope="col">{copy.modelColumn}</th>
+          <th scope="col" class="effort">{copy.effortColumn}</th>
         </tr>
       </thead>
       <tbody>

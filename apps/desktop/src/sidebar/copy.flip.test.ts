@@ -43,6 +43,9 @@ describe('a drawn sidebar', () => {
     expect(screen.getByText('Preview').getAttribute('title')).toBe(
       'Preview: under active development - fixes ship fast',
     )
+    // The gear's own name is the Settings dialog's word, read in this language:
+    // the seam T6 recorded is closed here, so the gear is never half Spanish.
+    expect(screen.getByRole('button', { name: 'Settings' })).toBeTruthy()
 
     setLanguage('es')
     await tick()
@@ -54,6 +57,7 @@ describe('a drawn sidebar', () => {
     expect(screen.getByText('Vista previa').getAttribute('title')).toBe(
       'Vista previa: en desarrollo activo; las correcciones llegan rápido',
     )
+    expect(screen.getByRole('button', { name: 'Ajustes' })).toBeTruthy()
 
     setLanguage('en')
   })
@@ -88,6 +92,39 @@ describe('a drawn sidebar', () => {
     expect(within(flipped).getByRole('menuitem', { name: 'Renombrar' })).toBeTruthy()
     expect(within(flipped).getByRole('menuitem', { name: 'Cerrar chat' })).toBeTruthy()
     expect(within(flipped).getByRole('menuitem', { name: 'Eliminar' })).toBeTruthy()
+
+    setLanguage('en')
+  })
+
+  it('flips the gear name while an update waits, dot and news and all', async () => {
+    setLanguage('en')
+    serveSidebar({
+      view: viewState({
+        total_sessions: 2,
+        updates: {
+          status: 'Ready',
+          desk: { current: '0.1.14', latest: '0.1.14', update_available: false },
+          pi: { current: '1.5.2', latest: '2.0.5', update_available: true },
+          shell: { current: '4.7.0', latest: null, update_available: null },
+        },
+      }),
+      rows: [workspaceRow('one'), chatRow('a', { title: TITLE })],
+      total: 2,
+    })
+    render(Sidebar)
+
+    // The Settings word is the dialog's (settings/copy.ts) and the news is the
+    // sidebar's: one word, one owner, and the two flip together.
+    expect(
+      await screen.findByRole('button', { name: 'Settings - an update is available' }),
+    ).toBeTruthy()
+
+    setLanguage('es')
+    await tick()
+
+    expect(
+      screen.getByRole('button', { name: 'Ajustes - hay una actualización disponible' }),
+    ).toBeTruthy()
 
     setLanguage('en')
   })

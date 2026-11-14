@@ -11,19 +11,10 @@ import { cleanup, fireEvent, render, within } from '@testing-library/svelte'
 import type { ProfilesView_Serialize as ProfilesView } from '../contract/bindings'
 import { handlerArgs, resetTauriMock, setHandler } from '../test-support/tauri-mock'
 import ProfilesPane from './ProfilesPane.svelte'
-import {
-  ACTIVE_NOTE,
-  EDIT_IN_TERMINAL,
-  EDIT_NOTE,
-  FAILED,
-  MODE_FULL_DELEGATION,
-  MODE_NOTE,
-  MODE_ORGANIC,
-  NO_PROFILES,
-  READING,
-  RETRY_SAFE,
-  TRY_AGAIN,
-} from './profiles-copy'
+import { profilesCopy } from './profiles-copy'
+
+/** The pane's own words in English, read through the dictionary (0.2.0, D4). */
+const copy = profilesCopy('en')
 
 vi.mock('@tauri-apps/api/core', () => import('../test-support/tauri-mock').then((m) => m.coreModule()))
 vi.mock('@tauri-apps/api/event', () => import('../test-support/tauri-mock').then((m) => m.eventModule()))
@@ -78,9 +69,9 @@ function reads(): number {
     .length
 }
 
-/** The pane's two sub-tabs, quoted as the user reads them (L17). */
-const PROFILE_TAB = 'Profile'
-const AGENTS_TAB = 'Agents'
+/** The pane's two sub-tabs, read through the dictionary (0.2.0, D4). */
+const PROFILE_TAB = copy.tabs.profile
+const AGENTS_TAB = copy.tabs.agents
 
 /** The panel a sub-tab points its `aria-controls` at. */
 function panelOf(pane: HTMLElement, name: string): HTMLElement {
@@ -106,7 +97,7 @@ describe('the Profiles pane', () => {
     expect(panel.getAttribute('aria-labelledby')).toBe(profileTab.id)
     expect(within(panel).getByRole('radiogroup')).toBeTruthy()
     expect(panel.querySelector('.profile')).toBeTruthy()
-    expect(within(panel).getByRole('button', { name: EDIT_IN_TERMINAL })).toBeTruthy()
+    expect(within(panel).getByRole('button', { name: copy.editInTerminal })).toBeTruthy()
 
     // The table is the other tab's, so the first view is not the long one.
     expect(within(pane).queryByRole('table')).toBeNull()
@@ -127,7 +118,7 @@ describe('the Profiles pane', () => {
     expect(panel.getAttribute('aria-labelledby')).toBe(agentsTab.id)
     expect(within(panel).getByRole('table')).toBeTruthy()
     expect(within(pane).queryByRole('radiogroup')).toBeNull()
-    expect(within(pane).queryByRole('button', { name: EDIT_IN_TERMINAL })).toBeNull()
+    expect(within(pane).queryByRole('button', { name: copy.editInTerminal })).toBeNull()
   })
 
   it('walks the sub-tabs with the arrow keys, one tab stop', async () => {
@@ -153,7 +144,7 @@ describe('the Profiles pane', () => {
     const pane = draw()
 
     expect(within(pane).getByText('Mine')).toBeTruthy()
-    expect(within(pane).getByText(ACTIVE_NOTE)).toBeTruthy()
+    expect(within(pane).getByText(copy.activeNote)).toBeTruthy()
     // The reserved orchestrator route, then the fallback chain's model.
     expect(pane.querySelector('.pair.orchestrator')?.textContent).toContain('prov/big')
     expect(pane.querySelector('.pair.orchestrator')?.textContent).toContain('medium')
@@ -165,7 +156,7 @@ describe('the Profiles pane', () => {
     expect(
       rows.map((row) => [...row.querySelectorAll('td')].map((cell) => cell.textContent?.trim())),
     ).toEqual([['worker', 'prov/small', 'high']])
-    expect(within(pane).getByRole('columnheader', { name: 'Effort' })).toBeTruthy()
+    expect(within(pane).getByRole('columnheader', { name: copy.effortColumn })).toBeTruthy()
   })
 
   it('never draws the fallback role as a row: the card already carries it', async () => {
@@ -181,11 +172,11 @@ describe('the Profiles pane', () => {
   it('sends the orchestrator mode the user picks, and says it is not stored', async () => {
     const pane = draw()
 
-    const organic = within(pane).getByRole('radio', { name: MODE_ORGANIC })
-    const full = within(pane).getByRole('radio', { name: MODE_FULL_DELEGATION })
+    const organic = within(pane).getByRole('radio', { name: copy.modeOrganic })
+    const full = within(pane).getByRole('radio', { name: copy.modeFullDelegation })
     expect(organic.getAttribute('aria-checked')).toBe('true')
     expect(full.getAttribute('aria-checked')).toBe('false')
-    expect(within(pane).getByText(MODE_NOTE)).toBeTruthy()
+    expect(within(pane).getByText(copy.modeNote)).toBeTruthy()
 
     await fireEvent.click(full)
     expect(modes()).toEqual([{ type: 'SetOrchestratorMode', data: { mode: 'full-delegation' } }])
@@ -197,7 +188,7 @@ describe('the Profiles pane', () => {
   it('says there are no profiles in a quiet line, never a broken pane', () => {
     const pane = draw(profiles({ active: null, profiles: [] }))
 
-    expect(within(pane).getByText(NO_PROFILES)).toBeTruthy()
+    expect(within(pane).getByText(copy.noProfiles)).toBeTruthy()
     // The switch stays usable: the mode is the session's, not the file's.
     expect(within(pane).getByRole('radiogroup')).toBeTruthy()
   })
@@ -206,10 +197,10 @@ describe('the Profiles pane', () => {
     const reason = 'the file is not a profiles document'
     const pane = draw(profiles({ status: { type: 'Failed', data: reason }, active: null, profiles: [] }))
 
-    expect(within(pane).getByText(FAILED(reason))).toBeTruthy()
-    expect(within(pane).getByText(RETRY_SAFE)).toBeTruthy()
+    expect(within(pane).getByText(copy.failed(reason))).toBeTruthy()
+    expect(within(pane).getByText(copy.retrySafe)).toBeTruthy()
     const before = reads()
-    await fireEvent.click(within(pane).getByRole('button', { name: TRY_AGAIN }))
+    await fireEvent.click(within(pane).getByRole('button', { name: copy.tryAgain }))
     expect(reads()).toBe(before + 1)
   })
 
@@ -228,16 +219,16 @@ describe('the Profiles pane', () => {
   it('opens the shell profiles screen in a terminal window', async () => {
     const pane = draw()
 
-    await fireEvent.click(within(pane).getByRole('button', { name: EDIT_IN_TERMINAL }))
+    await fireEvent.click(within(pane).getByRole('button', { name: copy.editInTerminal }))
     expect(handlerArgs('open_terminal')).toEqual([{ action: 'Profiles' }])
-    expect(within(pane).getByText(EDIT_NOTE)).toBeTruthy()
+    expect(within(pane).getByText(copy.editNote)).toBeTruthy()
   })
 
   it('says the terminal could not open, instead of a button that does nothing', async () => {
     setHandler('open_terminal', () => Promise.reject('gentle-shell could not be found'))
     const pane = draw()
 
-    await fireEvent.click(within(pane).getByRole('button', { name: EDIT_IN_TERMINAL }))
+    await fireEvent.click(within(pane).getByRole('button', { name: copy.editInTerminal }))
 
     await vi.waitFor(() =>
       expect(within(pane).getByRole('status').textContent).toContain(
@@ -248,6 +239,6 @@ describe('the Profiles pane', () => {
 
   it('says it is reading while the first answer is on its way', () => {
     const pane = draw(null)
-    expect(within(pane).getByText(READING)).toBeTruthy()
+    expect(within(pane).getByText(copy.reading)).toBeTruthy()
   })
 })

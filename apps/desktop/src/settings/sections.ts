@@ -5,8 +5,9 @@
 // entry's glyph carries no meaning on its own - the entry's word is its name -
 // and the eight follow the house style the settings gear set: Lucide outline
 // geometry on one 24x24 grid. That word is NOT here: the rail is drawn in the
-// language the app holds (0.2.0, D4), so `settings/copy.ts` keeps the words and
-// this module keeps the order, the glyphs and the ids.
+// language the app holds (0.2.0, D4), so `settings/copy.ts` keeps the words - the
+// rail's own accessible name included - and this module keeps the order, the
+// glyphs and the ids.
 //
 // The keys are the chat header's tablist keys (chat/tabs.ts): arrows walk the
 // rail and wrap, Home and End jump to the ends, and one entry is the tab stop.
@@ -47,9 +48,6 @@ export const SECTIONS: SectionEntry[] = [
 
 /** The section the dialog opens on: the first one in the rail. */
 export const DEFAULT_SECTION: Section = SECTIONS[0].id
-
-/** The rail's accessible name: the dialog's title already says Settings. */
-export const RAIL_LABEL = 'Settings sections'
 
 /** The id of each rail entry, so the pane can name it with `aria-labelledby`. */
 export const TAB_IDS: Record<Section, string> = {

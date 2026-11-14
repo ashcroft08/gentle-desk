@@ -18,7 +18,7 @@
   import WorkspaceTree from './WorkspaceTree.svelte'
   import Icon from '../icons/Icon.svelte'
   import SettingsDialog from '../settings/SettingsDialog.svelte'
-  import { SETTINGS } from '../settings/copy'
+  import { settingsCopy } from '../settings/copy'
   import { updateWaiting } from '../update/dot'
   import { language } from '../i18n/language.svelte'
   import {
@@ -71,10 +71,11 @@
   // The gear's dot (0.1.14): an update is waiting for one of the rows a terminal
   // updates. The dot is decoration; the gear's own name carries the same news in
   // words, so the promise is never the colour alone. The Settings word itself is
-  // the dialog's own (settings/copy.ts), so only the news around it is the
-  // sidebar's to word.
+  // the dialog's own (settings/copy.ts), read in the language this run holds, so
+  // the gear's name and the dialog's title are one word and flip together.
+  const settings = $derived(settingsCopy(language.current).settings)
   const updateDot = $derived(updateWaiting(model.view?.updates ?? null))
-  const gearLabel = $derived(updateDot ? copy.updateWaiting(SETTINGS) : SETTINGS)
+  const gearLabel = $derived(updateDot ? copy.updateWaiting(settings) : settings)
 
   // One view, one store: closing the sidebar ends the event listener and drops
   // every cached page.
