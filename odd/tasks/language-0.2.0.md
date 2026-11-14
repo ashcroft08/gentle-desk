@@ -156,18 +156,26 @@ fragments in 12 files.
       markLabelsCopy would silently drop the count). Sentence helpers take the
       dictionary as a parameter (composerStateOf, chipOf, sinceLabel). Route: writer.
       Commit 04f613c (RED 1 suite + 37 tests; GREEN 633/0, svelte-check 0, eslint 0).
-- [ ] T9 (S3) bilingual completion audit (RE-SCOPED, Log L6): the original sweep
-      (routing ~45 English-asserting test files through the catalog) is obsolete — the
-      pattern that emerged makes the pre-existing English literals THE pin (they pass
-      unchanged by design) and gives each area its own copy + flip tests asserting the
-      Spanish column. The audit instead: (1) grep the whole web src for any REMAINING
-      app-owned English word drawn outside the dictionaries, excluding the D7 families
-      (child/shell passthrough, released content) and the two Rust-ruled exceptions;
-      (2) one app-level flip: with a stored "es", the major surfaces (rail, dialog,
-      composer, thread, welcome) draw Spanish in the same tick; (3) the T8 sweep list
-      read through builders only where a file would otherwise break (expected: none);
-      (4) the same audit for Rust producers (string literals outside messages.rs, minus
-      the two rulings). Route: writer. Commit: pending.
+- [ ] T9 (S3) bilingual completion audit (RE-SCOPED, Log L6): DONE — the web side had
+      exactly one drawn app-owned English literal (App.svelte's update-retry reason →
+      update/copy.ts noNewerVersion) plus two latent ones reported (update/plugin.ts
+      NOT_THE_APP: carrier has no consumer; the retry branch itself is dead code today,
+      left in place); the app-level flip test exists (App.language.test.ts: stored es →
+      Ajustes/Enviar/Hilo del chat/Instalar actualización in one tick, and back; bit
+      under a composerCopy mutation, reverted). Audit tables in the T9 report. Route:
+      writer. Commit: pending.
+- [ ] T11 (S3, from the T9 audit; Log L7) T4b — the audit's 12 Rust producer groups
+      localized: config.rs NO_PATH_NOTICE stays English (joins ruling 1 — the folder
+      that would name the language is the one missing), config/writer.rs:220 save
+      failure cataloged (language in hand — a plain gap), settings/usage.rs:60/67
+      included though not drawn (same file, cheap), the rest of the 13-path list
+      threaded as T4 was (settings/auth.rs, settings/profiles.rs, settings.rs,
+      commands.rs:431/731, shell_install.rs ×6, close.rs CLOSING,
+      crates/runtime/src/usage.rs validation sentences ×13, crates/runtime/src/
+      profiles.rs ×8, gentle-core chat/history.rs:59 + chat/reducer.rs:140
+      "unknown model error"). Parent approved the widening 2026-11-14 (within S3's
+      mandate and T4's already-approved threading kind). Route: writer. Commit:
+      pending.
 - [ ] T10 (S5) close: version 0.2.0 in apps/desktop/package.json,
       apps/desktop/src-tauri/Cargo.toml and apps/desktop/src-tauri/tauri.conf.json, the
       what's-new entry, the shipped note in odd/tasks/tauri-settings-roadmap.md, then
@@ -289,3 +297,12 @@ fragments in 12 files.
   dictionaries, one app-level flip, the Rust-producer equivalent). T8's ViewTabs
   deviation accepted: the badge's accessible name carries the count, so the count
   sentence moved into chatCopy() rather than the generic mark label.
+- L7 (parent, 2026-11-14): T9 delivered the audit: web clean after one fix
+  (noNewerVersion), two latent hits reported, app-level flip test in place. The Rust
+  audit found 12 drawn producer groups T4's inventory missed — none were in its 12-file
+  list; the audit's draw-site tracing is what caught them. Parent approved T4b (task
+  T11) with approve-all (13 paths) rather than deferring: S3's verbatim scope covers
+  these texts, and leaving Spanish users half-English reason lines would ship the
+  feature incomplete. New rulings: NO_PATH_NOTICE joins ruling 1 (the missing folder
+  is the one that would name the language); the config save-failure line is cataloged
+  (language in hand); the un-drawn usage-sources line joins anyway (cheap, same file).
