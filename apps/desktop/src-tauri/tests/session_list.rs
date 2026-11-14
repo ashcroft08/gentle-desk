@@ -208,7 +208,8 @@ fn a_row_carries_the_texts_the_runtime_rules_produce() {
         0,
         window::MAX_WINDOW,
         1_000 + 3 * 60 * 60_000,
-        &window::folder_status,
+        gentle_core::i18n::Language::En,
+        &|path| window::folder_status(path, gentle_core::i18n::Language::En),
     )
     .rows;
     let rows = chats(&rows);

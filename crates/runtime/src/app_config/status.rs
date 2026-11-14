@@ -8,10 +8,7 @@
 use std::fs;
 use std::path::Path;
 
-/// The reason a missing folder is missing.
-pub const MISSING_REASON: &str = "This folder no longer exists.";
-/// The reason a path that is not a folder cannot be a workspace.
-pub const NOT_A_FOLDER_REASON: &str = "That path is a file, not a folder.";
+use gentle_core::i18n::{messages, Language};
 
 /// What the folder of a workspace is right now.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -39,12 +36,15 @@ impl WorkspaceStatus {
     }
 }
 
-/// The status of the workspace folder at `path`.
-pub fn workspace_status(path: &Path) -> WorkspaceStatus {
+/// The status of the workspace folder at `path`, with its reason in
+/// `language`: the folder is probed once and the words the sidebar shows are
+/// the catalog's, so the same dead folder says the same thing wherever it is
+/// met.
+pub fn workspace_status(path: &Path, language: Language) -> WorkspaceStatus {
     match fs::metadata(path) {
         Ok(metadata) if metadata.is_dir() => WorkspaceStatus::Available,
-        Ok(_) => WorkspaceStatus::NotAFolder(NOT_A_FOLDER_REASON.to_owned()),
-        Err(_) => WorkspaceStatus::Missing(MISSING_REASON.to_owned()),
+        Ok(_) => WorkspaceStatus::NotAFolder(messages::workspace_not_a_folder(language).to_owned()),
+        Err(_) => WorkspaceStatus::Missing(messages::workspace_folder_missing(language).to_owned()),
     }
 }
 

@@ -20,6 +20,8 @@ use std::path::{Path, PathBuf};
 
 use serde_json::Value;
 
+use gentle_core::i18n::{messages, Language};
+
 use crate::time_ago::time_until;
 
 /// The schema string the package's headless mode prints. A document of any other
@@ -280,15 +282,18 @@ fn text_of(value: &Value, field: &str) -> Option<String> {
         .map(str::to_owned)
 }
 
-/// How long until a window resets, as the pane draws it: "resets in 4h", or
-/// "resets now" for a time that already passed. `None` when the provider reports
-/// no reset time at all, which is what an explicit `null` is.
-pub fn reset_label(now_ms: u64, reset_at: Option<u64>) -> Option<String> {
+/// How long until a window resets, as the pane draws it in `language`: "resets
+/// in 4h", or "resets now" for a time that already passed. `None` when the
+/// provider reports no reset time at all, which is what an explicit `null` is.
+pub fn reset_label(language: Language, now_ms: u64, reset_at: Option<u64>) -> Option<String> {
     let at = reset_at?;
     if at <= now_ms {
-        return Some("resets now".to_owned());
+        return Some(messages::usage_resets_now(language).to_owned());
     }
-    Some(format!("resets in {}", time_until(now_ms, at)))
+    Some(messages::usage_resets_in(
+        language,
+        &time_until(language, now_ms, at),
+    ))
 }
 
 #[cfg(test)]

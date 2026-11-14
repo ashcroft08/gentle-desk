@@ -1,6 +1,7 @@
 //! Folding RPC events from the backend into the app state.
 
 use gentle_core::chat::{messages_from_history, reduce_chat_at};
+use gentle_core::i18n::messages;
 use gentle_core::rpc::{RpcCommand, RpcEvent, RpcResponse};
 
 use crate::chip;
@@ -64,29 +65,20 @@ fn apply_response(state: &mut AppState, response: &RpcResponse, commands: &mut V
             // The optimistic level from the intent is gone; unknown until the
             // session reports again. Same notice as every failed command.
             state.thinking_level = None;
-            push_notice(
-                state,
-                NoticeLevel::Error,
-                format!("set_thinking_level failed: {error}"),
-            );
+            let failure = messages::command_failed(state.language(), "set_thinking_level", error);
+            push_notice(state, NoticeLevel::Error, failure);
         }
         ("get_available_models", Err(error)) => {
             state.models_status = ModelsStatus::Failed(error.clone());
-            push_notice(
-                state,
-                NoticeLevel::Error,
-                format!("get_available_models failed: {error}"),
-            );
+            let failure = messages::command_failed(state.language(), "get_available_models", error);
+            push_notice(state, NoticeLevel::Error, failure);
         }
         (command, Err(error)) => {
             if command == "switch_session" {
                 state.current_session = None;
             }
-            push_notice(
-                state,
-                NoticeLevel::Error,
-                format!("{command} failed: {error}"),
-            );
+            let failure = messages::command_failed(state.language(), command, error);
+            push_notice(state, NoticeLevel::Error, failure);
         }
     }
 }

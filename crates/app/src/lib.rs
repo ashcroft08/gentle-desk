@@ -53,7 +53,21 @@ pub fn update(state: AppState, input: Input) -> (AppState, Vec<Command>) {
     (state, effects.commands)
 }
 
+/// One fold, with the language the state already speaks kept across it.
+///
+/// The language is the SHELL's, never the fold's: a fold that rebuilds the state
+/// from a default ([`Intent::NewChat`] does) would otherwise drop it silently,
+/// and every notice the reducer words itself would go back to English. Here it
+/// is captured before the input and put back after it, so nothing in the fold
+/// has to know.
 fn fold(state: AppState, input: Input) -> (AppState, Effects) {
+    let language = state.language;
+    let (mut state, effects) = fold_once(state, input);
+    state.language = language;
+    (state, effects)
+}
+
+fn fold_once(state: AppState, input: Input) -> (AppState, Effects) {
     match input {
         Input::Rpc(event) => shared(events::apply_event(state, &event, None)),
         Input::RpcAt(event, now_ms) => shared(events::apply_event(state, &event, Some(now_ms))),

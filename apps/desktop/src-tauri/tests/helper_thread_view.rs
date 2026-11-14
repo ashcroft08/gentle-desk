@@ -10,6 +10,7 @@
 
 use gentle_app::{ChatId, Input, Intent};
 use gentle_core::helpers::HelperStatus;
+use gentle_core::i18n::Language;
 use gentle_core::rpc::{RpcEvent, UiRequest};
 use gentle_desk_lib::bridge::AppStateHolder;
 use gentle_desk_lib::contract::{
@@ -142,7 +143,10 @@ fn opening_a_helper_carries_the_header_iced_draws() {
     assert_eq!(open.title, "running helper", "the title is the rule's");
     assert_eq!(open.agent, "gentle-ai-explore");
     assert_eq!(open.status, HelperStatusView::Running);
-    assert_eq!(open.status_label, status_label(HelperStatus::Running));
+    assert_eq!(
+        open.status_label,
+        status_label(Language::En, HelperStatus::Running)
+    );
     assert_eq!(open.prompt, prompt);
 }
 

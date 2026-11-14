@@ -11,6 +11,7 @@
 
 use std::path::Path;
 
+use gentle_core::i18n::messages;
 use gentle_runtime::app_config;
 
 use crate::bridge::AppStateHolder;
@@ -19,11 +20,6 @@ use crate::new_folder;
 use crate::pending::PendingFolders;
 use crate::picker::FolderPicker;
 use crate::workspace::{self, WorkspaceAction};
-
-/// The title of the dialog: this one picks the place the new folder goes in,
-/// which is why it never offers to make one (Q1 option A, not the dialog's own
-/// "New folder" button).
-pub const TITLE: &str = "Choose where the new workspace folder goes";
 
 /// Creates `name` under the parent the human picks.
 ///
@@ -35,17 +31,22 @@ pub fn create_new(
     folders: &PendingFolders,
     name: &str,
 ) -> WorkspaceAction {
-    let name = match folder_name::check(name) {
+    let language = holder.language();
+    let name = match folder_name::check(language, name) {
         Ok(name) => name,
         Err(reason) => return WorkspaceAction::refused(holder, reason),
     };
-    let Some(parent) = picker.pick_folder(TITLE) else {
+    // The title is the one this dialog needs: it picks the place the new folder
+    // goes in, which is why it never offers to make one (Q1 option A, not the
+    // dialog's own "New folder" button).
+    let title = messages::choose_new_workspace_parent_title(language);
+    let Some(parent) = picker.pick_folder(title) else {
         return WorkspaceAction::only(holder.view());
     };
-    if let Some(reason) = unavailable(&parent) {
+    if let Some(reason) = unavailable(&parent, language) {
         return WorkspaceAction::refused(holder, reason);
     }
-    let target = match new_folder::create_under(&parent, &name) {
+    let target = match new_folder::create_under(language, &parent, &name) {
         Ok(target) => target,
         Err(reason) => return WorkspaceAction::refused(holder, reason),
     };
@@ -53,8 +54,8 @@ pub fn create_new(
 }
 
 /// Why the picked parent cannot hold a new folder, `None` when it can.
-fn unavailable(parent: &Path) -> Option<String> {
-    app_config::workspace_status(parent)
+fn unavailable(parent: &Path, language: gentle_core::i18n::Language) -> Option<String> {
+    app_config::workspace_status(parent, language)
         .reason()
         .map(str::to_owned)
 }

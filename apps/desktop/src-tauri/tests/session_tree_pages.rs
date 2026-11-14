@@ -5,6 +5,7 @@
 mod session_tree_seam;
 use session_tree_seam::{available, chat, chat_ids, config, header, session, shape};
 
+use gentle_core::i18n::Language;
 use gentle_desk_lib::sessions::tree::Tree;
 use gentle_desk_lib::sessions::window::{self, MAX_WINDOW};
 
@@ -23,7 +24,7 @@ fn a_page_beyond_the_total_keeps_the_total_and_holds_no_rows() {
     let sessions = [session(r"C:\a", 300)];
     let tree = tree(&config(&[]), &sessions);
 
-    let page = window::window(&tree, 40, 10, NOW, &available);
+    let page = window::window(&tree, 40, 10, NOW, Language::En, &available);
 
     assert_eq!(page.total, 2, "the total of the whole tree");
     assert!(page.rows.is_empty(), "and no row past its end");
@@ -44,7 +45,7 @@ fn a_length_above_the_cap_is_cut_to_two_hundred_rows() {
     let total = tree.len();
     assert_eq!(total, 60 + 240, "60 headers and 240 chats");
 
-    let page = window::window(&tree, 0, 5_000, NOW, &available);
+    let page = window::window(&tree, 0, 5_000, NOW, Language::En, &available);
 
     assert_eq!(page.total as usize, total);
     assert_eq!(
@@ -59,7 +60,7 @@ fn a_workspace_with_no_chat_is_a_header_with_a_zero_count() {
     let sessions = [session(r"C:\has-chats", 300)];
     let tree = tree(&config(&[r"C:\empty"]), &sessions);
 
-    let page = window::window(&tree, 0, MAX_WINDOW, NOW, &available);
+    let page = window::window(&tree, 0, MAX_WINDOW, NOW, Language::En, &available);
 
     assert_eq!(
         shape(&page.rows),

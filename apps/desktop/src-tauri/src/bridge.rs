@@ -140,10 +140,15 @@ impl AppStateHolder {
     /// A holder for a run whose config file was read at startup, before any
     /// lock existed.
     pub fn with_config(config: ConfigSnapshot) -> Self {
-        Self {
+        let language = config.config.language;
+        let holder = Self {
             config: Mutex::new(Arc::new(config)),
             ..Self::default()
-        }
+        };
+        // The reducer words its own notices, so it starts the run in the
+        // language the config holds: `None` is English (D2).
+        lock(&holder.app).language = language;
+        holder
     }
 
     /// Installs what runs the shared commands of every later fold. One sink for
@@ -245,7 +250,10 @@ impl AppStateHolder {
     /// taken off the lock, so a fold on the pump's thread never waits for a
     /// page.
     pub fn sessions_window(&self, offset: u32, length: u32) -> SessionsWindow {
-        window::window(&self.tree(), offset, length, now_ms(), &folder_status)
+        let language = self.language();
+        window::window(&self.tree(), offset, length, now_ms(), language, &|path| {
+            folder_status(path, language)
+        })
     }
 
     /// Whether the workspace tree already holds `path` as a workspace, because a
@@ -269,6 +277,7 @@ impl AppStateHolder {
         let shell = self.shell_parts();
         let (view, chat_commands, commands) = {
             let mut app = lock(&self.app);
+            speak(&mut app, shell.language);
             let previous = app.clone();
             let full = revision::folds_the_list(&input);
             let (state, effects) = gentle_app::update_chats(previous.clone(), input);
@@ -363,8 +372,19 @@ impl AppStateHolder {
         &self.images
     }
 
+    /// The folded state, with the language this run speaks already in it: the
+    /// read path (`view`) words the texts it derives the same way a fold does.
     fn state(&self) -> gentle_app::AppState {
-        lock(&self.app).clone()
+        let language = self.language_value();
+        let mut state = lock(&self.app).clone();
+        speak(&mut state, language);
+        state
+    }
+
+    /// The language this run speaks, as the shell's own code asks for it: the
+    /// stored preference, or English while there is none (D2).
+    pub(crate) fn language(&self) -> Language {
+        self.language_value().unwrap_or(Language::En)
     }
 
     /// The session list the tree is built from, taken off the lock.
@@ -376,6 +396,17 @@ impl AppStateHolder {
     fn config_notice(&self) -> Option<String> {
         self.config_snapshot().notice.clone()
     }
+}
+
+/// Gives `state` the language this run speaks, read off the config.
+///
+/// This is the ONE place the reducer learns the language (0.2.0, S3): every
+/// notice `crates/app` produces is worded through the field this sets, so
+/// nothing there reads a config or a locale. `None` — no stored preference — is
+/// English (D2: Rust never detects, the web reports a Spanish system once and
+/// the stored choice wins from then on).
+fn speak(state: &mut gentle_app::AppState, language: Option<Language>) {
+    state.language = language;
 }
 
 /// A lock that survives a poisoned mutex: nothing here may panic because a

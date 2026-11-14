@@ -151,7 +151,8 @@ fn open(state: &mut AppState, chat: ChatId) -> Vec<ChatCommand> {
 /// nothing at all happens - no command and no notice.
 fn close_chat(state: &mut AppState, chat: &ChatId) -> Vec<ChatCommand> {
     if state.chats.is_working(chat) {
-        push_notice(state, NoticeLevel::Warning, close_working());
+        let refusal = close_working(state.language());
+        push_notice(state, NoticeLevel::Warning, refusal);
         return Vec::new();
     }
     if !state.chats.close(chat) {

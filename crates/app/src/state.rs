@@ -3,6 +3,7 @@
 use std::collections::BTreeMap;
 
 use gentle_core::chat::{ChatMessage, ChatRole, ChatState};
+use gentle_core::i18n::Language;
 
 use crate::chats::{ChatActivity, ChatId, Chats};
 use crate::list_status::ListStatus;
@@ -119,9 +120,21 @@ pub struct AppState {
     /// The levels the current model supports, from
     /// `get_available_thinking_levels`.
     pub thinking_levels: Vec<String>,
+    /// The language the app's own words are written in (0.2.0, S3), as the
+    /// config holds it. `None` until the shell says so, and `None` is English:
+    /// the app layer never detects the system language (D2), the shell reads the
+    /// stored preference and hands it in with the state it folds, and every
+    /// notice the reducer produces is worded through it.
+    pub language: Option<Language>,
 }
 
 impl AppState {
+    /// The language this state's own words are written in: the shell's choice,
+    /// or English while there is none (D2: nothing here detects a locale).
+    pub fn language(&self) -> Language {
+        self.language.unwrap_or(Language::En)
+    }
+
     /// The activity a sidebar row shows for the chat of the session stored at
     /// `path` (S4). The rows ask one path at a time — the ones being drawn —
     /// and a chat the app has never heard of is idle, so every path in the

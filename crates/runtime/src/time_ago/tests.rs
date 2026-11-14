@@ -1,4 +1,5 @@
 use super::*;
+use gentle_core::i18n::Language;
 
 const SEC: u64 = 1000;
 const MIN: u64 = 60 * SEC;
@@ -7,7 +8,7 @@ const DAY: u64 = 24 * HOUR;
 const NOW: u64 = 1_790_000_000_000;
 
 fn ago(delta: u64) -> String {
-    time_ago(NOW, NOW - delta)
+    time_ago(Language::En, NOW, NOW - delta)
 }
 
 #[test]
@@ -18,7 +19,7 @@ fn under_a_minute_is_now() {
 
 #[test]
 fn a_time_in_the_future_is_now() {
-    assert_eq!(time_ago(NOW, NOW + 5 * MIN), "now");
+    assert_eq!(time_ago(Language::En, NOW, NOW + 5 * MIN), "now");
 }
 
 #[test]
@@ -41,12 +42,12 @@ fn older_than_thirty_days_is_months_then_years() {
 
 #[test]
 fn an_unknown_zero_time_does_not_panic() {
-    assert_eq!(time_ago(NOW, 0), "56y");
+    assert_eq!(time_ago(Language::En, NOW, 0), "56y");
 }
 
 #[test]
 fn an_until_counts_up_and_never_answers_zero() {
-    let until = |delta: u64| time_until(NOW, NOW + delta);
+    let until = |delta: u64| time_until(Language::En, NOW, NOW + delta);
 
     // Rounded UP: a countdown that says 3h when it means 3h40m understates the
     // wait, and a reset under a minute still needs a minute on the clock.
@@ -61,6 +62,9 @@ fn an_until_counts_up_and_never_answers_zero() {
 
 #[test]
 fn an_until_that_already_passed_is_now() {
-    assert_eq!(time_until(NOW, NOW), "now");
-    assert_eq!(time_until(NOW, NOW.saturating_sub(HOUR)), "now");
+    assert_eq!(time_until(Language::En, NOW, NOW), "now");
+    assert_eq!(
+        time_until(Language::En, NOW, NOW.saturating_sub(HOUR)),
+        "now"
+    );
 }

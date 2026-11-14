@@ -627,7 +627,11 @@ impl Bridge {
     /// (no launcher, no console) reaches the button that asked.
     pub fn open_terminal(&self, action: TerminalActionView) -> Result<(), String> {
         self.accepting_work()?;
-        crate::terminal::open(action, &self.settings.paths.home_args)
+        crate::terminal::open(
+            self.holder.language(),
+            action,
+            &self.settings.paths.home_args,
+        )
     }
 
     /// The Profiles pane's read (0.1.12, T2): the config home's `profiles.json`
@@ -716,6 +720,7 @@ impl Bridge {
                     home.as_deref(),
                     &node,
                     gentle_runtime::clock::now_ms(),
+                    holder.language(),
                 );
                 push(&thread_emit, holder.note_usage(answered));
             });

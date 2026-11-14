@@ -5,5 +5,6 @@
 //! from pi is shown exactly as it arrives, so nothing here touches it.
 
 mod language;
+pub mod messages;
 
 pub use language::Language;

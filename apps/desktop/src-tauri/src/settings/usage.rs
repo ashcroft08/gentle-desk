@@ -10,6 +10,7 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use gentle_core::i18n::Language;
 use gentle_runtime::usage as rule;
 
 use super::{FileRead, NodeProbe};
@@ -39,7 +40,13 @@ const POLL: Duration = Duration::from_millis(50);
 /// script, the agent folder itself - and `Failed` means the sources ran and
 /// their answer could not be used. Both of the last two say why; a person can
 /// act on a sentence and not on a code.
-pub fn view(files: &FileRead, home: Option<&Path>, node: &NodeProbe, now_ms: u64) -> UsageView {
+pub fn view(
+    files: &FileRead,
+    home: Option<&Path>,
+    node: &NodeProbe,
+    now_ms: u64,
+    language: Language,
+) -> UsageView {
     let Some(home) = home else {
         return unreadable(
             "the shell's agent folder could not be found on this machine".to_owned(),
@@ -70,7 +77,7 @@ pub fn view(files: &FileRead, home: Option<&Path>, node: &NodeProbe, now_ms: u64
             providers: document
                 .providers
                 .into_iter()
-                .map(|provider| provider_view(now_ms, provider))
+                .map(|provider| provider_view(now_ms, language, provider))
                 .collect(),
         },
         Err(reason) => failed(reason),
@@ -101,7 +108,7 @@ fn failed(reason: String) -> UsageView {
 /// One provider of the document as the pane draws it: its name, its status, its
 /// plan when it reports one, and one row per window with the countdown the
 /// clock gives that window's reset.
-fn provider_view(now_ms: u64, provider: rule::Provider) -> UsageProviderView {
+fn provider_view(now_ms: u64, language: Language, provider: rule::Provider) -> UsageProviderView {
     UsageProviderView {
         provider: provider.provider,
         status: match provider.status {
@@ -123,7 +130,7 @@ fn provider_view(now_ms: u64, provider: rule::Provider) -> UsageProviderView {
                     .map(|window| UsageWindowView {
                         label: window.label,
                         used_percent: window.used_percent,
-                        resets_in: rule::reset_label(now_ms, window.reset_at),
+                        resets_in: rule::reset_label(language, now_ms, window.reset_at),
                     })
                     .collect(),
             })
@@ -285,6 +292,7 @@ mod tests {
             Some(&home()),
             &node(Ok(DOCUMENT), Arc::clone(&ran)),
             NOW,
+            Language::En,
         );
 
         assert_eq!(view.status, UsageStatusView::Installed);
@@ -343,6 +351,7 @@ mod tests {
             Some(&home()),
             &node(Ok(DOCUMENT), never()),
             NOW,
+            Language::En,
         );
 
         let opencode = &view.providers[0];
@@ -364,6 +373,7 @@ mod tests {
             Some(&home()),
             &node(Ok(document), never()),
             NOW,
+            Language::En,
         );
 
         let limit = &view.providers[0].limits[0];
@@ -382,6 +392,7 @@ mod tests {
             Some(&home()),
             &node(Ok(DOCUMENT), Arc::clone(&ran)),
             NOW,
+            Language::En,
         );
 
         assert!(matches!(view.status, UsageStatusView::Missing(_)));
@@ -400,6 +411,7 @@ mod tests {
             Some(&home()),
             &node(Ok(DOCUMENT), never()),
             NOW,
+            Language::En,
         );
         assert!(matches!(view.status, UsageStatusView::Missing(_)));
     }
@@ -412,6 +424,7 @@ mod tests {
             Some(&home()),
             &node(Ok(DOCUMENT), Arc::clone(&ran)),
             NOW,
+            Language::En,
         );
 
         assert!(matches!(view.status, UsageStatusView::Missing(_)));
@@ -425,6 +438,7 @@ mod tests {
             Some(&home()),
             &node(Ok(DOCUMENT), never()),
             NOW,
+            Language::En,
         );
         assert_eq!(
             view.status,
@@ -451,6 +465,7 @@ mod tests {
             Some(&home()),
             &node(Ok(DOCUMENT), never()),
             NOW,
+            Language::En,
         );
         match view.status {
             UsageStatusView::Unreadable(reason) => {
@@ -467,6 +482,7 @@ mod tests {
             None,
             &node(Ok(DOCUMENT), never()),
             NOW,
+            Language::En,
         );
         match view.status {
             UsageStatusView::Unreadable(reason) => {
@@ -483,6 +499,7 @@ mod tests {
             Some(&home()),
             &node(Err("node is not installed"), never()),
             NOW,
+            Language::En,
         );
         assert_eq!(
             view.status,
@@ -499,6 +516,7 @@ mod tests {
             Some(&home()),
             &node(Ok(wrong), never()),
             NOW,
+            Language::En,
         );
         match view.status {
             UsageStatusView::Failed(reason) => assert!(reason.contains("someone/else"), "{reason}"),

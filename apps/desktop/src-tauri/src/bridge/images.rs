@@ -23,7 +23,7 @@ impl AppStateHolder {
     /// file was refused. No foreground chat takes nothing.
     pub fn attach_images(&self, paths: &[String]) -> ViewState {
         if let Some(chat) = self.foreground() {
-            self.images.attach(chat.as_str(), paths);
+            self.images.attach(self.language(), chat.as_str(), paths);
         }
         self.view()
     }

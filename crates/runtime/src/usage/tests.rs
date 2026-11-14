@@ -4,6 +4,7 @@
 use std::path::{Path, PathBuf};
 
 use super::*;
+use gentle_core::i18n::Language;
 
 const SEC: u64 = 1000;
 const MIN: u64 = 60 * SEC;
@@ -184,7 +185,7 @@ fn a_reset_time_that_is_null_is_no_countdown() {
     let window = &document.providers[0].limits[0].windows[0];
     assert_eq!(window.reset_at, None);
     assert_eq!(window.used_percent, 12.5);
-    assert_eq!(reset_label(NOW, window.reset_at), None);
+    assert_eq!(reset_label(Language::En, NOW, window.reset_at), None);
 }
 
 #[test]
@@ -261,23 +262,26 @@ fn a_provider_of_another_shape_is_refused() {
 #[test]
 fn the_reset_label_counts_up_from_now() {
     assert_eq!(
-        reset_label(NOW, Some(NOW + 4 * HOUR)).as_deref(),
+        reset_label(Language::En, NOW, Some(NOW + 4 * HOUR)).as_deref(),
         Some("resets in 4h")
     );
     assert_eq!(
-        reset_label(NOW, Some(NOW + 6 * DAY + 3 * HOUR)).as_deref(),
+        reset_label(Language::En, NOW, Some(NOW + 6 * DAY + 3 * HOUR)).as_deref(),
         Some("resets in 7d")
     );
     // Under a minute still counts as a minute: "resets in 0m" would be a lie.
     assert_eq!(
-        reset_label(NOW, Some(NOW + 30 * SEC)).as_deref(),
+        reset_label(Language::En, NOW, Some(NOW + 30 * SEC)).as_deref(),
         Some("resets in 1m")
     );
     // A reset that already happened is not a countdown into the past.
-    assert_eq!(reset_label(NOW, Some(NOW)).as_deref(), Some("resets now"));
     assert_eq!(
-        reset_label(NOW, Some(NOW - HOUR)).as_deref(),
+        reset_label(Language::En, NOW, Some(NOW)).as_deref(),
         Some("resets now")
     );
-    assert_eq!(reset_label(NOW, None), None);
+    assert_eq!(
+        reset_label(Language::En, NOW, Some(NOW - HOUR)).as_deref(),
+        Some("resets now")
+    );
+    assert_eq!(reset_label(Language::En, NOW, None), None);
 }

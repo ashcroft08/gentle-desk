@@ -12,6 +12,7 @@
 
 use std::path::Path;
 
+use gentle_core::i18n::Language;
 use gentle_runtime::app_config::{workspace_status, WorkspaceStatus};
 
 use crate::contract::{SessionTreeRow, SessionsWindow, WorkspaceRowView};
@@ -23,13 +24,14 @@ use crate::sessions::view;
 pub const MAX_WINDOW: u32 = 200;
 
 /// The rows `[offset, offset + length)` of the flattened tree, with the ages of
-/// the chat rows measured at `now_ms` and the folders of the served headers
-/// asked through `status`.
+/// the chat rows measured at `now_ms`, their words in `language`, and the
+/// folders of the served headers asked through `status`.
 pub fn window(
     tree: &Tree,
     offset: u32,
     length: u32,
     now_ms: u64,
+    language: Language,
     status: &dyn Fn(&str) -> WorkspaceStatus,
 ) -> SessionsWindow {
     let length = length.min(MAX_WINDOW) as usize;
@@ -40,7 +42,7 @@ pub fn window(
             Row::Header(index) => tree.header(index).map(|header| header_row(header, status)),
             Row::Chat(index) => tree
                 .chat(index)
-                .map(|session| SessionTreeRow::Chat(view::row(session, now_ms))),
+                .map(|session| SessionTreeRow::Chat(view::row(session, now_ms, language))),
         })
         .collect();
     SessionsWindow {
@@ -49,10 +51,10 @@ pub fn window(
     }
 }
 
-/// What the file system says about the folder of a workspace: the probe the
-/// running app passes to [`window`].
-pub fn folder_status(path: &str) -> WorkspaceStatus {
-    workspace_status(Path::new(path))
+/// What the file system says about the folder of a workspace, in `language`:
+/// the probe the running app passes to [`window`].
+pub fn folder_status(path: &str, language: Language) -> WorkspaceStatus {
+    workspace_status(Path::new(path), language)
 }
 
 /// One workspace header, with its folder asked through `status`.
