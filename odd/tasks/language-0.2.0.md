@@ -100,17 +100,29 @@ fragments in 12 files.
       started with an interaction_required stop: the two rail-count pinning test files
       joined the surfaces by maintainer approval, placement A). Commit: pending — see
       Log L4 for the five deviations accepted.
-- [ ] T4 (S3) Rust catalog: the ~62 fragments in crates/runtime/src/app_config/{status,
-      store}.rs, helper_text.rs, chat_runtime/execute.rs, time_ago.rs,
-      crates/app/src/{chats/*,chip.rs,events.rs} and
-      apps/desktop/src-tauri/src/{folder_name,new_folder,terminal,workspace_add,
-      workspace_create,sessions/view,chat_rename,images}.rs become catalog messages in
-      the two languages. Tests: each message asserted in en and es, parametrized ones
-      with their substitution. Route: writer. Commit: pending.
+- [ ] T4 (S3) Rust catalog: the maintainer's ~62 fragments inventoried by the T4 writer
+      as 61 OWN + 8 PASSTHROUGH (now 60 OWN after the parent's ruling on
+      images.rs:348). First attempt stopped: 9 of 12 producer files cannot read the
+      language — `crates/app` carries no language channel (AppState/Input have no such
+      field) and 18 threading paths were outside the surfaces. Maintainer approved
+      widening (option A, 2026-11-14): the threading set plus the real
+      crates/runtime/src/helper_text.rs (the task's app_config/helper_text.rs does not
+      exist). Parent rulings: ConfigNotice stays ALWAYS ENGLISH (the damaged-config
+      case has no readable preference by construction); images.rs:348 is prompt
+      content, not UI copy, NOT cataloged (D7 by spirit); None → Language::En at every
+      producer, Rust never detects; usage.rs:288/291 join the catalog. Route: writer.
+      Commit: pending.
 - [ ] T5 (S3) web catalog pattern + the modules that need no other work: notices/,
-      dialogs/, helpers/ and the 16 hardcoded .ts strings (theme/themes.ts:30-37 and
-      friends) get their en/es dictionaries, consumers migrated, tests updated. This
-      slice sets the pattern T6-T8 follow. Route: writer. Commit: pending.
+      dialogs/ and helpers/ migrated on the D4 shape (first attempt delivered 18+2 files:
+      levels words out of level.ts into noticesCopy, dialogs and helpers builders, 532
+      tests green); the theme labels (theme/themes.ts THEME_LABELS) finish in T5 with
+      their consumer, sidebar/ThemePicker.svelte + its test, approved by the parent as
+      completing the maintainer's named item (its only consumer is the picker). The
+      recipe for T6-T8 is in the T5 report (5 steps, SAME_IN_BOTH rule, forced
+      setLanguage('en') flip test — vi.resetModules is unsafe across module
+      generations). icons/shapes.ts MARK_LABELS is UNASSIGNED in T6-T8's lists →
+      assigned to T8. Deferred: chat/tabs.ts → T8, settings/profile-tabs.ts and
+      sections.ts 'Settings sections' → T7. Route: writer. Commit: pending.
 - [ ] T6 (S3) chrome: App.svelte, sidebar/{copy.ts,home-copy.ts,Sidebar.svelte,
       ChatRow.svelte} — the largest concentration of the 28 hardcoded .svelte strings.
       Route: writer. Commit: pending.
