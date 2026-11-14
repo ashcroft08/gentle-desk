@@ -94,24 +94,64 @@ pub fn open(action: TerminalActionView, home_args: &[OsString]) -> Result<(), St
     launch(&program, &args)
 }
 
-/// Starts `program` in a terminal window of its own, answering as soon as the
-/// window exists: nothing here waits for the window to close.
+/// The arguments Windows Terminal gets: one new window, one tab, then the
+/// program and its own arguments after `--`. Pure, so the shape is pinned by a
+/// test.
+pub fn windows_terminal_args(program: &Path, args: &[OsString]) -> Vec<OsString> {
+    let mut argv: Vec<OsString> = ["-w", "-1", "new-tab", "--"]
+        .iter()
+        .map(OsString::from)
+        .collect();
+    argv.push(program.as_os_str().to_owned());
+    argv.extend(args.iter().cloned());
+    argv
+}
+
+/// `wt.exe` on this machine: the Windows Terminal this user has, when it is
+/// installed. `LOCALAPPDATA`'s alias is the documented place; `PATH` is looked
+/// at too, because a machine may have it either way.
+fn windows_terminal() -> Option<PathBuf> {
+    if let Some(base) = std::env::var_os("LOCALAPPDATA") {
+        let candidate = PathBuf::from(base).join("Microsoft/WindowsApps/wt.exe");
+        if candidate.is_file() {
+            return Some(candidate);
+        }
+    }
+    let path = std::env::var_os("PATH")?;
+    std::env::split_paths(&path)
+        .map(|dir| dir.join("wt.exe"))
+        .find(|candidate| candidate.is_file())
+}
+
+/// Opens `program` in a terminal window, answering as soon as the window
+/// exists: nothing here waits for the window to close.
 ///
-/// NO shell in between: `CREATE_NEW_CONSOLE` gives the process its own visible
-/// console and the launcher runs as `Command::new(program).args(args)` - the
-/// shape the settings probes already run, verified from a console-less GUI
-/// process with the real launcher (node under `C:\Program Files\...`, a path
-/// with a space): the interactive shell stays alive with a true TTY. Wrapping
-/// doubled outer quotes once the line carries more than the program
-/// ("network path not found", then a dead prompt), which is why the first
-/// maintainer run saw a window flash and die.
+/// Windows Terminal is used when it is installed: it owns a real terminal and
+/// starts the program itself, so no `cmd` parses the line and no console
+/// handles are inherited from this GUI process. Measured in this app: a child
+/// started with `CREATE_NEW_CONSOLE` from the console-less app exits at once
+/// with code 0 and prints nothing, while the very same command stays alive in a
+/// terminal of its own. When `wt.exe` is missing, the direct spawn with its own
+/// console is the fallback.
 #[cfg(windows)]
 fn launch(program: &Path, args: &[OsString]) -> Result<(), String> {
     use std::os::windows::process::CommandExt;
 
-    /// `CREATE_NEW_CONSOLE`: the new console is the visible terminal this
-    /// command exists to open.
+    /// `CREATE_NEW_CONSOLE`: the fallback console that is visible on its own.
     const CREATE_NEW_CONSOLE: u32 = 0x0000_0010;
+    /// `DETACHED_PROCESS`: Windows Terminal must not borrow this process's
+    /// console, because a GUI process has none to give.
+    const DETACHED_PROCESS: u32 = 0x0000_0008;
+
+    if let Some(wt) = windows_terminal() {
+        let started = std::process::Command::new(wt)
+            .args(windows_terminal_args(program, args))
+            .creation_flags(DETACHED_PROCESS)
+            .spawn();
+        if started.is_ok() {
+            return Ok(());
+        }
+    }
 
     std::process::Command::new(program)
         .args(args)
@@ -205,6 +245,29 @@ mod tests {
             args,
             os(&["C:/npm/gentle-shell.mjs", "--home", "C:/h", "--link"]),
             "the flags travel as the children get them: `--home` is the one the shell reads first"
+        );
+    }
+
+    /// Windows Terminal gets one new window and one tab, then `--` and the
+    /// program with its own arguments: nothing is parsed by cmd.
+    #[test]
+    fn windows_terminal_opens_one_tab_on_the_program() {
+        let argv = windows_terminal_args(
+            Path::new("C:/Program Files/nodejs/node.exe"),
+            &os(&["C:/npm/gentle-shell.mjs", "--link"]),
+        );
+
+        assert_eq!(
+            argv,
+            os(&[
+                "-w",
+                "-1",
+                "new-tab",
+                "--",
+                "C:/Program Files/nodejs/node.exe",
+                "C:/npm/gentle-shell.mjs",
+                "--link"
+            ])
         );
     }
 
