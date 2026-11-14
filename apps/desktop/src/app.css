@@ -790,13 +790,13 @@ p {
 .ctx {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 3px 9px;
+  gap: 7px;
+  padding: 4px 10px;
   border: 1px solid var(--border);
   border-radius: 999px;
-  color: var(--muted);
+  color: var(--text);
   font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   line-height: 1;
   white-space: nowrap;
@@ -805,9 +805,9 @@ p {
 
 .ctx .bar {
   display: inline-block;
-  width: 38px;
-  height: 4px;
-  border-radius: 2px;
+  width: 46px;
+  height: 5px;
+  border-radius: 3px;
   background: var(--border);
   overflow: hidden;
 }
@@ -815,7 +815,10 @@ p {
 .ctx .bar i {
   display: block;
   height: 100%;
-  border-radius: 2px;
+  /* A small share still shows a sliver: at 6% the fill is under a pixel
+     otherwise, and the bar would read as empty. */
+  min-width: 4px;
+  border-radius: 3px;
   background: var(--accent);
 }
 

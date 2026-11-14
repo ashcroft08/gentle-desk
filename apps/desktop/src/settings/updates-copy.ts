@@ -7,9 +7,10 @@
 export const CHECKING = 'Checking...'
 export const NOT_CHECKED = 'Not checked yet.'
 
-/** The one check button, and the one action. */
+/** The one check button, and the two actions a terminal window runs. */
 export const CHECK_AGAIN = 'Check again'
 export const UPDATE = 'Update'
+export const UPDATE_EXTENSIONS = 'Update extensions'
 
 /** The card's two tags. */
 export const UPDATE_AVAILABLE = 'Update available'
@@ -37,15 +38,25 @@ export const VERSIONS = (lines: string[]): string => lines.join(SEPARATOR)
 export const UPDATE_IN_TERMINAL =
   "Update opens a terminal window and runs the shell's own update; read what it says there."
 
+/**
+ * What Update extensions does, and why it is always offered: the shell's own
+ * updater with pi's `--extensions` flag passed through, touching only the
+ * packages the shell has installed. Nothing can say which of them are behind,
+ * so there is no check to wait for and the button is safe to press any time
+ * (running it again changes nothing). No version, no promise.
+ */
+export const UPDATE_EXTENSIONS_IN_TERMINAL =
+  "Update extensions opens a terminal window and updates the packages your shell has installed. There is no way to tell which ones are behind, so this button is always offered and safe to use any time."
+
 /** The app's own release is not a terminal's job: the banner installs it. */
 export const APP_UPDATES_ITSELF = 'This app updates itself: use the update banner at the top.'
 
 /**
- * Why Update is dead while a chat is open (S4): the rule, the count that blocks
- * it, and what makes it come alive.
+ * Why the update buttons are dead while a chat is open (S4): the rule, the
+ * count that blocks them, and what makes them come alive.
  */
 export function gateHint(openChats: number): string {
   const chats = openChats === 1 ? '1 chat is' : `${openChats} chats are`
   const them = openChats === 1 ? 'it' : 'them'
-  return `Updates need every chat closed. ${chats} open - close ${them} and Update comes alive.`
+  return `Updates need every chat closed. ${chats} open - close ${them} and the update buttons come alive.`
 }

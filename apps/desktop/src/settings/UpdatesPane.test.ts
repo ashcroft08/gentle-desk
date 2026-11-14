@@ -14,6 +14,8 @@ import {
   CHECK_AGAIN,
   UPDATE,
   UPDATE_AVAILABLE,
+  UPDATE_EXTENSIONS,
+  UPDATE_EXTENSIONS_IN_TERMINAL,
   UP_TO_DATE,
   gateHint,
 } from './updates-copy'
@@ -81,6 +83,51 @@ describe('the Updates pane', () => {
     expect(pane.querySelector('.tag')?.classList.contains('ok')).toBe(true)
     expect(within(pane).queryByRole('button', { name: UPDATE })).toBeNull()
     expect(within(pane).getByRole('button', { name: CHECK_AGAIN })).toBeTruthy()
+  })
+
+  it('always offers Update extensions, with the note that says what it updates', () => {
+    // Nothing with the check drives this button: extensions are updated by the
+    // shell's own updater and there is no way to know which are behind, so it
+    // is offered with everything up to date too.
+    const pane = draw(current())
+    const extensions = within(pane).getByRole('button', {
+      name: UPDATE_EXTENSIONS,
+    }) as HTMLButtonElement
+
+    expect(extensions.disabled).toBe(false)
+    expect(within(pane).getByText(UPDATE_EXTENSIONS_IN_TERMINAL)).toBeTruthy()
+    // It sits next to Check again, in the card's own action row.
+    expect(extensions.closest('.acts')?.textContent).toContain(CHECK_AGAIN)
+  })
+
+  it('offers Update extensions before the check has answered, and never checks', () => {
+    const pane = draw(updates({ status: 'Unknown' }))
+
+    expect(within(pane).getByRole('button', { name: UPDATE_EXTENSIONS })).toBeTruthy()
+    expect(within(pane).getByRole('button', { name: CHECK_AGAIN })).toBeTruthy()
+    expect(intents()).toEqual([])
+  })
+
+  it('opens the extensions update in a terminal window with every chat closed', async () => {
+    const pane = draw(current())
+
+    await fireEvent.click(within(pane).getByRole('button', { name: UPDATE_EXTENSIONS }))
+    expect(handlerArgs('open_terminal')).toEqual([{ action: 'UpdateExtensions' }])
+    expect(intents()).toEqual([])
+  })
+
+  it('keeps Update extensions dead while a chat is open, and says why', () => {
+    const pane = draw(updates(), 1)
+    const extensions = within(pane).getByRole('button', {
+      name: UPDATE_EXTENSIONS,
+    }) as HTMLButtonElement
+    const hint = within(pane).getByText(gateHint(1))
+
+    expect(extensions.disabled).toBe(true)
+    expect(hint.getAttribute('role')).toBe('status')
+    expect(extensions.getAttribute('aria-describedby')).toBe(hint.id)
+    // Nothing opens from a dead button.
+    expect(handlerArgs('open_terminal')).toEqual([])
   })
 
   it('draws the checking line without taking the pane away', () => {

@@ -359,6 +359,11 @@ pub enum TerminalActionView {
     /// The shell's own `update`, which forwards to pi's updater (L5): run from a
     /// terminal, and only offered with every chat closed (S4).
     Update,
+    /// The same shell update with pi's `--extensions` flag passed straight
+    /// through, so only the packages the shell has installed are touched: safe
+    /// to run any time, and offered without a check (nothing can say which
+    /// extensions are behind).
+    UpdateExtensions,
 }
 
 /// How one provider's `auth check` stands: the four states the shell reports.
