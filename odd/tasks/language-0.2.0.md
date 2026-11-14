@@ -100,18 +100,23 @@ fragments in 12 files.
       started with an interaction_required stop: the two rail-count pinning test files
       joined the surfaces by maintainer approval, placement A). Commit: pending — see
       Log L4 for the five deviations accepted.
-- [ ] T4 (S3) Rust catalog: the maintainer's ~62 fragments inventoried by the T4 writer
-      as 61 OWN + 8 PASSTHROUGH (now 60 OWN after the parent's ruling on
-      images.rs:348). First attempt stopped: 9 of 12 producer files cannot read the
-      language — `crates/app` carries no language channel (AppState/Input have no such
-      field) and 18 threading paths were outside the surfaces. Maintainer approved
-      widening (option A, 2026-11-14): the threading set plus the real
-      crates/runtime/src/helper_text.rs (the task's app_config/helper_text.rs does not
-      exist). Parent rulings: ConfigNotice stays ALWAYS ENGLISH (the damaged-config
-      case has no readable preference by construction); images.rs:348 is prompt
-      content, not UI copy, NOT cataloged (D7 by spirit); None → Language::En at every
-      producer, Rust never detects; usage.rs:288/291 join the catalog. Route: writer.
-      Commit: pending.
+- [x] T4 (S3) Rust catalog: 57 catalog messages in crates/gentle-core/src/i18n/messages.rs
+      (one function per message, Language first, English byte-identical, neutral
+      Spanish) and a one-way language channel — `AppState.language` fed by
+      `bridge::speak` from the config snapshot (None == English, D2), preserved across
+      folds (`Intent::NewChat` rebuilds state, `fold` re-applies), read by every
+      producer through the holder. 61 OWN fragments localized (the maintainer's ~62;
+      the writer's inventory found 61 + 8 passthrough); two stay English BY RULING:
+      the damaged-config notice (no readable preference exists at that moment) and
+      images.rs:348 `Attached image:` (prompt content, D7 by spirit). First attempt
+      stopped: 9 of 12 producer files could not read the language — maintainer
+      approved the 18-path widening plus the Usage countdown's 2 paths
+      (settings/usage.rs; bridge/settings.rs turned out unused — refresh_usage already
+      holds the holder). English pinned by the pre-existing exact-English suites with
+      only mechanical Language::En args; deliberate speak-no-op mutation proved the
+      channel carries (RED then reverted). Route: writer. Commit a75c77c (GREEN:
+      gentle-core 143, gentle-runtime 260, gentle-app 215, gentle-desk-app 369,
+      0 failed; clippy/fmt clean).
 - [ ] T5 (S3) web catalog pattern + the modules that need no other work: notices/,
       dialogs/ and helpers/ migrated on the D4 shape (first attempt delivered 18+2 files:
       levels words out of level.ts into noticesCopy, dialogs and helpers builders, 532
@@ -123,9 +128,16 @@ fragments in 12 files.
       generations). icons/shapes.ts MARK_LABELS is UNASSIGNED in T6-T8's lists →
       assigned to T8. Deferred: chat/tabs.ts → T8, settings/profile-tabs.ts and
       sections.ts 'Settings sections' → T7. Route: writer. Commit: pending.
-- [ ] T6 (S3) chrome: App.svelte, sidebar/{copy.ts,home-copy.ts,Sidebar.svelte,
-      ChatRow.svelte} — the largest concentration of the 28 hardcoded .svelte strings.
-      Route: writer. Commit: pending.
+- [x] T6 (S3) chrome: App.svelte (new minimal src/app-copy.ts), sidebar/{copy.ts,
+      home-copy.ts} converted to the D4 builder shape, the 23 hardcoded chrome words
+      and the six mark names (icons/shapes.ts markLabelsCopy, English MARK_LABELS kept
+      as the bare Mark default) migrated; titles/labels/timestamps/the delete dialog's
+      path stay passthrough, proven by the flip tests. Two seams recorded for their
+      owners: Sidebar.svelte:75 still passes the flat SETTINGS word into
+      copy.updateWaiting() (one line, now inside T7's surfaces) and the bare <Mark>
+      draws in notices/Notice.svelte (T5-owned) and chat/ViewTabs.svelte (T8) until
+      those slices pass markLabelsCopy(language.current)[kind]. Route: writer. Commit
+      802864c (RED 7; GREEN 558/0, svelte-check 0, eslint 0).
 - [ ] T7 (S3) settings area: settings/{copy.ts,account-copy.ts,profiles-copy.ts,
       updates-copy.ts,usage-copy.ts}, SettingsDialog.svelte and its panes. Route:
       writer. Commit: pending.
