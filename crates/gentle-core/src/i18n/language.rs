@@ -44,11 +44,13 @@ impl Language {
 
     /// The language a locale tag starts the app in.
     ///
-    /// The primary subtag (before the first `-` or `_`), lowercased, decides:
-    /// exactly `es` starts in Spanish, so `es`, `es-ES`, `es-419`, `es_MX` and
-    /// `ES-ar` all answer [`Language::Es`]. Every other input — an empty or
-    /// whitespace-only string, one-letter junk, another language — answers
-    /// [`Language::En`], and no input makes this panic.
+    /// The primary subtag (before the first `-` or `_`), trimmed of
+    /// surrounding spaces and lowercased, decides: exactly `es` starts in
+    /// Spanish — not every locale that begins with those letters — so `es`,
+    /// `es-ES`, `es-419`, `es_MX`, `ES-ar` and `  es  ` all answer
+    /// [`Language::Es`]. Every other input — an empty or whitespace-only
+    /// string, one-letter junk, another language — answers [`Language::En`],
+    /// and no input makes this panic.
     pub fn detect_from_locale(locale: &str) -> Language {
         let primary = locale
             .split(['-', '_'])
