@@ -270,3 +270,13 @@ the subscription panel goes to NEXT version's analysis; 0.1.12 ships the four pi
   and the maintainer's real-app test feeding three fixes (L17) into the final link. Open for the
   release: nothing in the feature; the maintainer's retest of the dev app (open_terminal never
   executed by a writer) and the 0.1.12 release phase remain maintainer decisions.
+
+- L20 (2026-11-13, release): the terminal hand-offs were fixed for good after four measured
+  rounds (direct spawn, cmd /k, inherited handles, PI_* env): a console-less GUI process cannot
+  give a child a usable console, so the desk now opens **Windows Terminal** (`wt.exe -w -1
+  new-tab -- launcher args`, detached) with the direct spawn as fallback; the maintainer
+  confirmed both buttons work and are faster. The Settings design audit (rendered in Chrome,
+  dark + light) found and fixed two things - the Profiles state line sat between the sub-tabs
+  and the switch, and Account accented the secondary action - and left the tags, notes and tab
+  strip as they were. 0.1.12 bumps the version in three files and ships from main; the roadmap
+  records it as shipped and lists 0.1.13 candidates.
