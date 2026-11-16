@@ -350,7 +350,12 @@ mod decode {
 mod fixtures {
     use super::*;
 
-    const FIXTURES: [(&str, &str); 5] = [
+    const FIXTURES: [(&str, &str); 7] = [
+        ("desktop-rpc", include_str!("fixtures/desktop-rpc.jsonl")),
+        (
+            "desktop-rpc-real",
+            include_str!("fixtures/desktop-rpc-real.jsonl"),
+        ),
         (
             "extension-error",
             include_str!("fixtures/extension-error.jsonl"),
@@ -388,7 +393,7 @@ mod fixtures {
             }
         }
         assert_eq!(
-            total, 41,
+            total, 48,
             "fixture line count changed; update this guard together with the fixtures"
         );
     }

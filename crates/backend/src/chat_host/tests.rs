@@ -9,7 +9,7 @@ use gentle_core::rpc::{Decoded, RpcCommand, RpcEvent};
 use super::*;
 use crate::process::ProcessEvent;
 
-mod fake;
+pub(crate) mod fake;
 use fake::{FakeSpawner, WAIT};
 
 fn saved(name: &str) -> ChatKey {

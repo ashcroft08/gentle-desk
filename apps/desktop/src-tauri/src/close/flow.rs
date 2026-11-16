@@ -38,10 +38,12 @@ pub struct Deadlines {
     /// The child-event threads: they end on the stop signal within their poll
     /// interval, so this only covers a wedged thread.
     pub pump: Duration,
-    /// The session watcher and the safety-net timer: the batch threads and the
-    /// timer end on the stop signal within their poll interval, and the platform
-    /// watch's own thread ends when its handle drops. This only covers a wedged
-    /// one, as the pump's deadline does for the child events.
+    /// The session watcher and the safety-net timer, PLUS the Settings files'
+    /// watcher, which the same step stops: one budget for the whole step. The
+    /// batch threads and the timer end on the stop signal within their poll
+    /// interval, and the platform watch's own thread ends when its handle drops,
+    /// so this only covers a wedged one, as the pump's deadline does for the
+    /// child events.
     pub watch: Duration,
     /// The session index cache: one JSON document, about 29 MB at 50 000 chats.
     pub cache: Duration,
@@ -114,9 +116,15 @@ pub trait CloseSteps: Send + Sync {
     fn stop_children(&self);
     /// Ends the child-event threads and waits for them, at most `budget`.
     fn join_pump(&self, budget: Duration);
-    /// Stops the session watcher and the safety-net timer, and waits at most
-    /// `budget` for their threads. Before the cache flush, so no batch asks for
-    /// a pass after the last one was written.
+    /// Stops the Settings files' watcher, the session watcher and the safety-net
+    /// timer, and waits at most `budget` for their threads: ONE deadline, shared
+    /// by the whole step and never one budget per watcher. The Settings watcher's
+    /// stop is given that deadline first, because it only pushes a typed event
+    /// and reads nothing; the session threads are given what is LEFT of it, so a
+    /// wedged Settings watcher costs the session threads part of this step's
+    /// budget and never a fresh one. Before the cache flush, so no batch and no
+    /// notice asks for a read after the last state was written, and before the
+    /// config flush for the same reason.
     fn stop_watch(&self, budget: Duration);
     /// Writes the session index cache the throttle held back, and seals it: no
     /// pass writes it after this, so the state written here is the one the next

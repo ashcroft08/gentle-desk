@@ -5,7 +5,7 @@
 //! which is the only place that knows a saved chat gets `--session <path>` and
 //! a new one gets no session flag at all.
 
-use std::ffi::OsString;
+use std::ffi::{OsStr, OsString};
 use std::io;
 use std::path::Path;
 use std::sync::Mutex;
@@ -15,6 +15,14 @@ use crate::process::{RpcProcess, SpawnOptions};
 
 use super::child::Child;
 use super::ChatKey;
+
+/// The variable gentle-shell's desktop RPC channel is activated by: a child
+/// without it is a headless RPC child, where `/gentle:desktop` stays closed
+/// (`docs/desktop-rpc.md`, Activation).
+const INTERACTIVE_HOST_VAR: &str = "GENTLE_SHELL_INTERACTIVE_HOST";
+
+/// The only value of [`INTERACTIVE_HOST_VAR`] that activates the channel.
+const INTERACTIVE_HOST_ON: &str = "1";
 
 /// The variable pi's intercom extension reads as the identity of the session it
 /// holds. pi allows one process per id, so every chat's child needs its own or
@@ -106,6 +114,16 @@ pub trait Spawner: Send + Sync {
     /// Starts the child of `key` in `folder`, or in the folder of this process
     /// when the caller names none.
     fn spawn(&self, key: &ChatKey, folder: Option<&Path>) -> io::Result<Box<dyn Child>>;
+
+    /// Whether the children this spawner starts run as interactive RPC hosts.
+    ///
+    /// That marker is the only gate gentle-shell's desktop RPC channel opens
+    /// behind, so it is also the truthful answer to "can this host serve that
+    /// channel". A spawner that cannot say answers `false`: the channel then
+    /// degrades quietly instead of writing a prompt nobody will answer.
+    fn interactive(&self) -> bool {
+        false
+    }
 }
 
 /// Real children: one launcher for every chat, the forwarded arguments of the
@@ -138,8 +156,8 @@ impl ProcessSpawner {
             launcher,
             vec![(
                 // pi's rpc mode only serves extension UI requests with an interactive host.
-                "GENTLE_SHELL_INTERACTIVE_HOST".into(),
-                "1".into(),
+                INTERACTIVE_HOST_VAR.into(),
+                INTERACTIVE_HOST_ON.into(),
             )],
         )
     }
@@ -238,6 +256,13 @@ impl Spawner for ProcessSpawner {
         let options = self.options_for(key, folder);
         RpcProcess::spawn(&self.launcher, &options)
             .map(|process| Box::new(process) as Box<dyn Child>)
+    }
+
+    fn interactive(&self) -> bool {
+        self.env.iter().any(|(name, value)| {
+            name.as_os_str() == OsStr::new(INTERACTIVE_HOST_VAR)
+                && value.as_os_str() == OsStr::new(INTERACTIVE_HOST_ON)
+        })
     }
 }
 

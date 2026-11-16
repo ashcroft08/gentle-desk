@@ -20,6 +20,7 @@ use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::Duration;
 
+use super::desktop::DesktopHub;
 use super::policy::{self, Clock, Limits, SystemClock};
 use super::spawner::{ProcessSpawner, Spawner};
 use super::{ChatKey, TaggedEvent};
@@ -47,6 +48,9 @@ pub struct ChatHost {
     pub(super) spawner: Arc<dyn Spawner>,
     pub(super) clock: Arc<dyn Clock>,
     pub(super) grace: Duration,
+    /// The requests waiting for a `/gentle:desktop` answer, fed by the
+    /// forwarder of every child's events (see `desktop`).
+    pub(super) desktop: Arc<DesktopHub>,
     state: Mutex<State>,
     events_tx: Sender<TaggedEvent>,
     events_rx: Mutex<Receiver<TaggedEvent>>,
@@ -72,6 +76,7 @@ impl ChatHost {
             spawner,
             clock,
             grace: DEFAULT_GRACE,
+            desktop: Arc::new(DesktopHub::default()),
             state: Mutex::new(State::default()),
             events_tx,
             events_rx: Mutex::new(events_rx),

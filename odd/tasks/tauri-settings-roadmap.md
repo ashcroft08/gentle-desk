@@ -61,8 +61,18 @@ calendar one. Version numbers never repeat or go down (updater compares them).
   child-process chat transport, and nothing forces adoption.
 - Order, each its own slice with a real-window check:
   1. **Language (0.2.0) first**, so new UI is born bilingual instead of rewritten later.
-  2. **Live Settings sync**: `get_snapshot` plus the `config_changed` event, so panels
-     refresh while the terminal edits, instead of only when the terminal closes.
+  2. **Live Settings sync**: panels refresh while the terminal edits, instead of
+     only when the terminal closes. REVISED 2026-11-16 (rpc-settings-sync L2, L6):
+     the channel emits nothing for external edits ("No watcher. Nothing is pushed
+     except this slice's own `config_changed`") and a control child costs ~400 MB
+     and 5-10 s, so this step is built as a NATIVE FILE WATCHER over pi's config
+     files, not over the channel. The channel transport (built and reviewed in
+     rpc-settings-sync T2) resumes at step 3, the profiles and pins editor.
+     SHIPPED-ON-BRANCH 2026-11-16 (feat/rpc-settings-sync, pending release): a
+     debounced watcher over `profiles.json`, `profile-fallbacks.json` and `auth.json`
+     emits a typed `settings-files-changed` event; the Profiles and Account panes
+     re-read while mounted, the focus refresh stays as the fallback. Verified in the
+     maintainer's real window: an edit in the terminal reaches the pane at once.
   3. **Profiles and pins editor**: the largest one, sliced as read+state, model and
      effort per agent, fallback-chain editing, then the per-repo pin. It is safe now
      because `set_config` writes through gentle-pi's own writers and `writeRevision`
@@ -91,7 +101,11 @@ calendar one. Version numbers never repeat or go down (updater compares them).
 - What it needs: a new intent (`StopHelper`) through the contract, the app-side
   execution that stops that helper's work and marks it `Ended`/`Cancelled` while
   the chat keeps running, and the helper thread bar's red square (the artboard's
-  own `i-stop`), enabled only while that helper is running. Bilingual copy
+  own `i-stop`), enabled only while that helper is running. CORRECTION 2026-11-16
+  (T1's real probe of gentle-shell 4.8.0): the desktop RPC channel DOES offer the
+  capability - `cancel_subagent` and `cancel_job` are listed in `capabilities` - so
+  this feature is built on the channel's transport (rpc-settings-sync T2), not on a
+  backend that does not exist; only the app's own contract lacked it. Bilingual copy
   (`Stop` / `Detener`). Capability jump: minor bump when it ships.
 
 ## 0.2.x: removing a workspace, and deleting its chats (agreed 2026-11-14; RELEASED 2026-11-16 as 0.3.0, tag v0.3.0)
@@ -104,7 +118,10 @@ calendar one. Version numbers never repeat or go down (updater compares them).
 Target after the 0.2.0 language work (new UI must be born bilingual). Nothing here is
 re-argued. Queue order, the maintainer's call each time: (1) chat chrome + helpers
 two-column — SHIPPED-ON-BRANCH 2026-11-16 (feat/chat-chrome-helpers, PR #175, pending
-release; odd/tasks/chat-chrome-helpers.md), (2) the desktop RPC channel below,
+release; odd/tasks/chat-chrome-helpers.md), (2) the desktop RPC channel below — its
+step 2, live Settings by file watching, SHIPPED-ON-BRANCH 2026-11-16
+(feat/rpc-settings-sync, odd/tasks/rpc-settings-sync.md); step 3, the profiles and
+pins editor, is next on the channel,
 (3) stopping a helper (next section).
 built or started; this records the decision and the measurements so it is not
 re-argued.
