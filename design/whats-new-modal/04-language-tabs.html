@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>04 — language tabs in the what's-new modal</title>
+<style>
+  :root { --bg:#060407; --surface:#100a0f; --surface2:#100a0f; --border:#563040; --text:#f6eff3; --muted:#a78e9b; --faint:#d7a0b8; --accent:#f43888; --tint:#2e0f1f; --shadow:0 8px 24px rgba(0,0,0,.6); }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:14px/1.5 -apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif; padding:28px; display:flex; flex-direction:column; gap:22px; align-items:center; }
+  h1 { font-size:12px; font-weight:600; letter-spacing:.04em; text-transform:uppercase; color:var(--faint); margin:0; }
+  .why { margin:0; font-size:12px; color:var(--faint); font-style:italic; width:560px; }
+  .state { font-size:11px; font-weight:600; letter-spacing:.05em; text-transform:uppercase; color:var(--faint); width:560px; }
+  .dlg { width:560px; background:var(--surface); border:1px solid var(--border); border-radius:14px; box-shadow:var(--shadow); display:flex; flex-direction:column; }
+  .dlg header { display:flex; align-items:baseline; flex-wrap:wrap; gap:4px 10px; padding:20px 24px 14px; border-bottom:1px solid var(--border); }
+  .dlg .dt { margin:0; font-size:16px; font-weight:600; }
+  .dlg .ver { margin-left:6px; padding:4px 8px; border-radius:999px; background:var(--tint); color:var(--accent); font:600 12px/1 ui-monospace,Consolas,monospace; }
+  .dlg .since { margin-left:auto; color:var(--faint); font-size:12px; }
+  /* The language tabs: a folder tab. The row keeps its separator line, but the
+     ACTIVE tab is a surface-coloured block sitting 1px lower, so it covers the
+     line under itself and opens directly into the notes panel — one component,
+     the selected one told apart only by its accent text. */
+  .tabs { display:flex; gap:2px; padding:10px 24px 0; border-bottom:1px solid var(--border); }
+  .tabs [role='tab'] { position:relative; border:1px solid transparent; border-bottom:0; border-radius:8px 8px 0 0; padding:5px 13px; margin-bottom:-1px; background:transparent; color:var(--muted); font:inherit; font-size:12.5px; cursor:pointer; }
+  .tabs [role='tab']:hover { color:var(--text); }
+  .tabs [role='tab'][aria-selected='true'] { border-color:var(--border); border-bottom:0; background:var(--surface); color:var(--accent); font-weight:600; }
+  .dlg .notes { padding:16px 24px; overflow:auto; min-height:0; color:var(--muted); max-height:340px; }
+  .dlg .notes ul { display:grid; gap:14px; margin:0; padding:0; list-style:none; }
+  .dlg .notes li { position:relative; padding-left:16px; }
+  .dlg .notes li::before { content:''; position:absolute; left:0; top:.6em; width:6px; height:6px; border-radius:50%; background:var(--accent); }
+  .dlg .notes strong { color:var(--text); font-weight:600; }
+  .dlg .acts { align-items:center; gap:12px; margin:0; padding:14px 24px 20px; border-top:1px solid var(--border); display:flex; justify-content:flex-end; }
+  .dlg .hint { margin-right:auto; color:var(--faint); font-size:12px; }
+  .btn { border:1px solid var(--accent); background:var(--accent); color:var(--bg); border-radius:8px; padding:6px 14px; font:inherit; font-size:13px; font-weight:600; cursor:pointer; }
+</style>
+</head>
+<body>
+  <h1>04 — language tabs in the what's-new modal</h1>
+  <p class="why">Tradeoff: one panel per language (tabs under the header, the app's own language selected first) keeps each reading clean and ends the glued-sections problem; the body of the release stays the single source — the modal only splits it at the "Novedades en X.Y.Z" marker.</p>
+
+  <p class="state">State 1 · app in Spanish — Español tab active</p>
+  <div class="dlg" role="dialog" aria-labelledby="t1">
+    <header>
+      <p class="dt" id="t1">Novedades</p>
+      <span class="ver">0.3.0</span>
+      <span class="since">desde 0.2.0</span>
+    </header>
+    <div class="tabs" role="tablist" aria-label="Language">
+      <button role="tab" aria-selected="false">English</button>
+      <button role="tab" aria-selected="true">Español</button>
+    </div>
+    <div class="notes" role="tabpanel">
+      <ul>
+        <li><strong>Quitá un workspace con lógica.</strong> gentle-desk pregunta antes de actuar: un workspace sin chats simplemente sale de la lista (si agregas la carpeta de nuevo, sus chats vuelven); uno con chats ofrece una única salida roja — borrar esos chats y quitarlo.</li>
+        <li>Los chats borrados van a la papelera de reciclaje, igual que en la terminal. Tus chats viven en el store de sesiones de pi y gentle-desk nunca toca la carpeta del proyecto en disco. Un chat working niega la remoción hasta que termina su turno.</li>
+        <li>El diálogo de remoción muestra el conteo y el tamaño antes de borrar nada, puede listar los chats que eliminaría, y cada palabra nueva está en inglés y en español.</li>
+      </ul>
+    </div>
+    <div class="acts">
+      <span class="hint">Esc para cerrar</span>
+      <button class="btn">Entendido</button>
+    </div>
+  </div>
+
+  <p class="state">State 2 · same modal, English tab active</p>
+  <div class="dlg" role="dialog" aria-labelledby="t2">
+    <header>
+      <p class="dt" id="t2">Novedades</p>
+      <span class="ver">0.3.0</span>
+      <span class="since">desde 0.2.0</span>
+    </header>
+    <div class="tabs" role="tablist" aria-label="Language">
+      <button role="tab" aria-selected="true">English</button>
+      <button role="tab" aria-selected="false">Español</button>
+    </div>
+    <div class="notes" role="tabpanel">
+      <ul>
+        <li><strong>Remove a workspace, cleanly.</strong> gentle-desk asks before it acts: a workspace without chats just leaves the list (add the folder back and its chats return); a workspace with chats offers one red answer — delete those chats, then remove.</li>
+        <li>Deleted chats go to the Recycle Bin, the same way the terminal does it. Your chats live in pi's session store and gentle-desk never touches the project folder on disk. A chat that is working refuses the removal until its turn ends.</li>
+        <li>The removal dialog states the count and the size before anything is deleted, can list the chats it would remove, and every new word speaks English and Spanish.</li>
+      </ul>
+    </div>
+    <div class="acts">
+      <span class="hint">Esc para cerrar</span>
+      <button class="btn">Entendido</button>
+    </div>
+  </div>
+</body>
+</html>

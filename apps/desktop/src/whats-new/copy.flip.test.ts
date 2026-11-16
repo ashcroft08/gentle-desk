@@ -27,10 +27,40 @@ const NOTES: WhatsNewView = {
   notes: `- **Sidebar** ${BODY}`,
 }
 
+/** One bullet of each half of a bilingual body (design/whats-new-modal, artboard D). */
+const EN_BULLET = 'Remove a workspace, cleanly.'
+const ES_BULLET = 'Quitá un workspace con lógica.'
+
+/** The same release written twice, English then Spanish, as a body arrives. */
+const BILINGUAL: WhatsNewView = {
+  version: '0.3.0',
+  previous_version: '0.2.0',
+  notes: [
+    "## What's new in 0.3.0",
+    '',
+    `- **${EN_BULLET}** gentle-desk asks before it acts.`,
+    '',
+    '## Novedades en 0.3.0',
+    '',
+    `- **${ES_BULLET}** gentle-desk pregunta antes de actuar.`,
+  ].join('\n'),
+}
+
+/** The name of the tab the modal is reading, as `aria-selected` reports it. */
+function selected(): string {
+  return (
+    screen
+      .getAllByRole('tab')
+      .filter((tab) => tab.getAttribute('aria-selected') === 'true')[0]
+      ?.textContent?.trim() ?? ''
+  )
+}
+
 afterEach(cleanup)
 
 beforeEach(() => {
   resetTauriMock()
+  setLanguage('en')
   setHandler('store_last_run_version', () => viewState({ whats_new: null }))
 })
 
@@ -53,6 +83,32 @@ describe("a drawn what's-new modal", () => {
     expect(screen.getByRole('button', { name: 'Entendido' })).toBeTruthy()
     // D7: the release body is the release's, so it reads as it was written.
     expect(screen.getByText(BODY)).toBeTruthy()
+
+    setLanguage('en')
+  })
+})
+
+describe("a drawn what's-new modal with a bilingual body", () => {
+  // The tabs are the modal's own presentation (D7): the app's language picks the
+  // one it opens on, and keeps picking it while the reader has chosen nothing.
+  it('opens on the tab of the language the app holds, and follows it', async () => {
+    setLanguage('en')
+    render(WhatsNewDialog, { props: { whatsNew: BILINGUAL } })
+    await screen.findByRole('dialog')
+
+    expect(selected()).toBe('English')
+    expect(screen.getByRole('tabpanel').textContent).toContain(EN_BULLET)
+
+    setLanguage('es')
+    await tick()
+
+    expect(selected()).toBe('Español')
+    expect(screen.getByRole('tabpanel').textContent).toContain(ES_BULLET)
+    // Each language names itself, whatever the app holds: the labels never flip.
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent?.trim())).toEqual([
+      'English',
+      'Español',
+    ])
 
     setLanguage('en')
   })
