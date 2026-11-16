@@ -160,3 +160,20 @@ session index, not a folder-name encoding).
   real-window review: the delete-chat dialog still shows its elided path beside
   the new `Copy file path` row-menu item — dropping the path is a one-line
   removal if the maintainer prefers S3's letter.
+- L10 (parent, 2026-11-16): the native ordinary review ran on the slice
+  (lineage review-74c37722100c058e, candidate = ce23434..HEAD, 33 paths, 2706
+  lines, tier medium, correction budget 200): lenses risk/resilience/reliability
+  (3 host-relay runs, ~$0.058: glm-5.3-flash ×2, deepseek-v4.1-flash) + provider
+  refuter (glm-5.3-flash, ~$0.0025; the first refuter output was malformed JSON
+  and refused at admission — the provider reoffered the slot and the second run
+  closed). Verdict: APPROVED, authority burned (acknowledgement v1), delivery
+  ordinary-repository-policy. 12 advisory findings, ALL non-blocking (none
+  opened a correction; the CRITICAL R3-001 "unconfirmed data loss" was REFUTED):
+  risk R1-01 (working-gate TOCTOU), R1-02 (chats created between offer and
+  confirm get deleted), R1-03 (partial-refusal notice understates what was
+  destroyed); reliability R3-002/R4-dialog (no actions when the offer read
+  fails), R3-003/R4-err-path (Err closes the dialog silently), R3-004 (stale
+  deleted row until refresh heals), R3-005 (the real-trash test is
+  environment-dependent); resilience R4-serial-close-latency (2s grace per
+  child, no progress on the dialog). Recorded as later work, never a reopen of
+  this review; the maintainer picks which ones ride a pre-release fix batch.
