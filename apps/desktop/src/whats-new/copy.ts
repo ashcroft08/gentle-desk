@@ -8,6 +8,11 @@
 // The English column is what the modal has drawn since T2, unchanged; the Spanish
 // one is neutral - no voseo, no regionalisms - and keeps its accents.
 //
+// design/whats-new-modal artboard D adds one more word here - the language tabs'
+// accessible name - and nothing else: the two TAB NAMES are the languages' own
+// (`English`, `Español`) and are never translated, so they live with the tabs
+// (`tabs.ts`), not in this dictionary.
+//
 // What does NOT move: the release BODY. It travels in latest.json, so its words are
 // the release's, not this app's chrome; only what the modal itself says around it
 // is translated (D7).
@@ -21,6 +26,8 @@ export interface WhatsNewCopy {
   dismiss: string
   /** The keyboard hint beside the answer. */
   escHint: string
+  /** The language tabs' accessible name: the two tabs are the two readings. */
+  tabsLabel: string
   /** "since X" for the header, when `previous` is strictly older than `version`. */
   since: (previous: string) => string
 }
@@ -30,6 +37,7 @@ const ENGLISH: WhatsNewCopy = {
   heading: "What's new",
   dismiss: 'Got it',
   escHint: 'Esc to close',
+  tabsLabel: 'Notes language',
   since: (previous) => `since ${previous}`,
 }
 
@@ -38,6 +46,7 @@ const SPANISH: typeof ENGLISH = {
   heading: 'Novedades',
   dismiss: 'Entendido',
   escHint: 'Esc para cerrar',
+  tabsLabel: 'Idioma de las novedades',
   since: (previous) => `desde ${previous}`,
 }
 

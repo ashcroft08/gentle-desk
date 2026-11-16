@@ -1,6 +1,8 @@
-// The what's-new modal's own words (0.2.0, S3 and D4): its heading, its one
-// answer, the keyboard hint beside it and the "since X" header live in ONE
-// language-keyed dictionary. This file pins the two columns; the words a DRAWN
+// The what's-new modal's own words (0.2.0, S3 and D4; design/whats-new-modal 04):
+// its heading, its one answer, the keyboard hint beside it, the "since X" header
+// and the language tabs' accessible name live in ONE language-keyed dictionary.
+// The two TAB NAMES are not here: `English` and `Español` are each language's own
+// name and are never translated (the 0.2.0 LanguagePane convention). This file pins the two columns; the words a DRAWN
 // modal shows are pinned in `copy.flip.test.ts`.
 //
 // The English column is quoted literally - it is what the modal has drawn since
@@ -15,6 +17,7 @@ const ENGLISH = {
   heading: "What's new",
   dismiss: 'Got it',
   escHint: 'Esc to close',
+  tabsLabel: 'Notes language',
 }
 
 /** The Spanish words: neutral Spanish, no voseo, no regionalisms, accents kept. */
@@ -22,6 +25,7 @@ const SPANISH = {
   heading: 'Novedades',
   dismiss: 'Entendido',
   escHint: 'Esc para cerrar',
+  tabsLabel: 'Idioma de las novedades',
 }
 
 /** The plain words of one language. */
