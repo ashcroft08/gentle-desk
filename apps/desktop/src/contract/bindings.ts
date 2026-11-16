@@ -57,8 +57,9 @@ export const commands = {
 	 */
 	createWorkspace: (name: string) => typedError<ViewState_Serialize, string>(__TAURI_INVOKE("create_workspace", { name })),
 	/**
-	 *  Renames one chat (S4): the row sends the session path it was given and the name
-	 *  typed in its title, and the answer is the slice the sidebar draws.
+	 *  Renames one chat (S4): the chat id the UI holds - the row's session path or the
+	 *  header's `foreground_chat` text - and the name typed in its title, and the
+	 *  answer is the slice the sidebar draws.
 	 * 
 	 *  The write happens off the window's thread. A rename that lands asks the session
 	 *  list for the pass that reads the name back, which is what moves the row and the
