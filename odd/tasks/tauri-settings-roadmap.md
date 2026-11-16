@@ -103,8 +103,9 @@ calendar one. Version numbers never repeat or go down (updater compares them).
 
 Target after the 0.2.0 language work (new UI must be born bilingual). Nothing here is
 re-argued. Queue order, the maintainer's call each time: (1) chat chrome + helpers
-two-column (in flight, odd/tasks/chat-chrome-helpers.md), (2) the desktop RPC channel
-below, (3) stopping a helper (next section).
+two-column — SHIPPED-ON-BRANCH 2026-11-16 (feat/chat-chrome-helpers, PR #175, pending
+release; odd/tasks/chat-chrome-helpers.md), (2) the desktop RPC channel below,
+(3) stopping a helper (next section).
 built or started; this records the decision and the measurements so it is not
 re-argued.
 
