@@ -184,6 +184,21 @@ impl AppConfig {
         true
     }
 
+    /// Forgets the workspace of `path`, matched by [`folder_key`] so any
+    /// spelling of the folder answers it. This is the last step of removing a
+    /// workspace, taken once its chats are gone: it touches the config and
+    /// nothing on disk. Answers whether the config held that folder; every
+    /// other workspace keeps its place and its fold, in the order it had.
+    pub fn remove_workspace(&mut self, path: &str) -> bool {
+        if self.workspace(path).is_none() {
+            return false;
+        }
+        let key = folder_key(path);
+        self.workspaces
+            .retain(|entry| folder_key(&entry.path) != key);
+        true
+    }
+
     /// Folds or unfolds the chats of `path` in the sidebar. Answers whether the
     /// folder was a known workspace; an unknown folder changes nothing.
     pub fn set_collapsed(&mut self, path: &str, collapsed: bool) -> bool {

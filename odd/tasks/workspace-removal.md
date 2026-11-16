@@ -1,0 +1,130 @@
+# workspace-removal: removing a workspace, and deleting its chats
+
+Remove a workspace from gentle-desk with a clean, strict flow: a workspace that still
+holds chats cannot be removed until they are deleted, the deletion is trash-first, and
+the dialog follows the maintainer's destructive-dialog anatomy. Source decisions:
+`odd/tasks/tauri-settings-roadmap.md` section `## 0.2.x: removing a workspace, and
+deleting its chats` plus the 2026-11-16 rulings below. Chat data lives in pi's session
+store (`<agent-dir>/sessions/`, indexed by workspace path — gentle-desk maps via the
+session index, not a folder-name encoding).
+
+## Specs
+
+- S1 (GATE, maintainer 2026-11-16): "no deberiamos permitirle al usuario quitar un
+  workspace si aun tiene chats, debe quedar limpio para poder eliminar o quitarlo para
+  que tenga logica". So: a workspace with 0 chats removes freely (forgets the
+  bookmark, touches nothing on disk); a workspace with N ≥ 1 chats offers ONE
+  destructive path — delete its N chats, then remove. There is no opt-in
+  checkbox; the recorded 2026-11-14 opt-in shape (`[ ] Also delete those N chats
+  (M MB)`, primary button becomes `Remove and delete 2 chats` only when checked) is
+  SUPERSEDED by this gate. In the N ≥ 1 dialog the destructive button is
+  `Delete N chats and remove`, last, red, scope-labelled — WITHOUT the parenthetical
+  (maintainer, canvas comment on the artboards): the size lives in the consequence
+  line and, where shown, the disclosure, per S2.
+- S2 (counts and sizes, roadmap): "Size is therefore shown in megabytes next to the
+  count, not only a count" — measured baseline 12 chats / 36 MB, a workspace of 2
+  chats / 1.7 MB. The count and byte size of a workspace's chats come from the
+  session index (pi's store), surfaced wherever the removal offer is drawn.
+- S3 (dialog anatomy, roadmap verbatim): "the title is the question (`Remove this
+  workspace?` / `Delete this chat?`); one consequence line in the user's words, with
+  the scope in bold (`Delete 37 chats`), never the words 'chat file'; NO inner card
+  and no boxed path; the destructive button is last, red, and labelled with its
+  scope; actions right-aligned. Where a path is shown, it is plain monospaced text
+  with the middle elided (`C:\…\gentle-desk`), or behind a `Show file paths`
+  disclosure. The workspace path IS the identity and belongs in the first sentence; a
+  chat's internal `<timestamp>_<id>.jsonl` name is noise and moves to a row-menu
+  `Copy file path`." The existing delete-chat dialog is upgraded to this same
+  anatomy.
+- S4 (trash-first, maintainer 2026-11-16: "papelera, como pi"): deleting chat files
+  moves them to the OS trash first (Rust `trash` crate, native Windows recycle-bin
+  API — pi's own terminal delete tries `trash` then falls back to `rm`); unlink is
+  the fallback when the trash move fails.
+- S5 (teardown first, roadmap): "removing a workspace that has an open chat must
+  first close that chat's child process and drop its cached session (process-per-chat,
+  sessions-cache, refresh-watcher) ... That teardown is the real work of the safe
+  half and needs its own spec before any code." Order: close the workspace's open
+  (idle) children → then delete the chat files → then forget the bookmark. A
+  WORKING chat of that workspace refuses the whole removal with the existing
+  working-chat wording, nothing deleted.
+- S6 (design first, maintainer + roadmap): "artboard en gentle-design antes de tocar
+  Svelte" / "Visual work goes through the gentle-design canvas before
+  SettingsDialog/dialogs change, not by hand in Svelte."
+- S7 (bilingual, 0.2.0 standing rule): new copy is born bilingual — web dictionaries
+  en/es with parity-pinned flip tests; new Rust-drawn notices enter
+  `crates/gentle-core/src/i18n/messages.rs` in both columns.
+- S8 (row menu, deviation recorded): the workspace header row gains a `...` menu
+  whose destructive item offers removal (D5 previously kept the row menu-free; the
+  circle-plus stays). English rule: what the D5 note pinned was "no menu", this
+  feature is the maintainer's decision to add one.
+
+## Open (decided here, recorded)
+
+- Orphan chats (folder deleted outside the app) are OUT of scope; the maintainer
+  deferred the `Unused chats` Settings view ("eso de huerfanos le veo mal"). The gate
+  makes in-app orphans impossible.
+- Version number for the release carrying this (0.2.1 patch vs 0.3.0 minor) is the
+  maintainer's call at close; the roadmap calls this section 0.2.x.
+
+## Tasks
+
+- [x] T1 (S6) gentle-design: artboard(s) of the removal dialog — DONE. Three
+      directions written (`01-question-plain`, `02-evidence-disclosure`,
+      `03-one-quiet-line`), each with the 0-chat and N-chat states; design-system
+      sync re-run first. Canvas comment senflglr applied (button label without the
+      parenthetical). The maintainer chose **02-evidence-disclosure (B)** for
+      implementation — the handoff's chosen artboard; 01 and 03 are alternatives.
+- [ ] T2 (S2, S4, S5, S7) Rust core: per-workspace chat count + byte size from the
+      session index (expose per-file size the store already caches); bulk delete
+      trash-first (`trash` dep, fallback `remove_file`) extending
+      `session_delete.rs`; `remove_workspace` flow: refusal while a workspace chat
+      is WORKING, close-and-drop open idle children first, then bulk delete, then
+      forget the bookmark; bilingual catalog messages for every new Rust-drawn
+      notice. TDD; the trash move is pinned by a test with a temp store.
+- [ ] T3 (S1, S3, S7, S8) web: `...` menu on `WorkspaceHeaderRow`; the removal
+      dialog per the approved artboard and S3's anatomy; `DeleteChatDialog`
+      upgraded to the same anatomy (elided mono path, bold scope, right-aligned
+      actions, `Copy file path` in the chat row menu); bilingual copy + flip tests.
+      Route: writer, after T2's bindings.
+- [ ] T4 (close) full verification: cargo workspace suite, clippy -D warnings, fmt,
+      bindings drift guard, vitest, svelte-check, eslint; real-window check
+      (remove with open chat, remove with chats checked state, working-chat
+      refusal, trash contains the files); roadmap + version per the maintainer's
+      call.
+
+## Log
+
+- L1 (user, 2026-11-16, session start): "Siguiente feature después del release:
+  remoción de workspaces con borrado opt-in de chats (roadmap, sección ## 0.2.x:
+  removing a workspace, and deleting its chats, commit 97c958a): diálogo sin card
+  interna, check [ ] Also delete those N chats (M MB), teardown de hijos primero, y
+  artboard en gentle-design antes de tocar Svelte."
+- L2 (user, 2026-11-16): on the trash decision, asked "cuando se borran en la
+  terminal con ctr+d y enter, a donde se van?" — evidence: pi's session-selector
+  tries `trash` (spawnSync) with an `rm`/unlink fallback. Decision: "papelera, como
+  pi" (S4). Orphan view still open at this point.
+- L3 (user, 2026-11-16): "para que haya logica, no deberiamos permitirle al usuario
+  quitar un workspace si aun tiene chats, debe quedar limpio para poder eliminar o
+  quitarlo para que tenga logica. porque eso de huerfanos le veo mal" — parent
+  surfaced the trade-off (gate makes destroying history mandatory for removal and
+  loses the temporary-removal case; opt-in keeps deletion optional and re-adding the
+  path restores the chats). Maintainer chose the GATE with full knowledge; the
+  opt-in shape of L1 is superseded (S1), the orphan view is deferred (S2 note).
+- L4 (parent, 2026-11-16): maintainer also ruled trash-first (pi's own terminal
+  delete tries `trash` then falls back to `rm`; gentle-desk does the same with the
+  Rust `trash` crate, S4) and deferred the orphan-chats Settings view.
+- L5 (parent, 2026-11-16): design-system sync re-run before designing —
+  `design/system.md` + `design/system.html` rewritten from
+  `apps/desktop/src/{theme,app}.css` (maintainer's OK). Removal-dialog artboards
+  written: `design/workspace-removal-dialog/` — 01-question-plain (A),
+  02-evidence-disclosure (B), 03-one-quiet-line (C); each shows the 0-chat and the
+  N-chat states. Canvas opened for the maintainer's review; the chosen artboard
+  feeds T3.
+- L6 (maintainer, 2026-11-16, canvas comment senflglr): "quita lo del paréntesis, en
+  esta vista y en las otras" — the destructive button reads `Delete 2 chats and
+  remove` in all three artboards; the parenthetical size stays in the consequence
+  line and the disclosure (S2). S1 rewritten accordingly.
+- L7 (maintainer, 2026-11-16, design handoff): implement
+  `design/workspace-removal-dialog/02-evidence-disclosure.html` — artboard B is the
+  chosen one; T3 maps its parts to the real stack (bits-ui dialog + the house
+  tokens of design/system.md), never copying the artboard HTML. T2 (Rust core)
+  runs first so the dialog draws on real bindings.
