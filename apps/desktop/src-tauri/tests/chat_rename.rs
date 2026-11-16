@@ -12,9 +12,10 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard};
 
+use gentle_app::ChatId;
 use gentle_backend::session_rename::{SessionFiles, EMPTY_NAME};
 use gentle_desk_lib::bridge::AppStateHolder;
-use gentle_desk_lib::chat_rename::{self, WorkingChats, WORKING_CHILD};
+use gentle_desk_lib::chat_rename::{self, WorkingChats, NO_SESSION, WORKING_CHILD};
 
 const HEADER: &str = r#"{"type":"session","version":3,"id":"s1","timestamp":"2026-01-01T00:00:00.000Z","cwd":"C:\\dev\\p"}"#;
 const MESSAGE: &str = r#"{"type":"message","id":"m","timestamp":"2026-01-01T00:01:00.000Z","message":{"role":"user","content":"first chat"}}"#;
@@ -175,6 +176,89 @@ fn a_blank_name_is_refused_with_the_reason_and_the_file_is_untouched() {
         renamed.view.sessions_notice.as_deref(),
         Some(EMPTY_NAME),
         "the backend's own line is what the user reads"
+    );
+}
+
+#[test]
+fn the_id_the_header_sends_renames_the_file_the_row_names() {
+    // The chat header dispatches `foreground_chat`, which is the ChatId text
+    // (`session:<path>`), while a sidebar row still sends the bare path. Both
+    // name the same session file, so both rename it.
+    let holder = AppStateHolder::default();
+    let files = FakeFiles::holding(&before());
+    let id = ChatId::of_session(SESSION);
+
+    let renamed = chat_rename::rename(
+        &holder,
+        &files,
+        &FakeWork::idle(),
+        id.as_str(),
+        "Season two",
+    );
+
+    assert!(
+        renamed.written,
+        "the header's id form renames the same file the row's path does"
+    );
+    assert_eq!(
+        files.text(),
+        format!("{}{}", before(), appended("Season two")),
+        "one session_info line was appended to the session's own file"
+    );
+    assert_eq!(files.writes(), 1, "one write");
+    assert_eq!(renamed.view.sessions_notice, None, "nothing to refuse");
+}
+
+#[test]
+fn the_header_s_id_form_of_a_working_chat_is_still_refused() {
+    // The mid-turn rule is about the FILE, so it must hold whichever form the
+    // chat arrived in: the id is resolved before the activity is asked.
+    let holder = AppStateHolder::default();
+    let files = FakeFiles::holding(&before());
+    let id = ChatId::of_session(SESSION);
+
+    let renamed = chat_rename::rename(
+        &holder,
+        &files,
+        &FakeWork::working(SESSION),
+        id.as_str(),
+        "Season two",
+    );
+
+    assert!(!renamed.written, "nothing was written");
+    assert_eq!(files.text(), before(), "the session file is byte for byte");
+    assert_eq!(files.writes(), 0, "the append never ran");
+    assert_eq!(
+        renamed.view.sessions_notice.as_deref(),
+        Some(WORKING_CHILD),
+        "the same refusal the row gets"
+    );
+}
+
+#[test]
+fn a_fresh_chat_is_refused_with_words_and_nothing_is_written() {
+    // A fresh chat has no session file yet, so there is nothing to append a name
+    // to: the user reads why instead of an OS error about a path that does not
+    // exist (the header used to send `new-<n>` straight to the disk).
+    let holder = AppStateHolder::default();
+    let files = FakeFiles::holding(&before());
+    let fresh = ChatId::fresh();
+
+    let renamed = chat_rename::rename(
+        &holder,
+        &files,
+        &FakeWork::idle(),
+        fresh.as_str(),
+        "Season two",
+    );
+
+    assert!(!renamed.written, "no file was written");
+    assert_eq!(files.text(), before(), "the one session file is untouched");
+    assert_eq!(files.writes(), 0, "no append was attempted");
+    assert_eq!(
+        renamed.view.sessions_notice.as_deref(),
+        Some(NO_SESSION),
+        "the user reads why a fresh chat cannot be renamed yet"
     );
 }
 
