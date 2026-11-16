@@ -6,11 +6,13 @@
   // It owns the only view-local selection this slice needs (P5): the workspace
   // row the user clicked last, and the chat row clicked while Rust catches up.
   import { dispatchIntent, renameSession, deleteSession } from '../bridge'
+  import { setContext } from 'svelte'
   import { workspacePathOfChat, type ChatRow, type WorkspaceRow } from '../sessions/rows'
   import { createSessionsView } from '../sessions/view'
   import type { Viewport } from '../sessions/window'
   import WordMark from '../brand/WordMark.svelte'
   import DeleteChatDialog from './DeleteChatDialog.svelte'
+  import RemoveWorkspaceDialog from './RemoveWorkspaceDialog.svelte'
   import EmptyState from './EmptyState.svelte'
   import NewSessionButton from './NewSessionButton.svelte'
   import SidebarHeader from './SidebarHeader.svelte'
@@ -26,6 +28,7 @@
     NEW_SESSION_WHY_ID,
     sidebarCopy,
   } from './copy'
+  import { chatTitles, REMOVAL_HOST, removeWorkspace } from './removal'
 
   const sessions = createSessionsView()
 
@@ -40,6 +43,9 @@
   let clickedChat = $state<string | null>(null)
   /** Whether the delete confirm dialog is open. */
   let deleteOpen = $state(false)
+  /** Whether the removal dialog is open, and the workspace it is about (S8). */
+  let removeOpen = $state(false)
+  let removingPath = $state<string | null>(null)
   /** Whether the Settings dialog is open (settings-dialog S1-S6). */
   let settingsOpen = $state(false)
   /** The chat row that dialog is about: the one whose Delete the user picked. */
@@ -145,6 +151,32 @@
     await deleteSession(path)
   }
 
+  /**
+   * A workspace header row's Remove (S8): the removal dialog opens on that
+   * workspace, and it is the only thing that sends the removal (S1). The row
+   * reaches this through the context below, so the tree forwards no new callback.
+   */
+  function askRemove(path: string): void {
+    removingPath = path
+    removeOpen = true
+  }
+
+  setContext(REMOVAL_HOST, { askRemove })
+
+  /**
+   * The dialog's answer (S1, S5): Rust closes the workspace's idle chats, deletes
+   * their files trash-first and forgets the bookmark, and a refusal - a chat
+   * still working - reaches the user as `workspace_notice`.
+   */
+  async function confirmRemove(path: string): Promise<void> {
+    await removeWorkspace(path)
+  }
+
+  /** The titles the removal dialog lists, from the rows this page already holds. */
+  const removalTitles = $derived(
+    removingPath === null ? [] : chatTitles(model.rows, removingPath),
+  )
+
   function newSession(): void {
     if (currentPath !== null) newChatAt(currentPath)
   }
@@ -196,6 +228,14 @@
     bind:open={deleteOpen}
     path={deleting?.id ?? ''}
     onDelete={confirmDelete}
+  />
+  <!-- The removal dialog (S1, S3, S8): the workspace header's own menu opens it
+       on the row the user picked, and only its last button sends the removal. -->
+  <RemoveWorkspaceDialog
+    bind:open={removeOpen}
+    path={removingPath ?? ''}
+    titles={removalTitles}
+    onRemove={confirmRemove}
   />
   <!-- The Settings dialog, the only home the theme picker and the home setting
        have now (S1), and where the app's name and running version live (S5).

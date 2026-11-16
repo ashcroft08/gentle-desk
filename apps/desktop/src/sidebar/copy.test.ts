@@ -40,8 +40,12 @@ const ENGLISH = {
   closeChat: 'Close chat',
   deleteChat: 'Delete',
   newChatTip: 'New chat',
+  copyPath: 'Copy file path',
+  workspaceActionsTip: 'Workspace actions',
+  removeWorkspace: 'Remove workspace...',
+  removeTitle: 'Remove this workspace?',
+  removeKeepConfirm: 'Remove',
   deleteTitle: 'Delete this chat?',
-  deleteBody: 'The chat file is removed from disk and cannot be restored.',
   deleteConfirm: 'Delete',
 }
 
@@ -73,8 +77,12 @@ const SPANISH = {
   closeChat: 'Cerrar chat',
   deleteChat: 'Eliminar',
   newChatTip: 'Chat nuevo',
+  copyPath: 'Copiar ruta del archivo',
+  workspaceActionsTip: 'Acciones del espacio de trabajo',
+  removeWorkspace: 'Quitar espacio de trabajo...',
+  removeTitle: '¿Quitar este espacio de trabajo?',
+  removeKeepConfirm: 'Quitar',
   deleteTitle: '¿Eliminar este chat?',
-  deleteBody: 'El archivo del chat se borra del disco y no se puede recuperar.',
   deleteConfirm: 'Eliminar',
 }
 
@@ -149,5 +157,53 @@ describe('the sidebar lines that carry a number, a name or a title', () => {
   it('names the gear with the Settings word it is given, so one word has one owner', () => {
     expect(english.updateWaiting('Settings')).toBe('Settings - an update is available')
     expect(spanish.updateWaiting('Ajustes')).toBe('Ajustes - hay una actualización disponible')
+  })
+
+  it('names a workspace row menu with the label Rust sent, word for word', () => {
+    expect(english.workspaceActions('one')).toBe('Workspace actions for one')
+    expect(spanish.workspaceActions('one')).toBe('Acciones del espacio de trabajo: one')
+  })
+
+  it('writes each consequence line with the scope as its own run (S3)', () => {
+    expect(english.removeKeepLine).toEqual({
+      before: 'gentle-desk only ',
+      scope: 'forgets the bookmark',
+      after:
+        ". Its chats stay in gentle-shell's session store - add the folder back and they come back with it.",
+    })
+    expect(spanish.removeKeepLine.scope).toBe('olvida el marcador')
+
+    const scope = '2 chats (1.7 MB)'
+    const removed = english.removeChatsLine(scope)
+    expect(removed.scope).toBe(scope)
+    expect(removed.before).toBe('Removing deletes its ')
+    expect(removed.after).toContain('cannot be regenerated')
+    // The count and the size are drawn by `removal.ts`, never re-spelled here.
+    expect(spanish.removeChatsLine(scope).scope).toBe(scope)
+  })
+
+  it('labels the disclosure and the answers with the scope, and never a parenthetical (L6)', () => {
+    expect(english.showChats('2 chats (1.7 MB)')).toBe('Show 2 chats (1.7 MB)')
+    expect(spanish.showChats('2 chats (1.7 MB)')).toBe('Mostrar 2 chats (1.7 MB)')
+    expect(english.removeChatsConfirm('2 chats')).toBe('Delete 2 chats and remove')
+    expect(spanish.removeChatsConfirm('2 chats')).toBe('Eliminar 2 chats y quitar')
+    expect(english.removeChatsConfirm('2 chats')).not.toContain('(')
+  })
+
+  it('never prints the words of the store\u2019s own files (S3)', () => {
+    const lines = [
+      english.removeKeepLine,
+      english.removeChatsLine('1 chat'),
+      spanish.removeKeepLine,
+      spanish.removeChatsLine('1 chat'),
+      english.deleteLine,
+      spanish.deleteLine,
+    ]
+    for (const line of lines) {
+      const whole = `${line.before}${line.scope}${line.after}`
+      expect(whole).not.toMatch(/chat file/i)
+      expect(line.scope.length).toBeGreaterThan(0)
+    }
+    expect(english.deleteLine.scope).toBe('chat')
   })
 })

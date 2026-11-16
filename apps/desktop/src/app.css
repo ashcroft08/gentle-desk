@@ -1209,6 +1209,12 @@ p {
   max-width: calc(280px - 24px);
 }
 
+/* A workspace header's menu (S8): the same card and the same ceiling, so its one
+   label cannot be cut by the sidebar's edge either. */
+.ws-menu {
+  max-width: calc(280px - 24px);
+}
+
 .menu [role='menuitem'] {
   display: block;
   width: 100%;
@@ -1289,19 +1295,68 @@ p {
   margin-top: 16px;
 }
 
-/* The real file the delete dialog names: the states board's `code` line, the one
-   thing that tells the user which file goes. */
-.dlg code {
-  display: block;
-  margin: 10px 0 4px;
-  padding: 8px 10px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 8px;
+/* The workspace a dialog names: plain monospaced text with its middle elided by
+   `removal.ts` (S3), never a boxed code card - the boxed `code` line the delete
+   dialog used before the removal anatomy replaced it. */
+.dlg .path {
+  margin: 0 0 4px;
   font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
   font-size: 12.5px;
-  word-break: break-all;
   color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+/* The one consequence line of a dialog (S3, artboard B): plain and muted, with
+   the scope it names as its only bold run. */
+.dlg .why {
+  margin: 10px 0 0;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.dlg .why b {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* The removal dialog's evidence (artboard B): a quiet disclosure over a plain
+   list, never a card inside the card. The rows are the chats' own names, one
+   dashed separator between them. */
+.dlg details {
+  margin: 12px 0 0;
+}
+
+.dlg summary {
+  color: var(--accent);
+  font-size: 12.5px;
+  cursor: pointer;
+  padding: 2px 0;
+}
+
+.dlg summary:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.dlg summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.dlg .chats {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+}
+
+.dlg .chats li {
+  padding: 5px 2px 5px 14px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.dlg .chats li + li {
+  border-top: 1px dashed var(--border);
 }
 
 .dlg .btn.d {
@@ -2161,7 +2216,7 @@ p {
 }
 
 .frow .row.folder {
-  padding-right: 44px;
+  padding-right: 76px;
 }
 
 .frow .nc {
@@ -2175,6 +2230,29 @@ p {
 .frow .nc[data-visible='true'],
 .frow .nc:focus-visible {
   opacity: 1;
+}
+
+/* The workspace header's own "..." menu (S8): the new-chat icon's slot moved one
+   button to the left, revealed the same way (section hover, or focus), and kept
+   drawn while the menu it opened is still up. */
+.frow .nm {
+  position: absolute;
+  right: 38px;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0;
+}
+
+.frow .nm[data-visible='true'],
+.frow .nm:focus-visible,
+.frow.menu-open .nm {
+  opacity: 1;
+}
+
+.frow .nm:hover {
+  background: transparent;
+  box-shadow: none;
+  color: var(--text);
 }
 
 .frow .nc:hover {

@@ -1,7 +1,12 @@
 <script lang="ts">
-  // The delete confirm dialog (T3, S4, D2(b)): the states board's own card - the
-  // question, the line that says it cannot be undone, and the chat's REAL file
-  // path, so the user confirms a file and not a row.
+  // The delete confirm dialog (T3, S4, D2(b)), upgraded to the removal dialog's
+  // anatomy (workspace-removal S3): the question is the title, one consequence
+  // line carries its scope in bold, the session path is plain monospaced text
+  // with its middle elided (never a boxed `code` card), and the actions are
+  // right-aligned with the destructive one last.
+  //
+  // The file's own `<timestamp>_<id>.jsonl` name stays reachable from the row's
+  // menu (`Copy file path`), where it is asked for instead of printed at everyone.
   //
   // Cancel and Escape close it and send nothing. Delete sends the path ONCE and
   // the dialog closes when Rust answers, so a second click cannot remove another
@@ -11,6 +16,7 @@
   import { Dialog } from 'bits-ui'
   import { language } from '../i18n/language.svelte'
   import { sidebarCopy } from './copy'
+  import { elideMiddle } from './removal'
 
   let {
     open = $bindable(false),
@@ -54,8 +60,10 @@
     <Dialog.Overlay class="ovl" />
     <Dialog.Content class="dlg" onOpenAutoFocus={(event) => event.preventDefault()}>
       <Dialog.Title class="dt">{copy.deleteTitle}</Dialog.Title>
-      <Dialog.Description class="why">{copy.deleteBody}</Dialog.Description>
-      <code>{path}</code>
+      <p class="path mono">{elideMiddle(path)}</p>
+      <Dialog.Description class="why"
+        >{copy.deleteLine.before}<b>{copy.deleteLine.scope}</b>{copy.deleteLine.after}</Dialog.Description
+      >
       <div class="acts">
         <button class="btn" type="button" bind:this={cancel} onclick={() => (open = false)}>
           {copy.cancel}

@@ -3,17 +3,18 @@
   // and the mark its activity calls for (reusing `Mark`, so the state is always
   // a shape and a name, never colour alone). Selected means foreground.
   //
-  // The row's own "..." menu (T2, S4) offers Rename, Close chat and Delete.
-  // Rename turns the title into an input, like the states board's inline rename:
-  // Enter commits, Escape cancels, and the typed name goes to Rust as the rename
-  // command (the title the state carries moves on the next push, when the
-  // session list reads the appended name back). Close chat (0.1.14) stops the
-  // chat's child and takes it off the open set, leaving its row and its file
-  // alone - it is the way out of the Updates pane's chats-closed gate. Delete
-  // opens the sidebar's confirm dialog, which names the real file before the
-  // delete command runs (T3). The two items stay enabled always, because only
-  // the chat's WORKING state refuses them, and that refusal is the state's to
-  // say (one sentence, shared by both).
+  // The row's own "..." menu (T2, S4) offers Rename, Copy file path, Close chat
+  // and Delete. Rename turns the title into an input, like the states board's
+  // inline rename: Enter commits, Escape cancels, and the typed name goes to Rust
+  // as the rename command (the title the state carries moves on the next push,
+  // when the session list reads the appended name back). Copy file path (removal
+  // S3) puts the session file's own name on the clipboard, where it is asked for
+  // instead of printed in the delete dialog. Close chat (0.1.14) stops the chat's
+  // child and takes it off the open set, leaving its row and its file alone - it is
+  // the way out of the Updates pane's chats-closed gate. Delete opens the sidebar's
+  // confirm dialog (T3). The items stay enabled always, because only the chat's
+  // WORKING state refuses them, and that refusal is the state's to say (one
+  // sentence, shared by all of them).
   import { DropdownMenu } from 'bits-ui'
   import Icon from '../icons/Icon.svelte'
   import Mark from '../icons/Mark.svelte'
@@ -116,6 +117,20 @@
       cancel()
     }
   }
+
+  /**
+   * This chat's session file, on the clipboard (removal S3): the internal name is
+   * noise in the dialog, so it lives here instead. Nothing is drawn either way -
+   * the system owns the clipboard, and a note this view could not verify would be
+   * worse than silence, the same rule the thread's copy follows.
+   */
+  async function copyPath(): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(row.id)
+    } catch {
+      // No clipboard, or a refused write: nothing to say.
+    }
+  }
 </script>
 
 <div class="frow chat-row" class:menu-open={menuOpen}>
@@ -173,6 +188,7 @@
         collisionPadding={12}
       >
         <DropdownMenu.Item onSelect={startRename}>{copy.rename}</DropdownMenu.Item>
+        <DropdownMenu.Item onSelect={() => void copyPath()}>{copy.copyPath}</DropdownMenu.Item>
         <DropdownMenu.Item onSelect={() => onClose(row)}>{copy.closeChat}</DropdownMenu.Item>
         <DropdownMenu.Item class="d" onSelect={() => onDelete(row)}>{copy.deleteChat}</DropdownMenu.Item>
       </DropdownMenu.Content>

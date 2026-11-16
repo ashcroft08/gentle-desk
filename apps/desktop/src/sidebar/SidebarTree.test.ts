@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/svelte'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/svelte'
 import { activity, resetTauriMock, viewState, chatRow, workspaceRow } from '../test-support/tauri-mock'
 import { rowOf, serveSidebar, treeItems, type SidebarFixture } from '../test-support/sidebar'
 import Sidebar from './Sidebar.svelte'
@@ -56,6 +56,26 @@ describe('Sidebar tree', () => {
     expect(fixture.intents()).toEqual([
       { type: 'SetWorkspaceCollapsed', data: { path: 'C:\\dev\\one', collapsed: false } },
     ])
+  })
+
+  it('keeps the new-chat icon and gains the one row menu of the removal (S8)', async () => {
+    fixture = serveSidebar({
+      view: viewState({ total_sessions: 2 }),
+      rows: [workspaceRow('one'), chatRow('a', { title: 'Alpha' })],
+      total: 2,
+    })
+    render(Sidebar)
+
+    expect(await screen.findByRole('button', { name: 'New chat in one' })).toBeTruthy()
+    await fireEvent.click(screen.getByRole('button', { name: 'Workspace actions for one' }))
+
+    const menu = await screen.findByRole('menu', { name: 'Workspace actions for one' })
+    expect(within(menu).getAllByRole('menuitem').map((item) => item.textContent?.trim())).toEqual([
+      'Remove workspace...',
+    ])
+    // One menu per header, and the row itself still toggles its group.
+    expect(screen.getAllByRole('menu')).toHaveLength(1)
+    expect(treeItems()).toHaveLength(2)
   })
 
   it('toggles an expanded header to collapsed', async () => {

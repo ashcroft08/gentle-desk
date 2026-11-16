@@ -38,11 +38,12 @@ async function openRowMenu(): Promise<HTMLElement> {
 }
 
 describe("The chat row's Close chat", () => {
-  it('sits between Rename and Delete, one menuitem each', async () => {
+  it('sits between the row\u2019s copy action and the destructive one, one menuitem each', async () => {
     const menu = await openRowMenu()
 
     expect(within(menu).getAllByRole('menuitem').map((item) => item.textContent?.trim())).toEqual([
       'Rename',
+      'Copy file path',
       'Close chat',
       'Delete',
     ])
