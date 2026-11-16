@@ -36,12 +36,33 @@ rules).
       today's controls) and the header part of `01a-tree-chat.html` (Rename in
       the header, switch right-aligned) — maintainer review on the canvas
       before any Svelte. Route: parent.
-- [ ] T2 (S1, S2, S5) web: the Working pulse in `Mark.svelte`/`app.css`; the
-      header Rename (reusing the row's inline-rename flow) + the switch pinned
-      right and responsive. TDD; suites green.
-- [ ] T3 (S3, S5) web: the HelpersPanel two-column rebuild per the refreshed
-      artboard; list selection keeps the thread beside it; keyboard walk kept.
-      TDD; suites green.
+- [x] T2 (S1, S2, S5) web — DONE, commit 8ece406. Writer report: S1 (Mark.svelte
+      now draws 01a's per-state class beside `mark`; app.css gains the pulse
+      (1.2s ease-in-out, keyframes 50% opacity .35) with the reduced-motion
+      kill); S2 (Header.svelte draws 01a's header: pencil with the artboard's
+      Lucide outline inline (no pencil glyph in shapes.ts), local inline-rename
+      flow — Enter commits trimmed, Escape cancels, blur commits, unchanged
+      sends nothing — reporting through a new `onRename` prop that App.svelte
+      wires to the row's own `renameSession(foreground_chat, name)`; ViewTabs
+      switch stays last with the spacer pinning it right; 900px responsive step
+      ported); S5 (`renameChat` "Rename chat"/"Renombrar el chat" + `chatName`
+      reuse, parity + same-tick flip tests). TDD: RED 27 failed/9 passed, GREEN
+      36 passed; svelte-check 0, eslint clean.
+- [x] T3 (S3, S5) web — DONE, commit b95033f. Writer report: HelpersPanel
+      rebuilt to 01b's two columns — the list column always drawn (counters
+      above the listbox, right border, `minmax(200px,280px)` with the artboard's
+      1000px → 200px collapse, scoped styles), the selected helper's thread
+      beside it swapping in place, empty-chat chats keep the plain line;
+      HelperThread no longer takes focus on mount (the list keeps the keyboard,
+      arrow walk works with a thread beside it); the bar stays Back + heading +
+      mark, Back still dispatches the existing CloseHelper (no new intents);
+      copy unchanged (S5 nothing new). The one obsolete App-level pin ("thread
+      replaces the list") was swapped to "the list is drawn beside the thread"
+      with the parent's approval. TDD: RED 6 failed/42 passed, GREEN 48;
+      validation battery 711/711, svelte-check 0, eslint clean. Open for the
+      real-window check: the right column is blank when nothing is selected
+      (no placeholder copy was added), and Back's CloseHelper is visually a
+      selection-clear with the list always drawn.
 - [ ] T4 (close) battery + real-window check + roadmap note.
 
 ## Log
