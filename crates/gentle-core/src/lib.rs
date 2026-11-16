@@ -7,6 +7,7 @@
 
 pub mod chat;
 pub mod helpers;
+pub mod i18n;
 pub mod rpc;
 pub mod session;
 pub mod time;

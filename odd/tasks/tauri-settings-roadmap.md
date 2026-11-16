@@ -44,13 +44,87 @@ calendar one. Version numbers never repeat or go down (updater compares them).
   says why, so a placeholder would only hide a gap nobody sees).
 - Profile editing: RESOLVED without a GUI - the Profiles pane's Edit in terminal opens the shell
   and the maintainer types `/gentle:profiles` there. Editing models inside the pane (clicking a
-  field) is a luxury, not a need, and is not planned.
-- Blocked on gentle-pi, the only one left: the **subscription usage panel** (the Alt+U overlay's
-  percentages). That data lives only in the child's memory today, so gentle-pi must expose it
-  (`get_usage` RPC or `/gentle:usage --json`) before the desk can draw it.
-- 0.2.0 (optional, user decision): profile and subagent editing in the GUI. Blocked on
-  gentle-pi adding text subcommands such as `/gentle:profiles use <name>` and
-  `/gentle:profiles mode <name> <mode>`.
+  field) is a luxury, not a need, and is not planned. Status 2026-11-14, corrected by the maintainer: this is the current state, not the end state - in a desktop app, moving work out of the terminal into the interface is product value, so a GUI Profiles/pins editor is now planned (see the 0.2.x adoption plan below).
+- RESOLVED by the maintainer (2026-11-14): the subscription usage panel stays terminal-only - the maintainer uses `/gentle:usage` in the shell, no GUI overlay. Separately, gentle-shell's own repo now documents a structured desktop control channel (`docs/desktop-rpc.md`, schema `gentle-shell.desktop-rpc/v1`, activated with `GENTLE_SHELL_INTERACTIVE_HOST=1 pi --mode rpc`) whose advertised methods include `get_subscription_usage`, `refresh_subscription_usage`, `apply_profile`, `list_subagents` and `cancel_subagent`; if a GUI version is ever wanted again, that contract is where the data would come from. Not planned.
+- RESOLVED by the maintainer (2026-11-14): profile and subagent editing stays solved through the maintainer's own gentle-shell package (its `/gentle:profiles` and the desktop RPC contract above expose `apply_profile` and subagent list/cancel), not a gentle-desk GUI. Not planned.
+
+## 0.2.x: adopting gentle-shell's desktop RPC channel (agreed 2026-11-14)
+
+- What the channel is: gentle-shell 4.8.0 documents `docs/desktop-rpc.md`, contract
+  `gentle-shell.desktop-rpc/v1`, active only with `GENTLE_SHELL_INTERACTIVE_HOST=1 pi
+  --mode rpc`. The client sends `/gentle:desktop {json}` as an ordinary prompt and the
+  domain answer arrives as an Extension UI widget correlated by `requestId`, so control
+  traffic never enters the conversation. gentle-desk does not consume it today
+  (verified: no `/gentle:desktop` reference under apps/desktop or crates).
+- Adopt what we lack; do not migrate what already works. Nothing here replaces the
+  child-process chat transport, and nothing forces adoption.
+- Order, each its own slice with a real-window check:
+  1. **Language (0.2.0) first**, so new UI is born bilingual instead of rewritten later.
+  2. **Live Settings sync**: `get_snapshot` plus the `config_changed` event, so panels
+     refresh while the terminal edits, instead of only when the terminal closes.
+  3. **Profiles and pins editor**: the largest one, sliced as read+state, model and
+     effort per agent, fallback-chain editing, then the per-repo pin. It is safe now
+     because `set_config` writes through gentle-pi's own writers and `writeRevision`
+     rejects the write when the file changed underneath. Model pickers reuse the
+     0.1.11 model catalog.
+  4. **Subagents and jobs per chat**: `list_subagents`/`cancel_subagent` and
+     `list_jobs`/`cancel_job`, plus the `rate_limit` event. Capability the desk does
+     not have at all today.
+- Deliberately NOT adopted, because the maintainer keeps these in the terminal by
+  decision: the subscription usage panel stays `/gentle:usage` (the channel does expose
+  `get_subscription_usage`, so it remains the data source if that decision ever
+  changes), and the design canvas `open`/`stop` actions stay the `gentle_design`
+  tool's job.
+- Before relying on the channel, validate it against our own children with
+  `GENTLE_SHELL_INTERACTIVE_HOST` set; it is a new surface and a child that ignores it
+  must degrade to today's behaviour, never break.
+
+## 0.2.x: removing a workspace, and deleting its chats (agreed 2026-11-14)
+
+Target after the 0.2.0 language work (new UI must be born bilingual). Nothing here is
+built or started; this records the decision and the measurements so it is not
+re-argued.
+
+- The premise, corrected: chats do not live in the workspace folder. They live in pi's
+  session store (`<agent-dir>/sessions/<encoded-workspace-path>/<timestamp>_<id>.jsonl`,
+  here `C:\Users\josep\.pi\agent\sessions`), indexed by the workspace's path. So
+  removing a workspace entry cannot delete chats by itself, and deleting the folder from
+  disk would only orphan them: still on disk, unreachable from the UI.
+- Measured on the maintainer's machine (2026-11-14): 12 chats, 36 MB in total; the three
+  largest are 10.8 MB, 6.4 MB and 5.9 MB, all from ONE project; this repo's own
+  workspace holds 2 chats, 1.7 MB. A long agent session carries its tool output, so a
+  single chat can outweigh a whole workspace list. Size is therefore shown in megabytes
+  next to the count, not only a count.
+- Decision (maintainer): "si quitas un workspace, debes eliminar los chats ya que eso
+  ocupa espacio del usuario" was raised, and the agreed shape is the opt-in checkbox in
+  the removal dialog — NOT an automatic consequence. Removing a workspace only forgets
+  the bookmark; deleting its chats is a second, explicit, destructive choice with the
+  number and the size in front of the user (`[ ] Also delete those 2 chats (1.7 MB)`),
+  and the primary button becomes `Remove and delete 2 chats` only when it is checked.
+  Rationale: removing a workspace is usually temporary (another drive, another phase),
+  and chat history is the one artifact that cannot be regenerated; the app owns
+  bookmarks, not the user's conversations.
+- Dialog design (maintainer): "mejorar el diseño del modal ya que una card dentro del
+  modal no se ve bien". Anatomy: the title is the question (`Remove this workspace?` /
+  `Delete this chat?`); one consequence line in the user's words, with the scope in
+  bold (`Delete 37 chats`), never the words "chat file"; NO inner card and no boxed
+  path; the destructive button is last, red, and labelled with its scope; actions
+  right-aligned. Where a path is shown, it is plain monospaced text with the middle
+  elided (`C:\…\gentle-desk`), or behind a `Show file paths` disclosure. The workspace
+  path IS the identity and belongs in the first sentence; a chat's internal
+  `<timestamp>_<id>.jsonl` name is noise and moves to a row-menu `Copy file path`.
+- Not a check to touch config: removing a workspace that has an open chat must first
+  close that chat's child process and drop its cached session (process-per-chat,
+  sessions-cache, refresh-watcher), or the app is left with children pointing at a
+  folder no longer in the list. That teardown is the real work of the safe half and
+  needs its own spec before any code.
+- Open decisions for when it is picked up: whether a bulk delete moves the files to the
+  OS trash instead of unlinking them (reversible, and it costs a new `trash`
+  dependency, so an explicit maintainer decision), and whether the orphan case (a
+  workspace folder deleted outside the app) gets its own Settings view (`Unused chats:
+  N chats, M MB — Review`), which is where space reclamation honestly belongs.
+- Visual work goes through the gentle-design canvas before `SettingsDialog`/`dialogs`
+  change, not by hand in Svelte.
 
 ## Old roadmap (superseded by the version plan)
 
@@ -61,6 +135,8 @@ calendar one. Version numbers never repeat or go down (updater compares them).
 
 Decision for now: gentle-desk does not write gentle-pi's JSON files (profiles.json,
 models.json, settings.json, ...).
+
+- The v1 **Ctrl+K command palette** (gentle-desk's own actions: new chat, switch workspace, search, theme, open settings) was never built and is DROPPED by the maintainer (2026-11-14). gentle-shell's own TUI already ships a command palette (alt+k) for shell commands, and no gentle-desk user asked for a GUI one.
 
 ## What was verified (code reading only; nothing was executed; no real shell was started)
 
