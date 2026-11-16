@@ -189,3 +189,16 @@ session index, not a folder-name encoding).
   vitest 668/668, svelte-check 0, eslint clean, workspace_remove 11/11, clippy
   -D warnings, fmt clean. The remaining findings (R1-02, R1-03, R3-004, R3-005,
   R4-serial-close-latency) stay backlog.
+- L12 (parent, 2026-11-16): the fix batch's own native review — lineage
+  review-f95cbc6c7bc257ee, candidate = cd4b96b..HEAD (10 paths, 304 lines, tier
+  medium), lenses risk/resilience/reliability, 3 host-relay runs ~$0.033 —
+  APPROVED on the last admitted capture (no refuter required), authority
+  burned, delivery ordinary-repository-policy. 5 advisory findings, all
+  non-blocking: R1-caller-audit (audit removeWorkspace callers — only the
+  dialog calls it), R1-partial-delete-refusal (the mid-flow refusal may follow
+  already-deleted chats; verify the wording or re-check before the first file
+  at the real-window check), R1-residual-toctou (the narrowed but unclosed
+  race, backlog), R4-001 (stale sidebar rows for already-deleted chats until
+  the next rescan, accepted fix-forward), R4-002 (the dialog's catch shows the
+  generic line; whether the backend push carries the Err reason is for the
+  real-window check).
