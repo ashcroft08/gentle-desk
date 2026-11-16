@@ -1,0 +1,21 @@
+{
+  "arrangement": "row",
+  "positions": {
+    "system": {
+      "x": 0,
+      "y": 0
+    },
+    "01-question-plain.html": {
+      "x": 1520,
+      "y": 0
+    },
+    "02-evidence-disclosure.html": {
+      "x": 2100,
+      "y": 0
+    },
+    "03-one-quiet-line.html": {
+      "x": 2680,
+      "y": 0
+    }
+  }
+}

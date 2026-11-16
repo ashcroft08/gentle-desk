@@ -44,6 +44,10 @@ pub struct SessionEntry {
     pub summary: SessionSummary,
     /// Latest activity, else creation time, else the file's mtime (as pi does).
     pub modified_ms: u64,
+    /// The file's length in bytes at the last fold: what the removal offer adds
+    /// up to say "2 chats (1.7 MB)" (S2), taken from the size the cache already
+    /// keeps, so reading it costs no `stat` of its own.
+    pub bytes: u64,
 }
 
 /// What a [`SessionIndex::refresh`] did, so callers (and tests) can see its cost.
@@ -206,6 +210,7 @@ impl SessionIndex {
                     path: path.clone(),
                     summary,
                     modified_ms,
+                    bytes: cached.size,
                 })
             })
             .collect();

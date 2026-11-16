@@ -532,6 +532,28 @@ impl Bridge {
         }
     }
 
+    /// The close a workspace removal runs before it deletes (S5), as a value a
+    /// blocking thread can carry: the reducer's Close chat folded here, and the
+    /// command it answers run TO ITS END, because the session file the removal
+    /// deletes next must not be one a child still holds open.
+    ///
+    /// Unlike [`run_chat_commands`](Self::run_chat_commands) this never hands a
+    /// command to a worker thread and never returns before it settled: the order
+    /// the maintainer ruled (close, then delete, then forget) is the caller's
+    /// thread's.
+    pub(crate) fn close_first(&self) -> crate::workspace_remove::ShellClose {
+        let holder = Arc::clone(&self.holder);
+        let executor = Arc::clone(&self.executor);
+        let emit = self.emitter();
+        let run = move |commands: Vec<gentle_app::ChatCommand>| {
+            for command in commands {
+                let ran = effects::run_one(command, executor.as_ref());
+                fold_and_push(&holder, &emit, ran);
+            }
+        };
+        crate::workspace_remove::ShellClose::new(Arc::clone(&self.holder), Arc::new(run))
+    }
+
     /// Pushes the slice one workspace action answers, then runs the new chat it
     /// opened: exactly what [`Bridge::dispatch`] does with the commands of the
     /// reducer, so a workspace added by hand behaves like one that was there.

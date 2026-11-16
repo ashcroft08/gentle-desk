@@ -1,6 +1,6 @@
-// Deleting a chat from the sidebar (T3, D2(b), S4): the row's own menu, the
-// confirm dialog that names the REAL file of that chat, and the command the app
-// dispatches once the user confirms it.
+// Deleting a chat from the sidebar (T3, D2(b), S4; the removal feature's S3
+// anatomy): the row's own menu, the confirm dialog that names the chat in a plain
+// elided path, and the command the app dispatches once the user confirms it.
 //
 // The file removal itself is Rust's (`delete_session`), so these tests assert
 // what the view ASKS for - the session path of the row, and the confirmation
@@ -27,7 +27,8 @@ vi.mock('@tauri-apps/api/event', () => import('../test-support/tauri-mock').then
 const DELETE = 'Delete'
 const TITLE = 'First chat'
 const DIALOG_TITLE = 'Delete this chat?'
-const DIALOG_BODY = 'The chat file is removed from disk and cannot be restored.'
+/** The session file's path, as the dialog shows it: plain and elided in the middle. */
+const ELIDED = 'C:\\…\\2026_s1.jsonl'
 const SESSION = 'C:\\pi\\sessions\\--dev-gentle-desk--\\2026_s1.jsonl'
 
 // The testing library only cleans up on its own with vitest globals on.
@@ -75,13 +76,31 @@ describe('Deleting a chat', () => {
     expect(handlerArgs('delete_session')).toEqual([])
   })
 
-  it('names the real file of that chat in the dialog', async () => {
+  it('draws the question, the scope in bold and a plain elided path', async () => {
     serve()
     const dialog = await openDialog()
 
     expect(within(dialog).getByText(DIALOG_TITLE)).toBeTruthy()
-    expect(within(dialog).getByText(DIALOG_BODY)).toBeTruthy()
-    expect(within(dialog).getByText(SESSION).tagName).toBe('CODE')
+    // One consequence line, its scope the only bold run (S3).
+    const scope = within(dialog).getByText('chat')
+    expect(scope.tagName).toBe('B')
+    expect(dialog.textContent ?? '').toContain('cannot be regenerated')
+    expect(dialog.textContent ?? '').not.toMatch(/chat file/i)
+    // The path is plain monospaced text with its middle elided, never a code box.
+    const path = within(dialog).getByText(ELIDED)
+    expect(path.tagName).not.toBe('CODE')
+    expect(path.className).toContain('mono')
+    expect(dialog.querySelector('code')).toBeNull()
+  })
+
+  it('puts the destructive answer last, red, and Cancel before it', async () => {
+    serve()
+    const dialog = await openDialog()
+
+    const buttons = within(dialog).getAllByRole('button')
+    expect(buttons.map((button) => button.textContent?.trim())).toEqual(['Cancel', DELETE])
+    expect(buttons[1].classList.contains('d')).toBe(true)
+    expect(buttons[0].classList.contains('d')).toBe(false)
   })
 
   it('dispatches nothing when the user cancels', async () => {

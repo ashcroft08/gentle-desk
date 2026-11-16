@@ -42,6 +42,7 @@ pub mod workspace;
 pub mod workspace_add;
 pub mod workspace_commands;
 pub mod workspace_create;
+pub mod workspace_remove;
 
 use commands::Bridge;
 use tauri::{Manager, WindowEvent};
@@ -63,6 +64,8 @@ pub fn contract_builder() -> Builder<tauri::Wry> {
             workspace_commands::create_workspace,
             chat_rename::rename_session,
             chat_delete::delete_session,
+            workspace_remove::workspace_removal_offer,
+            workspace_remove::remove_workspace,
             commands::attach_images,
             commands::remove_image,
             commands::store_last_run_version,

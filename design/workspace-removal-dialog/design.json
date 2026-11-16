@@ -1,0 +1,10 @@
+{
+  "title": "Workspace removal dialog",
+  "brief": "The destructive-confirm dialog for removing a workspace, under the gate ruling: 0 chats removes freely; N >= 1 chats offers the single destructive path 'Delete N chats (M MB) and remove'. Anatomy per the maintainer: title is the question, one consequence line with the scope in bold, NO inner card, no boxed path, destructive button last/red/scope-labelled, actions right-aligned, path elided monospaced. Each artboard shows both states. Copy born bilingual in the app; artboards show the English column.",
+  "feature": "odd/tasks/workspace-removal.md",
+  "artboards": [
+    { "file": "01-question-plain.html", "title": "A: the question asks, the path speaks", "tradeoff": "Fastest to confirm; weakest justification for the destructive case — nothing between question and buttons", "width": 500, "height": 780 },
+    { "file": "02-evidence-disclosure.html", "title": "B: evidence before the red button", "tradeoff": "The loss is backed by an expandable list of the chats with their sizes — more deliberate, one interaction deeper", "width": 500, "height": 860 },
+    { "file": "03-one-quiet-line.html", "title": "C: one quiet line", "tradeoff": "Most compact, tuned for the frequent harmless case; the destructive case leans on the button's own words", "width": 460, "height": 720 }
+  ]
+}

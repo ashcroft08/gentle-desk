@@ -76,6 +76,22 @@ export const commands = {
 	 */
 	deleteSession: (sessionId: string, confirmed: boolean) => typedError<ViewState_Serialize, string>(__TAURI_INVOKE("delete_session", { sessionId, confirmed })),
 	/**
+	 *  The removal offer of the workspace at `path` (S1, S2): what the dialog says
+	 *  before anything happens.
+	 */
+	workspaceRemovalOffer: (path: string) => typedError<WorkspaceRemovalView, string>(__TAURI_INVOKE("workspace_removal_offer", { path })),
+	/**
+	 *  Removes one workspace (S1, S2, S4, S5): the row menu's one destructive path,
+	 *  which the web side sends only from its dialog, `confirmed`.
+	 * 
+	 *  Everything that blocks - closing a child (up to the host's 2 s grace) and the
+	 *  deletes - runs off the window's thread. A removal that lands asks the session
+	 *  list for the pass that heals it, which is what takes the chats' rows off the
+	 *  tree; a removal of a workspace with no chat changes the config, whose revision
+	 *  the page already follows.
+	 */
+	removeWorkspace: (path: string, confirmed: boolean) => typedError<ViewState_Serialize, string>(__TAURI_INVOKE("remove_workspace", { path, confirmed })),
+	/**
 	 *  The images a drop attached, as one command: the paths are the files the user
 	 *  dragged, and they come from Tauri's own drop event, because the webview's
 	 *  `File` has no path. Nothing but paths travel up: the shell reads the files,
@@ -2059,6 +2075,47 @@ export type WhatsNewView_Serialize = {
 	 *  decides how it lays them out (T2).
 	 */
 	notes: string,
+};
+
+/**
+ *  The removal offer of one workspace (S1, S2): the chats a removal would
+ *  delete, and how much they weigh. The count is what the dialog's consequence
+ *  line names in bold and the bytes are what stands beside it ("2 chats
+ *  (1.7 MB)"), so the sentence is drawn from these two numbers and never from
+ *  text built here.
+ * 
+ *  Both come from the session index, filtered by the folder each session header
+ *  reports ([`gentle_runtime::app_config::folder_key`]), which is the same
+ *  identity the sidebar groups by: a removal offers exactly the chats the row
+ *  shows.
+ */
+export type WorkspaceRemovalView = {
+	/**
+	 *  The folder identity two spellings share, as [`WorkspaceRowView::key`]
+	 *  carries it.
+	 */
+	key: string,
+	/**
+	 *  The canonical spelling of the folder: the config's, when the config holds
+	 *  it, else the spelling the caller named.
+	 */
+	path: string,
+	/**
+	 *  The label the sidebar draws for the workspace, so the dialog names it the
+	 *  way the row does.
+	 */
+	label: string,
+	/**  How many chats the workspace holds: the removal deletes exactly these. */
+	chats: number,
+	/**
+	 *  Their total size in bytes, from the session index. A `f64` because the
+	 *  generated bindings forbid 64-bit integers on the wire (a `number` that
+	 *  could lose precision): a byte count is exact in a double far past any
+	 *  real session store, and the web side is what turns it into "1.7 MB". The
+	 *  sum of the chats' sizes is always written, so the generated `| null` of
+	 *  this contract's other measured values never arrives here.
+	 */
+	bytes: number | null,
 };
 
 /**

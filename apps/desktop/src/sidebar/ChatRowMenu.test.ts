@@ -82,9 +82,28 @@ describe("The chat row's actions menu", () => {
     const items = within(menu).getAllByRole('menuitem')
     expect(items.map((item) => item.textContent?.trim())).toEqual([
       'Rename',
+      'Copy file path',
       'Close chat',
       'Delete',
     ])
+  })
+
+  it('copies the chat\u2019s own session path, never printing it in a dialog (S3)', async () => {
+    const written: string[] = []
+    Object.defineProperty(navigator, 'clipboard', {
+      value: {
+        writeText: (text: string) => {
+          written.push(text)
+          return Promise.resolve()
+        },
+      },
+      configurable: true,
+    })
+    const menu = await openRowMenu()
+
+    await fireEvent.click(within(menu).getByRole('menuitem', { name: 'Copy file path' }))
+
+    expect(written).toEqual([SESSION])
   })
 })
 

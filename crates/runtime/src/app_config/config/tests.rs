@@ -153,6 +153,95 @@ fn collapsing_an_unknown_workspace_changes_nothing() {
 }
 
 #[test]
+fn removing_a_workspace_forgets_it_and_keeps_the_others_in_the_order_they_were_added() {
+    let mut config = AppConfig::default();
+    assert!(config.add_workspace(r"C:\dev\p"));
+    assert!(config.add_workspace(r"C:\dev\q"));
+    assert!(config.add_workspace(r"C:\dev\r"));
+
+    assert!(config.remove_workspace(r"C:\dev\q"));
+
+    assert_eq!(
+        config.workspaces,
+        [
+            WorkspaceEntry {
+                path: r"C:\dev\p".to_owned(),
+                collapsed: false,
+            },
+            WorkspaceEntry {
+                path: r"C:\dev\r".to_owned(),
+                collapsed: false,
+            },
+        ],
+        "the folders the config keeps are untouched and still in order"
+    );
+    assert_eq!(config.workspace(r"C:\dev\q"), None);
+}
+
+#[test]
+fn removing_a_workspace_is_reached_through_another_spelling_of_the_folder() {
+    let mut config = AppConfig::default();
+    assert!(config.add_workspace(r"C:\dev\p"));
+
+    assert!(config.remove_workspace(r"\\?\C:\Dev\P\"));
+
+    assert!(
+        config.workspaces.is_empty(),
+        "the one spelling is one folder"
+    );
+}
+
+#[test]
+fn removing_a_workspace_the_config_does_not_hold_changes_nothing() {
+    let mut config = AppConfig::default();
+    assert!(config.add_workspace(r"C:\dev\p"));
+
+    assert!(!config.remove_workspace(r"C:\dev\other"));
+    assert!(!config.remove_workspace(""));
+    assert!(!config.remove_workspace("   "));
+
+    assert_eq!(config.workspaces.len(), 1);
+    assert_eq!(config.workspaces[0].path, r"C:\dev\p");
+}
+
+#[test]
+fn the_fold_of_the_workspaces_it_keeps_survives_another_one_being_removed() {
+    let mut config = AppConfig::default();
+    assert!(config.add_workspace(r"C:\dev\p"));
+    assert!(config.add_workspace(r"C:\dev\q"));
+    assert!(config.set_collapsed(r"C:\dev\p", true));
+
+    assert!(config.remove_workspace(r"C:\dev\q"));
+
+    assert_eq!(
+        config.workspaces,
+        [WorkspaceEntry {
+            path: r"C:\dev\p".to_owned(),
+            collapsed: true,
+        }]
+    );
+}
+
+#[test]
+fn a_workspace_removed_can_be_added_again_expanded() {
+    let mut config = AppConfig::default();
+    assert!(config.add_workspace(r"C:\dev\p"));
+    assert!(config.set_collapsed(r"C:\dev\p", true));
+    assert!(config.remove_workspace(r"C:\dev\p"));
+
+    assert!(config.add_workspace(r"C:\dev\p"));
+
+    assert_eq!(
+        config.workspaces,
+        [WorkspaceEntry {
+            path: r"C:\dev\p".to_owned(),
+            collapsed: false,
+        }],
+        "adding a folder the config does not hold still stores it expanded"
+    );
+}
+
+#[test]
 fn the_canonical_spelling_is_what_a_workspace_is_stored_with() {
     assert_eq!(canonical_path(r"\\?\C:\dev\p\"), r"C:\dev\p");
     assert_eq!(canonical_path(r"\\?\UNC\srv\share"), r"\\srv\share");

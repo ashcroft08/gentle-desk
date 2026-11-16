@@ -80,7 +80,12 @@ calendar one. Version numbers never repeat or go down (updater compares them).
   `GENTLE_SHELL_INTERACTIVE_HOST` set; it is a new surface and a child that ignores it
   must degrade to today's behaviour, never break.
 
-## 0.2.x: removing a workspace, and deleting its chats (agreed 2026-11-14)
+## 0.2.x: removing a workspace, and deleting its chats (agreed 2026-11-14; SHIPPED 2026-11-16 on feat/workspace-removal, release 0.3.0)
+
+- 2026-11-16 rulings at pickup: the GATE replaced the opt-in checkbox (a workspace
+  with chats leaves only via "Delete N chats and remove"); deletion is trash-first
+  like pi (crate `trash`, unlink fallback); the orphan-chats Settings view is
+  DEFERRED (own feature if ever wanted). See odd/tasks/workspace-removal.md.
 
 Target after the 0.2.0 language work (new UI must be born bilingual). Nothing here is
 built or started; this records the decision and the measurements so it is not
@@ -119,11 +124,8 @@ re-argued.
   sessions-cache, refresh-watcher), or the app is left with children pointing at a
   folder no longer in the list. That teardown is the real work of the safe half and
   needs its own spec before any code.
-- Open decisions for when it is picked up: whether a bulk delete moves the files to the
-  OS trash instead of unlinking them (reversible, and it costs a new `trash`
-  dependency, so an explicit maintainer decision), and whether the orphan case (a
-  workspace folder deleted outside the app) gets its own Settings view (`Unused chats:
-  N chats, M MB — Review`), which is where space reclamation honestly belongs.
+- Open decisions RESOLVED 2026-11-16: bulk delete goes to the OS trash (crate
+  `trash`, pi-consistent), and the orphan view is deferred, not built.
 - Visual work goes through the gentle-design canvas before `SettingsDialog`/`dialogs`
   change, not by hand in Svelte.
 

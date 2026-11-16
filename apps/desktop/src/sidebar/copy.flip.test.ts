@@ -10,7 +10,7 @@ import '../test-support/dom-env'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/svelte'
 import { tick } from 'svelte'
-import { activity, chatRow, resetTauriMock, viewState, workspaceRow } from '../test-support/tauri-mock'
+import { activity, chatRow, resetTauriMock, setHandler, viewState, workspaceRow } from '../test-support/tauri-mock'
 import { serveSidebar } from '../test-support/sidebar'
 import { setLanguage } from '../i18n/language.svelte'
 import Sidebar from './Sidebar.svelte'
@@ -76,6 +76,7 @@ describe('a drawn sidebar', () => {
     expect(screen.getByRole('img', { name: 'Working' })).toBeTruthy()
     const menu = await openMenu(trigger)
     expect(within(menu).getByRole('menuitem', { name: 'Rename' })).toBeTruthy()
+    expect(within(menu).getByRole('menuitem', { name: 'Copy file path' })).toBeTruthy()
     expect(within(menu).getByRole('menuitem', { name: 'Close chat' })).toBeTruthy()
     expect(within(menu).getByRole('menuitem', { name: 'Delete' })).toBeTruthy()
 
@@ -90,6 +91,7 @@ describe('a drawn sidebar', () => {
     expect(screen.getByRole('img', { name: 'Trabajando' })).toBeTruthy()
     const flipped = screen.getByRole('menu', { name: `Acciones del chat: ${TITLE}` })
     expect(within(flipped).getByRole('menuitem', { name: 'Renombrar' })).toBeTruthy()
+    expect(within(flipped).getByRole('menuitem', { name: 'Copiar ruta del archivo' })).toBeTruthy()
     expect(within(flipped).getByRole('menuitem', { name: 'Cerrar chat' })).toBeTruthy()
     expect(within(flipped).getByRole('menuitem', { name: 'Eliminar' })).toBeTruthy()
 
@@ -153,11 +155,52 @@ describe('a drawn sidebar', () => {
     await fireEvent.click(screen.getByRole('menuitem', { name: 'Eliminar' }))
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByText('¿Eliminar este chat?')).toBeTruthy()
-    expect(
-      within(dialog).getByText('El archivo del chat se borra del disco y no se puede recuperar.'),
-    ).toBeTruthy()
+    // The consequence line is the dialog's own, in the same dictionary (S3).
+    expect(within(dialog).getByText('chat').tagName).toBe('B')
+    expect(dialog.textContent ?? '').toContain('almacén de sesiones de gentle-shell')
     expect(within(dialog).getByRole('button', { name: 'Cancelar' })).toBeTruthy()
     expect(within(dialog).getByRole('button', { name: 'Eliminar' })).toBeTruthy()
+
+    setLanguage('en')
+  })
+
+  it('flips the removal dialog in the same tick, offer, disclosure and all', async () => {
+    setLanguage('en')
+    const path = 'C:\\dev\\one'
+    serveSidebar({
+      view: viewState({ total_sessions: 2 }),
+      rows: [workspaceRow('one', { path }), chatRow('a', { title: TITLE })],
+      total: 2,
+    })
+    setHandler('workspace_removal_offer', () => ({
+      key: 'one',
+      path,
+      label: 'one',
+      chats: 1,
+      bytes: 1_800_000,
+    }))
+    render(Sidebar)
+
+    await fireEvent.click(await screen.findByRole('button', { name: 'Workspace actions for one' }))
+    await fireEvent.click(await screen.findByRole('menuitem', { name: 'Remove workspace...' }))
+    const dialog = await screen.findByRole('dialog')
+    await within(dialog).findByText('Remove this workspace?')
+
+    expect(within(dialog).getByText('1 chat (1.7 MB)').tagName).toBe('B')
+    expect(within(dialog).getByText('Show 1 chat (1.7 MB)').tagName).toBe('SUMMARY')
+    expect(within(dialog).getByRole('button', { name: 'Delete 1 chat and remove' })).toBeTruthy()
+
+    setLanguage('es')
+    await tick()
+
+    // S7: the row menu's item and every word of the dialog it opened, together.
+    expect(within(dialog).getByText('¿Quitar este espacio de trabajo?')).toBeTruthy()
+    expect(within(dialog).getByText('1 chat (1.7 MB)').tagName).toBe('B')
+    expect(within(dialog).getByText('Mostrar 1 chat (1.7 MB)').tagName).toBe('SUMMARY')
+    expect(within(dialog).getByRole('button', { name: 'Cancelar' })).toBeTruthy()
+    expect(within(dialog).getByRole('button', { name: 'Eliminar 1 chat y quitar' })).toBeTruthy()
+    // The workspace's own title is Rust's and stays exactly as it arrived (D7).
+    expect(within(dialog).getByText(TITLE)).toBeTruthy()
 
     setLanguage('en')
   })

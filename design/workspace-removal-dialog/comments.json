@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "comments": [
+    {
+      "id": "senflglr",
+      "file": "01-question-plain.html",
+      "selector": "body > div:nth-of-type(2) > div > button:nth-of-type(2)",
+      "excerpt": "Delete 2 chats (1.7 MB) and remove",
+      "comment": "quita lo del paréntesis, en esta vista y en las otras",
+      "createdAt": "2026-11-16T03:00:09.240Z",
+      "status": "resolved",
+      "sentAt": "2026-11-16T03:00:09.351Z",
+      "resolvedAt": "2026-11-16T03:00:35.234Z",
+      "resolution": "Button label is now \"Delete 2 chats and remove\" in all three artboards (01/02/03); the size stays in the consequence line and the disclosure per the MB rule."
+    }
+  ]
+}

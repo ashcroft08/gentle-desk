@@ -16,6 +16,7 @@
 // exactly as they arrived (D7), which is why every function below that carries one
 // keeps it untouched.
 import type { LanguageView } from '../contract/bindings'
+import type { ConsequenceLine } from './removal'
 
 /** The id of the `Select a workspace to start a session.` line. */
 export const NEW_SESSION_WHY_ID = 'new-session-why'
@@ -78,9 +79,38 @@ export interface SidebarCopy {
   /** The new-chat icon of a workspace header, named with the workspace's label. */
   newChatTip: string
   newChatIn: (label: string) => string
-  /** The delete confirm dialog, quoted from the states board's own card. */
+  /** The chat row menu's copy of the session file's own name (S3). */
+  copyPath: string
+  /**
+   * The workspace header's `...` menu (S8): the button's tooltip, the menu's name
+   * around the workspace's label, and its one destructive item.
+   */
+  workspaceActionsTip: string
+  workspaceActions: (label: string) => string
+  removeWorkspace: string
+  /**
+   * The removal dialog (S1, S3): the question, its one consequence line with the
+   * scope to be drawn in bold, the disclosure over the chats that go, and the two
+   * answers. The count and the size inside those lines are `removal.ts`'s, so the
+   * words here only hold the sentence around them.
+   */
+  removeTitle: string
+  removeKeepLine: ConsequenceLine
+  removeChatsLine: (scope: string) => ConsequenceLine
+  showChats: (scope: string) => string
+  removeKeepConfirm: string
+  removeChatsConfirm: (count: string) => string
+  /**
+   * The dialog's two failure lines, in the consequence line's own anatomy (S3):
+   * one for an offer that could not be read (R3-002), one for a removal the shell
+   * refused before it answered (R3-003). Those two are the dialog's words, not
+   * Rust's: the reason a command carries is drawn where a notice is drawn.
+   */
+  removeOfferError: ConsequenceLine
+  removeError: ConsequenceLine
+  /** The delete confirm dialog, in the same anatomy (S3). */
   deleteTitle: string
-  deleteBody: string
+  deleteLine: ConsequenceLine
   deleteConfirm: string
 }
 
@@ -118,8 +148,41 @@ const ENGLISH: SidebarCopy = {
   deleteChat: 'Delete',
   newChatTip: 'New chat',
   newChatIn: (label) => `New chat in ${label}`,
+  copyPath: 'Copy file path',
+  workspaceActionsTip: 'Workspace actions',
+  workspaceActions: (label) => `Workspace actions for ${label}`,
+  removeWorkspace: 'Remove workspace...',
+  removeTitle: 'Remove this workspace?',
+  removeKeepLine: {
+    before: 'gentle-desk only ',
+    scope: 'forgets the bookmark',
+    after:
+      ". Its chats stay in gentle-shell's session store - add the folder back and they come back with it.",
+  },
+  removeChatsLine: (scope) => ({
+    before: 'Removing deletes its ',
+    scope,
+    after: " from gentle-shell's session store. This history cannot be regenerated.",
+  }),
+  showChats: (scope) => `Show ${scope}`,
+  removeKeepConfirm: 'Remove',
+  removeChatsConfirm: (count) => `Delete ${count} and remove`,
+  removeOfferError: {
+    before: 'The chats of this workspace could not be read. ',
+    scope: 'Nothing was removed.',
+    after: ' Try again from the workspace menu, or cancel.',
+  },
+  removeError: {
+    before: 'The removal did not finish. ',
+    scope: 'Nothing more will be deleted',
+    after: ' unless you try again.',
+  },
   deleteTitle: 'Delete this chat?',
-  deleteBody: 'The chat file is removed from disk and cannot be restored.',
+  deleteLine: {
+    before: 'Removing deletes this ',
+    scope: 'chat',
+    after: " from gentle-shell's session store. This history cannot be regenerated.",
+  },
   deleteConfirm: 'Delete',
 }
 
@@ -157,8 +220,41 @@ const SPANISH: typeof ENGLISH = {
   deleteChat: 'Eliminar',
   newChatTip: 'Chat nuevo',
   newChatIn: (label) => `Chat nuevo en ${label}`,
+  copyPath: 'Copiar ruta del archivo',
+  workspaceActionsTip: 'Acciones del espacio de trabajo',
+  workspaceActions: (label) => `Acciones del espacio de trabajo: ${label}`,
+  removeWorkspace: 'Quitar espacio de trabajo...',
+  removeTitle: '¿Quitar este espacio de trabajo?',
+  removeKeepLine: {
+    before: 'gentle-desk solo ',
+    scope: 'olvida el marcador',
+    after:
+      '. Sus chats siguen en el almacén de sesiones de gentle-shell: agrega la carpeta de nuevo y vuelven con ella.',
+  },
+  removeChatsLine: (scope) => ({
+    before: 'Al quitarlo se eliminan sus ',
+    scope,
+    after: ' del almacén de sesiones de gentle-shell. Este historial no se puede regenerar.',
+  }),
+  showChats: (scope) => `Mostrar ${scope}`,
+  removeKeepConfirm: 'Quitar',
+  removeChatsConfirm: (count) => `Eliminar ${count} y quitar`,
+  removeOfferError: {
+    before: 'No se pudieron leer los chats de este espacio de trabajo. ',
+    scope: 'No se quitó nada.',
+    after: ' Inténtalo de nuevo desde el menú del espacio de trabajo, o cancela.',
+  },
+  removeError: {
+    before: 'La operación no terminó. ',
+    scope: 'No se eliminará nada más',
+    after: ' a menos que lo intentes de nuevo.',
+  },
   deleteTitle: '¿Eliminar este chat?',
-  deleteBody: 'El archivo del chat se borra del disco y no se puede recuperar.',
+  deleteLine: {
+    before: 'Quitarlo elimina este ',
+    scope: 'chat',
+    after: ' del almacén de sesiones de gentle-shell. Este historial no se puede regenerar.',
+  },
   deleteConfirm: 'Eliminar',
 }
 

@@ -519,6 +519,36 @@ pub fn workspace_gone(language: Language, workspace: &str) -> String {
     }
 }
 
+// --- Removing a workspace (tauri: workspace_remove) -------------------------
+
+/// "This chat is working. Stop it first, then remove the workspace."
+///
+/// The same sentence Close chat and Delete a chat refuse with, ending in this
+/// action's own verb (S1: a workspace with a chat mid-turn is not removed at
+/// all, so the user has one thing to do first).
+pub fn remove_workspace_working_refusal(language: Language) -> String {
+    match language {
+        Language::En => {
+            "This chat is working. Stop it first, then remove the workspace.".to_owned()
+        }
+        Language::Es => {
+            "Este chat está trabajando. Detenlo primero, luego quita el espacio de trabajo."
+                .to_owned()
+        }
+    }
+}
+
+/// "the removal could not run: access is denied": the sentence is the app's,
+/// the reason is the disk's and travels as it arrived (D7).
+pub fn workspace_removal_failed(language: Language, error: &str) -> String {
+    match language {
+        Language::En => format!("the removal could not run: {error}"),
+        Language::Es => {
+            format!("no se pudo ejecutar la eliminación del espacio de trabajo: {error}")
+        }
+    }
+}
+
 // --- The images a chat carries (tauri: images) ------------------------------
 
 /// "a.txt was not attached: only png, jpg, jpeg, webp and gif images can be."
@@ -1005,3 +1035,6 @@ pub const fn closing(language: Language) -> &'static str {
         Language::Es => "la app se está cerrando",
     }
 }
+
+#[cfg(test)]
+mod tests;

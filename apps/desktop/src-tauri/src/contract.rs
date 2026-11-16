@@ -628,6 +628,38 @@ pub struct WorkspaceRowView {
     pub reason: Option<String>,
 }
 
+/// The removal offer of one workspace (S1, S2): the chats a removal would
+/// delete, and how much they weigh. The count is what the dialog's consequence
+/// line names in bold and the bytes are what stands beside it ("2 chats
+/// (1.7 MB)"), so the sentence is drawn from these two numbers and never from
+/// text built here.
+///
+/// Both come from the session index, filtered by the folder each session header
+/// reports ([`gentle_runtime::app_config::folder_key`]), which is the same
+/// identity the sidebar groups by: a removal offers exactly the chats the row
+/// shows.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+pub struct WorkspaceRemovalView {
+    /// The folder identity two spellings share, as [`WorkspaceRowView::key`]
+    /// carries it.
+    pub key: String,
+    /// The canonical spelling of the folder: the config's, when the config holds
+    /// it, else the spelling the caller named.
+    pub path: String,
+    /// The label the sidebar draws for the workspace, so the dialog names it the
+    /// way the row does.
+    pub label: String,
+    /// How many chats the workspace holds: the removal deletes exactly these.
+    pub chats: u32,
+    /// Their total size in bytes, from the session index. A `f64` because the
+    /// generated bindings forbid 64-bit integers on the wire (a `number` that
+    /// could lose precision): a byte count is exact in a double far past any
+    /// real session store, and the web side is what turns it into "1.7 MB". The
+    /// sum of the chats' sizes is always written, so the generated `| null` of
+    /// this contract's other measured values never arrives here.
+    pub bytes: f64,
+}
+
 /// One row of the flattened workspace tree the sidebar draws: a workspace
 /// header, then - only when the workspace is not collapsed - its chats.
 ///
