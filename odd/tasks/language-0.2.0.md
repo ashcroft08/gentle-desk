@@ -328,3 +328,20 @@ fragments in 12 files.
   statement is in the T11 report: ruling-1 family (NO_PATH_NOTICE, damaged-config
   notice), ruling 2 (prompt line), shell/pi passthrough, and the OS's/JSON's own words
   interpolated into localized sentences.
+- L10 (parent, 2026-11-14, the chain that answered L9): reviewing each slice FROM ITS
+  OWN BOUNDARY (detached HEAD at the boundary commit, candidate = previous boundary..that
+  commit) is the shape that works — the maintainer's question "no se puede dividir en
+  revisiones pequeñas?" was right, and the earlier failures were my ranges always ending
+  at the full tip. Results, in order: T1 (6 paths/447 lines) reviewed natively with
+  risk+reliability, APPROVED and acknowledged (lineage review-f675569aab400891, authority
+  burned, ordinary-repository-policy delivery); T2 (656), T3 (1056), T5+T6 (2061), T4
+  (2354), T7+T8 (4816), T9 sliver (121) all assess `not due` — the controller's own
+  budget logic covers them. The ONE due unit is T11 (31 paths/~1.7k, high via the auth
+  hot path), and it exceeds the provider's lens-context budget at every derivable size
+  (two more preflight refusals: 38a724d..7381e70 and df6740e alone, lineages
+  review-54ab2737045733bc and review-9dd90c7e677a7cae; no authority created). Chain
+  verdict: everything is reviewed except T11's commit, which is atomic and over budget —
+  upstream defect data: 447 lines pass, 1.7k fail, so the budget sits between and a
+  31-file Rust slice with a 433-line catalog file should fit an intended budget. T11's
+  compensating proof stands: catalog EN/ES pairs, channel-level Spanish pins
+  (mutation-proven), draw-site tracing, and the five green suites.
