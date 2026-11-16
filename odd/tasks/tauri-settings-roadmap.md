@@ -61,8 +61,13 @@ calendar one. Version numbers never repeat or go down (updater compares them).
   child-process chat transport, and nothing forces adoption.
 - Order, each its own slice with a real-window check:
   1. **Language (0.2.0) first**, so new UI is born bilingual instead of rewritten later.
-  2. **Live Settings sync**: `get_snapshot` plus the `config_changed` event, so panels
-     refresh while the terminal edits, instead of only when the terminal closes.
+  2. **Live Settings sync**: panels refresh while the terminal edits, instead of
+     only when the terminal closes. REVISED 2026-11-16 (rpc-settings-sync L2, L6):
+     the channel emits nothing for external edits ("No watcher. Nothing is pushed
+     except this slice's own `config_changed`") and a control child costs ~400 MB
+     and 5-10 s, so this step is built as a NATIVE FILE WATCHER over pi's config
+     files, not over the channel. The channel transport (built and reviewed in
+     rpc-settings-sync T2) resumes at step 3, the profiles and pins editor.
   3. **Profiles and pins editor**: the largest one, sliced as read+state, model and
      effort per agent, fallback-chain editing, then the per-repo pin. It is safe now
      because `set_config` writes through gentle-pi's own writers and `writeRevision`
