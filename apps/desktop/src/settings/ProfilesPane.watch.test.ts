@@ -98,6 +98,28 @@ describe('the Profiles pane and the native watcher', () => {
     expect(reads()).toBe(2)
   })
 
+  it('starts nothing after the pane goes away: a queued read is dropped', async () => {
+    const first = deferred<void>()
+    let calls = 0
+    setHandler('dispatch_intent', () => (calls++ === 0 ? first.promise : null))
+    const { unmount } = render(ProfilesPane, { props: { profiles: profiles() } })
+    await vi.waitFor(() => expect(reads()).toBe(1))
+    await vi.waitFor(() => expect(listenerCount(WATCHED)).toBe(1))
+
+    // A notice while the first read is still in flight asks for a follow-up...
+    notice(true, false)
+    await settle()
+    expect(reads()).toBe(1)
+
+    // ...and the pane goes away before that first read answers.
+    unmount()
+    first.resolve()
+    await settle()
+
+    // The in-flight read may finish, but nothing starts after the teardown.
+    expect(reads()).toBe(1)
+  })
+
   it('stops listening when the pane goes away, and reads nothing after', async () => {
     const { unmount } = render(ProfilesPane, { props: { profiles: profiles() } })
     await vi.waitFor(() => expect(listenerCount(WATCHED)).toBe(1))

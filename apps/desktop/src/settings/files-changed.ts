@@ -15,16 +15,28 @@ import { events } from '../contract/bindings'
 export type SettingsFilesGroup = 'profiles' | 'account'
 
 /**
+ * A pane's read, plus the way to stop it: `cancel()` is the pane's teardown,
+ * after which the read starts nothing - not the queued follow-up and not a late
+ * event. A read already in flight is left to finish (an IPC call is not
+ * aborted), it simply starts nothing after itself.
+ */
+export type CoalescedRead = (() => Promise<void>) & { cancel: () => void }
+
+/**
  * Wraps a pane's refresh so two reads never stack: a refresh asked for while one
  * is in flight does not start a second call, it is remembered and runs ONCE when
  * the in-flight read answers. A burst of notices therefore costs one extra read,
  * not one per notice - which matters for the Account pane, whose read is a
- * subprocess.
+ * subprocess. `cancel()` ends that: nothing starts after the pane's teardown,
+ * so no refresh runs with Settings closed.
  */
-export function coalesced(read: () => Promise<void>): () => Promise<void> {
+export function coalesced(read: () => Promise<void>): CoalescedRead {
   let inFlight = false
   let asked = false
-  return async function run(): Promise<void> {
+  let stopped = false
+
+  async function run(): Promise<void> {
+    if (stopped) return
     if (inFlight) {
       asked = true
       return
@@ -34,11 +46,18 @@ export function coalesced(read: () => Promise<void>): () => Promise<void> {
       do {
         asked = false
         await read()
-      } while (asked)
+      } while (asked && !stopped)
     } finally {
       inFlight = false
     }
   }
+
+  return Object.assign(run, {
+    cancel(): void {
+      stopped = true
+      asked = false
+    },
+  })
 }
 
 /**

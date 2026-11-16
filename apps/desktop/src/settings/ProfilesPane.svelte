@@ -76,9 +76,17 @@
 
   /**
    * While this pane is on screen, the native watcher's notice re-reads the two
-   * files it names - and unmounting the pane takes the listener with it.
+   * files it names. Unmounting takes the listener with it AND cancels the read:
+   * a follow-up a notice queued while a read was in flight is dropped, so no
+   * refresh starts after the pane is gone (T3b-2).
    */
-  $effect(() => followSettingsFiles('profiles', read))
+  $effect(() => {
+    const stop = followSettingsFiles('profiles', read)
+    return () => {
+      stop()
+      read.cancel()
+    }
+  })
 
   function choose(next: OrchestratorModeView): void {
     if (next === mode) return

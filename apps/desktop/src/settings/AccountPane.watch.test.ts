@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render } from '@testing-library/svelte'
 import type { AuthView_Serialize as AuthView } from '../contract/bindings'
 import {
+  deferred,
   handlerArgs,
   listenerCount,
   pushEvent,
@@ -68,6 +69,28 @@ describe('the Account pane and the native watcher', () => {
     notice(true, false)
     await settle()
 
+    expect(checks()).toBe(1)
+  })
+
+  it('runs nothing after the pane goes away: a queued check is dropped', async () => {
+    const first = deferred<void>()
+    let calls = 0
+    setHandler('dispatch_intent', () => (calls++ === 0 ? first.promise : null))
+    const { unmount } = render(AccountPane, { props: { auth: auth() } })
+    await vi.waitFor(() => expect(checks()).toBe(1))
+    await vi.waitFor(() => expect(listenerCount(WATCHED)).toBe(1))
+
+    // A notice while the first check is still in flight asks for a follow-up...
+    notice(false, true)
+    await settle()
+    expect(checks()).toBe(1)
+
+    // ...and the pane goes away before that first check answers.
+    unmount()
+    first.resolve()
+    await settle()
+
+    // No subprocess starts after Settings' pane is gone.
     expect(checks()).toBe(1)
   })
 

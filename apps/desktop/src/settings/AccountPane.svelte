@@ -52,11 +52,18 @@
 
   /**
    * While this pane is on screen, the native watcher's notice runs the same
-   * check - only for the shell's auth store, and never after the pane is gone,
-   * so no subprocess runs in the background with Settings closed
-   * (rpc-settings-sync T3b-2).
+   * check - only for the shell's auth store, and never after the pane is gone:
+   * unmounting drops a notice's queued check along with the listener, so no
+   * subprocess runs in the background with Settings closed (rpc-settings-sync
+   * T3b-2).
    */
-  $effect(() => followSettingsFiles('account', check))
+  $effect(() => {
+    const stop = followSettingsFiles('account', check)
+    return () => {
+      stop()
+      check.cancel()
+    }
+  })
 
   /** One provider's check as the row draws it: its word and its tone. */
   function drawn(status: ProviderStatusView): { label: string; tone: string } {
