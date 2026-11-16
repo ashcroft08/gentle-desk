@@ -72,3 +72,18 @@ rules).
   Rename + right-aligned responsive switch), recorded in
   `design/gentle-desk-v2/decisions.md` (merged as PR #174). "arranquemos ahora"
   starts this feature.
+- L2 (parent, 2026-11-16): the design commit (artboards refreshed) was reviewed
+  natively — lineage review-a15f6a769484f8a4: the refuter corroborated two
+  CRITICAl findings the parent introduced (renderHelper still dereferenced the
+  removed `#h-follow`, throwing on artboard load in BOTH artboards); one
+  bounded correction (4 diff lines: the thread now always sticks, iced-always-
+  follows), targeted validation passed, APPROVED, authority burned. Then T2+T3
+  ran as parallel writers with disjoint surfaces; their combined slice
+  (`8d5ce5c..b95033f`) reviewed natively — lineage review-332bbfbafa4c0efa,
+  APPROVED (readability+reliability), with 4 advisory findings. The maintainer
+  approved a pre-push fix batch: R3-1 (the header rename now refuses honestly
+  when no chat is foreground: `canRename`, aria-disabled pencil + reason line,
+  no silent discard) and R3-2 (closing a helper thread returns focus to the
+  list — the open card's row, else the first; roving tabindex intact) — commit
+  c43be6a; the two R2 suggestions (CSS-parser dup in tests, Mark's class map
+  placement) stay backlog.
