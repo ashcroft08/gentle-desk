@@ -179,6 +179,23 @@ fragments in 12 files.
       apps/desktop/src-tauri/Cargo.toml and apps/desktop/src-tauri/tauri.conf.json, the
       what's-new entry, the shipped note in odd/tasks/tauri-settings-roadmap.md, then
       the full verification plan. Route: writer. Commit: pending.
+      Delivered (writer, 2026-11-14): 0.2.0 in exactly the three carriers, plus the one locked
+      `gentle-desk-app` version in the workspace lock — the lock lives at the REPO ROOT
+      (`Cargo.lock`); the handoff's `apps/desktop/src-tauri/Cargo.lock` does not exist, and
+      `cargo check --workspace` rewrote the single locked line. The roadmap's 0.2.0 entry is
+      now SHIPPED-ON-BRANCH (shipped on feat/language-0.2.0 pending release). The what's-new
+      notes are NOT a repo file: latest.json embeds the release body at publish, so the 0.2.0
+      body is written then, per the 0.1.12/0.1.14 flow. No test asserts the version string
+      (the six `0.1.14` literals in the suites are fixtures, not the app's version).
+      Verification, all green: cargo test --workspace 1243 passed / 0 failed / 1 ignored
+      (gentle-core 152, gentle-backend 231, gentle-term 15, gentle-app 215, gentle-runtime
+      260, gentle-desk-app 370 = 69 lib + 301 across 82 integration targets); clippy
+      --workspace --all-targets -D warnings clean; fmt --check clean; contract_bindings green
+      WITH GENTLE_DESK_REGEN_BINDINGS=1 (bindings byte-identical — git hash-object matches
+      HEAD) and green again without the switch; vitest 634/634 in 106 files; svelte-check 0
+      errors 0 warnings; eslint clean. Commit: still pending, the writer does not commit —
+      release, tag and publish stay the maintainer's decision. The T10 real-window and
+      passthrough checks (Verification plan) stay PENDING: they need the app running.
 
 ## Verification plan
 

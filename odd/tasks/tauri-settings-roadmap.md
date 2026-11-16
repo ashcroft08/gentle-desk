@@ -33,11 +33,12 @@ calendar one. Version numbers never repeat or go down (updater compares them).
   **Usage** section drawing the subscription numbers through `pi-usage-sources`' headless
   JSON mode, terminal windows that wait with a titled tab, and a Settings dialog that no
   longer closes on a press outside.
-- 0.2.0 (next, when the maintainer says): **language** - English and Spanish for the app's own
-  words. Everything user-facing already lives in 15 copy modules (~174 exports) on the web side
-  and in ~41 Rust strings that reach the UI; the work is a keyed catalog, Rust strings as codes
-  with parameters, the Spanish catalog, and a Language section with its stored preference.
-  Not a patch: it is a capability jump, which is what a minor bump marks.
+- 0.2.0 (SHIPPED-ON-BRANCH 2026-11-14, shipped on feat/language-0.2.0 pending release):
+  **language** — English and Spanish for the app's own words: the system language on first run
+  (any `es` locale → Spanish), an instant switch that needs no restart, and both the web copy and
+  the Rust notices/errors/validations drawing from a bilingual catalog; nothing that comes from the
+  shell or pi is translated. See odd/tasks/language-0.2.0.md. Not a patch: it is a capability jump,
+  which is what a minor bump marks.
 - Dropped on 2026-11-14, by the maintainer: a preference for how the terminal opens (Windows
   Terminal already honours the user's own settings; configuring over it is ceremony) and the
   Updates pane's empty state (the "not checked yet" line lives under a second; a failure already
