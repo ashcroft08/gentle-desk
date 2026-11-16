@@ -96,11 +96,16 @@ session index, not a folder-name encoding).
       path` joins the chat row menu), S7 (all new copy bilingual with parity +
       flip tests). TDD: RED 8/8, then GREEN 10/10; vitest 664/664 in 108 files,
       eslint 0, svelte-check 0. Deviations in L9.
-- [ ] T4 (close) full verification: cargo workspace suite, clippy -D warnings, fmt,
-      bindings drift guard, vitest, svelte-check, eslint; real-window check
-      (remove with open chat, remove with chats checked state, working-chat
-      refusal, trash contains the files); roadmap + version per the maintainer's
-      call.
+- [x] T4 (close) — DONE, split: (a) full battery green on the integrated tree
+      (cargo 1268/0, clippy -D warnings, fmt, bindings drift guard byte-identical
+      with regen, vitest 664/664 then 668/668 after the fix batch, svelte-check 0,
+      eslint 0); (b) the maintainer's real-window check on the maintainer's
+      machine 2026-11-16 (npm run tauri dev): "ya probé y funciona bien" — the
+      removal dialog in both states, the gate, the teardown, the trash and the
+      row-menu copy path exercised; (c) the maintainer's decision on the review
+      findings: the three UX findings fixed pre-release (L11), the rest backlog;
+      (d) version 0.3.0 in the three carriers + the root Cargo.lock (the
+      maintainer's ruling stands: capability jump, not a patch).
 
 ## Log
 
@@ -202,3 +207,7 @@ session index, not a folder-name encoding).
   the next rescan, accepted fix-forward), R4-002 (the dialog's catch shows the
   generic line; whether the backend push carries the Err reason is for the
   real-window check).
+- L13 (maintainer, 2026-11-16): "ya probé y funciona bien" — the real-window check
+  approved (npm run tauri dev, job log clean except Chromium teardown noise). The
+  maintainer also accepted the parent's ruling chain: fix batch of the three UX
+  findings, backlog for the rest, version 0.3.0.
