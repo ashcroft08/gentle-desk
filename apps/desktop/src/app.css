@@ -1240,7 +1240,8 @@ p {
   border: 1px solid var(--border);
   border-radius: 10px;
   box-shadow: var(--shadow);
-  padding: 6px;
+  padding: 6px 0;
+  overflow: hidden;
   z-index: 15;
 }
 
@@ -1264,7 +1265,7 @@ p {
   text-align: left;
   background: transparent;
   border: 0;
-  border-radius: 6px;
+  border-radius: 0;
   padding: 7px 12px;
   font-size: 13px;
   line-height: 1.4;
