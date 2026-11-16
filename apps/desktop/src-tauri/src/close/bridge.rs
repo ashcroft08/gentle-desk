@@ -4,9 +4,10 @@
 //! [`super::flow`]'s. This is where each step names the bridge part that does
 //! the work: the executor (stop new work, stop every child), the event pump (end
 //! its threads), the session service (stop the watcher and the safety net), the
-//! session cache and the config writer. It is also where the process finally
-//! ends; the exit runs through the closure the app arms at startup, so this
-//! module names no Tauri type and a test runs it with a flag instead.
+//! Settings files' watcher of the run, the session cache and the config writer.
+//! It is also where the process finally ends; the exit runs through the closure
+//! the app arms at startup, so this module names no Tauri type and a test runs it
+//! with a flag instead.
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -18,6 +19,7 @@ use crate::config::ConfigWriter;
 use crate::effects::RuntimeExecutor;
 use crate::events::EventPump;
 use crate::sessions::SessionsService;
+use crate::settings::SettingsWatch;
 
 /// The close of a running bridge.
 pub struct BridgeSteps {
@@ -27,6 +29,10 @@ pub struct BridgeSteps {
     /// `None` in a test that only exercises the other steps: a run with no
     /// session service has no watcher and no timer to stop.
     sessions: Option<Arc<SessionsService>>,
+    /// The Settings files' watcher of this run (rpc-settings-sync T3b-1), when the
+    /// close may stop it. `None` in a test that names no watcher: then the step
+    /// has no watch of that kind to end.
+    settings: Option<Arc<SettingsWatch>>,
     /// The index cache of this run: `None` when the pi home is unknown, and then
     /// there is nothing to flush.
     shared: Option<Shared>,
@@ -47,9 +53,21 @@ impl BridgeSteps {
             executor,
             pump,
             sessions: None,
+            settings: None,
             shared,
             writer,
             exit,
+        }
+    }
+
+    /// The same close with the Settings files' watcher of the run, so it is ended
+    /// in the same step as the session watcher and therefore before the cache and
+    /// the config are written. The app always sets it; a test that names no
+    /// watcher leaves the step with only the session threads to stop.
+    pub fn with_settings_watch(self, watch: Arc<SettingsWatch>) -> Self {
+        Self {
+            settings: Some(watch),
+            ..self
         }
     }
 
@@ -84,6 +102,17 @@ impl CloseSteps for BridgeSteps {
     }
 
     fn stop_watch(&self, budget: Duration) {
+        // The Settings files' watcher goes first (rpc-settings-sync T3b-1): it only
+        // pushes a typed event and reads nothing, so it must not take any of the
+        // step's deadline from the session threads, which may still be applying a
+        // batch. Its stop is bounded like theirs, and a watcher that were wedged is
+        // abandoned - the close goes on either way.
+        if let Some(settings) = self.settings.as_ref() {
+            if !settings.stop(budget) {
+                // The flow already logged the miss; this says which watch it was.
+                eprintln!("close: the settings watcher did not end within {budget:?}");
+            }
+        }
         let Some(sessions) = self.sessions.as_ref() else {
             return;
         };

@@ -71,7 +71,10 @@ pub fn contract_builder() -> Builder<tauri::Wry> {
             commands::store_last_run_version,
             terminal_commands::open_terminal,
         ])
-        .events(tauri_specta::collect_events![contract::StateChanged,])
+        .events(tauri_specta::collect_events![
+            contract::StateChanged,
+            contract::SettingsFilesChanged,
+        ])
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -149,6 +152,12 @@ pub fn run() {
             // The session list is armed the same way, and its first pass asked
             // for here: the window opens with a list that says it is reading.
             app.state::<Bridge>().start_sessions();
+            // The Settings files' watcher (rpc-settings-sync T3b-1) starts beside
+            // it and pushes its own typed event: the Profiles and Account panes
+            // re-read when the terminal edits the files they draw. A run whose
+            // directories cannot be watched says nothing and keeps the focus
+            // refresh, so this answer is deliberately dropped.
+            let _watching = app.state::<Bridge>().start_settings_watch();
             // The close is armed last and for the same reason: its exit step is
             // the one thing here that needs the handle.
             app.state::<Bridge>().arm_close(app.handle());

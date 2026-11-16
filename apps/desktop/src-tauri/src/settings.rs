@@ -28,6 +28,7 @@ mod paths;
 mod profiles;
 mod updates;
 mod usage;
+pub mod watch;
 mod web;
 
 pub use auth::view as auth_view;
@@ -35,6 +36,7 @@ pub use paths::SettingsPaths;
 pub use profiles::view as profiles_view;
 pub use updates::{view as updates_view, PI_REGISTRY};
 pub use usage::view as usage_view;
+pub use watch::{Changed, Dirs, SettingsWatch};
 
 /// Reads one file of the machine. `Ok(None)` is a file that is not there - an
 /// auth store nobody has written yet is not a failure - and `Err` is a file that

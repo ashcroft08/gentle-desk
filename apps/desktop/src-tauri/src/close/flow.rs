@@ -114,9 +114,10 @@ pub trait CloseSteps: Send + Sync {
     fn stop_children(&self);
     /// Ends the child-event threads and waits for them, at most `budget`.
     fn join_pump(&self, budget: Duration);
-    /// Stops the session watcher and the safety-net timer, and waits at most
-    /// `budget` for their threads. Before the cache flush, so no batch asks for
-    /// a pass after the last one was written.
+    /// Stops the Settings files' watcher, the session watcher and the safety-net
+    /// timer, and waits at most `budget` for their threads. Before the cache
+    /// flush, so no batch and no notice asks for a read after the last state was
+    /// written, and before the config flush for the same reason.
     fn stop_watch(&self, budget: Duration);
     /// Writes the session index cache the throttle held back, and seals it: no
     /// pass writes it after this, so the state written here is the one the next

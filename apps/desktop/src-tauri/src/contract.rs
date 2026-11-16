@@ -1130,6 +1130,38 @@ impl tauri_specta::Event for StateChanged {
     const NAME: &'static str = "state-changed";
 }
 
+/// Which of the Settings files changed on disk since the last notice
+/// (rpc-settings-sync T3b-1, S2): a group is on when at least one file of it was
+/// written, replaced or deleted during one quiet window of the native watcher.
+///
+/// The payload names GROUPS, never paths: the panes own the files they read, and
+/// the app side never tells the web side a location. A batch that touches both
+/// files of the Profiles group and the auth store carries both, so one notice
+/// covers it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub struct SettingsFilesChangedView {
+    /// `profiles.json` or its sibling `profile-fallbacks.json` in the config
+    /// home: the Profiles pane's files.
+    pub profiles: bool,
+    /// `auth.json` in the agent directory: the Account pane's file.
+    pub account: bool,
+}
+
+/// One notice that pi's Settings files changed (typed tauri-specta event, named
+/// by [`SETTINGS_FILES_CHANGED`] below). It is emitted on its own rather than on
+/// the `state-changed` slice: the files are NOT part of `ViewState`, and the
+/// panes are the ones that decide to re-read through their own refresh
+/// commands, so the notice carries no state at all.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub struct SettingsFilesChanged(pub SettingsFilesChangedView);
+
+/// The name of the [`SettingsFilesChanged`] event on the wire.
+pub const SETTINGS_FILES_CHANGED: &str = "settings-files-changed";
+
+impl tauri_specta::Event for SettingsFilesChanged {
+    const NAME: &'static str = SETTINGS_FILES_CHANGED;
+}
+
 /// Sample contract command. Trivial by design: it exists so the generator
 /// proves that command names, camel-cased argument names and return types are
 /// typed over the same Rust definition, not re-declared by hand.
@@ -1140,5 +1172,36 @@ pub fn get_badge(chat_id: String) -> ChatBadge {
         chat_id,
         activity: ChatActivityMark::Working,
         unread: false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The event the watcher's batch travels on is pinned by its wire shape: the
+    /// name the web side listens on and the two flags it reads, and nothing else
+    /// - no path, no file name, no revision.
+    #[test]
+    fn the_settings_files_changed_event_is_two_group_flags() {
+        assert_eq!(SETTINGS_FILES_CHANGED, "settings-files-changed");
+        let changed = SettingsFilesChanged(SettingsFilesChangedView {
+            profiles: true,
+            account: false,
+        });
+        assert_eq!(
+            serde_json::to_value(changed).expect("the event serializes"),
+            serde_json::json!({ "profiles": true, "account": false })
+        );
+        assert_eq!(
+            serde_json::from_str::<SettingsFilesChangedView>(
+                r#"{"profiles":false,"account":true}"#
+            )
+            .expect("the payload the web side reads"),
+            SettingsFilesChangedView {
+                profiles: false,
+                account: true,
+            }
+        );
     }
 }

@@ -31,8 +31,9 @@ use crate::clipboard::{self, Clipboard, SystemClipboard};
 use crate::close::{self, BridgeSteps, CloseFlow};
 use crate::config::{ConfigSnapshot, ConfigWriter};
 use crate::contract::{
-    OrchestratorModeView, StateChanged, TerminalActionView, UiIntent, UpdatesStatusView,
-    UpdatesView, UsageStatusView, UsageView, ViewState,
+    OrchestratorModeView, SettingsFilesChanged, SettingsFilesChangedView, StateChanged,
+    TerminalActionView, UiIntent, UpdatesStatusView, UpdatesView, UsageStatusView, UsageView,
+    ViewState,
 };
 use crate::effects::{self, Ran, RuntimeExecutor};
 use crate::events::{EventPump, Push};
@@ -40,7 +41,10 @@ use crate::link_opener::{LinkOpener, SystemLinkOpener};
 use crate::pending::PendingFolders;
 use crate::picker::{FolderPicker, NativeFolderPicker};
 use crate::sessions::{startup, SessionsService};
-use crate::settings::{self, FileRead, ProviderProbe, SettingsSeams, VersionProbe, WebGet};
+use crate::settings::{
+    self, Changed, Dirs, FileRead, ProviderProbe, SettingsSeams, SettingsWatch, VersionProbe,
+    WebGet,
+};
 use crate::shell_install::{CommandInstaller, Installer};
 use crate::theme::SystemWindowTheme;
 use crate::window::{self, SystemWindowRecorder};
@@ -62,6 +66,11 @@ pub type Fetcher = Arc<dyn Fn(&str) -> Result<Latest, String> + Send + Sync>;
 /// startup, on "Check again" and after a successful install, and for nothing
 /// else.
 pub type LauncherProbe = Arc<dyn Fn() -> bool + Send + Sync>;
+
+/// What pushes one debounced notice of the Settings files to the web side: the
+/// typed `settings-files-changed` event in the running app, a recorder in a test.
+/// `Send + Sync` because the watcher's own thread is what calls it.
+pub type SettingsNotify = Arc<dyn Fn(Changed) -> Result<(), String> + Send + Sync>;
 
 /// Everything the bridge owns and hands to the worker threads: the state, the
 /// pump the children's events come back through, the session list's passes, the
@@ -111,6 +120,15 @@ pub struct Bridge {
     /// endpoint the updater names, named once at startup by
     /// [`Bridge::start_updates`].
     desk_endpoint: Mutex<Option<String>>,
+    /// The watcher of pi's Settings files (rpc-settings-sync T3b-1, S2): the
+    /// debounced notice that the panes' files changed on disk. Started once at
+    /// boot and stopped by the close; a run whose directories could not be
+    /// watched keeps the panes' focus refresh.
+    settings_watch: Arc<SettingsWatch>,
+    /// The one push of that watcher, installed with the window's emit step: a
+    /// no-op until then, so a notice that came before the window existed is not
+    /// a failure.
+    settings_notify: Mutex<SettingsNotify>,
 }
 
 impl Bridge {
@@ -170,6 +188,10 @@ impl Bridge {
             // files it reads and the flags the shell runs with.
             settings: SettingsSeams::new(home_choice),
             desk_endpoint: Mutex::new(None),
+            settings_watch: Arc::new(SettingsWatch::new()),
+            // Nothing to push to until the window exists: the setup step installs
+            // the real event, exactly as it installs the state's emit.
+            settings_notify: Mutex::new(Arc::new(|_changed: Changed| Ok(()))),
         };
         // Whether the launcher resolves is asked once here, through the seam, so
         // a machine with no gentle-shell is told at the first frame, not at the
@@ -288,6 +310,9 @@ impl Bridge {
         // The bridge's own pushes need the same handle the pump's do, so the two
         // are installed in the same step.
         self.arm_emit(app);
+        // The Settings files' watcher pushes an event of its own, from the window
+        // handle this step is the only place to get.
+        self.arm_settings_notify(app);
         let emit = self.emitter();
         self.pump.arm(push_via(emit.clone()));
         // The folder dialog is owned by the window, so it is modal to the app
@@ -302,6 +327,44 @@ impl Bridge {
             let view = holder.note_config_problem(message);
             push(&failure_emit, view);
         }));
+    }
+
+    /// Installs the real push of the Settings files' watcher: the typed
+    /// `settings-files-changed` event, from the same handle every other push
+    /// gets. Only the setup step has the window, so it is armed beside the state
+    /// emit.
+    fn arm_settings_notify(&self, app: &AppHandle<tauri::Wry>) {
+        let app = app.clone();
+        *lock(&self.settings_notify) =
+            Arc::new(move |changed: Changed| emit_settings_files_changed(&app, changed));
+    }
+
+    /// Starts the watcher of pi's Settings files (rpc-settings-sync T3b-1, S2),
+    /// right beside the session list's: the directory of `profiles.json` and
+    /// `profile-fallbacks.json`, and the agent directory of `auth.json`, both
+    /// resolved by the same [`SettingsPaths`](crate::settings::SettingsPaths) the
+    /// panes read through.
+    ///
+    /// The watcher runs NO subprocess and calls NO refresh command: it pushes the
+    /// typed event, and the panes that are mounted decide to re-read through
+    /// their own commands (T3b-2). That is what keeps `auth check --no-refresh`
+    /// from running in the background while the Settings dialog is closed.
+    ///
+    /// Answers whether a watch runs. A run that could not watch anything is not
+    /// told to the user: the panes keep the focus refresh they have today. The
+    /// close stops it through [`Bridge::arm_close`]'s steps, in the same bounded
+    /// step as the session watcher.
+    pub fn start_settings_watch(&self) -> bool {
+        let dirs = Dirs::of(&self.settings.paths);
+        let notify = lock(&self.settings_notify).clone();
+        let on_change: settings::watch::OnChange = Arc::new(move |changed| {
+            if let Err(error) = notify(changed) {
+                // The web side missed one notice: the panes keep the focus
+                // refresh, so this is a log line and nothing else.
+                eprintln!("settings-files-changed could not be emitted: {error}");
+            }
+        });
+        self.settings_watch.start(&dirs, on_change)
     }
 
     /// Announces the list's emit step and boots the refresh of this run: the
@@ -380,8 +443,11 @@ impl Bridge {
             ),
         )
         // The watcher and the safety net stop before the cache write: a batch
-        // must not ask for a pass after the last state was written.
-        .with_sessions(Arc::clone(&self.sessions));
+        // must not ask for a pass after the last state was written. The Settings
+        // files' watcher stops in the same step (rpc-settings-sync T3b-1), for the
+        // same reason: its notice must not ask a pane to read after the flush.
+        .with_sessions(Arc::clone(&self.sessions))
+        .with_settings_watch(Arc::clone(&self.settings_watch));
         // Where and how big the window was is a step of the close of its own,
         // before the config flush: only this arm has the window, and a run
         // without one closes without recording anything.
@@ -943,6 +1009,20 @@ pub(crate) fn emit_state(app: &AppHandle<tauri::Wry>, view: &ViewState) -> Resul
     StateChanged(view.clone())
         .emit(app)
         .map_err(|error| error.to_string())
+}
+
+/// The one push of the Settings files' watcher: the typed event the web side
+/// listens on, carrying which groups changed and no path at all.
+pub(crate) fn emit_settings_files_changed(
+    app: &AppHandle<tauri::Wry>,
+    changed: Changed,
+) -> Result<(), String> {
+    SettingsFilesChanged(SettingsFilesChangedView {
+        profiles: changed.profiles,
+        account: changed.account,
+    })
+    .emit(app)
+    .map_err(|error| error.to_string())
 }
 
 /// One command this slice exposes: fold the intent, push the new slice and

@@ -124,6 +124,7 @@ export const commands = {
 
 /** Events */
 export const events = {
+	settingsFilesChanged: makeEvent<SettingsFilesChanged, SettingsFilesChanged>("settings-files-changed"),
 	stateChanged: makeEvent<StateChanged_Serialize, StateChanged_Deserialize>("state-changed"),
 };
 
@@ -1024,6 +1025,35 @@ export type SessionsWindow_Serialize = {
 	 */
 	total: number,
 	rows: SessionTreeRow_Serialize[],
+};
+
+/**
+ *  One notice that pi's Settings files changed (typed tauri-specta event, named
+ *  by [`SETTINGS_FILES_CHANGED`] below). It is emitted on its own rather than on
+ *  the `state-changed` slice: the files are NOT part of `ViewState`, and the
+ *  panes are the ones that decide to re-read through their own refresh
+ *  commands, so the notice carries no state at all.
+ */
+export type SettingsFilesChanged = SettingsFilesChangedView;
+
+/**
+ *  Which of the Settings files changed on disk since the last notice
+ *  (rpc-settings-sync T3b-1, S2): a group is on when at least one file of it was
+ *  written, replaced or deleted during one quiet window of the native watcher.
+ * 
+ *  The payload names GROUPS, never paths: the panes own the files they read, and
+ *  the app side never tells the web side a location. A batch that touches both
+ *  files of the Profiles group and the auth store carries both, so one notice
+ *  covers it.
+ */
+export type SettingsFilesChangedView = {
+	/**
+	 *  `profiles.json` or its sibling `profile-fallbacks.json` in the config
+	 *  home: the Profiles pane's files.
+	 */
+	profiles: boolean,
+	/**  `auth.json` in the agent directory: the Account pane's file. */
+	account: boolean,
 };
 
 /**
