@@ -1,12 +1,14 @@
 <script lang="ts">
-  // The helpers view of one chat: the counters line Rust spells and one card per
-  // delegated helper, or - when a card is selected and its thread arrived - that
-  // helper's thread in place of the list (T7b-2). The thread is iced's drawer:
-  // Back sends CloseHelper and the panel is the list again.
+  // The helpers view of one chat, as 01b draws it (T3): two columns, the helper
+  // list always on the left and the selected helper's thread on the right.
+  // Selecting a card swaps the right column in place - the list is never
+  // replaced, so the reader keeps walking it with the keyboard while a thread is
+  // drawn beside it.
   //
-  // The panel owns the two focus moves the switch needs: opening the thread puts
-  // the focus on its Back control (the card is gone), and closing it puts the
-  // focus back on the card that was open.
+  // The counters line is Rust's text and stays above the list; a chat with no
+  // helper keeps the plain line instead of an empty two-column shell. The thread
+  // bar's Back is iced's CloseHelper: it closes the thread and the list stays as
+  // it is.
   import { dispatchIntent } from '../bridge'
   import type {
     HelperThreadView as HelperThread,
@@ -31,10 +33,10 @@
   } = $props()
 
   /**
-   * The thread the panel draws: only the selected card's own. A missing thread
-   * (the helper left the list, or the push has not caught up) or one that names
-   * another helper keeps the list, so the panel never draws a stranger's
-   * transcript under the selected card.
+   * The thread the right column draws: only the selected card's own. A missing
+   * thread (the helper left the list, or the push has not caught up) or one that
+   * names another helper leaves the column empty, so the panel never draws a
+   * stranger's transcript under the selected card.
    */
   const open = $derived(thread !== null && selected !== null && thread.id === selected ? thread : null)
 
@@ -49,25 +51,11 @@
   /** The one card in the tab order: focus, else the selection, else the first. */
   const active = $derived(focused ?? selected ?? cards[0]?.id ?? null)
 
-  /** The card the open thread belongs to, kept to give it the focus back. */
-  let openCard: string | null = null
-
-  // Opening the thread hands the focus to its Back control (the thread does
-  // that when it mounts); closing it hands the focus back to the card that was
-  // open, which is what a reader who pressed Enter expects.
-  $effect(() => {
-    const now = open?.id ?? null
-    if (now === openCard) return
-    const left = openCard
-    openCard = now
-    if (now === null && left !== null) moveTo(left)
-  })
-
   function select(id: string): void {
     void dispatchIntent({ type: 'SelectHelper', data: { helper_id: id } })
   }
 
-  /** Back from a helper's thread to the list, iced's only way out. */
+  /** Back from a helper's thread: iced's CloseHelper, whose list stays drawn. */
   function back(): void {
     void dispatchIntent({ type: 'CloseHelper' })
   }
@@ -107,17 +95,18 @@
   }
 </script>
 
-<div class="panel" class:thread={open !== null}>
-  {#if open !== null}
-    <!-- The thread replaces the list and its counters: the bar names the helper
-         and the counters are the list's, as iced draws them. -->
-    <HelperThreadView thread={open} onBack={back} />
-  {:else}
-    <!-- The counters line is Rust's own text: no counter is spelled again here. -->
-    <p class="counters">{helpers.summary_line}</p>
-    {#if cards.length === 0}
+<div class="panel">
+  {#if cards.length === 0}
+    <!-- No helper to select: the plain line, never an empty two-column shell. -->
+    <div class="plain">
+      <p class="counters">{helpers.summary_line}</p>
       <p class="empty">{copy.noHelpers}</p>
-    {:else}
+    </div>
+  {:else}
+    <!-- The list column (01b's `.hl`): the counters line is Rust's own text
+         and no counter is spelled again here. -->
+    <div class="listcol">
+      <p class="counters">{helpers.summary_line}</p>
       <div class="list" role="listbox" aria-label={copy.listLabel} bind:this={list}>
         {#each cards as card (card.id)}
           <HelperCard
@@ -129,14 +118,38 @@
           />
         {/each}
       </div>
-    {/if}
+    </div>
+    <!-- The thread column (01b's `.ht`): the selected helper's thread, or the
+         empty column while the push has not arrived. -->
+    <div class="threadcol">
+      {#if open !== null}
+        <HelperThreadView thread={open} onBack={back} />
+      {/if}
+    </div>
   {/if}
 </div>
 
 <style>
+  /* 01b's `.hv`: the list column takes what it needs up to 280px, the thread
+     takes the rest; a narrow window pins the list at its 200px floor. */
   .panel {
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(200px, 280px) 1fr;
     flex: 1 1 0;
+    height: 100%;
+    min-height: 0;
+  }
+
+  @media (max-width: 1000px) {
+    .panel {
+      grid-template-columns: 200px 1fr;
+    }
+  }
+
+  /* The empty chat keeps the single padded column it always drew. */
+  .plain {
+    grid-column: 1 / -1;
+    display: flex;
     flex-direction: column;
     gap: 8px;
     min-height: 0;
@@ -144,22 +157,36 @@
     overflow: auto;
   }
 
-  /* The thread fills the panel and scrolls its own body; the list pads itself. */
-  .panel.thread {
-    gap: 0;
-    padding: 0;
-    overflow: hidden;
+  /* 01b's `.hl`: the column's own padding, its border and its surface. */
+  .listcol {
+    min-height: 0;
+    padding: 10px;
+    overflow: auto;
+    border-right: 1px solid var(--border);
+    background: var(--surface);
   }
+
   .counters,
   .empty {
     margin: 0;
-    padding: 0 10px;
     color: var(--muted);
     font-size: 12px;
   }
 
+  .counters {
+    margin-bottom: 6px;
+  }
+
   .empty {
     font-size: 13px;
+  }
+
+  /* 01b's `.ht`: the thread fills the column and scrolls its own body. */
+  .threadcol {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
   }
 
   .list {
