@@ -136,4 +136,36 @@ describe('the helpers panel two columns', () => {
 
     expect(document.activeElement).toBe(options()[1])
   })
+
+  it('returns the focus to the open card when the thread closes', async () => {
+    const view = draw('h1', helperThread({ id: 'h1' }))
+    // A keyboard user reaches Back, so that button holds the focus when the
+    // thread closes and takes it off the screen with it.
+    const back = screen.getByRole('button', { name: copy.back })
+    back.focus()
+    await fireEvent.click(back)
+
+    await view.rerender({ helpers: helpersPanel(ROWS), selected: null, thread: null })
+
+    expect(screen.queryByRole('region', { name: copy.threadLabel })).toBeNull()
+    // The card that was open takes the focus back, and it stays the list's one
+    // tab stop: the roving tabindex is not left on a card the keyboard is not on.
+    expect(document.activeElement).toBe(options()[0])
+    expect(options()[0].getAttribute('tabindex')).toBe('0')
+    expect(options()[1].getAttribute('tabindex')).toBe('-1')
+  })
+
+  it('returns the focus to the first row when the open card is gone', async () => {
+    const view = draw('h2', helperThread({ id: 'h2' }))
+    const back = screen.getByRole('button', { name: copy.back })
+    back.focus()
+    await fireEvent.click(back)
+
+    // The helper left the list while its thread was open, so the card that was
+    // open has no row to take the focus back.
+    await view.rerender({ helpers: helpersPanel([ROWS[0]]), selected: null, thread: null })
+
+    expect(document.activeElement).toBe(options()[0])
+    expect(options()[0].getAttribute('tabindex')).toBe('0')
+  })
 })

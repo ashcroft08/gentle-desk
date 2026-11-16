@@ -49,7 +49,9 @@
   // push and a chat switch, and the next start begins on Chat.
   let tab = $state<ViewTab>('chat')
 
-  /** The header's pencil (chat-chrome-helpers S2): the same rename the row sends. */
+  /** The header's pencil (chat-chrome-helpers S2): the same rename the row sends.
+   * The header is told whether there is a chat to rename (`canRename`), so the one
+   * state that has none says why there instead of dropping the name here. */
   function renameChat(name: string): void {
     const session = chat.chat
     if (session === null) return
@@ -169,6 +171,7 @@
         onToggleSidebar={() => (manualCollapsed = !sidebarCollapsed)}
         onSelect={(next) => (tab = next)}
         onRename={renameChat}
+        canRename={chat.chat !== null}
       />
       {#if shownNotices.length > 0}
         <div class="notices">

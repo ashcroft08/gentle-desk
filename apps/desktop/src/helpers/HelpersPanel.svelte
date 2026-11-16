@@ -46,6 +46,11 @@
   /** The card the keyboard is on: the selected one, else the first. */
   let focused = $state<string | null>(null)
   let list = $state<HTMLElement | null>(null)
+  /**
+   * The card whose thread the right column drew, so closing it can give the
+   * keyboard back to the list.
+   */
+  let drawn: string | null = null
 
   const cards = $derived(helpers.tasks)
   /** The one card in the tab order: focus, else the selection, else the first. */
@@ -68,6 +73,21 @@
       if (node.dataset.helperId === id) node.focus()
     }
   }
+
+  // Closing the thread - Back, or a push that clears the selection - takes the
+  // control the keyboard was on off the screen with it, so the focus goes back to
+  // the list: the card that was open if its row is still there, else the first
+  // row. The roving tab stop moves with it, so the list keeps one tab stop.
+  $effect(() => {
+    const shown = open?.id ?? null
+    const previous = drawn
+    drawn = shown
+    // Only a close is answered here: an opening thread keeps the caret where the
+    // user left it, and so does a selection that moves to another card.
+    if (shown !== null || previous === null) return
+    const target = cards.some((card) => card.id === previous) ? previous : (cards[0]?.id ?? null)
+    if (target !== null) moveTo(target)
+  })
 
   /**
    * The listbox's key rule: the arrows walk the cards, Home and End jump to the

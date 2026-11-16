@@ -11,10 +11,15 @@
   // commits - and reports the committed name through `onRename`, which the shell
   // sends as the row's own rename intent. The house has no pencil glyph in
   // `icons/shapes.ts`, so the artboard's Lucide outline is inlined here.
+  //
+  // The pencil needs a chat to rename: drawn before the foreground chat reached
+  // the shell, there is none. It is then `aria-disabled` and described by the line
+  // that says why, so it stays reachable by the keyboard and NOTHING is silently
+  // dropped - the field never opens, so no typed name is committed into a void.
   import SidebarToggle from './SidebarToggle.svelte'
   import ViewTabs from './ViewTabs.svelte'
   import { language } from '../i18n/language.svelte'
-  import { chatCopy } from './copy'
+  import { RENAME_WHY_ID, chatCopy } from './copy'
   import type { ViewTab } from './tabs'
 
   let {
@@ -22,6 +27,7 @@
     tab = 'chat',
     running = 0,
     collapsed = false,
+    canRename = true,
     onToggleSidebar = () => {},
     onSelect = () => {},
     onRename = () => {},
@@ -33,6 +39,9 @@
     running?: number
     /** Whether the sidebar is collapsed, for the toggle's `aria-expanded`. */
     collapsed?: boolean
+    /** Whether there is a chat the pencil can rename (a header drawn before the
+     * foreground chat arrives has none). */
+    canRename?: boolean
     onToggleSidebar?: () => void
     /** The view the user asked for. */
     onSelect?: (tab: ViewTab) => void
@@ -58,6 +67,9 @@
   })
 
   function startRename(): void {
+    // No chat to rename: the pencil is `aria-disabled` and says why, so the click
+    // does nothing and the field never opens (chat-chrome-helpers S2).
+    if (!canRename) return
     draft = title
     renaming = true
   }
@@ -110,6 +122,8 @@
       type="button"
       class="ic"
       aria-label={copy.renameChat}
+      aria-disabled={canRename ? undefined : 'true'}
+      aria-describedby={canRename ? undefined : RENAME_WHY_ID}
       data-tip={copy.renameChat}
       onclick={startRename}
     >
@@ -121,6 +135,11 @@
         <path d="m15 5 4 4" />
       </svg>
     </button>
+    {#if !canRename}
+      <!-- Why the pencil renames nothing, which is what the pencil is described
+           by: the faded state is never the only signal. -->
+      <p class="rn-why" id={RENAME_WHY_ID}>{copy.renameReason}</p>
+    {/if}
   {/if}
   <span class="sp"></span>
   <ViewTabs {tab} {running} {onSelect} />
@@ -136,5 +155,18 @@
     stroke-width: 1.8;
     stroke-linecap: round;
     stroke-linejoin: round;
+  }
+
+  /* The reason the pencil cannot rename: the row is one line, so it takes what
+     is left of the title's room and is cut by CSS like the title itself. */
+  .rn-why {
+    flex: 0 1 auto;
+    min-width: 0;
+    margin: 0 8px;
+    overflow: hidden;
+    color: var(--muted);
+    font-size: 12px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 </style>

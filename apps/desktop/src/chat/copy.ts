@@ -31,6 +31,11 @@ export interface ChatCopy {
    */
   chatName: string
   /**
+   * Why the pencil cannot rename right now: drawn as the line the pencil is
+   * described by while there is no chat to rename (chat-chrome-helpers S2).
+   */
+  renameReason: string
+  /**
    * The working badge's accessible name: one helper is singular, every other
    * count plural. The badge is drawn only while something runs, so this is never
    * asked for zero.
@@ -44,6 +49,7 @@ const ENGLISH: ChatCopy = {
   tabs: { chat: 'Chat', helpers: 'Helpers' },
   renameChat: 'Rename chat',
   chatName: 'Chat name',
+  renameReason: 'No chat is open to rename.',
   workingBadge: (running) => (running === 1 ? '1 helper working' : `${running} helpers working`),
 }
 
@@ -54,9 +60,16 @@ const SPANISH: typeof ENGLISH = {
   tabs: { chat: 'Chat', helpers: 'Ayudantes' },
   renameChat: 'Renombrar el chat',
   chatName: 'Nombre del chat',
+  renameReason: 'Ningún chat abierto para renombrar.',
   workingBadge: (running) =>
     running === 1 ? '1 ayudante trabajando' : `${running} ayudantes trabajando`,
 }
+
+/**
+ * The id of the line that says why the pencil cannot rename; the pencil is
+ * described by it (the composer's `SEND_WHY_ID` pattern, chat-chrome-helpers S2).
+ */
+export const RENAME_WHY_ID = 'chat-rename-why'
 
 /** The chat header's own words in `language`, the whole dictionary at once (D4). */
 export function chatCopy(language: LanguageView): typeof ENGLISH {

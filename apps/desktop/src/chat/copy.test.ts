@@ -18,6 +18,8 @@ const ENGLISH = {
   // name its field carries (the row's own field word, reused).
   renameChat: 'Rename chat',
   chatName: 'Chat name',
+  // Why the pencil renames nothing while no chat is open.
+  renameReason: 'No chat is open to rename.',
 }
 
 /** The Spanish words: neutral Spanish, no voseo, no regionalisms, accents kept. */
@@ -27,6 +29,7 @@ const SPANISH = {
   tabs: { chat: 'Chat', helpers: 'Ayudantes' },
   renameChat: 'Renombrar el chat',
   chatName: 'Nombre del chat',
+  renameReason: 'Ningún chat abierto para renombrar.',
 }
 
 /** The one tab both languages spell the same. */
@@ -40,6 +43,7 @@ function words(language: 'en' | 'es'): unknown {
     tabs: copy.tabs,
     renameChat: copy.renameChat,
     chatName: copy.chatName,
+    renameReason: copy.renameReason,
   }
 }
 
@@ -59,6 +63,7 @@ describe('the chat copy', () => {
     expect(spanish.tabsLabel).not.toBe(english.tabsLabel)
     expect(spanish.renameChat).not.toBe(english.renameChat)
     expect(spanish.chatName).not.toBe(english.chatName)
+    expect(spanish.renameReason).not.toBe(english.renameReason)
     expect(Object.keys(spanish.tabs).sort()).toEqual(Object.keys(english.tabs).sort())
     for (const tab of ['chat', 'helpers'] as const) {
       if (SAME_IN_BOTH.has(tab)) {

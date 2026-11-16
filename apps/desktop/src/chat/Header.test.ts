@@ -8,6 +8,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/svelte'
 import Header from './Header.svelte'
+import { RENAME_WHY_ID, chatCopy } from './copy'
 
 afterEach(cleanup)
 
@@ -154,5 +155,31 @@ describe('Header', () => {
     await fireEvent.keyDown(field(), { key: 'Enter' })
 
     expect(onRename).not.toHaveBeenCalled()
+  })
+
+  it('says why the pencil cannot rename while no chat is open, and opens nothing', async () => {
+    const onRename = vi.fn()
+    render(Header, { props: { title: '', canRename: false, onRename } })
+
+    // The house's disabled control: `aria-disabled`, still in the tab order, and
+    // described by the line that says why (the states board's rule).
+    expect(pencil().getAttribute('aria-disabled')).toBe('true')
+    expect(pencil().getAttribute('aria-describedby')).toBe(RENAME_WHY_ID)
+    expect(screen.getByText(chatCopy('en').renameReason).id).toBe(RENAME_WHY_ID)
+
+    pencil().focus()
+    await fireEvent.click(pencil())
+
+    // No field opens, so no name can be committed and dropped on the way out.
+    expect(screen.queryByRole('textbox', { name: 'Chat name' })).toBeNull()
+    expect(onRename).not.toHaveBeenCalled()
+  })
+
+  it('draws no reason and an enabled pencil while there is a chat to rename', () => {
+    render(Header, { props: { title: 'Idle one' } })
+
+    expect(document.getElementById(RENAME_WHY_ID)).toBeNull()
+    expect(pencil().getAttribute('aria-disabled')).toBeNull()
+    expect(pencil().getAttribute('aria-describedby')).toBeNull()
   })
 })
