@@ -15,15 +15,17 @@
 //! consumer, no filter on the app's stream.
 //!
 //! [`HostDesktopChannel`] is the real [`DesktopChannel`]: it writes the request
-//! through the existing routing (`ChatHost::send`) and waits on the hub with a
-//! bounded deadline. Every way it can fail is a typed [`ChannelReply`], so a
+//! through the existing routing (`ChatHost::send`) and waits on the hub, all
+//! under one deadline that covers the write as well as the answer. Every way it
+//! can fail is a typed [`ChannelReply`], so a
 //! child that ignores the command degrades to today's behaviour instead of
 //! breaking a chat.
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
 use std::sync::{Arc, Mutex, MutexGuard};
-use std::time::Duration;
+use std::thread;
+use std::time::{Duration, Instant};
 
 use gentle_core::rpc::{
     parse_widget_payload, widget_payload, ChannelReply, DesktopChannel, DesktopRequest, RpcEvent,
@@ -189,10 +191,36 @@ impl DesktopChannel for HostDesktopChannel {
         }
         // Registered before the write, so an answer can never arrive first.
         let wait = self.host.watch_desktop(&self.key, request.request_id());
-        if self.host.send(&self.key, &request.command()).is_err() {
-            return ChannelReply::Closed;
+        let started = Instant::now();
+        // One deadline covers the whole exchange, the write included: a child
+        // that has stopped reading its stdin parks `ChatHost::send` inside the
+        // pipe for as long as it likes, so the write runs on a thread of its
+        // own and this call waits for that thread only while the deadline
+        // lasts. A write that does not finish in time is abandoned - its
+        // thread ends when the pipe drains or the child goes away, and it holds
+        // no lock the host needs - and reported as the same timeout the wait
+        // returns, so the caller never blocks past the deadline (R3-1).
+        let (done, finished) = mpsc::channel();
+        let writer = {
+            let host = Arc::clone(&self.host);
+            let key = self.key.clone();
+            let command = request.command();
+            thread::spawn(move || {
+                let _ = done.send(host.send(&key, &command).is_ok());
+            })
+        };
+        // Detached: the abandoned writer is not joined, so a parked write can
+        // never hold the caller.
+        drop(writer);
+        match finished.recv_timeout(self.deadline) {
+            Ok(true) => {}
+            Ok(false) => return ChannelReply::Closed,
+            Err(RecvTimeoutError::Timeout) => return ChannelReply::Timeout,
+            // The writer never gave a verdict, so nothing more arrives.
+            Err(RecvTimeoutError::Disconnected) => return ChannelReply::Closed,
         }
-        match wait.recv_timeout(self.deadline) {
+        // Whatever the write left of the deadline is what the answer gets.
+        match wait.recv_timeout(self.deadline.saturating_sub(started.elapsed())) {
             Ok(reply) => reply,
             Err(RecvTimeoutError::Timeout) => ChannelReply::Timeout,
             Err(RecvTimeoutError::Disconnected) => ChannelReply::Closed,

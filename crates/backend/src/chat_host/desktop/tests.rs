@@ -126,6 +126,44 @@ fn the_prompt_reaches_the_child_and_its_widget_answers_it() {
 }
 
 #[test]
+fn a_write_that_blocks_past_the_deadline_times_out_and_leaves_no_waiter() {
+    let (blocked, gate) = FakeSpawner::with_blocked_writes(chat());
+    let spawner = Arc::new(blocked.with_interactive());
+    let host = host_with(&spawner);
+    host.open(chat()).expect("the child starts");
+    let deadline = Duration::from_millis(50);
+    let channel = host.desktop_channel(chat()).with_deadline(deadline);
+
+    let (replies, replied) = std::sync::mpsc::channel();
+    let asker = thread::spawn(move || {
+        let _ = replies.send(DesktopChannel::exchange(&channel, &get_config()));
+    });
+    // The child has stopped reading: the write is parked inside its pipe.
+    gate.wait_until_parked(1);
+    let asked = Instant::now();
+    let reply = replied.recv_timeout(deadline * 10);
+    let blocked_for = asked.elapsed();
+    // Released before asserting, so a failing run leaves no parked thread.
+    gate.release();
+
+    // A child that ignores the command degrades to today's timeout instead of
+    // hanging the caller past the exchange's own deadline.
+    assert_eq!(
+        reply.expect("the exchange must not block past its deadline"),
+        ChannelReply::Timeout
+    );
+    assert!(
+        blocked_for < deadline * 10,
+        "a blocked write must be bounded by the deadline, took {blocked_for:?}"
+    );
+    assert!(
+        lock(&host.desktop.waits).is_empty(),
+        "a timed-out exchange must leave no waiter behind"
+    );
+    asker.join().expect("the asker ends");
+}
+
+#[test]
 fn a_child_that_ignores_the_prompt_times_out_on_a_bounded_wait() {
     let (spawner, host) = live(true);
     let request = get_config();
