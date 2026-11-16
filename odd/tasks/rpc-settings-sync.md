@@ -121,3 +121,17 @@ editor and the subagents/jobs slices.
   channel — the earlier roadmap claim that helper Stop has no backend was true only
   of the app's own contract (chat-level Abort); the feature can be built on the
   channel.
+- L5 (maintainer, 2026-11-16): the T3 architecture question — which process answers
+  the sync's snapshot, since the channel belongs to a pi child and the stores
+  (profiles, pins) are global. Options: (1) reuse an open chat's child, (2) a
+  temporary control child alive only while the Settings dialog is open, (3) a
+  permanent control child. The maintainer asked for the parent's recommendation and
+  accepted it: OPTION 2, "con spike primero". Rationale: sync and the next slice
+  (the profiles/pins editor with `set_config`) both live in the Settings dialog;
+  no permanent process; works with no chat open; per-chat features (subagents,
+  jobs, helper Stop) use each chat's own child. The engine is built against a
+  swappable channel provider so the choice can change without a rewrite. The spike
+  comes FIRST and runs only in a throwaway sandbox home: (a) spawn-to-answer
+  latency of a cold child, (b) the tree's memory once ready, (c) whether answering
+  `/gentle:desktop` prompts creates any session file (the control child must never
+  dirty the maintainer's chat history).
