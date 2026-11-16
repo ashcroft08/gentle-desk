@@ -73,18 +73,29 @@ session index, not a folder-name encoding).
       sync re-run first. Canvas comment senflglr applied (button label without the
       parenthetical). The maintainer chose **02-evidence-disclosure (B)** for
       implementation — the handoff's chosen artboard; 01 and 03 are alternatives.
-- [ ] T2 (S2, S4, S5, S7) Rust core: per-workspace chat count + byte size from the
-      session index (expose per-file size the store already caches); bulk delete
-      trash-first (`trash` dep, fallback `remove_file`) extending
-      `session_delete.rs`; `remove_workspace` flow: refusal while a workspace chat
-      is WORKING, close-and-drop open idle children first, then bulk delete, then
-      forget the bookmark; bilingual catalog messages for every new Rust-drawn
-      notice. TDD; the trash move is pinned by a test with a temp store.
-- [ ] T3 (S1, S3, S7, S8) web: `...` menu on `WorkspaceHeaderRow`; the removal
-      dialog per the approved artboard and S3's anatomy; `DeleteChatDialog`
-      upgraded to the same anatomy (elided mono path, bold scope, right-aligned
-      actions, `Copy file path` in the chat row menu); bilingual copy + flip tests.
-      Route: writer, after T2's bindings.
+- [x] T2 (S2, S4, S5, S7) Rust core — DONE, commit 8713e43. Writer report: S4
+      complete (session_delete is trash-first with unlink fallback, `TrashMoves`
+      seam + `OsTrash`, `trash 5.3.0` dep), S2 complete (SessionEntry.bytes from
+      the cached size; the offer is its own command `workspace_removal_offer`
+      returning `WorkspaceRemovalView { key, path, label, chats, bytes: f64 }` —
+      deviations recorded in L8), S5 complete (`workspace_remove::remove`: refuse
+      while a workspace chat is WORKING → close open idle children via
+      CloseProcess → bulk delete trash-first → forget the bookmark; stop on first
+      refused delete keeps the bookmark), S7 complete (`remove_workspace_working_refusal`,
+      `workspace_removal_failed` in both columns, asserted en+es). TDD: RED
+      observed (E0432/E0425/E0599/E0609, specta BigInt ban moved bytes→f64);
+      GREEN: workspace 106 suites 0 failed, clippy -D warnings, fmt, bindings
+      drift guard byte-identical with and without regen.
+- [x] T3 (S1, S3, S7, S8) web — DONE, commit 3721764. Writer report: S8 (the
+      header row's `...` menu, its one destructive item, circle-plus intact, D5
+      note rewritten), S1 (RemoveWorkspaceDialog per artboard B: 0-chat = plain
+      Remove, N-chat = one destructive `Delete N chats and remove` sending
+      `remove_workspace(path, true)`; no checkbox), S3 (shared anatomy in both
+      dialogs: question title, bold-scope consequence, plain elided mono path —
+      no boxed `.dlg code`, no inner card, right-aligned actions; `Copy file
+      path` joins the chat row menu), S7 (all new copy bilingual with parity +
+      flip tests). TDD: RED 8/8, then GREEN 10/10; vitest 664/664 in 108 files,
+      eslint 0, svelte-check 0. Deviations in L9.
 - [ ] T4 (close) full verification: cargo workspace suite, clippy -D warnings, fmt,
       bindings drift guard, vitest, svelte-check, eslint; real-window check
       (remove with open chat, remove with chats checked state, working-chat
@@ -128,3 +139,24 @@ session index, not a folder-name encoding).
   chosen one; T3 maps its parts to the real stack (bits-ui dialog + the house
   tokens of design/system.md), never copying the artboard HTML. T2 (Rust core)
   runs first so the dialog draws on real bindings.
+- L8 (parent, 2026-11-16): T2 delivered by the writer with two approved
+  deviations: (a) the offer is its own command `workspace_removal_offer` reading
+  the index at offer time, NOT a `WorkspaceRowView.chat_bytes` field — closer to
+  S2's "the size comes from the session index" and it avoided touching
+  SessionItem literals outside the surfaces; the authorized sessions.rs/state.rs/
+  tree.rs/window.rs paths were not needed. (b) `bytes` is `f64` on the wire
+  (Specta forbids exporting 64-bit integers; the contract's measured-value
+  channel). Slice volume ~465 source + ~860 test lines, above the ~400 guide
+  because flow and exposure were authorized together; the boundary is recorded
+  here and the web slice follows as T3. Path widening mid-task was approved by
+  the parent (contract/bindings, commands/lib registration, workspace_remove.rs).
+- L9 (parent, 2026-11-16): T3's two approved deviations: (a) the disclosure lists
+  chat TITLES with the aggregate size in the summary — the offer carries no
+  per-chat bytes, so no row sizes are drawn (a folded or half-read page draws the
+  consequence line alone, pinned by a test); per-row sizes are a future
+  refinement of the contract if the maintainer asks. (b) The removal command
+  wrappers live in `sidebar/removal.ts` because `bridge.ts` was outside the
+  surfaces; moving them later is call-site-neutral. Open point carried to T4's
+  real-window review: the delete-chat dialog still shows its elided path beside
+  the new `Copy file path` row-menu item — dropping the path is a one-line
+  removal if the maintainer prefers S3's letter.
