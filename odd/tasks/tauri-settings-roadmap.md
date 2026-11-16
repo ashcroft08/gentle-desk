@@ -33,7 +33,7 @@ calendar one. Version numbers never repeat or go down (updater compares them).
   **Usage** section drawing the subscription numbers through `pi-usage-sources`' headless
   JSON mode, terminal windows that wait with a titled tab, and a Settings dialog that no
   longer closes on a press outside.
-- 0.2.0 (SHIPPED-ON-BRANCH 2026-11-14, shipped on feat/language-0.2.0 pending release):
+- 0.2.0 (RELEASED 2026-11-16, tag v0.2.0):
   **language** — English and Spanish for the app's own words: the system language on first run
   (any `es` locale → Spanish), an instant switch that needs no restart, and both the web copy and
   the Rust notices/errors/validations drawing from a bilingual catalog; nothing that comes from the
