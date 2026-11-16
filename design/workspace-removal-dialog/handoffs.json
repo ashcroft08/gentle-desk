@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "chosen": "02-evidence-disclosure.html",
+  "handoffs": {
+    "02-evidence-disclosure.html": {
+      "status": "in_progress",
+      "queued": false,
+      "sentAt": "2026-11-16T03:01:53.675Z",
+      "startedAt": "2026-11-16T03:02:25.827Z",
+      "implementedAt": null,
+      "feature": "odd/tasks/workspace-removal.md",
+      "note": "Artboard B chosen by the maintainer. Implementation started: T2 (Rust core: per-workspace count+size, trash-first bulk delete, remove flow with child teardown, bilingual catalog) runs first; T3 (web: row menu + dialog per this artboard) follows on its bindings."
+    }
+  }
+}

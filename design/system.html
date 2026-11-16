@@ -2,101 +2,195 @@
 <html lang="en" data-theme="dark">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>gentle-desk — system (sourced from theme.css + app.css)</title>
+<title>gentle-desk design system</title>
 <style>
-  :root, [data-theme='dark']{--bg:#0e1116;--surface:#151a21;--surface2:#1c222b;--border:#2b333d;--text:#e4e8ee;--muted:#9aa4b2;--faint:#7d8593;--accent:#7aa2f7;--tint:rgba(122,162,247,.14);--success:#7edc9a;--warning:#e7b455;--danger:#ff8585;--shadow:0 8px 24px rgba(0,0,0,.45)}
-  [data-theme='light']{--bg:#f2f4f7;--surface:#ffffff;--surface2:#e9edf2;--border:#cfd5dd;--text:#17202a;--muted:#576272;--faint:#6b7686;--accent:#2e5bd7;--tint:rgba(46,91,215,.1);--success:#166e38;--warning:#8a5800;--danger:#c22f37;--shadow:0 8px 24px rgba(23,32,42,.18)}
-  [data-theme='Gentle']{--bg:#06080f;--surface:#06080f;--surface2:#0d0f14;--border:#313342;--text:#f3f6f9;--muted:#8394a3;--faint:#96a2b0;--accent:#7fb4ca;--tint:#161d2e;--success:#b7cc85;--warning:#deba87;--danger:#cb7c94;--shadow:0 8px 24px rgba(0,0,0,.6)}
-  [data-theme='Gentleman-Cute']{--bg:#060407;--surface:#100a0f;--surface2:#100a0f;--border:#563040;--text:#f6eff3;--muted:#a78e9b;--faint:#d7a0b8;--accent:#f095c8;--tint:#2a1523;--success:#b4e7c7;--warning:#f2b86d;--danger:#ff718f;--shadow:0 8px 24px rgba(0,0,0,.6)}
-  [data-theme='Gentleman-Sexy']{--bg:#060407;--surface:#100a0f;--surface2:#100a0f;--border:#563040;--text:#f6eff3;--muted:#a78e9b;--faint:#d7a0b8;--accent:#f43888;--tint:#2e0f1f;--success:#d2cbd0;--warning:#f2b86d;--danger:#ff718f;--shadow:0 8px 24px rgba(0,0,0,.6)}
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 system-ui,'Segoe UI',sans-serif;padding:32px;transition:background .15s}
-  .bar{position:sticky;top:0;display:flex;gap:8px;padding:12px 0;background:inherit;z-index:2}
-  .bar button{font:600 12px/1 inherit;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-radius:999px;padding:8px 14px;cursor:pointer}
-  .bar button.on{color:var(--bg);background:var(--accent);border-color:var(--accent)}
-  h1{font-size:16px;font-weight:600;margin:8px 0 4px}
-  .src{color:var(--faint);font-size:12px;margin:0 0 24px}
-  h2{font-size:13px;font-weight:600;color:var(--muted);margin:28px 0 10px;text-transform:uppercase;letter-spacing:.06em}
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
-  .sw{border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--surface)}
-  .sw .c{height:52px}
-  .sw .t{padding:8px 10px;font-size:11px;color:var(--muted);font-family:ui-monospace,Consolas,monospace}
-  .sw .t b{display:block;color:var(--text);font-weight:600;font-size:12px}
-  .row{display:flex;align-items:baseline;gap:18px;border-bottom:1px dashed var(--border);padding:6px 0}
-  .row span{color:var(--faint);font-size:11px;font-family:ui-monospace,Consolas,monospace;width:70px;flex:none}
-  .radius{display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap}
-  .radius div{width:86px;height:44px;background:var(--surface2);border:1px solid var(--border);display:grid;place-items:center;font-size:11px;color:var(--muted)}
-  .comps{display:flex;flex-wrap:wrap;gap:12px;align-items:center;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px;box-shadow:var(--shadow);max-width:900px}
-  .btn{border:1px solid var(--border);background:var(--surface2);color:var(--text);border-radius:8px;padding:6px 14px;font:inherit;font-size:13px;cursor:pointer}
-  .btn:hover{border-color:var(--accent)}
-  .btn.primary{border-color:var(--accent);background:var(--accent);color:var(--bg);font-weight:600}
-  .btn.d{background:var(--danger);border-color:var(--danger);color:var(--bg)}
-  .pill{font:600 12px/1 ui-monospace,Consolas,monospace;color:var(--accent);background:var(--tint);padding:4px 8px;border-radius:999px}
-  .chip{font-size:11px;font-weight:600;padding:3px 8px;border-radius:999px;display:inline-flex;gap:5px;align-items:center}
-  .chip.ok{color:var(--success)} .chip.warn{color:var(--warning)} .chip.err{color:var(--danger)}
-  .chip::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor}
-  .hint{color:var(--faint);font-size:12px;font-style:italic}
-  .muted{color:var(--muted);font-size:12px}
-  .fld{display:block;margin:0 0 6px;font-size:12px;font-weight:600;color:var(--muted)}
-  input{width:260px;border:1px solid var(--accent);border-radius:8px;padding:7px 10px;background:var(--bg);color:var(--text);font:inherit;font-size:13px}
-  .code{display:block;padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:8px;font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:12.5px;color:var(--muted);word-break:break-all}
-  button:focus-visible,.btn:focus-visible,input:focus-visible{outline:2px solid var(--text);outline-offset:2px}
+  /* Tokens copied verbatim from apps/desktop/src/theme.css */
+  :root, [data-theme='dark'] { --bg:#0e1116; --surface:#151a21; --surface2:#1c222b; --border:#2b333d; --text:#e4e8ee; --muted:#9aa4b2; --faint:#7d8593; --accent:#7aa2f7; --tint:rgba(122,162,247,.14); --success:#7edc9a; --warning:#e7b455; --danger:#ff8585; --shadow:0 8px 24px rgba(0,0,0,.45); --row-h:34px; }
+  [data-theme='light'] { --bg:#f2f4f7; --surface:#fff; --surface2:#e9edf2; --border:#cfd5dd; --text:#17202a; --muted:#576272; --faint:#6b7686; --accent:#2e5bd7; --tint:rgba(46,91,215,.1); --success:#166e38; --warning:#8a5800; --danger:#c22f37; --shadow:0 8px 24px rgba(23,32,42,.18); --row-h:34px; }
+  [data-theme='Gentle'] { --bg:#06080f; --surface:#06080f; --surface2:#0d0f14; --border:#313342; --text:#f3f6f9; --muted:#8394a3; --faint:#96a2b0; --accent:#7fb4ca; --tint:#161d2e; --success:#b7cc85; --warning:#deba87; --danger:#cb7c94; --shadow:0 8px 24px rgba(0,0,0,.6); --row-h:34px; }
+  [data-theme='Gentleman-Cute'] { --bg:#060407; --surface:#100a0f; --surface2:#100a0f; --border:#563040; --text:#f6eff3; --muted:#a78e9b; --faint:#d7a0b8; --accent:#f095c8; --tint:#2a1523; --success:#b4e7c7; --warning:#f2b86d; --danger:#ff718f; --shadow:0 8px 24px rgba(0,0,0,.6); --row-h:34px; }
+  [data-theme='Gentleman-Sexy'] { --bg:#060407; --surface:#100a0f; --surface2:#100a0f; --border:#563040; --text:#f6eff3; --muted:#a78e9b; --faint:#d7a0b8; --accent:#f43888; --tint:#2e0f1f; --success:#d2cbd0; --warning:#f2b86d; --danger:#ff718f; --shadow:0 8px 24px rgba(0,0,0,.6); --row-h:34px; }
+  [data-theme='dark'],[data-theme='Gentle'],[data-theme='Gentleman-Cute'],[data-theme='Gentleman-Sexy']{color-scheme:dark}
+  [data-theme='light']{color-scheme:light}
+
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:14px/1.5 -apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif; }
+  h1,h2,p { margin:0; }
+  :focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  .theme-bar { display:flex; flex-wrap:wrap; gap:6px; align-items:center; padding:14px 28px; border-bottom:1px solid var(--border); background:var(--surface); position:sticky; top:0; z-index:5; }
+  .theme-bar span { color:var(--muted); font-size:12px; margin-right:6px; }
+  .theme-bar button { border:1px solid var(--border); background:transparent; color:var(--muted); border-radius:8px; padding:4px 10px; font:inherit; font-size:12px; cursor:pointer; }
+  .theme-bar button[aria-pressed='true'] { background:var(--tint); color:var(--accent); border-color:var(--accent); }
+  main { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:20px; padding:24px 28px 48px; max-width:1440px; }
+  section { border:1px solid var(--border); border-radius:10px; background:var(--surface); padding:16px 18px 18px; }
+  section > h2 { font-size:11px; font-weight:600; letter-spacing:.05em; text-transform:uppercase; color:var(--faint); margin:0 0 12px; }
+  .swatches { display:flex; flex-direction:column; gap:6px; }
+  .sw { display:flex; align-items:center; gap:10px; font-size:12px; color:var(--muted); }
+  .sw i { width:44px; height:22px; border-radius:6px; border:1px solid var(--border); flex:none; }
+  .sw code { font-family:ui-monospace,'Cascadia Code',Consolas,monospace; font-size:11.5px; color:var(--text); }
+  .type p { margin:0 0 8px; }
+  .t11 { font-size:11px; font-weight:600; color:var(--faint); letter-spacing:.05em; text-transform:uppercase; }
+  .t12 { font-size:12px; color:var(--muted); }
+  .t13 { font-size:13px; }
+  .t15 { font-size:15px; font-weight:600; }
+  .t16 { font-size:16px; font-weight:600; }
+  .mono { font-family:ui-monospace,'Cascadia Code',Consolas,monospace; font-size:12px; color:var(--muted); }
+  .radii { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; }
+  .radii div { width:56px; height:44px; background:var(--surface2); border:1px solid var(--border); }
+  .radii code { display:block; font-family:ui-monospace,Consolas,monospace; font-size:10.5px; color:var(--faint); margin-top:4px; text-align:center; }
+  .r4{border-radius:4px}.r6{border-radius:6px}.r8{border-radius:8px}.r10{border-radius:10px}.r14{border-radius:14px}.r18{border-radius:18px}.r999{border-radius:999px}
+  .elev { height:44px; border-radius:10px; background:var(--surface2); border:1px solid var(--border); box-shadow:var(--shadow); }
+  .elev + .elev { margin-top:12px; }
+  .rowbtns { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  .btn { border:1px solid var(--border); background:var(--surface2); color:var(--text); border-radius:8px; padding:6px 14px; cursor:pointer; font:inherit; font-size:13px; }
+  .btn:hover { border-color:var(--accent); }
+  .btn.d { background:var(--danger); border-color:var(--danger); color:var(--bg); }
+  .btn.primary { border-color:var(--accent); background:var(--accent); color:var(--bg); font-weight:600; }
+  .btn:disabled { opacity:.55; cursor:not-allowed; }
+  .ic { width:32px; height:32px; display:inline-grid; place-items:center; border:0; background:transparent; color:var(--muted); border-radius:8px; cursor:pointer; font-size:14px; }
+  .ic:hover { background:var(--surface2); color:var(--text); box-shadow:inset 0 0 0 1px var(--border); }
+  .demo-dlg { width:300px; background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:18px; box-shadow:var(--shadow); }
+  .demo-dlg .dt { margin:0 0 6px; font-size:15px; font-weight:600; }
+  .demo-dlg p { color:var(--muted); font-size:13px; }
+  .demo-dlg input { width:100%; border:1px solid var(--accent); border-radius:8px; padding:7px 10px; background:var(--bg); color:inherit; font:inherit; font-size:13px; }
+  .demo-dlg .acts { display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
+  .menu { min-width:190px; background:var(--surface); border:1px solid var(--border); border-radius:10px; box-shadow:var(--shadow); padding:6px; }
+  .menu button { display:block; width:100%; text-align:left; background:transparent; border:0; border-radius:6px; padding:7px 12px; font:inherit; font-size:13px; color:var(--text); cursor:pointer; }
+  .menu button:hover { background:var(--surface2); box-shadow:inset 0 0 0 1px var(--border); }
+  .menu button.d { color:var(--danger); }
+  .rows { display:flex; flex-direction:column; gap:2px; }
+  .row { display:flex; align-items:center; gap:8px; height:var(--row-h); padding:0 10px; border-radius:8px; font-size:13px; cursor:pointer; }
+  .row:hover { background:var(--surface2); box-shadow:inset 0 0 0 1px var(--border); }
+  .row[aria-selected='true'] { background:var(--tint); }
+  .row.folder { font-weight:600; }
+  .row.chat { padding-left:42px; color:var(--muted); }
+  .notice { display:flex; align-items:center; gap:10px; border-radius:10px; padding:8px 12px; background:var(--surface2); border:1px solid var(--border); font-size:13px; margin-bottom:8px; }
+  .notice.err { box-shadow:inset 3px 0 0 var(--danger); }
+  .notice.warn { box-shadow:inset 3px 0 0 var(--warning); }
+  .notice.info { box-shadow:inset 3px 0 0 var(--accent); }
+  .tags { display:flex; gap:8px; flex-wrap:wrap; }
+  .tag { font-size:11px; font-weight:600; padding:3px 8px; border-radius:999px; border:1px solid currentColor; }
+  .tag.ok { color:var(--success); } .tag.warn { color:var(--warning); } .tag.bad { color:var(--danger); } .tag.quiet { color:var(--muted); }
+  .rail { display:flex; flex-direction:column; gap:2px; max-width:184px; }
+  .rail [role='tab'] { display:flex; align-items:center; gap:9px; height:32px; padding:0 10px; border:0; background:transparent; color:var(--muted); border-radius:8px; font:inherit; font-size:13px; text-align:left; cursor:pointer; }
+  .rail [role='tab']:hover { background:var(--surface2); color:var(--text); }
+  .rail [role='tab'][aria-selected='true'] { background:var(--tint); color:var(--accent); }
+  .spacing { display:flex; gap:4px; align-items:flex-end; }
+  .spacing div { background:var(--tint); border:1px solid var(--border); }
+  .spacing code { display:block; font-family:ui-monospace,Consolas,monospace; font-size:10px; color:var(--faint); margin-top:3px; text-align:center; }
 </style>
 </head>
 <body>
-<div class="bar" role="toolbar" aria-label="Theme preview">
-  <button class="on" data-t="dark">dark</button><button data-t="light">light</button><button data-t="Gentle">Gentle</button><button data-t="Gentleman-Cute">Cute</button><button data-t="Gentleman-Sexy">Sexy</button>
-</div>
-<h1>gentle-desk system</h1>
-<p class="src">Values copied from apps/desktop/src/theme.css (six themes) and apps/desktop/src/app.css (components). Stale names —surface-2 / --accent-tint— do not exist.</p>
-
-<h2>Colour tokens</h2>
-<div class="grid">
-  <div class="sw"><div class="c" style="background:var(--bg)"></div><div class="t"><b>--bg</b> page</div></div>
-  <div class="sw"><div class="c" style="background:var(--surface)"></div><div class="t"><b>--surface</b> dialogs</div></div>
-  <div class="sw"><div class="c" style="background:var(--surface2)"></div><div class="t"><b>--surface2</b> buttons</div></div>
-  <div class="sw"><div class="c" style="background:var(--border)"></div><div class="t"><b>--border</b> separators</div></div>
-  <div class="sw"><div class="c" style="background:var(--tint)"></div><div class="t"><b>--tint</b> selected</div></div>
-  <div class="sw"><div class="c" style="background:var(--accent)"></div><div class="t"><b>--accent</b> primary</div></div>
-  <div class="sw"><div class="c" style="background:var(--success)"></div><div class="t"><b>--success</b> ok</div></div>
-  <div class="sw"><div class="c" style="background:var(--warning)"></div><div class="t"><b>--warning</b> attention</div></div>
-  <div class="sw"><div class="c" style="background:var(--danger)"></div><div class="t"><b>--danger</b> errors</div></div>
-</div>
-
-<h2>Type scale</h2>
-<div class="row"><span>18px/600</span><div style="font-size:18px;font-weight:600">Section heading</div></div>
-<div class="row"><span>15px/600</span><div style="font-size:15px;font-weight:600">Dialog title</div></div>
-<div class="row"><span>14px</span><div style="font-size:14px">Body base (13px in the app shell)</div></div>
-<div class="row"><span>12px/600</span><div class="muted" style="font-weight:600">Field label</div></div>
-<div class="row"><span>12px mono</span><span class="pill">0.1.12</span></div>
-<div class="row"><span>12px faint</span><span class="hint">Esc to close</span></div>
-
-<h2>Radius</h2>
-<div class="radius">
-  <div style="border-radius:6px">6px chips</div><div style="border-radius:8px">8px controls</div>
-  <div style="border-radius:10px">10px</div><div style="border-radius:12px">12px cards</div>
-  <div style="border-radius:14px">14px dialog</div><div style="border-radius:999px">999px pill</div>
-</div>
-
-<h2>Components</h2>
-<div class="comps">
-  <button class="btn">Secondary</button><button class="btn primary">Primary</button>
-  <button class="btn d">Delete</button>
-  <span class="pill">pi 1.5.2</span>
-  <span class="chip ok">ok</span><span class="chip warn">attention</span><span class="chip err">error</span>
-  <span class="hint">Esc to close</span>
-</div>
-<div class="comps" style="margin-top:12px">
-  <div><label class="fld" for="d">Home directory</label><input id="d" value="C:\Users\josep\.gentle-shell"></div>
-  <code class="code">gentle-shell auth check --json</code>
-</div>
-
+  <div class="theme-bar" role="toolbar" aria-label="Theme">
+    <span>data-theme:</span>
+    <button aria-pressed="true" onclick="setTheme('dark',this)">dark</button>
+    <button aria-pressed="false" onclick="setTheme('light',this)">light</button>
+    <button aria-pressed="false" onclick="setTheme('Gentle',this)">Gentle</button>
+    <button aria-pressed="false" onclick="setTheme('Gentleman-Cute',this)">Gentleman-Cute</button>
+    <button aria-pressed="false" onclick="setTheme('Gentleman-Sexy',this)">Gentleman-Sexy</button>
+  </div>
+  <main>
+    <section>
+      <h2>Colors — dark theme</h2>
+      <div class="swatches" id="swatches"></div>
+    </section>
+    <section>
+      <h2>Typography</h2>
+      <div class="type">
+        <p class="t16">16px / 600 — modal title, h2</p>
+        <p class="t15">15px / 600 — dialog title, pane heading</p>
+        <p class="t13">13px — base UI text, menus, rows</p>
+        <p class="t12">12px — hints, secondary lines</p>
+        <p class="t11">11px — tags, section labels</p>
+        <p class="mono">12px monospace — paths, models, versions</p>
+        <p style="font-size:14px">14px/1.5 — the body voice of the app</p>
+      </div>
+    </section>
+    <section>
+      <h2>Spacing · Radius · Elevation</h2>
+      <div class="spacing">
+        <div style="width:6px;height:6px"></div><div style="width:8px;height:8px"></div><div style="width:10px;height:10px"></div><div style="width:12px;height:12px"></div><div style="width:16px;height:16px"></div><div style="width:24px;height:24px"></div>
+      </div>
+      <p class="t12" style="margin:6px 0 10px">4 · 6 · 8 · 10 · 12 · 14 · 16 · 18 · 24 · 28 · 32px rhythm</p>
+      <div class="radii">
+        <div><div class="r4" style="width:56px;height:36px;background:var(--surface2);border:1px solid var(--border)"></div><code>4</code></div>
+        <div><div class="r8" style="width:56px;height:36px;background:var(--surface2);border:1px solid var(--border)"></div><code>8</code></div>
+        <div><div class="r10" style="width:56px;height:36px;background:var(--surface2);border:1px solid var(--border)"></div><code>10</code></div>
+        <div><div class="r14" style="width:56px;height:36px;background:var(--surface2);border:1px solid var(--border)"></div><code>14</code></div>
+        <div><div class="r18" style="width:56px;height:36px;background:var(--surface2);border:1px solid var(--border)"></div><code>18</code></div>
+        <div><div class="r999" style="width:56px;height:36px;background:var(--surface2);border:1px solid var(--border)"></div><code>999</code></div>
+      </div>
+      <p class="t12" style="margin:12px 0 8px">Elevation: <code class="mono">--shadow</code></p>
+      <div class="elev"></div>
+    </section>
+    <section>
+      <h2>Buttons · Icon buttons</h2>
+      <div class="rowbtns">
+        <button class="btn">Default</button>
+        <button class="btn primary">Primary</button>
+        <button class="btn d">Delete</button>
+        <button class="btn" disabled>Disabled</button>
+        <button class="ic" aria-label="More">⋯</button>
+      </div>
+    </section>
+    <section>
+      <h2>Dialog card · Input · Actions</h2>
+      <div class="demo-dlg">
+        <p class="dt">Remove this workspace?</p>
+        <p>One consequence line in the user's words.</p>
+        <input value="C:\…\gentle-desk" readonly>
+        <div class="acts">
+          <button class="btn">Cancel</button>
+          <button class="btn d">Remove</button>
+        </div>
+      </div>
+    </section>
+    <section>
+      <h2>Menu · Sidebar rows</h2>
+      <div class="menu" style="margin-bottom:12px">
+        <button>Rename</button>
+        <button>Copy file path</button>
+        <button class="d">Delete</button>
+      </div>
+      <div class="rows">
+        <div class="row folder" aria-selected="true"><span>C:\dev\gentle-desk</span></div>
+        <div class="row chat"><span>chat title</span></div>
+        <div class="row"><span>hovered row</span></div>
+      </div>
+    </section>
+    <section>
+      <h2>Notices · Tags · Rail tabs</h2>
+      <div class="notice info">Info notice</div>
+      <div class="notice warn">Warning notice</div>
+      <div class="notice err">Error notice</div>
+      <div class="tags" style="margin:10px 0 14px">
+        <span class="tag ok">ok</span><span class="tag warn">warn</span><span class="tag bad">bad</span><span class="tag quiet">quiet</span>
+      </div>
+      <div class="rail" role="tablist">
+        <button role="tab" aria-selected="true">Appearance</button>
+        <button role="tab" aria-selected="false">Updates</button>
+        <button role="tab" aria-selected="false">About</button>
+      </div>
+    </section>
+  </main>
 <script>
-  document.querySelectorAll('.bar button').forEach(function(b){b.onclick=function(){
-    document.documentElement.dataset.theme=b.dataset.t;
-    document.querySelectorAll('.bar button').forEach(function(x){x.classList.toggle('on',x===b)});
-  };});
+  const TOK = ['--bg','--surface','--surface2','--border','--text','--muted','--faint','--accent','--success','--warning','--danger'];
+  function paint() {
+    const el = document.getElementById('swatches');
+    el.innerHTML = '';
+    for (const t of TOK) {
+      const v = getComputedStyle(document.documentElement).getPropertyValue(t);
+      const row = document.createElement('div'); row.className = 'sw';
+      row.innerHTML = `<i style="background:${v}"></i><code>${t}</code><code>${v}</code>`;
+      el.appendChild(row);
+    }
+  }
+  function setTheme(name, btn) {
+    document.documentElement.setAttribute('data-theme', name);
+    document.querySelectorAll('.theme-bar button').forEach(b => b.setAttribute('aria-pressed', String(b === btn)));
+    paint();
+  }
+  paint();
 </script>
 </body>
 </html>
