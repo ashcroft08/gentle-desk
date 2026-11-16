@@ -166,3 +166,31 @@ editor and the subagents/jobs slices.
   adoption resumes at the editor. Also in this round: the review of the real-frame
   fixture + docs, lineage review-9861fba7e97434a5 (reliability, 245 lines), one
   model run $0.008, APPROVED, authority burned, no findings.
+- L7 (parent, 2026-11-16): T3b-1 delivered — the native engine, commit da09051:
+  `settings/watch.rs` (a pure classify + quiet-window debounce core, QUIET 300 ms,
+  and a notify shell over the PARENT dirs of `profiles.json` + `profile-fallbacks.json`
+  (config home) and `auth.json` (agent dir); exact-name classification, so
+  `profiles.json.tmp` and every other name are ignored), the typed
+  `settings-files-changed` event `{profiles, account}` (specta type, registered in
+  the contract builder, emitted through the bridge's notify seam), started at
+  setup next to the sessions watcher and stopped inside the close's bounded
+  `watch` step BEFORE the cache/config flush (the maintainer approved the added
+  `close/bridge.rs` + `close/flow.rs` surfaces). It runs no subprocess and no
+  refresh command — the web panes will decide, while mounted, so
+  `auth check --no-refresh` never runs in the background with Settings closed.
+  Silent degradation (a missing dir / failed watcher = no watch, no event; a dir
+  that appears later is picked up by a restart). Independent verification:
+  workspace 1349/0, clippy, fmt, drift guard. Native review, lineage
+  review-0a17ac2e597110e8 (resilience + reliability, 1.3k lines): APPROVED,
+  authority burned, 2 model runs ~$0.031 (exactly the authorized runs), 6
+  advisory findings. The maintainer approved fixing three before moving on —
+  shared close budget (the step handed the settings watcher the WHOLE budget and
+  then the session watcher the whole budget again; now ONE deadline, the second
+  stop gets only the remainder), debounce order (a batch already due is flushed
+  before a new event is merged), and `start` semantics (a second start replaces
+  the running watch with the NEW dirs and callback, bounded; the comment now
+  matches the code) — each RED-first; the fix commit followed, workspace 1354/0
+  independently verified. BACKLOG (recorded, not fixed): R3-partial-watch-silent
+  (one watchable dir out of two reports success; the focus refresh covers the
+  other group; observability needs a diagnostics channel that does not exist yet)
+  and R4-002 (the stop thread failing to spawn — out-of-domain).
