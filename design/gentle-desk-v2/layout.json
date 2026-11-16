@@ -1,0 +1,21 @@
+{
+  "arrangement": "free",
+  "positions": {
+    "system": {
+      "x": 0,
+      "y": 3
+    },
+    "00-states-board.html": {
+      "x": 1492,
+      "y": 0
+    },
+    "01a-tree-chat.html": {
+      "x": 3040,
+      "y": 3
+    },
+    "01b-tree-helpers.html": {
+      "x": 4560,
+      "y": 3
+    }
+  }
+}
