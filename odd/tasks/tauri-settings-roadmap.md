@@ -68,6 +68,11 @@ calendar one. Version numbers never repeat or go down (updater compares them).
      and 5-10 s, so this step is built as a NATIVE FILE WATCHER over pi's config
      files, not over the channel. The channel transport (built and reviewed in
      rpc-settings-sync T2) resumes at step 3, the profiles and pins editor.
+     SHIPPED-ON-BRANCH 2026-11-16 (feat/rpc-settings-sync, pending release): a
+     debounced watcher over `profiles.json`, `profile-fallbacks.json` and `auth.json`
+     emits a typed `settings-files-changed` event; the Profiles and Account panes
+     re-read while mounted, the focus refresh stays as the fallback. Verified in the
+     maintainer's real window: an edit in the terminal reaches the pane at once.
   3. **Profiles and pins editor**: the largest one, sliced as read+state, model and
      effort per agent, fallback-chain editing, then the per-repo pin. It is safe now
      because `set_config` writes through gentle-pi's own writers and `writeRevision`
@@ -113,7 +118,10 @@ calendar one. Version numbers never repeat or go down (updater compares them).
 Target after the 0.2.0 language work (new UI must be born bilingual). Nothing here is
 re-argued. Queue order, the maintainer's call each time: (1) chat chrome + helpers
 two-column — SHIPPED-ON-BRANCH 2026-11-16 (feat/chat-chrome-helpers, PR #175, pending
-release; odd/tasks/chat-chrome-helpers.md), (2) the desktop RPC channel below,
+release; odd/tasks/chat-chrome-helpers.md), (2) the desktop RPC channel below — its
+step 2, live Settings by file watching, SHIPPED-ON-BRANCH 2026-11-16
+(feat/rpc-settings-sync, odd/tasks/rpc-settings-sync.md); step 3, the profiles and
+pins editor, is next on the channel,
 (3) stopping a helper (next section).
 built or started; this records the decision and the measurements so it is not
 re-argued.

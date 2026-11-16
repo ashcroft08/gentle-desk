@@ -236,3 +236,24 @@ editor and the subagents/jobs slices.
   in-flight read drops the queued follow-up (the caller already resolved), so a
   transient dispatch failure leaves the pane stale until the next event; the focus
   refresh bounds it.
+- L10 (maintainer + parent, 2026-11-16): T4 — the final battery on the finished tree
+  (cargo 1354/0, clippy -D warnings, fmt, drift guard byte-identical with regen,
+  vitest 726/726, svelte-check 0/0, eslint) and the maintainer's real-window check.
+  The first window check FAILED, and the cause was the parent's launch, not the
+  watcher: `npm run tauri dev` was started from inside this gentle-shell session, so
+  the app inherited `GENTLE_SHELL_CONFIG_HOME` and `PI_CODING_AGENT_DIR` (the
+  isolated `~/.gentle-shell` homes), which the path rule ranks ABOVE the maintainer's
+  "My pi" (link) choice. The pane and the watcher both followed
+  `C:\Users\josep\.gentle-shell\gentle-ai` while the maintainer edited
+  `~/.pi/gentle-ai` (the code reads the same `settings.paths` for both, so they were
+  consistent with each other). Relaunched with every `GENTLE_*` / `PI_*` variable
+  removed, the maintainer reported: "Funcionaaaa... ahora inmediatamente que edito en
+  la terminal se actualiza en la app". A separate `EPERM` while saving in
+  `/gentle:profiles` (the rename of the tmp file over `profiles.json`) was the
+  maintainer's own program holding the JSON open, unrelated to the app; the app had
+  been stopped first to isolate it. LESSON for every future window check: launch the
+  dev app with a clean environment (`env -u` of the GENTLE_* / PI_* variables). Scope
+  reminder given to the maintainer: this slice is ONE-WAY (terminal to app); creating
+  or editing profiles from the app is roadmap step 3, the editor (`set_config` with
+  `writeRevision`, a control child, artboards first; what a NEW profile must look
+  like is unverified and is the first thing to read in that feature's spec).
