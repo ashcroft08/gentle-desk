@@ -30,6 +30,10 @@ editor and the subagents/jobs slices.
   refresh the Profiles pane when a tracked store's revision changes via
   `get_config` — so when gentle-shell later emits events for external changes,
   the SAME engine consumes them unchanged. The focus-refresh stays as fallback.
+  RE-SCOPED AGAIN in L6 after the T3a spike: the live part is a NATIVE FILE WATCHER
+  (the channel cannot deliver change detection for external edits, and a control
+  child costs ~400 MB and 5-10 s); the channel stays as the transport for the
+  profiles/pins editor and the per-chat features.
 - S3 (prerequisite validation, roadmap): "Before relying on the channel, validate
   it against our own children with `GENTLE_SHELL_INTERACTIVE_HOST` set; it is a
   new surface and a child that ignores it must degrade to today's behaviour,
@@ -51,9 +55,20 @@ editor and the subagents/jobs slices.
       {json}`, correlate the `requestId` widget answer, and degrade silently
       (and to today's behaviour) when the child does not answer or the env is
       absent. TDD where testable; the seam is a fake-able transport.
-- [ ] T3 (S2) live sync: Settings panels read the snapshot and refresh on
-      `config_changed` while the terminal edits; the terminal-close refresh
-      stays as the fallback. TDD.
+- [x] T3a (S2) spike of the control child — DONE (L6): 5.0/5.4/9.8 s to
+      answer, 392-410 MB, 0 session files; decision: not worth it for sync.
+- [ ] T3b-1 (S2) native engine, Rust: a debounced watcher over pi's config files
+      (`profiles.json`, `profile-fallbacks.json` in the config home; `auth.json`
+      in the agent dir — the same paths `SettingsPaths` resolves for the panes),
+      watching the PARENT directories (pi replaces files atomically) and filtering
+      by file name; it emits a typed `settings-files-changed` event and runs no
+      subprocess on its own. Pattern: the sessions watcher
+      (`sessions/watch.rs`, `wiring.rs`). TDD with temp directories and bounded
+      waits. Route: writer.
+- [ ] T3b-2 (S2) web: the Profiles and Account panes, while mounted, re-read through
+      their EXISTING refresh commands when the event names their files; the
+      window-focus refresh stays as the fallback. TDD. Route: writer, after
+      T3b-1's bindings.
 - [ ] T4 (close) battery + real-window check (edit in the terminal, watch the
       panel move) + roadmap note + version per the maintainer.
 
@@ -135,3 +150,19 @@ editor and the subagents/jobs slices.
   latency of a cold child, (b) the tree's memory once ready, (c) whether answering
   `/gentle:desktop` prompts creates any session file (the control child must never
   dirty the maintainer's chat history).
+- L6 (maintainer + parent, 2026-11-16): the T3a spike (sandbox, 3 cold starts of
+  the real child, approved exact script, cleaned afterwards): answered in 4992,
+  5350 and 9794 ms; the process tree held 410, 398 and 392 MB; NO session file was
+  created (22 provisioning/presence/scratch files per start, 0 `.jsonl`) — so a
+  control child would not dirty the chat history, but it would register presence
+  files under `gentle-agents` (inferred from the names, not verified) and it costs
+  ~400 MB and 5-10 s to give a snapshot poll that the channel itself cannot make
+  event-driven (the spec: external edits emit nothing). The parent
+  recommended the pivot and the maintainer accepted it: T3 becomes a NATIVE file
+  watcher (instant, free, no child) with the focus refresh as fallback; the channel
+  keeps its role as the transport of the profiles/pins editor (`set_config` with
+  `writeRevision`), where a control child while the user edits is justified. The
+  roadmap's step 2 is therefore "live Settings by file watching" and the RPC
+  adoption resumes at the editor. Also in this round: the review of the real-frame
+  fixture + docs, lineage review-9861fba7e97434a5 (reliability, 245 lines), one
+  model run $0.008, APPROVED, authority burned, no findings.
