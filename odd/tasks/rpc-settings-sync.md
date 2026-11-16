@@ -93,3 +93,31 @@ editor and the subagents/jobs slices.
   R4-hub-request-id-collision → T3 must use ONE requestId counter per chat (ids are
   only unique per client today); R4-silent-degradation-no-trace → add a tracing
   point on Timeout/Inactive/Closed when a diagnostics channel exists.
+- L4 (maintainer + parent, 2026-11-16): T1 DONE — the real-child probe, run with the
+  maintainer's explicit approval of the exact command ("Apruebo el probe tal cual").
+  Sandbox: a throwaway `--home` and `GENTLE_PI_CONFIG_HOME` under %TEMP%,
+  `GENTLE_SHELL_INTERACTIVE_HOST=1`, `GENTLE_SHELL_NO_AUTO_SETUP=1` (the setup that
+  contaminated the 2026-11-12 attempt), node + gentle-shell.mjs `--mode rpc`, two
+  prompt lines (`capabilities`, then `get_snapshot` 8 s later). Result in ~36 s, no
+  stray processes, the temp dirs and script removed afterwards. Findings:
+  (1) the REAL envelope is `{schema, kind:"response", requestId, ok, data}` —
+  exactly what the client parses; the doc's bare examples are its own
+  inconsistency; the writer's open doubt is closed with evidence;
+  (2) `capabilities.data` lists methods [capabilities, get_snapshot, get_config,
+  set_config, get_permission_mode, set_permission_mode, get_subscription_usage,
+  refresh_subscription_usage, get_design_canvas, list_jobs, cancel_job,
+  apply_profile, list_subagents, cancel_subagent] and events [config_changed,
+  permission_mode_changed, rate_limit, design_canvas, jobs_update, profile_applied,
+  agents_update];
+  (3) `get_snapshot` is `{sequence, state:{config:{stores:[...]}}}` with six stores
+  (profiles, models[ro], profile_fallbacks, subagents[ro], pins, managed_assets[ro]),
+  each with scope/readOnly/status/revision, revisions `sha256:` + 32 hex (NOT 64);
+  (4) the command was registered before the first prompt arrived (`session_start`
+  precedes stdin), so the 2026-11-12 timeout was the auto-setup, not the channel.
+  The two real frames are pinned as `desktop-rpc-real.jsonl` with parsing and
+  client-replay tests, commit 7d5cf67 (core 194/0 after the additions; the tests
+  passed at once — no RED is invented for a passive pin of an already-correct
+  parser). NOTE for the queue: `cancel_subagent` and `cancel_job` EXIST in the
+  channel — the earlier roadmap claim that helper Stop has no backend was true only
+  of the app's own contract (chat-level Abort); the feature can be built on the
+  channel.

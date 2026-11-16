@@ -91,7 +91,11 @@ calendar one. Version numbers never repeat or go down (updater compares them).
 - What it needs: a new intent (`StopHelper`) through the contract, the app-side
   execution that stops that helper's work and marks it `Ended`/`Cancelled` while
   the chat keeps running, and the helper thread bar's red square (the artboard's
-  own `i-stop`), enabled only while that helper is running. Bilingual copy
+  own `i-stop`), enabled only while that helper is running. CORRECTION 2026-11-16
+  (T1's real probe of gentle-shell 4.8.0): the desktop RPC channel DOES offer the
+  capability - `cancel_subagent` and `cancel_job` are listed in `capabilities` - so
+  this feature is built on the channel's transport (rpc-settings-sync T2), not on a
+  backend that does not exist; only the app's own contract lacked it. Bilingual copy
   (`Stop` / `Detener`). Capability jump: minor bump when it ships.
 
 ## 0.2.x: removing a workspace, and deleting its chats (agreed 2026-11-14; RELEASED 2026-11-16 as 0.3.0, tag v0.3.0)
