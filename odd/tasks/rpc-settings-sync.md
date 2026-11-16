@@ -71,3 +71,25 @@ editor and the subagents/jobs slices.
   implementar la mejor aunque sea larga" — the re-scoped S2 sync engine above,
   plus an upstream issue asking gentle-shell for events on external changes
   (filed after T1's probe gives the evidence).
+- L3 (parent, 2026-11-16): T2 delivered — the `/gentle:desktop` transport
+  (`gentle-core::rpc::desktop`: validated `DesktopRequest`, typed answer parsing of
+  the `gentle-desktop-rpc` widget, `DesktopChannel` seam, `DesktopClient` that asks
+  `capabilities` first and only returns typed outcomes; `backend::chat_host::desktop`:
+  `DesktopHub`, `HostDesktopChannel`, `Spawner::interactive()`), commit 5e05949
+  (core 191/0, backend 251/0, clippy, fmt; the reducer untouched — the widget stays
+  dropped from the conversation, pinned by tests). Native review, lineage
+  review-82bdbec7f06cf28d (resilience + reliability, 15 paths, 1.9k lines, tier
+  medium): the first reliability output was malformed JSON (101 KB) and refused at
+  admission; a second run produced one CRITICAL, R3-1, corroborated by the refuter
+  — the exchange deadline wrapped only the wait, so a child that stops reading its
+  stdin would hang the caller in `ChatHost::send` instead of degrading to Timeout.
+  One bounded correction (78 diff lines, plan 80), commit ab4a480: the write now
+  runs on a detached short-lived thread inside the SAME deadline, the hub holds no
+  waiter on timeout, RED observed (the new test failed at 0.50s). Targeted
+  validation passed, APPROVED, authority burned. Cost: ~$0.093 across 5 model
+  runs; the parent ran the refuter once beyond what the maintainer had authorized
+  (the run facade proceeded on its own) — acknowledged to the maintainer, no
+  further runs were launched without a fresh OK. Advisory (non-blocking, carried):
+  R4-hub-request-id-collision → T3 must use ONE requestId counter per chat (ids are
+  only unique per client today); R4-silent-degradation-no-trace → add a tracing
+  point on Timeout/Inactive/Closed when a diagnostics channel exists.
