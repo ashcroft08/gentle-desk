@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "chosen": "01-document.html",
+  "chosen": "04-language-tabs.html",
   "handoffs": {
     "01-document.html": {
       "status": "implemented",
@@ -9,6 +9,13 @@
       "startedAt": "2026-11-13T03:47:35.570Z",
       "implementedAt": "2026-11-13T04:04:13.648Z",
       "note": "Artboard A implemented in feat/whats-new-modal-design: markdown notes rendered through the app's sanitized pipeline, version pill + \"since\" label in the accessible title, Esc hint + primary Got it. All theme colors via CSS variables; verified with Chrome headless renders in dark, light, Gentle and Gentleman-Cute, at 900px and ~400px, with long notes (scroll) — no live app preview available since the modal only appears after an update."
+    },
+    "04-language-tabs.html": {
+      "status": "implemented",
+      "queued": false,
+      "sentAt": "2026-11-16T15:08:05.195Z",
+      "startedAt": "2026-11-16T15:08:35.368Z",
+      "implementedAt": "2026-11-16T15:20:16.291Z"
     }
   }
 }

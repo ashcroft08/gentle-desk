@@ -4,6 +4,7 @@
   "artboards": [
     { "file": "01-document.html", "title": "A: Release notes as a document", "tradeoff": "Closest to today's dialog and the calmest: a version pill, a clear list and a divider before the footer; less personality, scales to any length by scrolling", "width": 900, "height": 700 },
     { "file": "02-hero.html", "title": "B: Version hero", "tradeoff": "Makes the update an event with a large version and one card per change; friendlier and scannable, but taller and heavier for a modal shown once per version", "width": 900, "height": 760 },
-    { "file": "03-compact.html", "title": "C: Compact and quiet", "tradeoff": "Smallest and least intrusive: two changes visible, the rest behind a disclosure; hides detail unless the user opens it and needs a link to the full notes", "width": 900, "height": 600 }
+    { "file": "03-compact.html", "title": "C: Compact and quiet", "tradeoff": "Smallest and least intrusive: two changes visible, the rest behind a disclosure; hides detail unless the user opens it and needs a link to the full notes", "width": 900, "height": 600 },
+    { "file": "04-language-tabs.html", "title": "D: Language tabs (maintainer's request 2026-11-16)", "tradeoff": "One panel per language, the app's language selected first; ends the glued EN/ES sections; the modal splits the release body at the 'Novedades en X.Y.Z' marker and falls back to one panel when absent", "width": 900, "height": 980 }
   ]
 }
