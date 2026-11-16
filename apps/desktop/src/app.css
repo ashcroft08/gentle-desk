@@ -1275,7 +1275,7 @@ p {
 
 .menu [role='menuitem']:hover,
 .menu [role='menuitem'][data-highlighted] {
-  background: var(--surface2);
+  background: var(--tint);
 }
 
 /* The delete item of a chat row's menu, and the dialog's delete button: the
