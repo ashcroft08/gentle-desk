@@ -353,7 +353,8 @@ impl Bridge {
     /// Answers whether a watch runs. A run that could not watch anything is not
     /// told to the user: the panes keep the focus refresh they have today. The
     /// close stops it through [`Bridge::arm_close`]'s steps, in the same bounded
-    /// step as the session watcher.
+    /// step as the session watcher, and a second call replaces the running watch
+    /// with the directories and the push of this one (`SettingsWatch::start`).
     pub fn start_settings_watch(&self) -> bool {
         let dirs = Dirs::of(&self.settings.paths);
         let notify = lock(&self.settings_notify).clone();

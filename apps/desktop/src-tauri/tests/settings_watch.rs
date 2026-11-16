@@ -272,6 +272,49 @@ fn a_directory_that_is_not_there_starts_nothing() {
     assert!(watching.stop(LIMIT));
 }
 
+/// A second start REPLACES the running watch: the directories and the callback
+/// it is given are the ones that take effect, and the watch it replaced stops
+/// reporting. An early return that ignored the arguments would leave the panes
+/// listening to the first directories with the first callback.
+#[test]
+fn a_second_start_watches_the_new_directories_with_the_new_callback() {
+    let first = Home::new();
+    let second = Home::new();
+    let first_recorder = Recorder::new();
+    let second_recorder = Recorder::new();
+    let watching = SettingsWatch::new();
+    assert!(
+        watching.start(&first.dirs(), first_recorder.on_change()),
+        "the first watch started"
+    );
+
+    fs::write(first.config().join("profiles.json"), "{}").expect("the scratch profiles file");
+    assert_eq!(first_recorder.wait_for(1), vec![profiles_only()]);
+
+    assert!(
+        watching.start(&second.dirs(), second_recorder.on_change()),
+        "the second start ran a watch"
+    );
+
+    // The replaced watch reports nothing more, and the new directories are the
+    // ones the new watch watches.
+    fs::write(first.config().join("profiles.json"), "{\"old\":true}")
+        .expect("the scratch profiles file");
+    assert_eq!(
+        first_recorder.within_the_quiet_window(),
+        vec![profiles_only()],
+        "the watch the second start replaced reported a change"
+    );
+    fs::write(second.config().join("profile-fallbacks.json"), "{}")
+        .expect("the scratch chain file");
+    assert_eq!(
+        second_recorder.wait_for(1),
+        vec![profiles_only()],
+        "the new watch did not report its own directory"
+    );
+    assert!(watching.stop(LIMIT), "the watcher thread ended");
+}
+
 /// The stop ends the thread, and nothing is reported after it: the close runs
 /// the stop before the config and the cache are written, so a late notice can
 /// never ask for a read of a file that is being flushed.

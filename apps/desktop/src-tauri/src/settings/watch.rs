@@ -178,13 +178,22 @@ impl Debouncer {
 
     /// Notes one raw event: the group it names, or `None` for a file this
     /// watcher does not care about (which opens no batch).
-    pub fn push(&mut self, now: Duration, group: Option<Group>) {
-        let Some(group) = group else {
-            return;
-        };
+    ///
+    /// A batch that is already DUE when the event arrives is answered here and
+    /// the event opens the NEXT one: the thread that owns the debouncer can be
+    /// delayed past a deadline, and an event that arrives after the quiet window
+    /// is not part of the old batch - merging it would delay the notice the old
+    /// batch already owed until the new event's own quiet window.
+    pub fn push(&mut self, now: Duration, group: Option<Group>) -> Option<Changed> {
+        let group = group?;
+        // The due check comes FIRST, from the instant this event arrived: the
+        // notice the open batch already owes goes out with this push, and the
+        // event opens the next batch.
+        let flushed = self.take_if_due(now);
         // A `now` earlier than the previous push only widens the window.
         self.last = Some(self.last.map_or(now, |last| last.max(now)));
         self.changed.note(group);
+        flushed
     }
 
     /// The instant the open batch is due, if one is open.
@@ -286,7 +295,14 @@ fn debounce_events(raw: &Receiver<notify::Result<notify::Event>>, on_change: &On
             Ok(Ok(event)) => {
                 for path in &event.paths {
                     let name = path.file_name().and_then(|name| name.to_str());
-                    debouncer.push(started.elapsed(), name.and_then(classify));
+                    // The push answers a batch that was already due before this
+                    // event: that notice goes out NOW, and this event opens the
+                    // next batch.
+                    if let Some(changed) =
+                        debouncer.push(started.elapsed(), name.and_then(classify))
+                    {
+                        on_change(changed);
+                    }
                 }
             }
             // A platform error names no file, so it names no group either: this
@@ -303,11 +319,19 @@ fn debounce_events(raw: &Receiver<notify::Result<notify::Event>>, on_change: &On
     }
 }
 
+/// How long a second [`SettingsWatch::start`] waits for the watch it replaces
+/// before it goes on with the new one. The same shape as the close's stop: on a
+/// thread of its own, waited for at most this, so no start can hang on a watch
+/// someone else wedged.
+const REPLACE_WAIT: Duration = Duration::from_secs(1);
+
 /// The watcher of this run, as the bridge holds it and the close stops it.
 ///
-/// It is started ONCE, at startup, and stopped once by the close: no restart and
-/// no retry. A run whose directories were not there at startup keeps the focus
-/// refresh until the next start of the app (documented limit, no polling).
+/// The app starts it ONCE, at startup, and the close stops it once: nothing
+/// retries, and nothing polls for a directory that appears later. A second
+/// [`SettingsWatch::start`] replaces the running watch with the one it is given
+/// (documented there); a run whose directories were not there at startup keeps
+/// the focus refresh until the next start of the app.
 #[derive(Default)]
 pub struct SettingsWatch {
     /// The watch of this run; taken out by the stop under this lock and dropped
@@ -320,17 +344,19 @@ impl SettingsWatch {
         Self::default()
     }
 
-    /// Starts the watcher on `dirs`. Answers whether one runs: a run that could
-    /// not watch anything answers `false` and is otherwise identical.
+    /// Starts the watcher on `dirs`, with `on_change` as its push. Answers
+    /// whether one runs: a run that could not watch anything answers `false`
+    /// and is otherwise identical.
     ///
-    /// The start itself runs outside the lock: it creates a platform watch and
-    /// spawns a thread. Two simultaneous starts are not a case of this app - the
-    /// setup step is the only caller - so the second would simply replace the
-    /// first, which `Drop` joins outside the lock.
+    /// A watch that is already running is REPLACED, not kept: the `dirs` and the
+    /// `on_change` given here are the ones that take effect, and the old watch
+    /// stops reporting. The old one is stopped the way the close stops it - on a
+    /// thread of its own, waited for at most a fixed short wait - so a start
+    /// never hangs on it: a wedged watch is abandoned, and this start goes on
+    /// without it. The stop and the start both run outside the lock, because the
+    /// stop joins a thread and the start creates a platform watch and a thread.
     pub fn start(&self, dirs: &Dirs, on_change: OnChange) -> bool {
-        if self.is_watching() {
-            return true;
-        }
+        self.stop(REPLACE_WAIT);
         match start(dirs, on_change) {
             Ok(watcher) => {
                 *lock(&self.running) = Some(watcher);
@@ -433,10 +459,46 @@ mod tests {
     #[test]
     fn two_bursts_separated_by_the_quiet_window_are_two_notices() {
         let mut debouncer = Debouncer::default();
-        debouncer.push(at(0), Some(Group::Account));
+        assert_eq!(debouncer.push(at(0), Some(Group::Account)), None);
         assert!(debouncer.take_if_due(at(0) + QUIET).is_some());
-        debouncer.push(at(1_000), Some(Group::Account));
+        assert_eq!(debouncer.push(at(1_000), Some(Group::Account)), None);
         assert!(debouncer.take_if_due(at(1_000) + QUIET).is_some());
+    }
+
+    /// An event that arrives AFTER the open batch's deadline is the next batch's:
+    /// the notice the old batch already owed goes out first, and the new event
+    /// opens a batch of its own. The thread that owns the debouncer can be
+    /// delayed past a deadline, and merging then would delay that notice until
+    /// the new event's quiet window.
+    #[test]
+    fn an_event_after_the_deadline_flushes_the_old_batch_first() {
+        let mut debouncer = Debouncer::default();
+        assert_eq!(debouncer.push(at(0), Some(Group::Profiles)), None);
+        let deadline = debouncer.deadline().expect("the batch is open");
+
+        // Half a second past the deadline the account file changes: the profiles
+        // notice is already owed and is answered with this very push.
+        let late = deadline + at(500);
+        assert_eq!(
+            debouncer.push(late, Some(Group::Account)),
+            Some(Changed {
+                profiles: true,
+                account: false,
+            }),
+            "an event past the deadline merged into the batch that was already due"
+        );
+        assert_eq!(
+            debouncer.deadline(),
+            Some(late + QUIET),
+            "the late event did not open a batch of its own"
+        );
+        assert_eq!(
+            debouncer.take_if_due(late + QUIET),
+            Some(Changed {
+                profiles: false,
+                account: true,
+            })
+        );
     }
 
     /// The groups are tracked independently: one file's burst names its own
