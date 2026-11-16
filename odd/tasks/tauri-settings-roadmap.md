@@ -80,7 +80,7 @@ calendar one. Version numbers never repeat or go down (updater compares them).
   `GENTLE_SHELL_INTERACTIVE_HOST` set; it is a new surface and a child that ignores it
   must degrade to today's behaviour, never break.
 
-## 0.2.x: removing a workspace, and deleting its chats (agreed 2026-11-14; SHIPPED 2026-11-16 on feat/workspace-removal, release 0.3.0)
+## 0.2.x: removing a workspace, and deleting its chats (agreed 2026-11-14; RELEASED 2026-11-16 as 0.3.0, tag v0.3.0)
 
 - 2026-11-16 rulings at pickup: the GATE replaced the opt-in checkbox (a workspace
   with chats leaves only via "Delete N chats and remove"); deletion is trash-first
