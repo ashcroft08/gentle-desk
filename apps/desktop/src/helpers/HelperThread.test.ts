@@ -1,8 +1,8 @@
 // One helper's thread, one test per rule: the header iced echoes (name, status
 // as the mark's accessible name, prompt), every item kind, markdown through the
 // thread's own renderer with its sanitizer and link handling, the dropped and
-// empty lines, the focus the thread takes, the keys it ignores, and the end it
-// follows.
+// empty lines, the focus the thread leaves where it is (the list beside it
+// keeps the keyboard), the keys it ignores, and the end it follows.
 
 import '../test-support/dom-env'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -141,10 +141,18 @@ describe('HelperThread', () => {
     expect(within(region).getByText(copy.noActivity).textContent).toBe('No activity yet')
   })
 
-  it('takes the focus with its Back control, the only control of the thread', () => {
-    draw()
+  it('leaves the focus where it is: the list beside it keeps the keyboard', () => {
+    const outside = document.createElement('button')
+    document.body.append(outside)
+    outside.focus()
+    try {
+      draw()
 
-    expect(document.activeElement).toBe(screen.getByRole('button', { name: copy.back }))
+      expect(document.activeElement).toBe(outside)
+      expect(document.activeElement).not.toBe(screen.getByRole('button', { name: copy.back }))
+    } finally {
+      outside.remove()
+    }
   })
 
   it('sends nothing on Escape: iced leaves a thread from its Back control only', async () => {

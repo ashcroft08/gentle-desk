@@ -128,7 +128,8 @@ describe('the Chat | Helpers views', () => {
 
     expect(screen.getByRole('region', { name: 'Helper thread' })).toBeTruthy()
     expect(screen.getByText('Reading the crate.')).toBeTruthy()
-    expect(screen.queryByRole('listbox', { name: 'Helpers' })).toBeNull()
+    // T3 (S3): the list is drawn BESIDE the thread, never replaced by it.
+    expect(screen.getByRole('listbox', { name: 'Helpers' })).toBeTruthy()
   })
 
   it('draws the helpers the pushed state carries when it changes', async () => {

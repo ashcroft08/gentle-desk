@@ -1,0 +1,103 @@
+# chat-chrome-helpers: the chat header gains its actions, the Helpers view returns to two columns
+
+The maintainer's 2026-11-16 rulings (design/gentle-desk-v2/decisions.md, made after
+the design-gap survey): the Working pulse comes back, the chat header gains Rename
+with a right-aligned responsive Chat|Helpers switch, and the Helpers view rebuilds
+to artboard 01b's two-column layout. The row `...` menu and the row timestamp stay.
+Design refresh on the gentle-design canvas BEFORE any Svelte (S6 of the house
+rules).
+
+## Specs
+
+- S1 (pulse, decision "Construir el pulso"): `01a-tree-chat.html`'s Working mark
+  animates again — the artboard's `m-working` pulse (1.2s ease), honouring
+  `prefers-reduced-motion`. The glyph, colour and placement do not change.
+- S2 (header, decision verbatim): "Que quede en la fila pero tambien agreguemos en
+  el header del chat lo de renombrar y tambien el switch de chat|helper debe estar
+  pechado a la derecha y ser responsive". So: the row `...` menu stays as is; the
+  chat header gains **Rename** (opens the same inline-rename flow the row uses);
+  and the **Chat | Helpers** switch sits pinned to the right edge of the header
+  and behaves on narrow windows (no crush, no overflow).
+- S3 (helpers two-column, decision "Reconstruir a dos columnas"): rebuild the
+  Helpers view per `01b-tree-helpers.html` — the helper list column
+  (`minmax(200px,280px)`, right border) and the helper thread ALWAYS visible side
+  by side; selecting a helper shows its thread in the right column without
+  replacing the list. The thread bar keeps today's controls (Back; no
+  Follow/Tools/Stop — recorded drop). Artboard refresh FIRST.
+- S4 (records, already done): the row timestamp is a deliberate addition and the
+  row menu's placement correction live in `design/gentle-desk-v2/decisions.md`
+  (PR #174) — no code change here.
+- S5 (bilingual, standing rule): new copy in both columns with parity + flip
+  tests; nothing new is expected beyond small labels.
+
+## Tasks
+
+- [ ] T1 (design) canvas refresh: `01b-tree-helpers.html` (two columns with
+      today's controls) and the header part of `01a-tree-chat.html` (Rename in
+      the header, switch right-aligned) — maintainer review on the canvas
+      before any Svelte. Route: parent.
+- [x] T2 (S1, S2, S5) web — DONE, commit 8ece406. Writer report: S1 (Mark.svelte
+      now draws 01a's per-state class beside `mark`; app.css gains the pulse
+      (1.2s ease-in-out, keyframes 50% opacity .35) with the reduced-motion
+      kill); S2 (Header.svelte draws 01a's header: pencil with the artboard's
+      Lucide outline inline (no pencil glyph in shapes.ts), local inline-rename
+      flow — Enter commits trimmed, Escape cancels, blur commits, unchanged
+      sends nothing — reporting through a new `onRename` prop that App.svelte
+      wires to the row's own `renameSession(foreground_chat, name)`; ViewTabs
+      switch stays last with the spacer pinning it right; 900px responsive step
+      ported); S5 (`renameChat` "Rename chat"/"Renombrar el chat" + `chatName`
+      reuse, parity + same-tick flip tests). TDD: RED 27 failed/9 passed, GREEN
+      36 passed; svelte-check 0, eslint clean.
+- [x] T3 (S3, S5) web — DONE, commit b95033f. Writer report: HelpersPanel
+      rebuilt to 01b's two columns — the list column always drawn (counters
+      above the listbox, right border, `minmax(200px,280px)` with the artboard's
+      1000px → 200px collapse, scoped styles), the selected helper's thread
+      beside it swapping in place, empty-chat chats keep the plain line;
+      HelperThread no longer takes focus on mount (the list keeps the keyboard,
+      arrow walk works with a thread beside it); the bar stays Back + heading +
+      mark, Back still dispatches the existing CloseHelper (no new intents);
+      copy unchanged (S5 nothing new). The one obsolete App-level pin ("thread
+      replaces the list") was swapped to "the list is drawn beside the thread"
+      with the parent's approval. TDD: RED 6 failed/42 passed, GREEN 48;
+      validation battery 711/711, svelte-check 0, eslint clean. Open for the
+      real-window check: the right column is blank when nothing is selected
+      (no placeholder copy was added), and Back's CloseHelper is visually a
+      selection-clear with the list always drawn.
+- [ ] T4 (close) battery + real-window check + roadmap note.
+
+## Log
+
+- L1 (maintainer, 2026-11-16): the four design decisions of the survey (pulse
+  build; timestamp keep; helpers two-column rebuild; row menu stays + header
+  Rename + right-aligned responsive switch), recorded in
+  `design/gentle-desk-v2/decisions.md` (merged as PR #174). "arranquemos ahora"
+  starts this feature.
+- L2 (parent, 2026-11-16): the design commit (artboards refreshed) was reviewed
+  natively — lineage review-a15f6a769484f8a4: the refuter corroborated two
+  CRITICAl findings the parent introduced (renderHelper still dereferenced the
+  removed `#h-follow`, throwing on artboard load in BOTH artboards); one
+  bounded correction (4 diff lines: the thread now always sticks, iced-always-
+  follows), targeted validation passed, APPROVED, authority burned. Then T2+T3
+  ran as parallel writers with disjoint surfaces; their combined slice
+  (`8d5ce5c..b95033f`) reviewed natively — lineage review-332bbfbafa4c0efa,
+  APPROVED (readability+reliability), with 4 advisory findings. The maintainer
+  approved a pre-push fix batch: R3-1 (the header rename now refuses honestly
+  when no chat is foreground: `canRename`, aria-disabled pencil + reason line,
+  no silent discard) and R3-2 (closing a helper thread returns focus to the
+  list — the open card's row, else the first; roving tabindex intact) — commit
+  c43be6a; the two R2 suggestions (CSS-parser dup in tests, Mark's class map
+  placement) stay backlog.
+- L3 (maintainer, 2026-11-16, real-window check): "no vale le cambio el nombre y
+  le doy enter y no edita aparte me salio esto: the chat's session file could not
+  be written: El nombre de archivo... (os error 123)". Root cause: the header's
+  pencil dispatches `foreground_chat` — the ChatId string (`session:<path>` for
+  stored chats, `new-<n>` for fresh) — while the row sends the bare session path;
+  the command handed the prefixed id straight to `Path::new` (os error 123).
+  Fix (commit e798133): `ChatId::session_path_of` is the one place the id scheme
+  is read (both forms resolve, fresh chats answered by `is_fresh`);
+  `chat_rename::rename` resolves FIRST (both forms rename the same file, the
+  row's raw-path form byte-identical), and a fresh chat refuses with the new
+  cataloged bilingual copy (`rename_no_session_refusal`, "A chat with no session
+  file yet has no name to change.") instead of an OS error. RED→GREEN
+  (chat_rename 7/7, chats 6/6, messages 3/3, clippy/fmt clean). The web side
+  needed no change — the id format is the Rust side's to read.

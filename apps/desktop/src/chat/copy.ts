@@ -21,6 +21,21 @@ export interface ChatCopy {
   /** Each tab's own word, in the order the tablist draws them. */
   tabs: Record<ViewTab, string>
   /**
+   * The pencil's one word: what the button does, drawn as its tooltip and read
+   * as its accessible name (chat-chrome-helpers S2).
+   */
+  renameChat: string
+  /**
+   * The inline rename field's name. It is the row's own word for the same field
+   * (the sidebar's `chatName`), so the two doors ask for the name the same way.
+   */
+  chatName: string
+  /**
+   * Why the pencil cannot rename right now: drawn as the line the pencil is
+   * described by while there is no chat to rename (chat-chrome-helpers S2).
+   */
+  renameReason: string
+  /**
    * The working badge's accessible name: one helper is singular, every other
    * count plural. The badge is drawn only while something runs, so this is never
    * asked for zero.
@@ -32,6 +47,9 @@ export interface ChatCopy {
 const ENGLISH: ChatCopy = {
   tabsLabel: 'View',
   tabs: { chat: 'Chat', helpers: 'Helpers' },
+  renameChat: 'Rename chat',
+  chatName: 'Chat name',
+  renameReason: 'No chat is open to rename.',
   workingBadge: (running) => (running === 1 ? '1 helper working' : `${running} helpers working`),
 }
 
@@ -40,9 +58,18 @@ const SPANISH: typeof ENGLISH = {
   tabsLabel: 'Vista',
   // "Chat" is the same word in Spanish, so it is shared on purpose.
   tabs: { chat: 'Chat', helpers: 'Ayudantes' },
+  renameChat: 'Renombrar el chat',
+  chatName: 'Nombre del chat',
+  renameReason: 'Ningún chat abierto para renombrar.',
   workingBadge: (running) =>
     running === 1 ? '1 ayudante trabajando' : `${running} ayudantes trabajando`,
 }
+
+/**
+ * The id of the line that says why the pencil cannot rename; the pencil is
+ * described by it (the composer's `SEND_WHY_ID` pattern, chat-chrome-helpers S2).
+ */
+export const RENAME_WHY_ID = 'chat-rename-why'
 
 /** The chat header's own words in `language`, the whole dictionary at once (D4). */
 export function chatCopy(language: LanguageView): typeof ENGLISH {

@@ -482,6 +482,16 @@ pub const fn rename_working_refusal(language: Language) -> &'static str {
     }
 }
 
+/// "A chat with no session file yet has no name to change.": a fresh chat has
+/// no file a name could be appended to, so the rename is refused in words
+/// instead of reaching a disk that has no target for it.
+pub const fn rename_no_session_refusal(language: Language) -> &'static str {
+    match language {
+        Language::En => "A chat with no session file yet has no name to change.",
+        Language::Es => "Un chat sin archivo de sesión todavía no tiene un nombre que cambiar.",
+    }
+}
+
 /// "the delete could not run: ..."
 pub fn delete_failed(language: Language, error: &str) -> String {
     match language {

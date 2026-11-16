@@ -22,7 +22,7 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use gentle_app::ChatActivity;
+use gentle_app::{ChatActivity, ChatId};
 use gentle_backend::session_rename::{self, DiskFiles, SessionFiles};
 use gentle_core::i18n::{messages, Language};
 use tauri::AppHandle;
@@ -35,6 +35,12 @@ use crate::contract::ViewState;
 /// in English: the catalog holds it in both languages and the command uses the
 /// language the config carries.
 pub const WORKING_CHILD: &str = messages::rename_working_refusal(Language::En);
+
+/// The one line a user reads when the chat they asked to rename has no session
+/// file yet: a fresh chat's name first reaches a file when its child stores the
+/// session, so there is nothing to append a name to (English form; the catalog
+/// holds both languages).
+pub const NO_SESSION: &str = messages::rename_no_session_refusal(Language::En);
 
 /// Whether the chat behind a session file has a child that is running a turn right
 /// now. The app already knows it (the host's working mark, as the reducer reports
@@ -59,7 +65,15 @@ pub struct Renamed {
     pub written: bool,
 }
 
-/// Renames the chat stored at `session` to `name`, or says why not in the slice.
+/// Renames the chat the id `chat` names to `name`, or says why not in the slice.
+///
+/// The id arrives as the UI holds it, both ways: the chat header sends the
+/// `foreground_chat` text (the `session:<path>` form) and a sidebar row sends the
+/// bare session path. [`ChatId::session_path_of`] resolves either to the session
+/// file, so one write serves both. A chat with no session file yet resolves to
+/// nothing: a fresh chat's name first reaches a file when its child stores the
+/// session, so the refusal is words instead of an OS error about a path that is
+/// not there (`NO_SESSION`).
 ///
 /// Answers the slice the user must see either way: a refusal carries its reason in
 /// `ViewState.sessions_notice` and leaves the file untouched, and a rename clears
@@ -68,9 +82,16 @@ pub fn rename(
     holder: &AppStateHolder,
     files: &dyn SessionFiles,
     working: &dyn WorkingChats,
-    session: &str,
+    chat: &str,
     name: &str,
 ) -> Renamed {
+    let Some(session) = ChatId::session_path_of(chat) else {
+        let refusal = messages::rename_no_session_refusal(holder.language()).to_owned();
+        return Renamed {
+            view: holder.note_sessions_problem(refusal),
+            written: false,
+        };
+    };
     if working.is_working(session) {
         let refusal = messages::rename_working_refusal(holder.language()).to_owned();
         return Renamed {
@@ -93,8 +114,9 @@ pub fn rename(
     }
 }
 
-/// Renames one chat (S4): the row sends the session path it was given and the name
-/// typed in its title, and the answer is the slice the sidebar draws.
+/// Renames one chat (S4): the chat id the UI holds - the row's session path or the
+/// header's `foreground_chat` text - and the name typed in its title, and the
+/// answer is the slice the sidebar draws.
 ///
 /// The write happens off the window's thread. A rename that lands asks the session
 /// list for the pass that reads the name back, which is what moves the row and the

@@ -9,10 +9,24 @@
   import { MARK_LABELS, MARK_SHAPES, MARK_VARS, type MarkKind } from './shapes'
 
   let { kind, label = MARK_LABELS[kind] }: { kind: MarkKind; label?: string } = $props()
+
+  /**
+   * The state class 01a names for each mark: the rules that belong to one state
+   * - the Working pulse - hang off it, so a state that must not move never
+   * borrows another's class. The colour still arrives through `MARK_VARS`.
+   */
+  const MARK_CLASSES: Record<MarkKind, string> = {
+    Working: 'm-working',
+    Queued: 'm-queued',
+    Opening: 'm-opening',
+    NewReply: 'm-reply',
+    NeedsAttention: 'm-attn',
+    Ended: 'm-ended',
+  }
 </script>
 
 <svg
-  class="mark"
+  class="mark {MARK_CLASSES[kind]}"
   style={`color: var(${MARK_VARS[kind]})`}
   viewBox="0 0 24 24"
   role="img"

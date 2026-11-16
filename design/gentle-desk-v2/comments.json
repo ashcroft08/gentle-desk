@@ -66,6 +66,18 @@
       "status": "resolved",
       "sentAt": "2026-11-09T06:22:07.084Z",
       "resolvedAt": "2026-11-09T06:25:20.879Z"
+    },
+    {
+      "id": "f42p5918",
+      "file": "01a-tree-chat.html",
+      "selector": "#more",
+      "excerpt": "Chat actions",
+      "comment": "mejor ponle un icono de lapiz ya que quiero que esto solo sea para poder editar el nombre para poder eliminarlo que lo haga desde la columna del workspace",
+      "createdAt": "2026-11-16T16:15:07.881Z",
+      "status": "resolved",
+      "sentAt": "2026-11-16T16:15:07.925Z",
+      "resolvedAt": "2026-11-16T16:19:44.834Z",
+      "resolution": "The header control is now a single pencil button that opens the inline rename directly (menu gone); Delete stays with the workspace column's row menu. Applied to both 01a and 01b headers."
     }
   ]
 }

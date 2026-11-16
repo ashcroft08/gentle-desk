@@ -31,6 +31,7 @@
   import Welcome from './welcome/Welcome.svelte'
   import WhatsNewDialog from './whats-new/WhatsNewDialog.svelte'
   import { appCopy } from './app-copy'
+  import { renameSession } from './bridge'
   import { language } from './i18n/language.svelte'
 
   const thread = createThreadView()
@@ -47,6 +48,15 @@
   // The active view is the shell's own choice, never Rust's state: it survives a
   // push and a chat switch, and the next start begins on Chat.
   let tab = $state<ViewTab>('chat')
+
+  /** The header's pencil (chat-chrome-helpers S2): the same rename the row sends.
+   * The header is told whether there is a chat to rename (`canRename`), so the one
+   * state that has none says why there instead of dropping the name here. */
+  function renameChat(name: string): void {
+    const session = chat.chat
+    if (session === null) return
+    void renameSession(session, name)
+  }
   // The sidebar's collapse (responsive-sidebar S2, S3): the width decides
   // until the user toggles it, and a manual toggle wins for the run. The
   // width follows the window's resizes.
@@ -160,6 +170,8 @@
         collapsed={sidebarCollapsed}
         onToggleSidebar={() => (manualCollapsed = !sidebarCollapsed)}
         onSelect={(next) => (tab = next)}
+        onRename={renameChat}
+        canRename={chat.chat !== null}
       />
       {#if shownNotices.length > 0}
         <div class="notices">

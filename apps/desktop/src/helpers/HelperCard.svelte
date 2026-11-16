@@ -67,6 +67,11 @@
     user-select: none;
   }
 
+  /* 01b's `.hl .row .mark`: the mark sits on the agent's line, not above it. */
+  .card > :global(svg) {
+    margin-top: 4px;
+  }
+
   .card:hover {
     background: var(--surface2);
     box-shadow: inset 0 0 0 1px var(--border);

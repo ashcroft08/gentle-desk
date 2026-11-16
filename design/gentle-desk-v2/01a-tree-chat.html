@@ -102,6 +102,7 @@ dialog .acts{display:flex;justify-content:flex-end;gap:8px}
 @media (max-width:1000px){.hv{grid-template-columns:200px 1fr}}
 
 .app{grid-template-columns:280px 1fr}
+@media (max-width:900px){.mh{height:48px;padding:0 12px}.mh h1{font-size:14px}.mh .crumb{display:none}.seg [role="tab"]{padding:4px 10px}}
 .row[aria-selected="true"]{box-shadow:none}
 .row[aria-selected="true"]:hover{box-shadow:inset 0 0 0 1px var(--border)}
 .side{background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;min-height:0;padding:12px 10px 8px}
@@ -130,7 +131,7 @@ code{font-variant-ligatures:none}
 .menu.mr{left:auto;right:0;min-width:210px}
 </style></head>
 <body>
-<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/> <path d="M12 5v14"/></symbol><symbol id="i-folder" viewBox="0 0 24 24"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></symbol><symbol id="i-folder-plus" viewBox="0 0 24 24"><path d="M12 10v6"/> <path d="M9 13h6"/> <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></symbol><symbol id="i-chat" viewBox="0 0 24 24"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/></symbol><symbol id="i-more" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/> <circle cx="19" cy="12" r="1"/> <circle cx="5" cy="12" r="1"/></symbol><symbol id="i-send" viewBox="0 0 24 24"><path d="m5 12 7-7 7 7"/> <path d="M12 19V5"/></symbol><symbol id="i-stop" viewBox="0 0 24 24"><g fill="currentColor"><rect width="18" height="18" x="3" y="3" rx="2"/></g></symbol><symbol id="i-follow" viewBox="0 0 24 24"><path d="M12 17V3"/> <path d="m6 11 6 6 6-6"/> <path d="M19 21H5"/></symbol><symbol id="i-terminal" viewBox="0 0 24 24"><path d="M12 19h8"/> <path d="m4 17 6-6-6-6"/></symbol><symbol id="i-back" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7"/> <path d="M19 12H5"/></symbol><symbol id="i-theme" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/> <path d="M12 18a6 6 0 0 0 0-12v12z"/></symbol><symbol id="i-bolt" viewBox="0 0 24 24"><path d="M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z"/></symbol><symbol id="i-circle-plus" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/><path d="M12 8v8"/></symbol><symbol id="i-folder-open" viewBox="0 0 24 24"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></symbol><symbol id="i-restart" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/> <path d="M3 3v5h5"/></symbol><symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/> <path d="m6 6 12 12"/></symbol><symbol id="m-working" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></symbol><symbol id="m-queued" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/> <path d="M12 6v6l4 2"/></symbol><symbol id="m-opening" viewBox="0 0 24 24"><path d="M12 2v4"/> <path d="m16.2 7.8 2.9-2.9"/> <path d="M18 12h4"/> <path d="m16.2 16.2 2.9 2.9"/> <path d="M12 18v4"/> <path d="m4.9 19.1 2.9-2.9"/> <path d="M2 12h4"/> <path d="m4.9 4.9 2.9 2.9"/></symbol><symbol id="m-reply" viewBox="0 0 24 24"><path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"/></symbol><symbol id="m-attn" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/> <path d="M12 9v4"/> <path d="M12 17h.01"/></symbol><symbol id="m-ended" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/> <path d="m15 9-6 6"/> <path d="m9 9 6 6"/></symbol><symbol id="m-done" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/> <path d="m16 9-5.5 5.5L8 12"/></symbol></defs></svg>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/> <path d="M12 5v14"/></symbol><symbol id="i-folder" viewBox="0 0 24 24"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></symbol><symbol id="i-folder-plus" viewBox="0 0 24 24"><path d="M12 10v6"/> <path d="M9 13h6"/> <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></symbol><symbol id="i-chat" viewBox="0 0 24 24"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/></symbol><symbol id="i-pencil" viewBox="0 0 24 24"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></symbol><symbol id="i-more" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/> <circle cx="19" cy="12" r="1"/> <circle cx="5" cy="12" r="1"/></symbol><symbol id="i-send" viewBox="0 0 24 24"><path d="m5 12 7-7 7 7"/> <path d="M12 19V5"/></symbol><symbol id="i-stop" viewBox="0 0 24 24"><g fill="currentColor"><rect width="18" height="18" x="3" y="3" rx="2"/></g></symbol><symbol id="i-follow" viewBox="0 0 24 24"><path d="M12 17V3"/> <path d="m6 11 6 6 6-6"/> <path d="M19 21H5"/></symbol><symbol id="i-terminal" viewBox="0 0 24 24"><path d="M12 19h8"/> <path d="m4 17 6-6-6-6"/></symbol><symbol id="i-back" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7"/> <path d="M19 12H5"/></symbol><symbol id="i-theme" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/> <path d="M12 18a6 6 0 0 0 0-12v12z"/></symbol><symbol id="i-bolt" viewBox="0 0 24 24"><path d="M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z"/></symbol><symbol id="i-circle-plus" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/><path d="M12 8v8"/></symbol><symbol id="i-folder-open" viewBox="0 0 24 24"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></symbol><symbol id="i-restart" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/> <path d="M3 3v5h5"/></symbol><symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/> <path d="m6 6 12 12"/></symbol><symbol id="m-working" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></symbol><symbol id="m-queued" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/> <path d="M12 6v6l4 2"/></symbol><symbol id="m-opening" viewBox="0 0 24 24"><path d="M12 2v4"/> <path d="m16.2 7.8 2.9-2.9"/> <path d="M18 12h4"/> <path d="m16.2 16.2 2.9 2.9"/> <path d="M12 18v4"/> <path d="m4.9 19.1 2.9-2.9"/> <path d="M2 12h4"/> <path d="m4.9 4.9 2.9 2.9"/></symbol><symbol id="m-reply" viewBox="0 0 24 24"><path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"/></symbol><symbol id="m-attn" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/> <path d="M12 9v4"/> <path d="M12 17h.01"/></symbol><symbol id="m-ended" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/> <path d="m15 9-6 6"/> <path d="m9 9 6 6"/></symbol><symbol id="m-done" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/> <path d="m16 9-5.5 5.5L8 12"/></symbol></defs></svg>
 <a class="skip" href="#main">Skip to chat</a>
 <div class="app">
 <aside class="side" aria-label="Workspaces">
@@ -142,8 +143,7 @@ code{font-variant-ligatures:none}
 <main id="main" class="main" style="display:grid;grid-template-rows:auto 1fr;min-height:0">
 <header class="mh">
  <h1 id="title">Tauri skeleton: window and bridge</h1>
- <span class="menu-wrap"><button class="ic" type="button" id="more" data-tip="Chat actions" aria-label="Chat actions" aria-haspopup="menu" aria-expanded="false"><svg class="" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-more"/></svg></button>
- <div class="menu" id="menu" role="menu" hidden><button type="button" role="menuitem" id="m-rename">Rename</button><button type="button" role="menuitem" class="d" id="m-delete">Delete</button></div></span>
+ <button class="ic" type="button" id="rename" data-tip="Rename chat" aria-label="Rename chat"><svg class="" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-pencil"/></svg></button>
  <span class="sp"></span>
  <div class="seg" role="tablist" id="views" aria-label="View"><button type="button" role="tab" id="t-chat" aria-controls="p-chat" aria-selected="true" tabindex="0">Chat</button><button type="button" role="tab" id="t-help" aria-controls="p-helpers" aria-selected="false" tabindex="-1">Helpers<svg class="mark m-working" viewBox="0 0 24 24" role="img" aria-label="1 helper working"><title>1 helper working</title><use href="#m-working"/></svg></button></div>
 </header>
@@ -156,7 +156,7 @@ code{font-variant-ligatures:none}
  <div class="hv">
   <div class="hl"><div role="listbox" data-nav aria-label="Helpers"><div role="option" data-item data-helper="h1" tabindex="-1" class="row" aria-selected="true"><svg class="mark m-working" viewBox="0 0 24 24" role="img" aria-label="Running"><title>Running</title><use href="#m-working"/></svg><span class="t"><span>explore</span><span class="sub">Inventory of sidebar modules</span></span></div><div role="option" data-item data-helper="h2" tabindex="-1" class="row" aria-selected="false"><svg class="mark m-done" viewBox="0 0 24 24" role="img" aria-label="Done"><title>Done</title><use href="#m-done"/></svg><span class="t"><span>verify</span><span class="sub">Contract tests for the bridge</span></span></div><div role="option" data-item data-helper="h3" tabindex="-1" class="row" aria-selected="false"><svg class="mark m-queued" viewBox="0 0 24 24" role="img" aria-label="Waiting"><title>Waiting</title><use href="#m-queued"/></svg><span class="t"><span>worker</span><span class="sub">Bridge event types</span></span></div></div></div>
   <div class="ht">
-   <div class="ht-bar"><button class="ic tip-l" type="button" id="back" data-tip="Back to chat" aria-label="Back to chat"><svg class="" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-back"/></svg></button><h2 id="h-name"></h2><button class="ic " type="button" aria-pressed="true" id="h-follow" data-tip="Follow live" aria-label="Follow live"><svg class="" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-follow"/></svg></button><button class="ic " type="button" aria-pressed="false" data-toggle="tools" id="h-tools" data-tip="Show tool details" aria-label="Show tool details"><svg class="" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-terminal"/></svg></button><button class="ic danger tip-r" type="button" id="h-stop" data-tip="Stop" aria-label="Stop"><svg class="" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-stop"/></svg></button></div>
+   <div class="ht-bar"><button class="ic tip-l" type="button" id="back" data-tip="Back to chat" aria-label="Back to chat"><svg class="" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-back"/></svg></button><h2 id="h-name"></h2></div>
    <div class="ht-body" id="h-body" aria-live="polite"></div>
   </div>
  </div>
@@ -164,7 +164,6 @@ code{font-variant-ligatures:none}
 </div>
 </main>
 </div>
-<dialog id="del" aria-labelledby="del-h"><h2 id="del-h">Delete this chat?</h2><p>The chat file is removed from disk and cannot be restored.</p><code>&lt;home&gt;\sessions\--&lt;project&gt;--\&lt;stamp&gt;_&lt;id&gt;.jsonl</code><div class="acts"><button class="btn" type="button" id="del-cancel">Cancel</button><button class="btn d" type="button" id="del-ok">Delete</button></div></dialog>
 <script type="application/json" id="hdata">{"h1":{"name":"explore","task":"Inventory of sidebar modules","mark":"working","stop":true,"lines":[["a","Reading crates/runtime to list what the bridge must expose."],["t","read crates/runtime/src/lib.rs"],["a","Found 14 intents and 6 state events so far."],["t","grep Intent crates/runtime"],["a","Still scanning the sessions module."]]},"h2":{"name":"verify","task":"Contract tests for the bridge","mark":"done","stop":false,"lines":[["a","All 9 contract tests pass against the stand-in shell."],["t","cargo test -p runtime bridge"],["a","No orphan processes after close."]]},"h3":{"name":"worker","task":"Bridge event types","mark":"queued","stop":false,"lines":[["a","Waiting for a free slot."]]}}</script>
 <script>
 (function(){
@@ -179,13 +178,8 @@ function renderHelper(id){
  document.getElementById('h-name').textContent=h.name+' - '+h.task;
  body.innerHTML='';
  h.lines.forEach(function(l){var p=document.createElement('p');if(l[0]==='t'){p.className='tool';var c=document.createElement('code');c.textContent=l[1];p.appendChild(c);}else{p.className='a';p.textContent=l[1];}body.appendChild(p);});
- var st=document.getElementById('h-stop');st.disabled=!h.stop;
- if(document.getElementById('h-follow').getAttribute('aria-pressed')==='true')body.scrollTop=body.scrollHeight;
+ body.scrollTop=body.scrollHeight;
 }
-document.querySelectorAll('[aria-pressed]').forEach(function(b){b.addEventListener('click',function(){
- b.setAttribute('aria-pressed',b.getAttribute('aria-pressed')==='true'?'false':'true');
- if(b.dataset.toggle==='tools'&&body)body.classList.toggle('show-tools');
-});});
 document.querySelectorAll('[role=tablist]').forEach(function(list){
  var tabs=[].slice.call(list.querySelectorAll('[role=tab]'));
  function activate(t,focus){tabs.forEach(function(x){var on=x===t;x.setAttribute('aria-selected',on?'true':'false');x.tabIndex=on?0:-1;var p=document.getElementById(x.getAttribute('aria-controls'));if(p)p.hidden=!on;});if(focus)t.focus();}
@@ -219,21 +213,13 @@ document.querySelectorAll('[data-nav]').forEach(function(box){
   else if(e.key==='ArrowLeft'&&it.getAttribute('aria-expanded')==='true'){e.preventDefault();pick(it);return;}
   if(n){e.preventDefault();rove(n);n.focus();}});
 });
-var more=document.getElementById('more'),menu=document.getElementById('menu'),title=document.getElementById('title');
-function closeMenu(f){menu.hidden=true;more.setAttribute('aria-expanded','false');if(f)more.focus();}
-if(more){more.addEventListener('click',function(){var o=menu.hidden;menu.hidden=!o;more.setAttribute('aria-expanded',o?'true':'false');if(o)menu.querySelector('button').focus();});
- menu.addEventListener('keydown',function(e){if(e.key==='Escape'){e.preventDefault();closeMenu(true);}});
- document.addEventListener('click',function(e){if(!menu.hidden&&!menu.contains(e.target)&&e.target!==more&&!more.contains(e.target))closeMenu(false);});
- document.getElementById('m-rename').addEventListener('click',function(){closeMenu(false);var old=title.textContent;title.contentEditable='true';title.focus();
-  var sr=window.getSelection(),r=document.createRange();r.selectNodeContents(title);sr.removeAllRanges();sr.addRange(r);
-  function end(ok){title.contentEditable='false';if(!ok)title.textContent=old;title.removeEventListener('keydown',kd);title.removeEventListener('blur',bl);more.focus();}
-  function kd(e){if(e.key==='Enter'){e.preventDefault();end(true);}else if(e.key==='Escape'){e.preventDefault();end(false);}}
-  function bl(){end(true);}
-  title.addEventListener('keydown',kd);title.addEventListener('blur',bl);});
- document.getElementById('m-delete').addEventListener('click',function(){closeMenu(false);document.getElementById('del').showModal();});
-}
-var del=document.getElementById('del');
-if(del){document.getElementById('del-cancel').addEventListener('click',function(){del.close();});document.getElementById('del-ok').addEventListener('click',function(){del.close();});del.addEventListener('close',function(){if(more)more.focus();});}
+var rename=document.getElementById('rename'),title=document.getElementById('title');
+if(rename){rename.addEventListener('click',function(){var old=title.textContent;title.contentEditable='true';title.focus();
+ var sr=window.getSelection(),r=document.createRange();r.selectNodeContents(title);sr.removeAllRanges();sr.addRange(r);
+ function end(ok){title.contentEditable='false';if(!ok)title.textContent=old;title.removeEventListener('keydown',kd);title.removeEventListener('blur',bl);rename.focus();}
+ function kd(e){if(e.key==='Enter'){e.preventDefault();end(true);}else if(e.key==='Escape'){e.preventDefault();end(false);}}
+ function bl(){end(true);}
+ title.addEventListener('keydown',kd);title.addEventListener('blur',bl);});}
 var ta=document.getElementById('msg');
 if(ta)ta.addEventListener('input',function(){ta.style.height='auto';ta.style.height=Math.min(ta.scrollHeight,120)+'px';});
 renderHelper('h1');

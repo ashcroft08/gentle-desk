@@ -80,6 +80,20 @@ calendar one. Version numbers never repeat or go down (updater compares them).
   `GENTLE_SHELL_INTERACTIVE_HOST` set; it is a new surface and a child that ignores it
   must degrade to today's behaviour, never break.
 
+## 0.4.x: stopping a helper (agreed 2026-11-16, maintainer: "agenda helper Stop como feature propio")
+
+- What: stop ONE running helper (subagent) without touching the chat or its other
+  helpers. The capability does not exist today: the contract only carries the
+  chat-level `Abort` (`bindings.ts:1189`) and the helper channel has
+  `SelectHelper`/`CloseHelper` only, so the red square the old artboard drew
+  (`01b`'s `i-stop`) was a control with no backend — it stayed out of the
+  two-column rebuild for that reason.
+- What it needs: a new intent (`StopHelper`) through the contract, the app-side
+  execution that stops that helper's work and marks it `Ended`/`Cancelled` while
+  the chat keeps running, and the helper thread bar's red square (the artboard's
+  own `i-stop`), enabled only while that helper is running. Bilingual copy
+  (`Stop` / `Detener`). Capability jump: minor bump when it ships.
+
 ## 0.2.x: removing a workspace, and deleting its chats (agreed 2026-11-14; RELEASED 2026-11-16 as 0.3.0, tag v0.3.0)
 
 - 2026-11-16 rulings at pickup: the GATE replaced the opt-in checkbox (a workspace
@@ -88,6 +102,9 @@ calendar one. Version numbers never repeat or go down (updater compares them).
   DEFERRED (own feature if ever wanted). See odd/tasks/workspace-removal.md.
 
 Target after the 0.2.0 language work (new UI must be born bilingual). Nothing here is
+re-argued. Queue order, the maintainer's call each time: (1) chat chrome + helpers
+two-column (in flight, odd/tasks/chat-chrome-helpers.md), (2) the desktop RPC channel
+below, (3) stopping a helper (next section).
 built or started; this records the decision and the measurements so it is not
 re-argued.
 

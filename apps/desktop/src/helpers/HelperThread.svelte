@@ -8,7 +8,10 @@
   // follows and always shows tools, decided in T7b-1), and there is no Stop:
   // the only control is the drawn Back. So the thread sticks to the end while
   // the reader is at the end, and shows every tool call, with no switch.
-  import { onMount } from 'svelte'
+  //
+  // Since T3 the thread is drawn BESIDE the helper list, never in its place, so
+  // it takes no focus when it appears: the list it sits next to keeps the
+  // keyboard, which is what walking it with a thread open needs.
   import type { HelperThreadView as HelperThread } from '../contract/bindings'
   import Icon from '../icons/Icon.svelte'
   import Mark from '../icons/Mark.svelte'
@@ -45,13 +48,8 @@
   )
 
   let box: HTMLElement | null = $state(null)
-  let back: HTMLButtonElement | null = $state(null)
   /** Whether the reader is stuck to the end; scrolling up unsticks them. */
   let stick = true
-
-  // The Back control takes the focus when the thread opens: the card the reader
-  // came from is gone, and the way out is the one control here.
-  onMount(() => back?.focus())
 
   // The cache follows the items on screen: a thread that moved on keeps no
   // render of the items it no longer draws.
@@ -85,7 +83,6 @@
       aria-label={copy.back}
       title={copy.back}
       onclick={onBack}
-      bind:this={back}
     >
       <Icon name="back" />
     </button>

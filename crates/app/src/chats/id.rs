@@ -16,7 +16,10 @@ impl ChatId {
     /// A brand-new chat: it has no session file yet, so its child is started
     /// without one. Ids are never reused, so a reopened chat is a new chat.
     pub fn fresh() -> Self {
-        Self(format!("new-{}", NEXT.fetch_add(1, Ordering::Relaxed)))
+        Self(format!(
+            "{FRESH_PREFIX}{}",
+            NEXT.fetch_add(1, Ordering::Relaxed)
+        ))
     }
 
     /// The chat of a stored session. The path is the identity: opening the same
@@ -30,6 +33,25 @@ impl ChatId {
     /// scheme itself.
     pub fn session_path(&self) -> Option<&str> {
         self.0.strip_prefix(SESSION_PREFIX)
+    }
+
+    /// The session file the id TEXT names, if it names one: a command that starts
+    /// from an id the UI holds reads the scheme here and nowhere else.
+    ///
+    /// Both live forms answer their file. The chat header sends the [`ChatId`]
+    /// text itself (`foreground_chat`, the `of_session` form), and a sidebar row
+    /// still sends the bare session path; the rename both share writes the same
+    /// session file either way. A fresh chat ([`ChatId::fresh`]) has no file yet,
+    /// so it answers `None` - there is nothing to append a name to - and so does
+    /// an id that carries no path at all. Anything else is read as the path it
+    /// already was, so a string the app does not recognise is refused by the disk
+    /// in the disk's own words, exactly as before.
+    pub fn session_path_of(id: &str) -> Option<&str> {
+        if is_fresh(id) {
+            return None;
+        }
+        let path = id.strip_prefix(SESSION_PREFIX).unwrap_or(id);
+        (!path.is_empty()).then_some(path)
     }
 
     /// The id as text, the way the UI holds it.
@@ -54,6 +76,19 @@ impl ChatId {
 static NEXT: AtomicU64 = AtomicU64::new(1);
 
 const SESSION_PREFIX: &str = "session:";
+const FRESH_PREFIX: &str = "new-";
+
+/// Whether `id` is exactly [`ChatId::fresh`]'s form: the fresh prefix and the
+/// counter, so a path that merely starts with the same letters is not read as a
+/// chat that has no file yet.
+fn is_fresh(id: &str) -> bool {
+    id.strip_prefix(FRESH_PREFIX).is_some_and(|counter| {
+        !counter.is_empty() && counter.bytes().all(|byte| byte.is_ascii_digit())
+    })
+}
+
+#[cfg(test)]
+mod tests;
 
 impl fmt::Display for ChatId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
