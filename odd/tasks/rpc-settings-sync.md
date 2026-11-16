@@ -194,3 +194,20 @@ editor and the subagents/jobs slices.
   (one watchable dir out of two reports success; the focus refresh covers the
   other group; observability needs a diagnostics channel that does not exist yet)
   and R4-002 (the stop thread failing to spawn — out-of-domain).
+- L8 (parent, 2026-11-16): native review of the watcher's fix commit — lineage
+  review-a9e809678ce88714 (reliability, 409 lines): the authorized reliability run
+  ($0.022) raised a CRITICAL candidate, so the cycle required the refuter; the
+  maintainer authorized it separately ($0.003, glm-5.3-flash) and it REFUTED the
+  CRITICAL (R3-start-stop-race: a close's `stop` between `start`'s internal stop
+  and the install of the new watcher; the refuter did not confirm it as
+  reachable — `start` runs once at setup, before the close can arm). APPROVED,
+  authority burned; total ~$0.025 across 2 runs, each asked first. One WARNING
+  stays informational and is recorded as BACKLOG, with an honest caveat about my
+  own fix: R3-due-check-after-option — `Debouncer::push` returns on an ignored
+  event (`let group = group?;`) BEFORE the due check, so an ignored event does not
+  flush an already-due batch; the fix's "due before merge" rule therefore holds
+  for relevant events only, and its late-event test covers only a relevant
+  group. Impact is bounded (the loop's next iteration computes a zero timeout
+  and flushes) but that analysis is NOT verified; a one-line reorder plus an
+  ignored-event test would close it, and it should ride with the next slice that
+  touches `watch.rs`.
