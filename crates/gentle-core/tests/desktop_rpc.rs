@@ -4,7 +4,9 @@
 //! Every literal below is the channel spec's own example, verbatim from
 //! `desktop-rpc.md` of gentle-pi 4.8.0 (`gentle-shell.desktop-rpc/v1`), except
 //! the outer `extension_ui_request` frame: that is pi's (`fixtures/desktop-rpc.jsonl`,
-//! decoded the same way every other recorded frame is).
+//! decoded the same way every other recorded frame is), and the `real_frames`
+//! module, which reads the bytes a REAL child wrote during T1's probe
+//! (`fixtures/desktop-rpc-real.jsonl`) instead of the spec's examples.
 //!
 //! The real-IO half of the transport is the backend seam
 //! (`crates/backend/src/chat_host/desktop.rs`); this file drives the pure half
@@ -14,10 +16,10 @@ use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
 use gentle_core::rpc::{
-    decode_line, parse_widget_payload, widget_payload, ChannelReply, Decoded, DesktopChannel,
-    DesktopClient, DesktopError, DesktopOutcome, DesktopRequest, NoAnswer, RequestError,
-    RpcCommand, RpcEvent, UiRequest, WidgetPayload, MAX_METHOD_CHARS, MAX_REQUEST_BYTES,
-    MAX_REQUEST_ID_CHARS, SCHEMA, WIDGET_KEY,
+    decode_line, parse_widget_payload, widget_payload, ChannelReply, Decoded, DesktopCapabilities,
+    DesktopChannel, DesktopClient, DesktopError, DesktopOutcome, DesktopRequest, NoAnswer,
+    RequestError, RpcCommand, RpcEvent, UiRequest, WidgetPayload, MAX_METHOD_CHARS,
+    MAX_REQUEST_BYTES, MAX_REQUEST_ID_CHARS, SCHEMA, WIDGET_KEY,
 };
 use serde_json::{json, Value};
 
@@ -52,13 +54,26 @@ const DOC_ERROR: &str = r#"{
 
 const FIXTURE: &str = include_str!("fixtures/desktop-rpc.jsonl");
 
-fn fixture(index: usize) -> String {
-    FIXTURE
-        .lines()
+/// The bytes a real child wrote: gentle-shell 4.8.0's `pi --mode rpc` under
+/// `GENTLE_SHELL_INTERACTIVE_HOST=1`, sandboxed empty home, probed on
+/// 2026-11-16 (this feature's T1). Nothing here is the spec's example, so these
+/// are the frames the client must keep reading as the contract changes hands.
+const REAL_FIXTURE: &str = include_str!("fixtures/desktop-rpc-real.jsonl");
+
+fn fixture_line(raw: &'static str, index: usize) -> String {
+    raw.lines()
         .filter(|line| !line.trim().is_empty())
         .nth(index)
         .unwrap_or_else(|| panic!("fixture line {index} is missing"))
         .to_owned()
+}
+
+fn fixture(index: usize) -> String {
+    fixture_line(FIXTURE, index)
+}
+
+fn real_frame(index: usize) -> String {
+    fixture_line(REAL_FIXTURE, index)
 }
 
 fn value(raw: &str) -> Value {
@@ -401,6 +416,140 @@ mod answer {
         ] {
             assert_eq!(parse_widget_payload(payload), None, "{payload}");
         }
+    }
+}
+
+mod real_frames {
+    use super::*;
+
+    #[test]
+    fn the_real_capabilities_frame_parses_into_the_contract() {
+        let payload = payload_of(&real_frame(0)).expect("a desktop payload");
+
+        let Some(WidgetPayload::Response(response)) = parse_widget_payload(&payload) else {
+            panic!("expected a response envelope, got {payload}");
+        };
+        assert_eq!(response.request_id.as_deref(), Some("desktop-1"));
+        let data = response.outcome.expect("an ok answer");
+        let capabilities = DesktopCapabilities::from_data(&data).expect("the contract");
+
+        for method in [
+            "get_snapshot",
+            "get_config",
+            "set_config",
+            "list_subagents",
+            "cancel_subagent",
+            "cancel_job",
+        ] {
+            assert!(capabilities.supports(method), "{method}");
+        }
+        assert_eq!(capabilities.methods.len(), 14);
+        for event in ["config_changed", "agents_update", "jobs_update"] {
+            assert!(capabilities.events.contains(event), "{event}");
+        }
+        assert_eq!(capabilities.events.len(), 7);
+        assert_eq!(data["command"], "gentle:desktop");
+        assert_eq!(data["widget"], WIDGET_KEY);
+    }
+
+    #[test]
+    fn the_real_snapshot_frame_parses_into_the_sequence_and_six_stores() {
+        let payload = payload_of(&real_frame(1)).expect("a desktop payload");
+
+        let Some(WidgetPayload::Response(response)) = parse_widget_payload(&payload) else {
+            panic!("expected a response envelope, got {payload}");
+        };
+        assert_eq!(response.request_id.as_deref(), Some("desktop-2"));
+        let data = response.outcome.expect("an ok answer");
+
+        assert_eq!(data["sequence"], 0);
+        let stores = data["state"]["config"]["stores"]
+            .as_array()
+            .expect("the snapshot's store list");
+        let identities: Vec<(&str, &str, &str)> = stores
+            .iter()
+            .map(|store| {
+                (
+                    store["store"].as_str().expect("a store name"),
+                    store["status"].as_str().expect("a status"),
+                    store["revision"].as_str().expect("a revision"),
+                )
+            })
+            .collect();
+
+        assert_eq!(
+            identities,
+            [
+                (
+                    "profiles",
+                    "missing",
+                    "sha256:0f7d615cbdb6cd4cb6838732f0e7e469"
+                ),
+                (
+                    "models",
+                    "missing",
+                    "sha256:2e876c5d88ab6f8d9169a358c3cb98a3"
+                ),
+                (
+                    "profile_fallbacks",
+                    "missing",
+                    "sha256:0731468fb189bd660ce309c1048cc065"
+                ),
+                (
+                    "subagents",
+                    "missing",
+                    "sha256:84931a44c97dea9327108d5123dbcbb1"
+                ),
+                ("pins", "invalid", "sha256:e19ce0d97dcab2b402a603b978d0d88b"),
+                (
+                    "managed_assets",
+                    "ok",
+                    "sha256:74164d820eb8b183c98906b22ef4923b"
+                ),
+            ],
+            "the six stores, in the child's own order"
+        );
+        for (_, _, revision) in &identities {
+            assert_eq!(
+                revision.len(),
+                "sha256:".len() + 32,
+                "the real child's revisions are 32 hex characters, not 64: {revision}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_client_replaying_the_real_frames_answers_capabilities_then_the_snapshot() {
+        let channel = FakeChannel::answering(vec![
+            ChannelReply::Widget(
+                payload_of(&real_frame(0)).expect("the real capabilities payload"),
+            ),
+            ChannelReply::Widget(payload_of(&real_frame(1)).expect("the real snapshot payload")),
+        ]);
+        let mut client = DesktopClient::new(Arc::clone(&channel));
+
+        let answered = client.connect();
+        let DesktopOutcome::Data { request_id, .. } = answered else {
+            panic!("expected the capabilities answer, got {answered:?}");
+        };
+        assert_eq!(request_id, "desktop-1");
+        assert!(client.supports("get_snapshot"));
+
+        let answered = client.ask("get_snapshot", json!({}));
+        let DesktopOutcome::Data { request_id, data } = answered else {
+            panic!("expected the snapshot answer, got {answered:?}");
+        };
+        assert_eq!(request_id, "desktop-2");
+        assert_eq!(data["sequence"], 0);
+        assert_eq!(
+            data["state"]["config"]["stores"].as_array().map(Vec::len),
+            Some(6)
+        );
+
+        let requests = channel.sent();
+        let sent: Vec<&str> = requests.iter().map(DesktopRequest::method).collect();
+        assert_eq!(sent, ["capabilities", "get_snapshot"]);
+        assert_eq!(requests[1].params(), &json!({}));
     }
 }
 
