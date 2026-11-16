@@ -16,14 +16,17 @@
   //
   // The file is the shell's, so editing, creating and switching happen in the
   // terminal: the one button opens that window, and the pane asks for a fresh
-  // read when the pane opens and again when the desk takes the focus back -
-  // which is what "the panel refreshes when the terminal closes" means.
+  // read when the pane opens, when the desk takes the focus back - which is what
+  // "the panel refreshes when the terminal closes" means - and when the native
+  // watcher says these two files changed on disk while the pane is mounted
+  // (rpc-settings-sync T3b-2).
   import { dispatchIntent, openTerminal } from '../bridge'
   import type {
     OrchestratorModeView,
     ProfilesView_Serialize as ProfilesView,
   } from '../contract/bindings'
   import { language } from '../i18n/language.svelte'
+  import { coalesced, followSettingsFiles } from './files-changed'
   import {
     PROFILE_PANEL_IDS,
     PROFILE_TABS,
@@ -55,8 +58,10 @@
   )
 
   /** One read per open, so the pane never draws another run's file. */
+  const read = coalesced(() => dispatchIntent({ type: 'RefreshProfiles' }))
+
   $effect(() => {
-    void dispatchIntent({ type: 'RefreshProfiles' })
+    void read()
   })
 
   /**
@@ -64,18 +69,20 @@
    * the same push any other change takes, never a timer.
    */
   $effect(() => {
-    const read = () => void dispatchIntent({ type: 'RefreshProfiles' })
-    window.addEventListener('focus', read)
-    return () => window.removeEventListener('focus', read)
+    const again = () => void read()
+    window.addEventListener('focus', again)
+    return () => window.removeEventListener('focus', again)
   })
+
+  /**
+   * While this pane is on screen, the native watcher's notice re-reads the two
+   * files it names - and unmounting the pane takes the listener with it.
+   */
+  $effect(() => followSettingsFiles('profiles', read))
 
   function choose(next: OrchestratorModeView): void {
     if (next === mode) return
     void dispatchIntent({ type: 'SetOrchestratorMode', data: { mode: next } })
-  }
-
-  function read(): void {
-    void dispatchIntent({ type: 'RefreshProfiles' })
   }
 
   /** A key that walks the sub-tabs also takes the focus with it. */
@@ -101,7 +108,7 @@
   <!-- The file is there and cannot be used: say why, and that a read is safe. -->
   <p class="quiet" role="status">{copy.failed(failed)}</p>
   <p class="quiet">{copy.retrySafe}</p>
-  <button class="btn" type="button" onclick={read}>{copy.tryAgain}</button>
+  <button class="btn" type="button" onclick={() => void read()}>{copy.tryAgain}</button>
 {:else if active === null}
   <p class="quiet">{copy.noProfiles}</p>
 {/if}

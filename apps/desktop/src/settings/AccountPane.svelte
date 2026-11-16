@@ -13,6 +13,7 @@
   import type { AuthView_Serialize as AuthView, ProviderStatusView } from '../contract/bindings'
   import { language } from '../i18n/language.svelte'
   import { accountCopy } from './account-copy'
+  import { coalesced, followSettingsFiles } from './files-changed'
 
   let { auth }: { auth: AuthView | null } = $props()
 
@@ -33,8 +34,10 @@
    * on the intent thread (~1s per provider) and the quiet "Reading..." above is
    * the waiting state. This is the Profiles pane's own pattern (0.1.12, L17).
    */
+  const check = coalesced(() => dispatchIntent({ type: 'RefreshAuth' }))
+
   $effect(() => {
-    check()
+    void check()
   })
 
   /**
@@ -42,17 +45,18 @@
    * the one on screen: one more check, the same push, never a timer.
    */
   $effect(() => {
-    window.addEventListener('focus', check)
-    return () => window.removeEventListener('focus', check)
+    const again = () => void check()
+    window.addEventListener('focus', again)
+    return () => window.removeEventListener('focus', again)
   })
 
   /**
-   * The same check the "Check again" button asks for, and the one the pane asks
-   * for itself: the shell's per-provider check, never a token refresh.
+   * While this pane is on screen, the native watcher's notice runs the same
+   * check - only for the shell's auth store, and never after the pane is gone,
+   * so no subprocess runs in the background with Settings closed
+   * (rpc-settings-sync T3b-2).
    */
-  function check(): void {
-    void dispatchIntent({ type: 'RefreshAuth' })
-  }
+  $effect(() => followSettingsFiles('account', check))
 
   /** One provider's check as the row draws it: its word and its tone. */
   function drawn(status: ProviderStatusView): { label: string; tone: string } {
@@ -92,7 +96,7 @@
 
 <div class="acts">
   <button class="btn accent" type="button" onclick={() => void open('Login')}>{copy.openShell}</button>
-  <button class="btn" type="button" onclick={check}>{copy.checkAgain}</button>
+  <button class="btn" type="button" onclick={() => void check()}>{copy.checkAgain}</button>
 </div>
 <p class="note">{copy.note}</p>
 {#if terminalError !== null}

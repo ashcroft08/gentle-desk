@@ -28,6 +28,7 @@ export type Deferred<T> = {
 
 const handlers = new Map<string, InvokeHandler>()
 const listeners = new Map<string, Set<(event: MockEvent) => void>>()
+const refused = new Set<string>()
 
 /** Every command call this mock received, oldest first. */
 export const invokeCalls: InvokeCall[] = []
@@ -47,6 +48,7 @@ export function deferred<T>(): Deferred<T> {
 export function resetTauriMock(): void {
   handlers.clear()
   listeners.clear()
+  refused.clear()
   resetDrags()
   invokeCalls.length = 0
 }
@@ -71,6 +73,15 @@ export function pushEvent(name: string, payload: unknown): void {
   for (const callback of [...(listeners.get(name) ?? [])]) callback({ payload })
 }
 
+/**
+ * Makes every `listen(name)` of `name` reject, the way a build that does not
+ * carry that event behaves: no callback is ever registered, and the caller has
+ * to keep working without it.
+ */
+export function failListen(name: string): void {
+  refused.add(name)
+}
+
 function tauriInvoke(command: string, args?: InvokeArgs): Promise<unknown> {
   const call = { command, args: args ?? {} }
   invokeCalls.push(call)
@@ -86,6 +97,9 @@ function tauriInvoke(command: string, args?: InvokeArgs): Promise<unknown> {
 }
 
 function tauriListen(name: string, callback: (event: MockEvent) => void): Promise<() => void> {
+  if (refused.has(name)) {
+    return Promise.reject(new Error(`tauri-mock: no listener for ${name}`))
+  }
   const set = listeners.get(name) ?? new Set<(event: MockEvent) => void>()
   listeners.set(name, set)
   set.add(callback)
