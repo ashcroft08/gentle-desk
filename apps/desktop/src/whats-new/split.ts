@@ -14,11 +14,11 @@
 // on nothing.
 import type { LanguageView } from '../contract/bindings'
 
-/** The line that starts the Spanish half: `Novedades en 0.3.0`. */
-const ES_TITLE = /^Novedades en \d+\.\d+\.\d+\b/
+/** The line that starts the Spanish half: `Novedades en 0.3.0`, and nothing else. */
+const ES_TITLE = /^Novedades en \d+\.\d+\.\d+$/
 
-/** The English half's own section title: `What's new in 0.3.0`. */
-const EN_TITLE = /^What[’']s new in \d+\.\d+\.\d+\b/
+/** The English half's own section title: `What's new in 0.3.0`, and nothing else. */
+const EN_TITLE = /^What[’']s new in \d+\.\d+\.\d+$/
 
 /** One body per language, as each panel draws it. */
 export type SplitNotes = Record<LanguageView, string>
@@ -35,14 +35,21 @@ function text(line: string): string {
 }
 
 /**
- * The lines of one half, from the first content line - skipping that half's
- * section title when it is the first thing there.
+ * The lines of one half, from its first content line to its last - skipping
+ * that half's section title, and the one blank line under it, when it is the
+ * first thing there. Only empty lines go: a content line keeps every byte it
+ * has, down to the indentation that makes a half's first line a code block.
  */
 function half(lines: readonly string[], title: RegExp): string {
   let at = 0
   while (at < lines.length && lines[at].trim() === '') at++
-  if (at < lines.length && title.test(text(lines[at]))) at++
-  return lines.slice(at).join('\n').trim()
+  if (at < lines.length && title.test(text(lines[at]))) {
+    at++
+    if (at < lines.length && lines[at].trim() === '') at++
+  }
+  let end = lines.length
+  while (end > at && lines[end - 1].trim() === '') end--
+  return lines.slice(at, end).join('\n')
 }
 
 /**

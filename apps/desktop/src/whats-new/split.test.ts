@@ -49,6 +49,45 @@ describe('splitting a release body into its two languages', () => {
     }
   })
 
+  it('splits only at the marker line itself, never at prose that opens with its words', () => {
+    // A body line that merely BEGINS with the marker's words is still content:
+    // cutting there would drop the sentence that follows it.
+    const PROSE = 'Novedades en 0.3.0 incluyen más.'
+    const body = [
+      "## What's new in 0.3.0",
+      '',
+      EN_BULLET,
+      '',
+      PROSE,
+      '',
+      '## Novedades en 0.3.0',
+      '',
+      ES_BULLET,
+    ].join('\n')
+
+    expect(splitNotes(body)).toEqual({ en: `${EN_BULLET}\n\n${PROSE}`, es: ES_BULLET })
+    // The marker line itself - bare, or heading-marked - still splits there.
+    expect(splitNotes('- one\n## Novedades en 0.3.0\n- dos')).toEqual({ en: '- one', es: '- dos' })
+  })
+
+  it('keeps a half’s own indentation: the body is never re-written', () => {
+    // A half that starts with an indented code block starts with it still: the
+    // panels draw markdown, and four spaces are what make it a block.
+    const EN_CODE = '    const asked = true'
+    const ES_CODE = '    const preguntó = true'
+    const body = [
+      "## What's new in 0.3.0",
+      '',
+      EN_CODE,
+      '',
+      '## Novedades en 0.3.0',
+      '',
+      ES_CODE,
+    ].join('\n')
+
+    expect(splitNotes(body)).toEqual({ en: EN_CODE, es: ES_CODE })
+  })
+
   it('answers null when the body carries no marker: one panel, as before', () => {
     expect(splitNotes(`## Highlights\n\n- one`)).toBeNull()
     expect(splitNotes('')).toBeNull()
