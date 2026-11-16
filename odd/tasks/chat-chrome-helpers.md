@@ -87,3 +87,17 @@ rules).
   list — the open card's row, else the first; roving tabindex intact) — commit
   c43be6a; the two R2 suggestions (CSS-parser dup in tests, Mark's class map
   placement) stay backlog.
+- L3 (maintainer, 2026-11-16, real-window check): "no vale le cambio el nombre y
+  le doy enter y no edita aparte me salio esto: the chat's session file could not
+  be written: El nombre de archivo... (os error 123)". Root cause: the header's
+  pencil dispatches `foreground_chat` — the ChatId string (`session:<path>` for
+  stored chats, `new-<n>` for fresh) — while the row sends the bare session path;
+  the command handed the prefixed id straight to `Path::new` (os error 123).
+  Fix (commit e798133): `ChatId::session_path_of` is the one place the id scheme
+  is read (both forms resolve, fresh chats answered by `is_fresh`);
+  `chat_rename::rename` resolves FIRST (both forms rename the same file, the
+  row's raw-path form byte-identical), and a fresh chat refuses with the new
+  cataloged bilingual copy (`rename_no_session_refusal`, "A chat with no session
+  file yet has no name to change.") instead of an OS error. RED→GREEN
+  (chat_rename 7/7, chats 6/6, messages 3/3, clippy/fmt clean). The web side
+  needed no change — the id format is the Rust side's to read.
