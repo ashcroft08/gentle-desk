@@ -148,7 +148,7 @@ impl SessionRemovals for FakeDisk {
 /// Which chats are mid-turn, and every chat the removal asked to close.
 #[derive(Default)]
 struct FakeChats {
-    working: Vec<&'static str>,
+    working: Mutex<Vec<&'static str>>,
     closed: Mutex<Vec<String>>,
     events: Mutex<Vec<String>>,
 }
@@ -156,9 +156,15 @@ struct FakeChats {
 impl FakeChats {
     fn with_working(working: &[&'static str]) -> Self {
         Self {
-            working: working.to_vec(),
+            working: Mutex::new(working.to_vec()),
             ..Self::default()
         }
+    }
+
+    /// One chat begins its turn mid-flow: the gate the removal runs first has
+    /// already answered, so only a re-read of the flag can see this turn.
+    fn start_turn(&self, session: &'static str) {
+        lock(&self.working).push(session);
     }
 
     fn closed(&self) -> Vec<String> {
@@ -172,7 +178,7 @@ impl FakeChats {
 
 impl WorkingChats for FakeChats {
     fn is_working(&self, session: &str) -> bool {
-        self.working.contains(&session)
+        lock(&self.working).contains(&session)
     }
 }
 
@@ -194,6 +200,20 @@ impl SessionRemovals for RecordDisk<'_> {
     fn remove(&self, path: &Path) -> io::Result<()> {
         lock(&self.1.events).push(format!("delete {}", path.display()));
         self.0.remove(path)
+    }
+}
+
+/// The disk of the mid-flow test: each removal that lands starts another chat of
+/// the workspace working, which is the gap the gate above cannot see.
+struct StartTurnOnDelete<'a>(&'a FakeDisk, &'a FakeChats, &'static str);
+
+impl SessionRemovals for StartTurnOnDelete<'_> {
+    fn remove(&self, path: &Path) -> io::Result<()> {
+        let outcome = self.0.remove(path);
+        if outcome.is_ok() {
+            self.1.start_turn(self.2);
+        }
+        outcome
     }
 }
 
@@ -297,6 +317,40 @@ fn the_children_of_the_workspace_are_closed_before_their_files_are_deleted() {
     );
     assert!(removed.view.workspace_notice.is_none());
     assert!(removed.removed, "the list is asked to heal");
+}
+
+#[test]
+fn a_chat_that_starts_a_turn_mid_flow_is_not_deleted_under_its_own_turn() {
+    let holder = holder_holding(&[REPO]);
+    let index = FakeIndex::holding(&[(REPO, CHAT_ONE, 10), (REPO, CHAT_TWO, 20)]);
+    let disk = FakeDisk::holding(&[CHAT_ONE, CHAT_TWO]);
+    let chats = FakeChats::default();
+
+    // Chat one is deleted, and in that gap chat two begins a turn. The gate above
+    // answered before that turn existed, so only a re-read at the delete sees it.
+    let removed = run(
+        &holder,
+        &index,
+        &StartTurnOnDelete(&disk, &chats, CHAT_TWO),
+        &chats,
+        REPO,
+        true,
+    );
+
+    assert_eq!(
+        removed.view.workspace_notice.as_deref(),
+        Some(messages::remove_workspace_working_refusal(Language::En).as_str()),
+        "the cataloged working-chat wording, the same refusal the gate above gives"
+    );
+    assert_eq!(
+        disk.calls(),
+        [CHAT_ONE],
+        "the chat that started working keeps its file, and nothing after it is deleted"
+    );
+    assert!(
+        holder.config_value().workspace(REPO).is_some(),
+        "the bookmark stays: the workspace still holds a chat"
+    );
 }
 
 #[test]

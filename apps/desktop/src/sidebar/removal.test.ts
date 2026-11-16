@@ -135,11 +135,21 @@ describe('the two commands a removal sends', () => {
     ])
   })
 
-  it('swallows a refused removal, because the push carries the notice', async () => {
+  it('hands a refused answer back, so a failed removal never reads like a success', async () => {
+    // Tauri rejects an `Err(String)` with the reason itself, which the bindings
+    // turn into an answer of status `error`: the reason has to leave this helper.
     setHandler('remove_workspace', () => {
-      throw new Error('a chat is still working')
+      throw 'the removal could not run: access is denied'
     })
 
-    await expect(removeWorkspace('C:\\dev\\one')).resolves.toBeUndefined()
+    await expect(removeWorkspace('C:\\dev\\one')).rejects.toThrow('access is denied')
+  })
+
+  it('hands a failed call back too, and never closes over a call that never answered', async () => {
+    setHandler('remove_workspace', () => {
+      throw new Error('the bridge is gone')
+    })
+
+    await expect(removeWorkspace('C:\\dev\\one')).rejects.toThrow('the bridge is gone')
   })
 })

@@ -43,6 +43,12 @@ const KEEP_SCOPE = 'forgets the bookmark'
 /** 1.7 MB, the measured workspace of the spec (S2). */
 const BYTES = 1_800_000
 
+/** The two failure lines the dialog draws, quoted as it draws them (R3-002, R3-003). */
+const READ_FAILED =
+  'The chats of this workspace could not be read. Nothing was removed. Try again from the workspace menu, or cancel.'
+const REMOVE_FAILED =
+  'The removal did not finish. Nothing more will be deleted unless you try again.'
+
 // The testing library only cleans up on its own with vitest globals on.
 afterEach(cleanup)
 
@@ -183,6 +189,30 @@ describe('Removing a workspace', () => {
     expect(within(dialog).queryByText(SHOW)).toBeNull()
   })
 
+  it('says so, invents no count and leaves a way out when the offer cannot be read (R3-002)', async () => {
+    // The row is served with an offer that answers, and the read is refused before
+    // the dialog asks for it: the state the failure is about.
+    serve()
+    setHandler('workspace_removal_offer', () => {
+      throw new Error('the shell refused the read')
+    })
+    const dialog = await openDialog()
+
+    // The line that says the read failed, in the consequence line's own style (S3).
+    const alert = within(dialog).getByRole('alert')
+    expect(alert.className).toContain('why')
+    expect(alert.textContent).toBe(READ_FAILED)
+    expect(alert.querySelector('b')?.textContent).toBe('Nothing was removed.')
+    // No number is invented for a count that never arrived, and nothing is offered.
+    expect(dialog.textContent ?? '').not.toMatch(/\d chats/)
+    expect(handlerArgs('remove_workspace')).toEqual([])
+    // The action row is still there, and Cancel is the way out of it.
+    const buttons = within(dialog).getAllByRole('button').map((button) => button.textContent?.trim())
+    expect(buttons).toEqual(['Cancel'])
+    await fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+    await vi.waitFor(() => expect(dialog.isConnected).toBe(false))
+  })
+
   it('sends nothing when the user cancels', async () => {
     serve()
     const dialog = await openDialog()
@@ -218,5 +248,29 @@ describe('Removing a workspace', () => {
 
     pending.resolve(viewState({ total_sessions: 0 }))
     await vi.waitFor(() => expect(dialog.isConnected).toBe(false))
+  })
+
+  it('stays open with a line of its own when the removal is rejected (R3-003)', async () => {
+    serve()
+    const pending = deferred<unknown>()
+    setHandler('remove_workspace', () => pending.promise)
+    const dialog = await openDialog()
+
+    await fireEvent.click(within(dialog).getByRole('button', { name: CONFIRM }))
+    // The shape Tauri rejects a Rust `Err` with: the reason itself, not an Error.
+    pending.reject('the removal could not run')
+
+    const alert = await within(dialog).findByRole('alert')
+    expect(alert.textContent).toBe(REMOVE_FAILED)
+    expect(alert.querySelector('b')?.textContent).toBe('Nothing more will be deleted')
+    // A rejected command is not a removal: it is neither closed over nor resent.
+    expect(dialog.isConnected).toBe(true)
+    expect(handlerArgs('remove_workspace')).toEqual([{ path: PATH, confirmed: true }])
+
+    // The user's own second answer is a retry, and the answer it gets closes it.
+    setHandler('remove_workspace', () => viewState({ total_sessions: 0 }))
+    await fireEvent.click(within(dialog).getByRole('button', { name: CONFIRM }))
+    await vi.waitFor(() => expect(dialog.isConnected).toBe(false))
+    expect(handlerArgs('remove_workspace')).toHaveLength(2)
   })
 })

@@ -190,6 +190,31 @@ describe('the sidebar lines that carry a number, a name or a title', () => {
     expect(english.removeChatsConfirm('2 chats')).not.toContain('(')
   })
 
+  it('writes the dialog\u2019s two failure lines in both columns (R3-002, R3-003)', () => {
+    // A read that never answered, and a command that said no: two lines, one
+    // anatomy (S3), and neither of them borrowed from the other language.
+    expect(english.removeOfferError).toEqual({
+      before: 'The chats of this workspace could not be read. ',
+      scope: 'Nothing was removed.',
+      after: ' Try again from the workspace menu, or cancel.',
+    })
+    expect(spanish.removeOfferError).toEqual({
+      before: 'No se pudieron leer los chats de este espacio de trabajo. ',
+      scope: 'No se quit\u00f3 nada.',
+      after: ' Int\u00e9ntalo de nuevo desde el men\u00fa del espacio de trabajo, o cancela.',
+    })
+    expect(english.removeError).toEqual({
+      before: 'The removal did not finish. ',
+      scope: 'Nothing more will be deleted',
+      after: ' unless you try again.',
+    })
+    expect(spanish.removeError).toEqual({
+      before: 'La operaci\u00f3n no termin\u00f3. ',
+      scope: 'No se eliminar\u00e1 nada m\u00e1s',
+      after: ' a menos que lo intentes de nuevo.',
+    })
+  })
+
   it('never prints the words of the store\u2019s own files (S3)', () => {
     const lines = [
       english.removeKeepLine,

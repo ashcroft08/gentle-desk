@@ -100,6 +100,14 @@ export interface SidebarCopy {
   showChats: (scope: string) => string
   removeKeepConfirm: string
   removeChatsConfirm: (count: string) => string
+  /**
+   * The dialog's two failure lines, in the consequence line's own anatomy (S3):
+   * one for an offer that could not be read (R3-002), one for a removal the shell
+   * refused before it answered (R3-003). Those two are the dialog's words, not
+   * Rust's: the reason a command carries is drawn where a notice is drawn.
+   */
+  removeOfferError: ConsequenceLine
+  removeError: ConsequenceLine
   /** The delete confirm dialog, in the same anatomy (S3). */
   deleteTitle: string
   deleteLine: ConsequenceLine
@@ -159,6 +167,16 @@ const ENGLISH: SidebarCopy = {
   showChats: (scope) => `Show ${scope}`,
   removeKeepConfirm: 'Remove',
   removeChatsConfirm: (count) => `Delete ${count} and remove`,
+  removeOfferError: {
+    before: 'The chats of this workspace could not be read. ',
+    scope: 'Nothing was removed.',
+    after: ' Try again from the workspace menu, or cancel.',
+  },
+  removeError: {
+    before: 'The removal did not finish. ',
+    scope: 'Nothing more will be deleted',
+    after: ' unless you try again.',
+  },
   deleteTitle: 'Delete this chat?',
   deleteLine: {
     before: 'Removing deletes this ',
@@ -221,6 +239,16 @@ const SPANISH: typeof ENGLISH = {
   showChats: (scope) => `Mostrar ${scope}`,
   removeKeepConfirm: 'Quitar',
   removeChatsConfirm: (count) => `Eliminar ${count} y quitar`,
+  removeOfferError: {
+    before: 'No se pudieron leer los chats de este espacio de trabajo. ',
+    scope: 'No se quitó nada.',
+    after: ' Inténtalo de nuevo desde el menú del espacio de trabajo, o cancela.',
+  },
+  removeError: {
+    before: 'La operación no terminó. ',
+    scope: 'No se eliminará nada más',
+    after: ' a menos que lo intentes de nuevo.',
+  },
   deleteTitle: '¿Eliminar este chat?',
   deleteLine: {
     before: 'Quitarlo elimina este ',

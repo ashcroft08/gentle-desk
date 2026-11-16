@@ -1319,6 +1319,17 @@ p {
   font-weight: 600;
 }
 
+/* A dialog's failure line (R3-002, R3-003): the same consequence-line anatomy,
+   in the danger color, so a read that failed or an answer the shell refused is
+   not read as a consequence of the action. A line, never a card in the card. */
+.dlg .why.err {
+  color: var(--danger);
+}
+
+.dlg .why.err b {
+  color: var(--danger);
+}
+
 /* The removal dialog's evidence (artboard B): a quiet disclosure over a plain
    list, never a card inside the card. The rows are the chats' own names, one
    dashed separator between them. */

@@ -13,6 +13,12 @@
   // The destructive answer is the LAST button, red and labelled with its scope; a
   // workspace with no chat only forgets its bookmark, so that state's answer is a
   // plain Remove - nothing is destroyed, so nothing is red (S1).
+  //
+  // Two failures are drawn instead of hidden (R3-002, R3-003): an offer that could
+  // not be read still shows a line that says so and the action row's Cancel, never
+  // a number it did not receive; and a removal the shell rejects keeps the dialog
+  // open with a line of its own, instead of closing over an operation that never
+  // ran. Neither one is retried by itself: the user's own click is the next try.
   import { Dialog } from 'bits-ui'
   import type { WorkspaceRemovalView } from '../contract/bindings'
   import { language } from '../i18n/language.svelte'
@@ -31,12 +37,17 @@
     path: string
     /** The titles of that workspace's chats, as the sidebar's page holds them. */
     titles?: string[]
-    /** Removes the workspace; it resolves when Rust has answered. */
+    /** Removes the workspace; it resolves when Rust has answered, and rejects
+        when the shell refused the command before any answer (R3-003). */
     onRemove: (path: string) => Promise<void>
   } = $props()
 
   /** The offer Rust answered, or `null` while none is known. */
   let offer = $state<WorkspaceRemovalView | null>(null)
+  /** Whether the offer's own read failed: no count, and no destructive answer. */
+  let offerFailed = $state(false)
+  /** Whether the last removal was rejected, and the dialog still owes the user a line. */
+  let failed = $state(false)
   /** Whether an answer is on its way: a second click waits for it, never doubles. */
   let busy = $state(false)
   let cancel = $state<HTMLButtonElement | null>(null)
@@ -56,16 +67,20 @@
   const listed = $derived(offer !== null && offer.chats > 0 && titles.length === offer.chats)
 
   // The offer is read when the dialog opens and dropped when it closes, so a
-  // second open asks Rust again instead of repeating a count that may have moved.
+  // second open asks Rust again instead of repeating a count that may have moved,
+  // and starts from nothing: no count, no failure of an earlier read, no line owed
+  // by an earlier answer.
   $effect(() => {
-    if (!open) {
-      offer = null
-      busy = false
-      return
-    }
+    offer = null
+    offerFailed = false
+    failed = false
+    busy = false
+    if (!open) return
     let live = true
     void removalOffer(path).then((view) => {
-      if (live) offer = view
+      if (!live) return
+      offer = view
+      offerFailed = view === null
     })
     return () => {
       live = false
@@ -80,8 +95,15 @@
   async function remove(): Promise<void> {
     if (busy || offer === null) return
     busy = true
-    await onRemove(path)
-    open = false
+    try {
+      await onRemove(path)
+      open = false
+    } catch {
+      // R3-003: an answer of status `error` (or a call that never answered) is not
+      // a removal. The dialog stays where the user can read it and answer again.
+      failed = true
+      busy = false
+    }
   }
 </script>
 
@@ -91,7 +113,19 @@
     <Dialog.Content class="dlg" onOpenAutoFocus={(event) => event.preventDefault()}>
       <Dialog.Title class="dt">{copy.removeTitle}</Dialog.Title>
       <p class="path mono">{elideMiddle(path)}</p>
-      {#if offer !== null && line !== null}
+      {#if offerFailed}
+        <!-- R3-002: the read failed, so no count is drawn and the answer that
+             changes nothing is still there to leave by. -->
+        <Dialog.Description class="why err" role="alert"
+          >{copy.removeOfferError.before}<b>{copy.removeOfferError.scope}</b>{copy.removeOfferError
+            .after}</Dialog.Description
+        >
+        <div class="acts">
+          <button class="btn" type="button" bind:this={cancel} onclick={() => (open = false)}>
+            {copy.cancel}
+          </button>
+        </div>
+      {:else if offer !== null && line !== null}
         <Dialog.Description class="why"
           >{line.before}<b>{line.scope}</b>{line.after}</Dialog.Description
         >
@@ -104,6 +138,14 @@
               {/each}
             </ul>
           </details>
+        {/if}
+        {#if failed}
+          <!-- R3-003: the shell said no, so the dialog says so and waits for the
+               user's own next answer instead of closing. -->
+          <Dialog.Description class="why err" role="alert"
+            >{copy.removeError.before}<b>{copy.removeError.scope}</b>{copy.removeError
+              .after}</Dialog.Description
+          >
         {/if}
         <div class="acts">
           <button class="btn" type="button" bind:this={cancel} onclick={() => (open = false)}>

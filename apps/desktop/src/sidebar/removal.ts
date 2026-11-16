@@ -84,8 +84,8 @@ export function chatTitles(rows: TreeRow[], path: string): string[] {
 
 /**
  * The removal offer of one workspace (S1, S2): the count and the bytes the dialog
- * names. `null` when the shell refused the read - the next push carries the
- * reason, and the dialog draws no number rather than a guess.
+ * names. `null` when the shell refused the read - the dialog draws no number
+ * rather than a guess, and says the read failed instead (R3-002).
  */
 export async function removalOffer(path: string): Promise<WorkspaceRemovalView | null> {
   try {
@@ -98,14 +98,15 @@ export async function removalOffer(path: string): Promise<WorkspaceRemovalView |
 
 /**
  * Removes one workspace (S1, S5): its chats go with it in the one command, and
- * the `confirmed` sent here is always the dialog's own answer, never a default. A
- * refusal - a chat of that workspace still working - is not thrown back at the
- * view: Rust draws the notice and the next push carries it.
+ * the `confirmed` sent here is always the dialog's own answer, never a default.
+ *
+ * A rejected answer is NOT swallowed (R3-003): a Rust `Err` arrives as an answer
+ * of status `error` and a failed call as a rejection, and both are handed back so
+ * the dialog can stay open and say what happened instead of closing over an
+ * operation that never ran. A refusal that Rust answers as an `Ok` view - a chat
+ * of that workspace still working - is still the push's to draw.
  */
 export async function removeWorkspace(path: string): Promise<void> {
-  try {
-    await commands.removeWorkspace(path, true)
-  } catch {
-    // The push carries the reason; a failed call leaves the workspace in place.
-  }
+  const answer = await commands.removeWorkspace(path, true)
+  if (answer.status === 'error') throw new Error(answer.error)
 }

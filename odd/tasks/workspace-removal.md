@@ -177,3 +177,15 @@ session index, not a folder-name encoding).
   environment-dependent); resilience R4-serial-close-latency (2s grace per
   child, no progress on the dialog). Recorded as later work, never a reopen of
   this review; the maintainer picks which ones ride a pre-release fix batch.
+- L11 (parent, 2026-11-16, pre-release fix batch, maintainer-approved): the
+  writer fixed exactly three of L10's advisory findings, RED observed for all
+  three, commit 1d25b65. R3-002/R4-dialog: a failed/refused offer read now
+  renders a bilingual danger line + the normal action row (Cancel, no invented
+  count, nothing sent). R3-003/R4-err-path: `removeWorkspace` propagates the
+  Rust `Err` and call failures; the dialog stays open with a second bilingual
+  danger line, re-enables the button, never re-sends alone. R1-01/TOCTOU: the
+  delete loop re-checks `WorkingChats::is_working` before EACH deletion and
+  stops the whole flow with the cataloged wording, bookmark kept. Validation:
+  vitest 668/668, svelte-check 0, eslint clean, workspace_remove 11/11, clippy
+  -D warnings, fmt clean. The remaining findings (R1-02, R1-03, R3-004, R3-005,
+  R4-serial-close-latency) stay backlog.

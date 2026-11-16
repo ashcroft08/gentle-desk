@@ -9,6 +9,11 @@
 //! removal before the bookmark goes: a workspace that still holds a chat is not
 //! removed.
 //!
+//! The working flag is read TWICE: once for the whole removal, and again before
+//! each file, because the closes take time and a chat that starts a turn in that
+//! gap must not lose its file under its own turn (S1). The second read refuses
+//! the rest of the flow with the same wording and the same outcome as the first.
+//!
 //! Why that order (S5): the file must not be deleted under a child that still
 //! holds it open, so the close is run TO ITS END before the first `remove_file`,
 //! and the chat leaves the open set on the way, which drops the cached session
@@ -197,6 +202,14 @@ pub fn remove(
     }
     // ...then their files, trash-first (S4)...
     for chat in &listed {
+        // S1, read again for THIS file: the gate above answered before the closes,
+        // and a chat that started a turn in the gap would otherwise lose the file
+        // under its own turn. A chat that is working now refuses the rest of the
+        // flow whole, with the same wording and nothing further deleted.
+        if working.is_working(&chat.session()) {
+            let refusal = messages::remove_workspace_working_refusal(holder.language());
+            return Removed::refused(holder, refusal);
+        }
         if let Err(error) = session_delete::delete_session(files, &chat.path) {
             let line = messages::workspace_removal_failed(holder.language(), &error.to_string());
             return Removed::refused(holder, line);
