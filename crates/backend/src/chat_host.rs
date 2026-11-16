@@ -32,12 +32,14 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use crate::process::ProcessEvent;
 
 pub mod child;
+mod desktop;
 mod folder;
 mod host;
 pub mod policy;
 pub mod spawner;
 
 pub use child::{Child, Writer};
+pub use desktop::{DesktopHub, DesktopWait, HostDesktopChannel};
 pub use host::{ChatHost, SendError};
 pub use policy::{Admission, ChatView, Clock, Limits, ManualClock, SystemClock, TooManyLive};
 pub use spawner::{OrchestratorMode, ProcessSpawner, Spawner};
@@ -130,4 +132,4 @@ impl fmt::Display for HostError {
 impl std::error::Error for HostError {}
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;

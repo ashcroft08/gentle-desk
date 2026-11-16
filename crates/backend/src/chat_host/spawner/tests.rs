@@ -270,3 +270,46 @@ fn the_two_modes_are_the_two_values_gentle_pi_reads() {
     assert_eq!(OrchestratorMode::parse("delegation"), None);
     assert_eq!(OrchestratorMode::parse(""), None);
 }
+
+/// The desktop RPC channel is only active in a child that carries the marker,
+/// so the host's own answer has to come from the environment it really passes.
+#[test]
+fn a_child_of_the_default_spawner_is_an_interactive_rpc_host() {
+    assert!(spawner().interactive());
+}
+
+#[test]
+fn a_child_environment_without_the_marker_is_not_an_interactive_host() {
+    let bare = ProcessSpawner::with_env(
+        crate::launcher::Launcher {
+            program: "gentle-shell".into(),
+            args: vec![],
+        },
+        vec![],
+    );
+    assert!(!bare.interactive(), "no marker, no channel");
+
+    let other_value = ProcessSpawner::with_env(
+        crate::launcher::Launcher {
+            program: "gentle-shell".into(),
+            args: vec![],
+        },
+        vec![(
+            OsString::from("GENTLE_SHELL_INTERACTIVE_HOST"),
+            OsString::from("0"),
+        )],
+    );
+    assert!(!other_value.interactive(), "only `1` activates the channel");
+
+    let marked = ProcessSpawner::with_env(
+        crate::launcher::Launcher {
+            program: "gentle-shell".into(),
+            args: vec![],
+        },
+        vec![(
+            OsString::from("GENTLE_SHELL_INTERACTIVE_HOST"),
+            OsString::from("1"),
+        )],
+    );
+    assert!(marked.interactive());
+}

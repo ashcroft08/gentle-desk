@@ -782,3 +782,61 @@ mod model_errors {
         );
     }
 }
+
+/// The desktop RPC channel is control traffic: its widget never becomes part of
+/// the conversation, and it never disturbs the helpers widget either.
+mod desktop_rpc_widget {
+    use super::*;
+
+    const DESKTOP: &str = include_str!("fixtures/desktop-rpc.jsonl");
+    const HELPERS: &str = include_str!("fixtures/helpers-activity.jsonl");
+
+    fn first_event(raw: &str) -> RpcEvent {
+        let line = raw
+            .lines()
+            .find(|line| !line.trim().is_empty())
+            .expect("a fixture line");
+        match decode_line(line) {
+            Decoded::Event(event) => event,
+            Decoded::Unknown(raw) => panic!("not an event: {raw}"),
+        }
+    }
+
+    #[test]
+    fn every_desktop_rpc_frame_leaves_the_chat_state_untouched() {
+        let state = ChatState::default();
+        for line in DESKTOP.lines().filter(|line| !line.trim().is_empty()) {
+            let event = match decode_line(line) {
+                Decoded::Event(event) => event,
+                Decoded::Unknown(raw) => panic!("not an event: {raw}"),
+            };
+            assert_eq!(
+                reduce_chat(Language::En, state.clone(), &event),
+                state,
+                "the desktop channel is control traffic: {line}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_desktop_frame_does_not_clear_the_helpers_widget() {
+        let with_helpers = reduce_chat(Language::En, ChatState::default(), &first_event(HELPERS));
+        assert!(
+            !with_helpers.helpers.tasks.is_empty(),
+            "the helpers fixture must fold"
+        );
+
+        let clearing = DESKTOP
+            .lines()
+            .rfind(|line| !line.trim().is_empty())
+            .expect("the clearing frame");
+        let event = match decode_line(clearing) {
+            Decoded::Event(event) => event,
+            Decoded::Unknown(raw) => panic!("not an event: {raw}"),
+        };
+        assert_eq!(
+            reduce_chat(Language::En, with_helpers.clone(), &event),
+            with_helpers
+        );
+    }
+}

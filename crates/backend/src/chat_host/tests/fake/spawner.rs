@@ -18,6 +18,9 @@ pub struct FakeSpawner {
     /// The chat whose children park inside every write, with the gate they park on.
     blocked_writes: Option<(ChatKey, Arc<Gate>)>,
     journal: Journal,
+    /// Whether its children answer as interactive RPC hosts, the marker the
+    /// desktop RPC channel is active behind.
+    interactive: bool,
 }
 
 #[derive(Default)]
@@ -57,7 +60,15 @@ impl FakeSpawner {
             spawn_gate,
             blocked_writes,
             journal: Journal::default(),
+            interactive: false,
         }
+    }
+
+    /// The same spawner, reporting children that run with the interactive-host
+    /// marker set (what activates `/gentle:desktop`).
+    pub fn with_interactive(mut self) -> Self {
+        self.interactive = true;
+        self
     }
 
     /// Every start and stop, in order, across all the children.
@@ -131,6 +142,10 @@ impl FakeSpawner {
 }
 
 impl Spawner for FakeSpawner {
+    fn interactive(&self) -> bool {
+        self.interactive
+    }
+
     fn spawn(&self, key: &ChatKey, folder: Option<&Path>) -> io::Result<Box<dyn Child>> {
         {
             let mut state = self.state.lock().unwrap();

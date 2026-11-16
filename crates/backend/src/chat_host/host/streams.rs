@@ -7,6 +7,8 @@ use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
+use gentle_core::rpc::Decoded;
+
 use super::super::TaggedEvent;
 use super::state::Tag;
 use super::ChatHost;
@@ -31,7 +33,9 @@ impl ChatHost {
 
     /// Forwards one child's event stream onto the host's channel, tagging every
     /// event with its chat and saying whether its closure is one the host asked
-    /// for, and clears the child's alive flag when it goes.
+    /// for, and clears the child's alive flag when it goes. Every decoded event
+    /// is offered to the desktop hub first, and a closure answers its waiters; the
+    /// app's stream itself is unchanged.
     ///
     /// A forwarder that cannot be started is not left silent: the child is
     /// marked gone and one unexpected `Closed` is published at once, so the shell
@@ -45,6 +49,7 @@ impl ChatHost {
         events: Receiver<ProcessEvent>,
     ) {
         let sender = self.events_tx.clone();
+        let desktop = Arc::clone(&self.desktop);
         let initial_key = tag.lock().unwrap_or_else(|p| p.into_inner()).clone();
         let watched = Arc::clone(&alive);
         let spawned = thread::Builder::new()
@@ -56,6 +61,16 @@ impl ChatHost {
                         watched.store(false, Ordering::SeqCst);
                     }
                     let key = tag.lock().unwrap_or_else(|p| p.into_inner()).clone();
+                    // The desktop channel watches the same frames the app gets,
+                    // without taking them from it: it answers a waiting request
+                    // and the frame goes on unchanged.
+                    match &event {
+                        ProcessEvent::Output(Decoded::Event(decoded)) => {
+                            desktop.observe(&key, decoded);
+                        }
+                        ProcessEvent::Closed => desktop.close(&key),
+                        _ => {}
+                    }
                     let tagged = TaggedEvent {
                         key,
                         event,
