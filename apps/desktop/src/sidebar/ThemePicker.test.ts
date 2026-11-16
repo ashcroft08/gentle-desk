@@ -4,33 +4,45 @@
 // lives in the Settings dialog's Appearance section now (settings-dialog S3), so
 // every test here opens that dialog first and then behaves as it always did.
 import '../test-support/dom-env'
-import '../test-support/dom-env'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/svelte'
+import { tick } from 'svelte'
 import { handlerArgs, resetTauriMock, viewState } from '../test-support/tauri-mock'
 import { serveSidebar } from '../test-support/sidebar'
+import { setLanguage } from '../i18n/language.svelte'
 import type { ThemeView } from '../contract/bindings'
+import { themeLabelsCopy } from '../theme/themes'
+import { sidebarCopy } from './copy'
 import Sidebar from './Sidebar.svelte'
 
 vi.mock('@tauri-apps/api/core', () => import('../test-support/tauri-mock').then((m) => m.coreModule()))
 vi.mock('@tauri-apps/api/event', () => import('../test-support/tauri-mock').then((m) => m.eventModule()))
 
+/** The picker's own words: the English this file runs in, and the flipped ones. */
+const EN = sidebarCopy('en'), ES = sidebarCopy('es')
+
+/** The six labels the picker draws in the language this file runs in (English). */
+const LABELS = themeLabelsCopy('en')
+
 /**
  * The six options 01a draws, each label beside the theme identifier it stands
- * for: quoted so a change of copy, or a label leaking into an intent, is a
- * change here.
+ * for: quoted so a label leaking into an intent is a change here. The words are
+ * the theme module's own dictionary (0.2.0, D4); the identifiers never move.
  */
 const OPTIONS: readonly (readonly [ThemeView, string])[] = [
-  ['system', 'System'],
-  ['dark', 'Dark'],
-  ['Gentle', 'Gentle'],
-  ['Gentleman-Cute', 'Gentleman-Cute'],
-  ['Gentleman-Sexy', 'Gentleman-Sexy'],
-  ['light', 'Light'],
+  ['system', LABELS.system],
+  ['dark', LABELS.dark],
+  ['Gentle', LABELS.Gentle],
+  ['Gentleman-Cute', LABELS['Gentleman-Cute']],
+  ['Gentleman-Sexy', LABELS['Gentleman-Sexy']],
+  ['light', LABELS.light],
 ]
 
 /** The six labels the list draws, in the drawn order. */
 const NAMES = OPTIONS.map(([, label]) => label)
+
+/** The same six in Spanish: what a flipped picker must draw. */
+const NAMES_ES = OPTIONS.map(([theme]) => themeLabelsCopy('es')[theme])
 
 /** The label the control names one theme with. */
 function labelFor(theme: ThemeView): string {
@@ -66,19 +78,21 @@ async function openSettings(): Promise<void> {
   await screen.findByRole('dialog')
 }
 
-/** The control in the dialog's Appearance section, whatever theme it names. */
-function themeButton(): HTMLElement {
-  return screen.getByRole('button', { name: /^Theme: / })
-}
+/**
+ * The control in the dialog's Appearance section, whatever theme it names: the
+ * prefix is the picker's own word, read from `words` so it follows the language.
+ */
+const themeButton = (words = EN): HTMLElement =>
+  screen.getByRole('button', { name: new RegExp(`^${words.themeName('')}`) })
 
 /** The same control, found by the theme it SHOWS: the drawn name and nothing else. */
 function buttonNamed(name: string): HTMLElement {
   return screen.getByRole('button', { name })
 }
 
-async function openList(): Promise<HTMLElement> {
-  await fireEvent.click(themeButton())
-  return await screen.findByRole('listbox', { name: 'Theme' })
+async function openList(words = EN): Promise<HTMLElement> {
+  await fireEvent.click(themeButton(words))
+  return await screen.findByRole('listbox', { name: words.themeListName })
 }
 
 /** The option the list has moved the focus to. */
@@ -133,6 +147,29 @@ describe('the theme picker', () => {
     await fireEvent.click(screen.getByRole('option', { name: 'Dark' }))
 
     expect(themeIntents()).toEqual(['dark'])
+  })
+
+  it('flips its labels in the same tick, and still sends the identifier, never the label', async () => {
+    await mountSidebar('dark')
+    expect(buttonNamed('Theme: Dark')).not.toBeNull()
+
+    // No push and no restart: the picker reads the same reactive language the
+    // Settings rail sets, so one local write redraws its words.
+    setLanguage('es')
+    await tick()
+
+    // The control's own word wraps the theme's label, and both flip.
+    expect(buttonNamed(ES.themeName(themeLabelsCopy('es').dark))).not.toBeNull()
+    const list = await openList(ES)
+    expect(within(list).getAllByRole('option').map((option) => option.textContent?.trim())).toEqual(
+      NAMES_ES,
+    )
+
+    // The identifier is never translated: the label is only what is drawn.
+    await fireEvent.click(screen.getByRole('option', { name: themeLabelsCopy('es').light }))
+    expect(themeIntents()).toEqual(['light'])
+
+    setLanguage('en')
   })
 
   it('draws a quiet color swatch beside every row', async () => {

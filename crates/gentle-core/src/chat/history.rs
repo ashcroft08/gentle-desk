@@ -3,13 +3,18 @@
 use serde_json::Value;
 
 use super::state::{ChatMessage, ChatRole};
+use crate::i18n::{messages, Language};
 
 /// The thread a `get_messages` response (`{"messages": [...]}`) describes.
 ///
 /// Mirrors what the live reducer would have shown: only user and assistant
 /// text, an assistant turn with no text dropped, a failed one kept and
 /// flagged. System messages and tool results are not part of the thread.
-pub fn messages_from_history(data: &Value) -> Vec<ChatMessage> {
+///
+/// The language comes first, as it does everywhere in the catalog: a failed turn
+/// the provider said nothing about is worded here, and the caller holds the
+/// shell's choice (0.2.0, S3).
+pub fn messages_from_history(language: Language, data: &Value) -> Vec<ChatMessage> {
     let Some(entries) = data.get("messages").and_then(Value::as_array) else {
         return Vec::new();
     };
@@ -22,7 +27,7 @@ pub fn messages_from_history(data: &Value) -> Vec<ChatMessage> {
         };
         let text = text_of(&entry["content"]);
         let error = (role == ChatRole::Assistant)
-            .then(|| model_error(entry))
+            .then(|| model_error(language, entry))
             .flatten();
         if text.trim().is_empty() && error.is_none() {
             continue;
@@ -51,10 +56,13 @@ fn text_of(content: &Value) -> String {
     }
 }
 
-fn model_error(entry: &Value) -> Option<String> {
+fn model_error(language: Language, entry: &Value) -> Option<String> {
     if entry.get("stopReason").and_then(Value::as_str) != Some("error") {
         return None;
     }
     let text = entry.get("errorMessage").and_then(Value::as_str);
-    Some(text.unwrap_or("unknown model error").to_owned())
+    Some(
+        text.unwrap_or(messages::unknown_model_error(language))
+            .to_owned(),
+    )
 }

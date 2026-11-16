@@ -17,26 +17,14 @@
   // in a terminal window the user reads, never silently from here.
   import { dispatchIntent, openTerminal } from '../bridge'
   import type { UsageView_Serialize as UsageView } from '../contract/bindings'
+  import { language } from '../i18n/language.svelte'
   import { paneOf } from './usage'
-  import {
-    CANNOT_READ,
-    CHECK_AGAIN,
-    INSTALL,
-    INSTALL_NOTE,
-    LIMIT_REACHED,
-    MISSING,
-    MISSING_WHY,
-    NO_DATA,
-    NO_DATA_WHY,
-    NO_PROVIDERS,
-    NOTE,
-    PLAN,
-    PROVIDER_FAILED,
-    READING,
-    RETRY_SAFE,
-  } from './usage-copy'
+  import { usageCopy } from './usage-copy'
 
   let { usage }: { usage: UsageView | null } = $props()
+
+  /** The pane's own words in the language the app holds (0.2.0, D4). */
+  const copy = $derived(usageCopy(language.current))
 
   /** What the terminal said when it could not open, or `null`. */
   let terminalError = $state<string | null>(null)
@@ -63,26 +51,26 @@
 
 {#if pane.kind === 'reading'}
   <!-- The quiet waiting line: the read runs on its own thread in the shell. -->
-  <p class="quiet" role="status">{READING}</p>
+  <p class="quiet" role="status">{copy.reading}</p>
 {:else if pane.kind === 'missing'}
-  <p class="quiet">{MISSING}</p>
-  <p class="why">{MISSING_WHY}</p>
+  <p class="quiet">{copy.missing}</p>
+  <p class="why">{copy.missingWhy}</p>
   <div class="acts">
-    <button class="btn accent" type="button" onclick={() => void install()}>{INSTALL}</button>
-    <button class="btn" type="button" onclick={read}>{CHECK_AGAIN}</button>
+    <button class="btn accent" type="button" onclick={() => void install()}>{copy.install}</button>
+    <button class="btn" type="button" onclick={read}>{copy.checkAgain}</button>
   </div>
-  <p class="note">{INSTALL_NOTE}</p>
+  <p class="note">{copy.installNote}</p>
 {:else if pane.kind === 'unreadable' || pane.kind === 'failed'}
   <!-- Something the read needed could not be used: say why, in the shell's own
        words, and offer the same safe retry. -->
-  <p class="quiet" role="status">{CANNOT_READ(pane.reason)}</p>
+  <p class="quiet" role="status">{copy.cannotRead(pane.reason)}</p>
   <div class="acts">
-    <button class="btn" type="button" onclick={read}>{CHECK_AGAIN}</button>
+    <button class="btn" type="button" onclick={read}>{copy.checkAgain}</button>
   </div>
-  <p class="note">{RETRY_SAFE}</p>
+  <p class="note">{copy.retrySafe}</p>
 {:else}
   {#if pane.providers.length === 0}
-    <p class="quiet">{NO_PROVIDERS}</p>
+    <p class="quiet">{copy.noProviders}</p>
   {:else}
     <!-- A bounded list: the pane must not grow the dialog with every provider a
          machine happens to have logged in, so the cards scroll inside it and
@@ -93,27 +81,27 @@
         <div class="head">
           <span class="uname">{provider.provider}</span>
           {#if provider.plan !== null}
-            <span class="uplan">{PLAN(provider.plan)}</span>
+            <span class="uplan">{copy.plan(provider.plan)}</span>
           {/if}
         </div>
 
         {#if provider.status === 'NoData'}
           <!-- No credentials, nothing fetched: no gauge, and no zero either. -->
-          <p class="quiet">{NO_DATA}</p>
-          <p class="note">{NO_DATA_WHY}</p>
+          <p class="quiet">{copy.noData}</p>
+          <p class="note">{copy.noDataWhy}</p>
         {:else if provider.status === 'Failed'}
           <p class="quiet" role="status">
-            {PROVIDER_FAILED}{provider.error === null ? '' : `: ${provider.error}`}
+            {copy.providerFailed}{provider.error === null ? '' : `: ${provider.error}`}
           </p>
         {:else if provider.limits.length === 0}
-          <p class="quiet">{NO_PROVIDERS}</p>
+          <p class="quiet">{copy.noProviders}</p>
         {:else}
           {#each provider.limits as limit (limit.name)}
             <div class="ulimit" class:reached={limit.reached}>
               <div class="ulimit-head">
                 <span class="ulimit-name">{limit.name}</span>
                 {#if limit.reached}
-                  <span class="tag warn">{LIMIT_REACHED}</span>
+                  <span class="tag warn">{copy.limitReached}</span>
                 {/if}
               </div>
               {#each limit.windows as window (`${limit.name}-${window.label}`)}
@@ -137,9 +125,9 @@
   {/if}
 
   <div class="acts">
-    <button class="btn" type="button" onclick={read}>{CHECK_AGAIN}</button>
+    <button class="btn" type="button" onclick={read}>{copy.checkAgain}</button>
   </div>
-  <p class="note">{NOTE}</p>
+  <p class="note">{copy.note}</p>
 {/if}
 
 {#if terminalError !== null}

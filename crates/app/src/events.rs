@@ -1,6 +1,7 @@
 //! Folding RPC events from the backend into the app state.
 
 use gentle_core::chat::{messages_from_history, reduce_chat_at};
+use gentle_core::i18n::messages;
 use gentle_core::rpc::{RpcCommand, RpcEvent, RpcResponse};
 
 use crate::chip;
@@ -15,8 +16,9 @@ pub(crate) fn apply_event(
 ) -> (AppState, Vec<Command>) {
     let notice = notice_from(event);
     let mut commands = Vec::new();
+    let language = state.language();
     let mut state = AppState {
-        chat: reduce_chat_at(state.chat, event, now_ms),
+        chat: reduce_chat_at(language, state.chat, event, now_ms),
         ..state
     };
     if let Some((level, text)) = notice {
@@ -48,7 +50,10 @@ fn apply_response(state: &mut AppState, response: &RpcResponse, commands: &mut V
                 commands.push(Command::Send(RpcCommand::GetAvailableThinkingLevels));
             }
         }
-        ("get_messages", Ok(data)) => state.chat.messages = messages_from_history(data),
+        ("get_messages", Ok(data)) => {
+            let language = state.language();
+            state.chat.messages = messages_from_history(language, data);
+        }
         ("set_model", Ok(data)) => {
             // The chip's new model owns the levels list and the current
             // level: ask for both again (R3-002).
@@ -64,29 +69,20 @@ fn apply_response(state: &mut AppState, response: &RpcResponse, commands: &mut V
             // The optimistic level from the intent is gone; unknown until the
             // session reports again. Same notice as every failed command.
             state.thinking_level = None;
-            push_notice(
-                state,
-                NoticeLevel::Error,
-                format!("set_thinking_level failed: {error}"),
-            );
+            let failure = messages::command_failed(state.language(), "set_thinking_level", error);
+            push_notice(state, NoticeLevel::Error, failure);
         }
         ("get_available_models", Err(error)) => {
             state.models_status = ModelsStatus::Failed(error.clone());
-            push_notice(
-                state,
-                NoticeLevel::Error,
-                format!("get_available_models failed: {error}"),
-            );
+            let failure = messages::command_failed(state.language(), "get_available_models", error);
+            push_notice(state, NoticeLevel::Error, failure);
         }
         (command, Err(error)) => {
             if command == "switch_session" {
                 state.current_session = None;
             }
-            push_notice(
-                state,
-                NoticeLevel::Error,
-                format!("{command} failed: {error}"),
-            );
+            let failure = messages::command_failed(state.language(), command, error);
+            push_notice(state, NoticeLevel::Error, failure);
         }
     }
 }

@@ -10,7 +10,35 @@
 import { describe, expect, it } from 'vitest'
 import THEME_CSS from '../theme.css?raw'
 import APP_CSS from '../app.css?raw'
-import { THEMES } from './themes'
+import type { ThemeView } from '../contract/bindings'
+import { THEMES, themeLabelsCopy } from './themes'
+
+/** The English labels, exactly as the picker drew them before 0.2.0. */
+const ENGLISH: Record<ThemeView, string> = {
+  system: 'System',
+  dark: 'Dark',
+  Gentle: 'Gentle',
+  'Gentleman-Cute': 'Gentleman-Cute',
+  'Gentleman-Sexy': 'Gentleman-Sexy',
+  light: 'Light',
+}
+
+/** The Spanish labels: neutral Spanish, accents allowed. */
+const SPANISH: Record<ThemeView, string> = {
+  system: 'Sistema',
+  dark: 'Oscuro',
+  Gentle: 'Gentle',
+  'Gentleman-Cute': 'Gentleman-Cute',
+  'Gentleman-Sexy': 'Gentleman-Sexy',
+  light: 'Claro',
+}
+
+/**
+ * The three words that are NOT ours: a theme name is the identifier the config
+ * stores, the contract carries and `theme.css` selects, so it is drawn as
+ * itself in every language (D7).
+ */
+const SAME_IN_BOTH = new Set<ThemeView>(['Gentle', 'Gentleman-Cute', 'Gentleman-Sexy'])
 
 /** The `[data-theme='<name>']` blocks a stylesheet declares. */
 function dataThemeNames(css: string): string[] {
@@ -55,5 +83,32 @@ describe('the six theme names', () => {
     expect(list).toContain('background: var(--surface)')
     expect(list).toContain('border: 1px solid var(--border)')
     expect(ruleBody(APP_CSS, '.tpl li')).toContain('color: var(--text)')
+  })
+})
+
+describe('the theme labels', () => {
+  it('draw the English labels the picker already drew', () => {
+    expect(themeLabelsCopy('en')).toEqual(ENGLISH)
+  })
+
+  it('draw Spanish for the same six names', () => {
+    expect(themeLabelsCopy('es')).toEqual(SPANISH)
+  })
+
+  it('label every theme, and translate every word that is ours', () => {
+    const english = themeLabelsCopy('en')
+    const spanish = themeLabelsCopy('es')
+
+    // One label per theme, keyed by the identifier the picker carries.
+    expect(Object.keys(english).sort()).toEqual([...THEMES].sort())
+    expect(Object.keys(spanish).sort()).toEqual(Object.keys(english).sort())
+    for (const theme of THEMES) {
+      if (SAME_IN_BOTH.has(theme)) {
+        // An identifier, drawn as itself in every language.
+        expect(spanish[theme], theme).toBe(english[theme])
+        continue
+      }
+      expect(spanish[theme], `the label of ${theme}`).not.toBe(english[theme])
+    }
   })
 })

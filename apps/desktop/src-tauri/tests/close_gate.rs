@@ -9,8 +9,9 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
 use gentle_app::ChatCommand;
+use gentle_core::i18n::Language;
 use gentle_desk_lib::bridge::AppStateHolder;
-use gentle_desk_lib::close::{BridgeSteps, CloseFlow, Deadlines, CLOSING};
+use gentle_desk_lib::close::{closing, BridgeSteps, CloseFlow, Deadlines};
 use gentle_desk_lib::config::ConfigWriter;
 use gentle_desk_lib::effects::{ChatExecutor, RuntimeExecutor};
 use gentle_desk_lib::events::EventPump;
@@ -86,7 +87,7 @@ fn a_closed_executor_starts_nothing_new() {
             message,
         } => {
             assert_eq!(failed, chat);
-            assert_eq!(message, CLOSING);
+            assert_eq!(message, closing(Language::En));
         }
         other => panic!("a closed run must refuse the open, got {other:?}"),
     }

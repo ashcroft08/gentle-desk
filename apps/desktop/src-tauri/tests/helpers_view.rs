@@ -10,6 +10,7 @@
 
 use gentle_app::{ChatId, Input, Intent};
 use gentle_core::helpers::{HelperStatus, HelpersSummary};
+use gentle_core::i18n::Language;
 use gentle_core::rpc::{RpcEvent, UiRequest};
 use gentle_desk_lib::bridge::AppStateHolder;
 use gentle_desk_lib::contract::{HelperStatusView, UiIntent, ViewState};
@@ -166,7 +167,10 @@ fn a_cancelled_helper_is_a_status_of_its_own() {
     let row = &view.helpers.expect("a panel").tasks[0];
 
     assert_eq!(row.status, HelperStatusView::Cancelled);
-    assert_eq!(row.status_label, status_label(HelperStatus::Cancelled));
+    assert_eq!(
+        row.status_label,
+        status_label(Language::En, HelperStatus::Cancelled)
+    );
 }
 
 #[test]
@@ -204,12 +208,15 @@ fn the_counters_line_is_the_rules_text() {
     );
     assert_eq!(
         helpers.summary_line,
-        summary_line(&HelpersSummary {
-            running: 1,
-            queued: 1,
-            waiting: 1,
-            finished: 2,
-        }),
+        summary_line(
+            Language::En,
+            &HelpersSummary {
+                running: 1,
+                queued: 1,
+                waiting: 1,
+                finished: 2,
+            }
+        ),
         "the line is the runtime rule's, never a reopened-in-TS counter"
     );
 }
@@ -232,7 +239,7 @@ fn a_background_chats_helpers_never_reach_the_foreground_panel() {
     assert_eq!((helpers.running, helpers.finished), (0, 0));
     assert_eq!(
         helpers.summary_line,
-        summary_line(&HelpersSummary::default())
+        summary_line(Language::En, &HelpersSummary::default())
     );
 }
 
@@ -248,7 +255,7 @@ fn a_chat_with_no_helpers_still_has_a_panel_and_says_so_with_zeros() {
     assert!(helpers.tasks.is_empty());
     assert_eq!(
         helpers.summary_line,
-        summary_line(&HelpersSummary::default())
+        summary_line(Language::En, &HelpersSummary::default())
     );
 }
 

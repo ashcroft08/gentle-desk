@@ -13,6 +13,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
 use gentle_app::{ChatId, Input, Intent, SessionItem};
+use gentle_core::i18n::Language;
 use gentle_desk_lib::commands::{Bridge, Emit};
 use gentle_desk_lib::contract::{UiIntent, UsageProviderStatusView, UsageStatusView, ViewState};
 use gentle_desk_lib::settings::NodeProbe;
@@ -153,7 +154,7 @@ fn wait_for<T>(what: &str, mut probe: impl FnMut() -> Option<T>) -> T {
 /// A run that answers `answer` and records the script it was asked to run.
 fn node(answer: Result<&'static str, &'static str>, asked: &Arc<Mutex<Vec<String>>>) -> NodeProbe {
     let asked = Arc::clone(asked);
-    Arc::new(move |script: &std::path::Path| {
+    Arc::new(move |script: &std::path::Path, _language: Language| {
         lock(&asked).push(script.display().to_string());
         answer.map(str::to_owned).map_err(str::to_owned)
     })

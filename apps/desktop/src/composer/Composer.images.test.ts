@@ -13,7 +13,7 @@ import type { ChatActivityMark, ImageView } from '../contract/bindings'
 import { handlerArgs, resetTauriMock, setHandler, viewState } from '../test-support/tauri-mock'
 import { dragEvent } from '../test-support/webview'
 import Composer from './Composer.svelte'
-import { DROP_HINT, REMOVE_IMAGE } from './copy'
+import { composerCopy } from './copy'
 
 vi.mock('@tauri-apps/api/core', () => import('../test-support/tauri-mock').then((m) => m.coreModule()))
 vi.mock('@tauri-apps/api/event', () => import('../test-support/tauri-mock').then((m) => m.eventModule()))
@@ -36,6 +36,10 @@ type Props = {
 function draw(props: Props) {
   return render(Composer, { props })
 }
+
+// The two words read through the dictionary, in English: what a run that has not
+// been told otherwise draws.
+const { dropHint: DROP_HINT, removeImage: REMOVE_IMAGE } = composerCopy('en')
 
 afterEach(cleanup)
 

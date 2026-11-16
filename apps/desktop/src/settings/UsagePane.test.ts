@@ -14,15 +14,10 @@ import { cleanup, fireEvent, render, within } from '@testing-library/svelte'
 import type { UsageView_Serialize as UsageView } from '../contract/bindings'
 import { handlerArgs, resetTauriMock, setHandler } from '../test-support/tauri-mock'
 import UsagePane from './UsagePane.svelte'
-import {
-  CANNOT_READ,
-  CHECK_AGAIN,
-  INSTALL,
-  LIMIT_REACHED,
-  MISSING,
-  NO_PROVIDERS,
-  READING,
-} from './usage-copy'
+import { usageCopy } from './usage-copy'
+
+/** The pane's own words in English, read through the dictionary (0.2.0, D4). */
+const copy = usageCopy('en')
 
 vi.mock('@tauri-apps/api/core', () => import('../test-support/tauri-mock').then((m) => m.coreModule()))
 vi.mock('@tauri-apps/api/event', () => import('../test-support/tauri-mock').then((m) => m.eventModule()))
@@ -115,7 +110,7 @@ describe('the Usage pane', () => {
       (rows[1].querySelector('.ubar i') as HTMLElement).style.width,
     ).toBe('88%')
     // The provider's own mark reaches the row.
-    expect(cards[0].querySelector('.tag')?.textContent).toBe(LIMIT_REACHED)
+    expect(cards[0].querySelector('.tag')?.textContent).toBe(copy.limitReached)
   })
 
   it('does not list a provider with no credentials, and never draws it as 0%', () => {
@@ -132,44 +127,44 @@ describe('the Usage pane', () => {
   it('says the sources are not installed, and installs only through the terminal', async () => {
     const pane = draw({ status: { type: 'Missing', data: 'not installed' }, providers: [] })
 
-    expect(within(pane).getByText(MISSING)).toBeTruthy()
-    await fireEvent.click(within(pane).getByRole('button', { name: INSTALL }))
+    expect(within(pane).getByText(copy.missing)).toBeTruthy()
+    await fireEvent.click(within(pane).getByRole('button', { name: copy.install }))
     expect(handlerArgs('open_terminal')).toEqual([{ action: 'InstallUsageSources' }])
   })
 
   it('says why an unreadable slice could not be read, and that retrying is safe', () => {
     const pane = draw({ status: { type: 'Unreadable', data: 'permission denied' }, providers: [] })
 
-    expect(within(pane).getByText(CANNOT_READ('permission denied'))).toBeTruthy()
-    expect(within(pane).getByRole('button', { name: CHECK_AGAIN })).toBeTruthy()
+    expect(within(pane).getByText(copy.cannotRead('permission denied'))).toBeTruthy()
+    expect(within(pane).getByRole('button', { name: copy.checkAgain })).toBeTruthy()
   })
 
   it('says why a failed read failed and offers the retry', () => {
     const pane = draw({ status: { type: 'Failed', data: 'wrong schema' }, providers: [] })
 
-    expect(within(pane).getByText(CANNOT_READ('wrong schema'))).toBeTruthy()
-    expect(within(pane).getByRole('button', { name: CHECK_AGAIN })).toBeTruthy()
+    expect(within(pane).getByText(copy.cannotRead('wrong schema'))).toBeTruthy()
+    expect(within(pane).getByRole('button', { name: copy.checkAgain })).toBeTruthy()
   })
 
   it('draws a quiet line while the read runs, with no spinner and no second read', async () => {
     const pane = draw({ status: { type: 'Reading' }, providers: [] })
 
-    expect(within(pane).getByText(READING)).toBeTruthy()
+    expect(within(pane).getByText(copy.reading)).toBeTruthy()
     expect(within(pane).queryByRole('progressbar')).toBeNull()
-    expect(within(pane).queryByRole('button', { name: CHECK_AGAIN })).toBeNull()
+    expect(within(pane).queryByRole('button', { name: copy.checkAgain })).toBeNull()
     await vi.waitFor(() => expect(reads()).toBe(1))
   })
 
   it('says so when the sources answered with no provider at all', () => {
     const pane = draw({ status: { type: 'Installed' }, providers: [] })
-    expect(within(pane).getByText(NO_PROVIDERS)).toBeTruthy()
+    expect(within(pane).getByText(copy.noProviders)).toBeTruthy()
   })
 
   it('reads once when it appears, and again only when the user asks', async () => {
     const pane = draw()
 
     await vi.waitFor(() => expect(reads()).toBe(1))
-    await fireEvent.click(within(pane).getByRole('button', { name: CHECK_AGAIN }))
+    await fireEvent.click(within(pane).getByRole('button', { name: copy.checkAgain }))
     expect(reads()).toBe(2)
   })
 })

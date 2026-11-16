@@ -11,6 +11,7 @@ use gentle_app::{
     close_working, update_chats, AppState, ChatCommand, ChatId, Effects, Input, Intent,
     NoticeLevel, SessionItem, WORKING_CHAT,
 };
+use gentle_core::i18n::Language;
 use gentle_core::rpc::RpcEvent;
 
 const SESSION: &str = "/sessions/a.jsonl";
@@ -158,7 +159,7 @@ fn a_working_chat_is_refused_with_the_delete_flows_own_words() {
     assert_eq!(notice.level, NoticeLevel::Warning);
     assert_eq!(
         notice.text,
-        close_working(),
+        close_working(Language::En),
         "the refusal is the delete flow's sentence, with this action's verb"
     );
     assert_eq!(

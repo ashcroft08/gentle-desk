@@ -10,6 +10,7 @@ mod session_tree_seam;
 use session_tree_seam::{available, chat_ids, config, folded, header, session, shape};
 
 use gentle_app::SessionItem;
+use gentle_core::i18n::Language;
 use gentle_desk_lib::sessions::tree::Tree;
 use gentle_desk_lib::sessions::window::{self, MAX_WINDOW};
 
@@ -31,7 +32,7 @@ fn a_workspace_header_comes_first_and_its_own_chats_follow_it() {
     ];
     let tree = tree(&config(&[]), &sessions);
 
-    let page = window::window(&tree, 0, MAX_WINDOW, NOW, &available);
+    let page = window::window(&tree, 0, MAX_WINDOW, NOW, Language::En, &available);
 
     assert_eq!(
         shape(&page.rows),
@@ -68,7 +69,7 @@ fn a_collapsed_workspace_shows_its_header_and_none_of_its_chats() {
     ];
     let tree = tree(&folded(&[r"C:\dev\folded"]), &sessions);
 
-    let page = window::window(&tree, 0, MAX_WINDOW, NOW, &available);
+    let page = window::window(&tree, 0, MAX_WINDOW, NOW, Language::En, &available);
 
     assert_eq!(shape(&page.rows), "WCW", "the folded header has no chat");
     let folded = header(&page.rows[2]);
@@ -93,7 +94,7 @@ fn the_total_counts_the_workspace_headers() {
     ];
     let tree = tree(&config(&[]), &sessions);
 
-    let page = window::window(&tree, 0, MAX_WINDOW, NOW, &available);
+    let page = window::window(&tree, 0, MAX_WINDOW, NOW, Language::En, &available);
 
     assert_eq!(page.total, 5, "two headers and three chats");
     assert_eq!(page.rows.len(), 5);
@@ -109,7 +110,7 @@ fn a_page_that_starts_on_a_chat_and_ends_on_the_next_header_tiles_the_tree() {
     let tree = tree(&config(&[]), &sessions);
 
     // Row 0 is a's header, 1 and 2 are its chats, 3 is b's header, 4 its chat.
-    let boundary = window::window(&tree, 1, 3, NOW, &available);
+    let boundary = window::window(&tree, 1, 3, NOW, Language::En, &available);
 
     assert_eq!(shape(&boundary.rows), "CCW", "a page crosses the boundary");
     assert_eq!(boundary.total, 5, "the total is the whole tree");

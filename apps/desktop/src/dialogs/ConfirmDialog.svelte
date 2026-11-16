@@ -4,8 +4,9 @@
   // confirms a prompt with, and the whole modal traps it from there.
   import { Dialog } from 'bits-ui'
   import type { DialogAnswer, DialogView } from '../contract/bindings'
+  import { language } from '../i18n/language.svelte'
   import { CANCELLED, confirmedAnswer } from './answer'
-  import { CANCEL, NO, YES } from './copy'
+  import { dialogsCopy } from './copy'
 
   let {
     dialog,
@@ -14,6 +15,9 @@
     dialog: Extract<DialogView, { kind: 'Confirm' }>
     onAnswer: (answer: DialogAnswer) => void
   } = $props()
+
+  /** The three answers' words in the language the dialog is drawn in (D4). */
+  const copy = $derived(dialogsCopy(language.current))
 
   let primary = $state<HTMLButtonElement | null>(null)
 
@@ -26,8 +30,8 @@
 <Dialog.Description class="msg">{dialog.message}</Dialog.Description>
 <div class="acts">
   <button class="btn primary" type="button" bind:this={primary} onclick={() => onAnswer(confirmedAnswer(true))}>
-    {YES}
+    {copy.yes}
   </button>
-  <button class="btn" type="button" onclick={() => onAnswer(confirmedAnswer(false))}>{NO}</button>
-  <button class="btn" type="button" onclick={() => onAnswer(CANCELLED)}>{CANCEL}</button>
+  <button class="btn" type="button" onclick={() => onAnswer(confirmedAnswer(false))}>{copy.no}</button>
+  <button class="btn" type="button" onclick={() => onAnswer(CANCELLED)}>{copy.cancel}</button>
 </div>

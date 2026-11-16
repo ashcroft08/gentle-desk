@@ -30,6 +30,7 @@ pub use store::Chats;
 pub(crate) use inputs::{closed, failed, push_death_notice, rekeyed, stderr};
 pub(crate) use intents::apply as apply_intent;
 
+use gentle_core::i18n::{messages, Language};
 use gentle_core::rpc::{RpcCommand, RpcEvent};
 
 use crate::chip;
@@ -45,13 +46,17 @@ use crate::{
 /// words are the delete flow's (T3, S4), so the row menu never grows a second
 /// wording for the same refusal. Each action closes the sentence with its own
 /// verb.
-pub const WORKING_CHAT: &str = "This chat is working. Stop it first";
+///
+/// This is the English form of the rule: the catalog holds both languages
+/// (`gentle_core::i18n::messages`) and the two sentences are built from it in the
+/// language the state speaks.
+pub const WORKING_CHAT: &str = messages::chat_working_refusal(Language::En);
 
 /// What Close chat answers a chat that is mid-turn: [`WORKING_CHAT`] with this
 /// action's verb. The delete flow says the same sentence, ending in
 /// "then delete it." (`chat_delete::working_child`).
-pub fn close_working() -> String {
-    format!("{WORKING_CHAT}, then close it.")
+pub fn close_working(language: Language) -> String {
+    messages::close_working_refusal(language)
 }
 
 /// Applies the boot's working cap for every chat at once (S7).
@@ -85,7 +90,10 @@ pub(crate) fn apply_event(
     event: &RpcEvent,
     now_ms: Option<u64>,
 ) -> (AppState, Effects) {
-    let (commands, chat_commands) = state.chats.apply(&chat, event, now_ms);
+    // The language of this run's own words, read before the chats borrow the
+    // state: the fold words the one text it produces itself (0.2.0, S3).
+    let language = state.language();
+    let (commands, chat_commands) = state.chats.apply(language, &chat, event, now_ms);
     if let Some((level, text)) = notice_from(event) {
         push_notice(&mut state, level, text);
     }
@@ -129,11 +137,8 @@ pub(crate) fn apply_event(
                 // command would end every turn with a notice (0.1.12, S5).
                 (Err(_), "get_session_stats") => {}
                 (Err(error), command) => {
-                    push_notice(
-                        &mut state,
-                        NoticeLevel::Error,
-                        format!("{command} failed: {error}"),
-                    );
+                    let failure = messages::command_failed(state.language(), command, error);
+                    push_notice(&mut state, NoticeLevel::Error, failure);
                 }
             }
         }

@@ -5,6 +5,8 @@
 
 use serde_json::Value;
 
+use gentle_core::i18n::messages;
+
 use crate::state::{AppState, ModelChoice, ModelsStatus};
 
 /// One Model object in pi's shape (`id`, `name`, `provider`, optional
@@ -91,11 +93,13 @@ pub(crate) fn apply_err(
     match command {
         "get_available_models" => {
             state.models_status = ModelsStatus::Failed(error.to_owned());
-            notice(state, format!("get_available_models failed: {error}"));
+            let failure = messages::command_failed(state.language(), "get_available_models", error);
+            notice(state, failure);
         }
         "set_thinking_level" => {
             state.thinking_level = None;
-            notice(state, format!("set_thinking_level failed: {error}"));
+            let failure = messages::command_failed(state.language(), "set_thinking_level", error);
+            notice(state, failure);
         }
         _ => {}
     }

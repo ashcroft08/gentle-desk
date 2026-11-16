@@ -5,7 +5,8 @@
 
 import './test-support/dom-env'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen, waitFor } from '@testing-library/svelte'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte'
+import { tick } from 'svelte'
 import {
   activity,
   confirmDialog,
@@ -15,6 +16,8 @@ import {
   viewState,
 } from './test-support/tauri-mock'
 import { serveSidebar } from './test-support/sidebar'
+import { setLanguage } from './i18n/language.svelte'
+import { appCopy } from './app-copy'
 import App from './App.svelte'
 
 vi.mock('@tauri-apps/api/core', () => import('./test-support/tauri-mock').then((m) => m.coreModule()))
@@ -172,5 +175,80 @@ describe('App', () => {
 
     expect(await screen.findByText('a second line')).toBeTruthy()
     expect(screen.getByRole('dialog')).toBeTruthy()
+  })
+})
+
+describe("the shell's own words", () => {
+  /** The English words, exactly as the shell drew them before 0.2.0. */
+  const ENGLISH = {
+    skipToChat: 'Skip to chat',
+    closeSidebar: 'Close sidebar',
+    noChatOpen: 'No chat open',
+    noChatHint: 'Choose a chat in the workspace tree, or start a new session.',
+  }
+
+  /** The Spanish words: neutral Spanish, accents allowed. */
+  const SPANISH = {
+    skipToChat: 'Ir al chat',
+    closeSidebar: 'Cerrar la barra lateral',
+    noChatOpen: 'Ningún chat abierto',
+    noChatHint: 'Elige un chat en el árbol de espacios de trabajo o inicia una sesión nueva.',
+  }
+
+  /** The shell's words in one language, as the main area draws them. */
+  const WORDS = Object.keys(ENGLISH) as (keyof typeof ENGLISH)[]
+
+  it('draws the English words the shell already had, and Spanish for the same shape', () => {
+    expect(appCopy('en')).toEqual(ENGLISH)
+    expect(appCopy('es')).toEqual(SPANISH)
+  })
+
+  it('translates every word: nothing of the shell is left in English', () => {
+    const [english, spanish] = [appCopy('en'), appCopy('es')]
+    for (const word of WORDS) expect(spanish[word], word).not.toBe(english[word])
+  })
+
+  it('flips the empty main area in the same tick, with no push and no restart', async () => {
+    setLanguage('en')
+    serveSidebar({ view: viewState({ foreground_chat: null }) })
+    render(App)
+
+    expect(await screen.findByText(ENGLISH.noChatOpen)).toBeTruthy()
+    expect(screen.getByText(ENGLISH.noChatHint)).toBeTruthy()
+    expect(screen.getByRole('link', { name: ENGLISH.skipToChat })).toBeTruthy()
+
+    setLanguage('es')
+    await tick()
+
+    expect(screen.getByText(SPANISH.noChatOpen)).toBeTruthy()
+    expect(screen.getByText(SPANISH.noChatHint)).toBeTruthy()
+    expect(screen.getByRole('link', { name: SPANISH.skipToChat })).toBeTruthy()
+
+    setLanguage('en')
+  })
+
+  it('flips the floating sidebar scrim, and leaves the chat title exactly as Rust sent it', async () => {
+    setLanguage('en')
+    // A narrow window: opening the sidebar by hand floats it over the chat, with
+    // the scrim that closes it (responsive-sidebar S3).
+    Object.defineProperty(window, 'innerWidth', { value: 600, configurable: true })
+    const TITLE = 'Tauri skeleton: window and bridge'
+    serveSidebar({
+      view: viewState({ foreground_chat: 'chat-1', foreground_title: TITLE }),
+    })
+    render(App)
+
+    await fireEvent.click(await screen.findByRole('button', { name: 'Toggle sidebar' }))
+    expect(screen.getByRole('button', { name: 'Close sidebar' })).toBeTruthy()
+
+    setLanguage('es')
+    await tick()
+
+    expect(screen.getByRole('button', { name: 'Cerrar la barra lateral' })).toBeTruthy()
+    // D7: the title came from Rust, so both languages draw it as it arrived.
+    expect(screen.getByRole('heading', { name: TITLE })).toBeTruthy()
+
+    setLanguage('en')
+    Object.defineProperty(window, 'innerWidth', { value: 1024, configurable: true })
   })
 })

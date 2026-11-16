@@ -21,6 +21,7 @@ use std::time::Duration;
 
 use gentle_backend::home::HomeChoice;
 use gentle_backend::launcher::{self, LauncherEnv};
+use gentle_core::i18n::{messages, Language};
 
 mod auth;
 mod paths;
@@ -37,8 +38,9 @@ pub use usage::view as usage_view;
 
 /// Reads one file of the machine. `Ok(None)` is a file that is not there - an
 /// auth store nobody has written yet is not a failure - and `Err` is a file that
-/// is there and could not be read.
-pub type FileRead = Arc<dyn Fn(&Path) -> Result<Option<String>, String> + Send + Sync>;
+/// is there and could not be read, worded in the language it is asked in: the
+/// seam is asked per read, so a switch applies to the next one (0.2.0, S2/S3).
+pub type FileRead = Arc<dyn Fn(&Path, Language) -> Result<Option<String>, String> + Send + Sync>;
 
 /// What one `gentle-shell auth check --provider <id> --json --no-refresh` run
 /// printed: its exit code (the shell's own contract) and its output. The
@@ -50,13 +52,20 @@ pub struct ProviderAnswer {
 }
 
 /// Runs the shell's own check for one provider. A run that could not start at
-/// all is the `Err`, which the pane draws as that provider's error.
-pub type ProviderProbe = Arc<dyn Fn(&str) -> Result<ProviderAnswer, String> + Send + Sync>;
+/// all is the `Err`, which the pane draws as that provider's error, worded in
+/// the language it is asked in.
+pub type ProviderProbe =
+    Arc<dyn Fn(&str, Language) -> Result<ProviderAnswer, String> + Send + Sync>;
 
 /// Runs `gentle-shell --version` and answers what it printed: the line for the
 /// shell and the line for the pi it runs, both read by
 /// [`gentle_runtime::updates::parse_version_output`].
-pub type VersionProbe = Arc<dyn Fn() -> Result<String, String> + Send + Sync>;
+///
+/// The failure is worded in the language it is asked in like its siblings even
+/// though the Updates pane has no row for it: the version probe and the provider
+/// probe fail the same way, and one seam that silently answered English would be
+/// the one that later gets drawn.
+pub type VersionProbe = Arc<dyn Fn(Language) -> Result<String, String> + Send + Sync>;
 
 /// One GET of an https address, answering the body. Used for the release
 /// manifest (the desk's own version) and for the npm registry (pi's).
@@ -106,11 +115,17 @@ impl SettingsSeams {
 
 /// The real file reader: the file's text, `None` when there is no such file.
 pub fn file_read() -> FileRead {
-    Arc::new(|path: &Path| match std::fs::read_to_string(path) {
-        Ok(text) => Ok(Some(text)),
-        Err(error) if error.kind() == ErrorKind::NotFound => Ok(None),
-        Err(error) => Err(format!("{} could not be read: {error}", path.display())),
-    })
+    Arc::new(
+        |path: &Path, language: Language| match std::fs::read_to_string(path) {
+            Ok(text) => Ok(Some(text)),
+            Err(error) if error.kind() == ErrorKind::NotFound => Ok(None),
+            Err(error) => Err(messages::file_could_not_be_read(
+                language,
+                &path.display().to_string(),
+                &error.to_string(),
+            )),
+        },
+    )
 }
 
 /// The real per-provider check: the launcher this machine resolves, run with the
@@ -119,8 +134,8 @@ pub fn file_read() -> FileRead {
 /// `--no-refresh` is part of the command, not a courtesy: without it the check
 /// would make pi refresh an OAuth token, and the terminal owns that.
 pub fn provider_probe(home_args: Arc<Vec<OsString>>) -> ProviderProbe {
-    Arc::new(move |provider: &str| {
-        let output = run(&provider_args(&home_args, provider))?;
+    Arc::new(move |provider: &str, language: Language| {
+        let output = run(language, &provider_args(&home_args, provider))?;
         Ok(ProviderAnswer {
             // A signal-terminated run has no code: -1 is no exit code the shell
             // uses, so the pane reports it as an error.
@@ -151,15 +166,16 @@ pub fn provider_args(home_args: &[OsString], provider: &str) -> Vec<OsString> {
 /// document line it prints. A run that could not start, exit or finish inside
 /// the budget is the `Err`, which the pane draws as the reason it could not read
 /// the usage.
-pub type NodeProbe = Arc<dyn Fn(&std::path::Path) -> Result<String, String> + Send + Sync>;
+pub type NodeProbe =
+    Arc<dyn Fn(&std::path::Path, Language) -> Result<String, String> + Send + Sync>;
 
 /// The real version probe: `gentle-shell --version`, which prints the shell's
 /// version and the version of the pi it runs, with the same home flags.
 pub fn version_probe(home_args: Arc<Vec<OsString>>) -> VersionProbe {
-    Arc::new(move || {
+    Arc::new(move |language: Language| {
         let mut args = (*home_args).clone();
         args.push(OsString::from("--version"));
-        let output = run(&args)?;
+        let output = run(language, &args)?;
         let mut text = String::from_utf8_lossy(&output.stdout).into_owned();
         // The launcher may split its own output between the streams; both are
         // read so a warning line cannot hide the versions.
@@ -176,15 +192,16 @@ pub fn web_get() -> WebGet {
 }
 
 /// Runs the resolved `gentle-shell` with `args`, answering what it printed.
-fn run(args: &[OsString]) -> Result<std::process::Output, String> {
+/// `language` words the two ways the run itself can fail, which the panes draw.
+fn run(language: Language, args: &[OsString]) -> Result<std::process::Output, String> {
     let launcher = launcher::resolve(&LauncherEnv::from_process())
-        .map_err(|error| format!("gentle-shell could not be resolved: {error}"))?;
+        .map_err(|error| messages::shell_could_not_be_resolved(language, &error.to_string()))?;
     std::process::Command::new(&launcher.program)
         .args(&launcher.args)
         .args(args)
         .stdin(std::process::Stdio::null())
         .output()
-        .map_err(|error| format!("gentle-shell could not run: {error}"))
+        .map_err(|error| messages::shell_could_not_run(language, &error.to_string()))
 }
 
 #[cfg(test)]
@@ -200,10 +217,10 @@ mod tests {
         std::fs::write(&present, "{}").expect("the scratch file is writable");
 
         let read = file_read();
-        assert_eq!(read(&missing), Ok(None));
-        assert_eq!(read(&present), Ok(Some("{}".to_owned())));
+        assert_eq!(read(&missing, Language::En), Ok(None));
+        assert_eq!(read(&present, Language::En), Ok(Some("{}".to_owned())));
         // A folder is not a file: that is a read that failed, not a missing one.
-        assert!(read(&dir).is_err());
+        assert!(read(&dir, Language::En).is_err());
 
         let _ = std::fs::remove_dir_all(&dir);
     }

@@ -5,6 +5,7 @@
 //! field it should not touch fails here too.
 
 use gentle_core::chat::{reduce_chat, ChatMessage, ChatRole, ChatState, Dialog};
+use gentle_core::i18n::Language;
 use gentle_core::rpc::{
     decode_line, AssistantMessageEvent, Decoded, RpcEvent, RpcMessage, RpcResponse, UiRequest,
 };
@@ -70,7 +71,7 @@ fn reducer_run(events: Vec<RpcEvent>) -> ChatState {
     events
         .into_iter()
         .fold(ChatState::default(), |state, event| {
-            reduce_chat(state, &event)
+            reduce_chat(Language::En, state, &event)
         })
 }
 
@@ -80,7 +81,7 @@ mod working {
     #[test]
     fn agent_start_sets_working_true() {
         assert_eq!(
-            reduce_chat(ChatState::default(), &RpcEvent::AgentStart),
+            reduce_chat(Language::En, ChatState::default(), &RpcEvent::AgentStart),
             ChatState {
                 working: true,
                 ..ChatState::default()
@@ -95,7 +96,11 @@ mod working {
             ..ChatState::default()
         };
         assert_eq!(
-            reduce_chat(working, &RpcEvent::AgentEnd { will_retry: None }),
+            reduce_chat(
+                Language::En,
+                working,
+                &RpcEvent::AgentEnd { will_retry: None }
+            ),
             ChatState::default()
         );
     }
@@ -107,7 +112,7 @@ mod working {
             ..ChatState::default()
         };
         assert_eq!(
-            reduce_chat(working, &RpcEvent::AgentSettled),
+            reduce_chat(Language::En, working, &RpcEvent::AgentSettled),
             ChatState::default()
         );
     }
@@ -118,7 +123,7 @@ mod assistant_messages {
 
     #[test]
     fn message_start_for_an_assistant_message_opens_an_empty_streaming_message() {
-        let state = reduce_chat(ChatState::default(), &assistant_start());
+        let state = reduce_chat(Language::En, ChatState::default(), &assistant_start());
         assert_eq!(
             state,
             ChatState {
@@ -135,7 +140,7 @@ mod assistant_messages {
             raw: json!({"role": "toolResult", "content": []}),
         });
         assert_eq!(
-            reduce_chat(ChatState::default(), &event),
+            reduce_chat(Language::En, ChatState::default(), &event),
             ChatState::default()
         );
     }
@@ -159,7 +164,7 @@ mod assistant_messages {
     #[test]
     fn text_delta_with_no_open_assistant_message_is_a_no_op() {
         assert_eq!(
-            reduce_chat(ChatState::default(), &text_delta("orphaned")),
+            reduce_chat(Language::En, ChatState::default(), &text_delta("orphaned")),
             ChatState::default()
         );
     }
@@ -170,7 +175,7 @@ mod assistant_messages {
             messages: vec![user("msg-0", "hi")],
             ..ChatState::default()
         };
-        let state = reduce_chat(state, &text_delta("orphaned"));
+        let state = reduce_chat(Language::En, state, &text_delta("orphaned"));
         assert_eq!(
             state,
             ChatState {
@@ -280,13 +285,13 @@ mod assistant_messages {
             messages: vec![user("msg-0", "hi")],
             ..ChatState::default()
         };
-        state = reduce_chat(state, &assistant_start());
+        state = reduce_chat(Language::En, state, &assistant_start());
         assert_eq!(state.messages[1].id, "msg-1");
 
-        state = reduce_chat(state, &assistant_end(json!([])));
+        state = reduce_chat(Language::En, state, &assistant_end(json!([])));
         assert_eq!(state.messages, vec![user("msg-0", "hi")]);
 
-        state = reduce_chat(state, &assistant_start());
+        state = reduce_chat(Language::En, state, &assistant_start());
         assert_eq!(state.messages.len(), 2);
         assert_eq!(state.messages[1].id, "msg-1");
         assert_eq!(state.messages[1].text, "");
@@ -303,7 +308,7 @@ mod assistant_messages {
             role: "toolResult".to_owned(),
             raw: json!({"role": "toolResult", "content": [{"type": "text", "text": "out"}]}),
         });
-        assert_eq!(reduce_chat(before.clone(), &event), before);
+        assert_eq!(reduce_chat(Language::En, before.clone(), &event), before);
     }
 
     #[test]
@@ -314,6 +319,7 @@ mod assistant_messages {
         };
         assert_eq!(
             reduce_chat(
+                Language::En,
                 before.clone(),
                 &assistant_end(json!([{"type": "text", "text": "late"}]))
             ),
@@ -333,7 +339,7 @@ mod activity {
     }
 
     fn assert_bumps(before: &ChatState, event: RpcEvent) {
-        let after = reduce_chat(before.clone(), &event);
+        let after = reduce_chat(Language::En, before.clone(), &event);
         assert_eq!(after.activity, before.activity + 1);
         assert_eq!(after.messages, before.messages);
     }
@@ -406,7 +412,10 @@ mod activity {
                 content: "done".to_owned(),
             },
         ] {
-            assert_eq!(reduce_chat(before.clone(), &update(event)), before);
+            assert_eq!(
+                reduce_chat(Language::En, before.clone(), &update(event)),
+                before
+            );
         }
     }
 
@@ -443,7 +452,11 @@ mod dialogs {
 
     #[test]
     fn a_select_request_pushes_a_select_dialog() {
-        let state = reduce_chat(ChatState::default(), &RpcEvent::UiRequest(select()));
+        let state = reduce_chat(
+            Language::En,
+            ChatState::default(),
+            &RpcEvent::UiRequest(select()),
+        );
         assert_eq!(
             state,
             ChatState {
@@ -466,7 +479,7 @@ mod dialogs {
             timeout: None,
         });
         assert_eq!(
-            reduce_chat(ChatState::default(), &event),
+            reduce_chat(Language::En, ChatState::default(), &event),
             ChatState {
                 pending_dialogs: vec![Dialog::Confirm {
                     id: "dlg-2".to_owned(),
@@ -487,7 +500,7 @@ mod dialogs {
             timeout: None,
         });
         assert_eq!(
-            reduce_chat(ChatState::default(), &event),
+            reduce_chat(Language::En, ChatState::default(), &event),
             ChatState {
                 pending_dialogs: vec![Dialog::Input {
                     id: "dlg-3".to_owned(),
@@ -507,7 +520,7 @@ mod dialogs {
             prefill: Some("line 1".to_owned()),
         });
         assert_eq!(
-            reduce_chat(ChatState::default(), &event),
+            reduce_chat(Language::En, ChatState::default(), &event),
             ChatState {
                 pending_dialogs: vec![Dialog::Editor {
                     id: "dlg-4".to_owned(),
@@ -556,7 +569,7 @@ mod dialogs {
             raw: json!({"type": "extension_ui_request", "id": "dlg-5", "method": "notify", "message": "hi"}),
         });
         assert_eq!(
-            reduce_chat(ChatState::default(), &event),
+            reduce_chat(Language::En, ChatState::default(), &event),
             ChatState::default()
         );
     }
@@ -576,6 +589,7 @@ mod errors_and_unhandled_events {
             ..ChatState::default()
         };
         let state = reduce_chat(
+            Language::En,
             before,
             &RpcEvent::ExtensionError {
                 extension_path: "/ext.ts".to_owned(),
@@ -603,14 +617,20 @@ mod errors_and_unhandled_events {
             activity: 2,
             ..ChatState::default()
         };
-        assert_eq!(reduce_chat(before.clone(), &RpcEvent::TurnStart), before);
-        assert_eq!(reduce_chat(before.clone(), &RpcEvent::TurnEnd), before);
+        assert_eq!(
+            reduce_chat(Language::En, before.clone(), &RpcEvent::TurnStart),
+            before
+        );
+        assert_eq!(
+            reduce_chat(Language::En, before.clone(), &RpcEvent::TurnEnd),
+            before
+        );
         let response = RpcEvent::Response(RpcResponse {
             id: None,
             command: "prompt".to_owned(),
             outcome: Ok(json!({"disposition": "started"})),
         });
-        assert_eq!(reduce_chat(before.clone(), &response), before);
+        assert_eq!(reduce_chat(Language::En, before.clone(), &response), before);
     }
 }
 
@@ -621,7 +641,7 @@ mod fixtures {
         raw.lines().filter(|line| !line.trim().is_empty()).fold(
             ChatState::default(),
             |state, line| match decode_line(line) {
-                Decoded::Event(event) => reduce_chat(state, &event),
+                Decoded::Event(event) => reduce_chat(Language::En, state, &event),
                 Decoded::Unknown(raw) => panic!("fixture line decoded as unknown: {raw}"),
             },
         )
@@ -742,6 +762,23 @@ mod model_errors {
         assert_eq!(
             state.messages[0].error.as_deref(),
             Some("unknown model error")
+        );
+    }
+
+    /// The one text this fold words itself follows the language it was folded in
+    /// (0.2.0, S3): the shell hands it in with the state, so a Spanish run reads
+    /// the catalog's Spanish sentence and not the English one.
+    #[test]
+    fn an_error_without_a_message_is_worded_in_the_language_it_was_folded_in() {
+        let end = RpcEvent::MessageEnd(RpcMessage {
+            role: assistant_role(),
+            raw: json!({"role": "assistant", "content": [], "stopReason": "error"}),
+        });
+        let opened = reduce_chat(Language::Es, ChatState::default(), &assistant_start());
+        let state = reduce_chat(Language::Es, opened, &end);
+        assert_eq!(
+            state.messages[0].error.as_deref(),
+            Some("error desconocido del modelo")
         );
     }
 }

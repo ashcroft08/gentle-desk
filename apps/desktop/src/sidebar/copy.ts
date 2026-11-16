@@ -1,6 +1,21 @@
 // The sidebar's words, in one place: the design's own text, quoted from
 // design/gentle-desk-v2/00-states-board.html, so the states board and the app
 // cannot drift apart silently. Everything here is plain text.
+//
+// 0.2.0 (S3, D4): those words are written in BOTH languages here - one dictionary
+// per language and a builder that answers the whole object, so a parametrized
+// entry (a reading line with its counter, a row's actions menu, a name with a
+// theme label in it) stays a function and no string-keyed lookup is introduced.
+// A sidebar drawn from it redraws its words in the same tick it is told the new
+// language (S2). The English column is what the sidebar has drawn since 01a and
+// the states board, unchanged; the Spanish one is neutral - no voseo, no
+// regionalisms - and keeps its accents.
+//
+// What does NOT move: the chat titles, the workspace labels and the timestamps
+// Rust sends, and the drawn shapes of the marks. They travel through these words
+// exactly as they arrived (D7), which is why every function below that carries one
+// keeps it untouched.
+import type { LanguageView } from '../contract/bindings'
 
 /** The id of the `Select a workspace to start a session.` line. */
 export const NEW_SESSION_WHY_ID = 'new-session-why'
@@ -8,48 +23,146 @@ export const NEW_SESSION_WHY_ID = 'new-session-why'
 /** The id of the empty first-run reason, drawn by the empty state. */
 export const EMPTY_WHY_ID = 'workspace-empty-why'
 
-/** Drawn above the tree when no workspace exists yet. */
-export const EMPTY_TITLE = 'No workspaces yet'
-
-/** The empty first run's one line: what to do, and why nothing else works. */
-export const EMPTY_REASON =
-  'Use New workspace to choose a folder or create a new one. A new session needs a workspace.'
-
-/** New session's reason while a workspace exists but none is current (D4). */
-export const NO_WORKSPACE_REASON = 'Select a workspace to start a session.'
-
-/** The sidebar header: the section name of the tree. */
-export const WORKSPACE_TITLE = 'Workspace'
-
-/**
- * The two items the New workspace menu draws (01a, and the states board's
- * "New workspace: the menu" card).
- */
-export const MENU_CHOOSE = 'Choose an existing folder'
-export const MENU_CREATE = 'Create a new folder'
-
-// The create-folder dialog. No artboard draws it, so these words are this
-// slice's own; the board's delete sample gives the shape (title, one line,
-// Cancel and the action).
-export const NEW_FOLDER_TITLE = MENU_CREATE
-export const NEW_FOLDER_HINT = 'Enter a name, then choose where the folder goes.'
-export const NEW_FOLDER_LABEL = 'Folder name'
-export const CREATE_IDLE = 'Create'
-export const CREATE_BUSY = 'Creating...'
-export const CANCEL = 'Cancel'
-
-/**
- * The first-pass line and its counter, mirroring the rule the iced sidebar
- * tests (`crates/ui/src/view/sidebar/status.rs`): no counter before a file has
- * been found, so a zero total never reads like a settled answer.
- */
-export function readingLine(done: number, total: number): string {
-  return total === 0 ? 'Reading chats...' : `Reading chats... ${done} / ${total}`
+/** The sidebar's own words for one language. */
+export interface SidebarCopy {
+  /** The sidebar's own name, and the tree's: the same word for both. */
+  workspaces: string
+  /** The first-run empty state's title. */
+  emptyTitle: string
+  /** The empty first run's one line: what to do, and why nothing else works. */
+  emptyReason: string
+  /** New session's reason while a workspace exists but none is current (D4). */
+  noWorkspaceReason: string
+  /** The sidebar header: the section name of the tree. */
+  workspaceTitle: string
+  /** New session: one new chat in the current workspace. */
+  newSession: string
+  /** The New workspace control's own name: the icon, its menu and its dialog. */
+  newWorkspace: string
+  /** The two items the New workspace menu draws (01a, the board's menu card). */
+  menuChoose: string
+  menuCreate: string
+  /** The create-folder dialog. No artboard draws it, so these are its own words. */
+  newFolderTitle: string
+  newFolderHint: string
+  newFolderLabel: string
+  createIdle: string
+  createBusy: string
+  cancel: string
+  /**
+   * The first-pass line and its counter, mirroring the rule the iced sidebar
+   * tests (`crates/ui/src/view/sidebar/status.rs`): no counter before a file has
+   * been found, so a zero total never reads like a settled answer.
+   */
+  reading: (done: number, total: number) => string
+  /** The run's Preview chip, and the promise its tooltip carries. */
+  preview: string
+  previewTitle: string
+  /**
+   * The gear's name while an update waits. The Settings word itself is the
+   * dialog's (settings/copy.ts), so it is passed in and only the news is ours.
+   */
+  updateWaiting: (settings: string) => string
+  /** The theme control's tooltip, and the name of the list it opens. */
+  themeTip: string
+  themeListName: string
+  /** The control's own name, around the label of the current theme. */
+  themeName: (label: string) => string
+  /** A chat row's actions: the button's tooltip, the menu's name and its items. */
+  chatActionsTip: string
+  chatActions: (title: string) => string
+  chatName: string
+  rename: string
+  closeChat: string
+  deleteChat: string
+  /** The new-chat icon of a workspace header, named with the workspace's label. */
+  newChatTip: string
+  newChatIn: (label: string) => string
+  /** The delete confirm dialog, quoted from the states board's own card. */
+  deleteTitle: string
+  deleteBody: string
+  deleteConfirm: string
 }
 
-// The delete confirm dialog, quoted from the states board's own card ("Delete:
-// confirm, names the real file"). The board draws the chat's real path in a
-// `code` line between these two texts; the app fills it from the row it deletes.
-export const DELETE_TITLE = 'Delete this chat?'
-export const DELETE_BODY = 'The chat file is removed from disk and cannot be restored.'
-export const DELETE_CONFIRM = 'Delete'
+/** English: the words the sidebar already drew. */
+const ENGLISH: SidebarCopy = {
+  workspaces: 'Workspaces',
+  emptyTitle: 'No workspaces yet',
+  emptyReason:
+    'Use New workspace to choose a folder or create a new one. A new session needs a workspace.',
+  noWorkspaceReason: 'Select a workspace to start a session.',
+  workspaceTitle: 'Workspace',
+  newSession: 'New session',
+  newWorkspace: 'New workspace',
+  menuChoose: 'Choose an existing folder',
+  menuCreate: 'Create a new folder',
+  newFolderTitle: 'Create a new folder',
+  newFolderHint: 'Enter a name, then choose where the folder goes.',
+  newFolderLabel: 'Folder name',
+  createIdle: 'Create',
+  createBusy: 'Creating...',
+  cancel: 'Cancel',
+  reading: (done, total) =>
+    total === 0 ? 'Reading chats...' : `Reading chats... ${done} / ${total}`,
+  preview: 'Preview',
+  previewTitle: 'Preview: under active development - fixes ship fast',
+  updateWaiting: (settings) => `${settings} - an update is available`,
+  themeTip: 'Theme',
+  themeListName: 'Theme',
+  themeName: (label) => `Theme: ${label}`,
+  chatActionsTip: 'Chat actions',
+  chatActions: (title) => `Chat actions for ${title}`,
+  chatName: 'Chat name',
+  rename: 'Rename',
+  closeChat: 'Close chat',
+  deleteChat: 'Delete',
+  newChatTip: 'New chat',
+  newChatIn: (label) => `New chat in ${label}`,
+  deleteTitle: 'Delete this chat?',
+  deleteBody: 'The chat file is removed from disk and cannot be restored.',
+  deleteConfirm: 'Delete',
+}
+
+/** Neutral Spanish: no voseo, no regionalisms, nothing left in English. */
+const SPANISH: typeof ENGLISH = {
+  workspaces: 'Espacios de trabajo',
+  emptyTitle: 'Aún no hay espacios de trabajo',
+  emptyReason:
+    'Usa Nuevo espacio de trabajo para elegir una carpeta o crear una nueva. Una sesión nueva necesita un espacio de trabajo.',
+  noWorkspaceReason: 'Elige un espacio de trabajo para iniciar una sesión.',
+  workspaceTitle: 'Espacio de trabajo',
+  newSession: 'Nueva sesión',
+  newWorkspace: 'Nuevo espacio de trabajo',
+  menuChoose: 'Elegir una carpeta existente',
+  menuCreate: 'Crear una carpeta nueva',
+  newFolderTitle: 'Crear una carpeta nueva',
+  newFolderHint: 'Escribe un nombre y elige dónde se crea la carpeta.',
+  newFolderLabel: 'Nombre de la carpeta',
+  createIdle: 'Crear',
+  createBusy: 'Creando...',
+  cancel: 'Cancelar',
+  reading: (done, total) =>
+    total === 0 ? 'Leyendo chats...' : `Leyendo chats... ${done} / ${total}`,
+  preview: 'Vista previa',
+  previewTitle: 'Vista previa: en desarrollo activo; las correcciones llegan rápido',
+  updateWaiting: (settings) => `${settings} - hay una actualización disponible`,
+  themeTip: 'Tema',
+  themeListName: 'Tema',
+  themeName: (label) => `Tema: ${label}`,
+  chatActionsTip: 'Acciones del chat',
+  chatActions: (title) => `Acciones del chat: ${title}`,
+  chatName: 'Nombre del chat',
+  rename: 'Renombrar',
+  closeChat: 'Cerrar chat',
+  deleteChat: 'Eliminar',
+  newChatTip: 'Chat nuevo',
+  newChatIn: (label) => `Chat nuevo en ${label}`,
+  deleteTitle: '¿Eliminar este chat?',
+  deleteBody: 'El archivo del chat se borra del disco y no se puede recuperar.',
+  deleteConfirm: 'Eliminar',
+}
+
+/** The sidebar's own words in `language`, the whole dictionary at once (D4). */
+export function sidebarCopy(language: LanguageView): typeof ENGLISH {
+  return language === 'es' ? SPANISH : ENGLISH
+}

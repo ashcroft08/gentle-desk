@@ -5,7 +5,8 @@
   // user still reaches the reason (D4). The click handler stays, because the
   // button keeps its focus; it just does nothing while disabled.
   import Icon from '../icons/Icon.svelte'
-  import { NEW_SESSION_WHY_ID } from './copy'
+  import { language } from '../i18n/language.svelte'
+  import { NEW_SESSION_WHY_ID, sidebarCopy } from './copy'
 
   let {
     enabled = false,
@@ -21,6 +22,9 @@
     onNewSession: () => void
   } = $props()
 
+  /** The button's own word, in the language this run is set to (0.2.0, S3/D4). */
+  const copy = $derived(sidebarCopy(language.current))
+
   function activate(): void {
     if (enabled) onNewSession()
   }
@@ -34,7 +38,7 @@
   onclick={activate}
 >
   <Icon name="plus" />
-  New session
+  {copy.newSession}
 </button>
 
 {#if reason !== null}

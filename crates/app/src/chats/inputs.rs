@@ -2,6 +2,8 @@
 //! not reach it, the stderr its child printed, the session file a new chat
 //! learned, and its child going away.
 
+use gentle_core::i18n::messages;
+
 use crate::chats::{queue, ChatId};
 use crate::input::Effects;
 use crate::notices::{push_action_notice, push_notice};
@@ -74,17 +76,12 @@ pub(crate) fn closed(mut state: AppState, chat: &ChatId, expected: bool) -> (App
 /// character boundary and closed with `…`, losing only its tail.
 pub(crate) fn push_death_notice(state: &mut AppState, chat: &ChatId) {
     let reason = cap_reason(state.chats.stderr_of(chat).join(" · "));
+    let language = state.language();
+    let label = chat.label();
     let text = if reason.is_empty() {
-        format!(
-            "{}: the child that runs this chat exited. Restart to keep talking.",
-            chat.label()
-        )
+        messages::death_notice(language, &label)
     } else {
-        format!(
-            "{}: the child that runs this chat exited ({}). Restart to keep talking.",
-            chat.label(),
-            reason
-        )
+        messages::death_notice_with_reason(language, &label, &reason)
     };
     push_action_notice(
         state,

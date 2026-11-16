@@ -9,16 +9,10 @@ import { cleanup, fireEvent, render, within } from '@testing-library/svelte'
 import type { UpdatesView_Serialize as UpdatesView } from '../contract/bindings'
 import { handlerArgs, resetTauriMock, setHandler } from '../test-support/tauri-mock'
 import UpdatesPane from './UpdatesPane.svelte'
-import {
-  CHECKING,
-  CHECK_AGAIN,
-  UPDATE,
-  UPDATE_AVAILABLE,
-  UPDATE_EXTENSIONS,
-  UPDATE_EXTENSIONS_IN_TERMINAL,
-  UP_TO_DATE,
-  gateHint,
-} from './updates-copy'
+import { updatesCopy } from './updates-copy'
+
+/** The pane's own words in English, read through the dictionary (0.2.0, D4). */
+const copy = updatesCopy('en')
 
 vi.mock('@tauri-apps/api/core', () => import('../test-support/tauri-mock').then((m) => m.coreModule()))
 vi.mock('@tauri-apps/api/event', () => import('../test-support/tauri-mock').then((m) => m.eventModule()))
@@ -63,7 +57,7 @@ describe('the Updates pane', () => {
   it('draws one card: the tag, the pi headline, the quiet versions and the two buttons', () => {
     const pane = draw()
 
-    expect(within(pane).getByText(UPDATE_AVAILABLE)).toBeTruthy()
+    expect(within(pane).getByText(copy.updateAvailable)).toBeTruthy()
     expect(pane.querySelector('.tag')?.classList.contains('warn')).toBe(true)
     expect(pane.querySelector('.headline')?.textContent?.replace(/\s+/g, ' ')).toBe(
       'pi 1.5.2 \u2192 2.0.5',
@@ -72,17 +66,17 @@ describe('the Updates pane', () => {
     expect(pane.querySelector('.versions')?.textContent?.replace(/\s+/g, ' ')).toContain(
       'This app 0.1.12 \u00b7 pi 1.5.2 \u00b7 shell 4.7.0',
     )
-    expect(within(pane).getByRole('button', { name: UPDATE })).toBeTruthy()
-    expect(within(pane).getByRole('button', { name: CHECK_AGAIN })).toBeTruthy()
+    expect(within(pane).getByRole('button', { name: copy.update })).toBeTruthy()
+    expect(within(pane).getByRole('button', { name: copy.checkAgain })).toBeTruthy()
   })
 
   it('says everything is up to date, with no Update to press', () => {
     const pane = draw(current())
 
-    expect(within(pane).getByText(UP_TO_DATE)).toBeTruthy()
+    expect(within(pane).getByText(copy.upToDate)).toBeTruthy()
     expect(pane.querySelector('.tag')?.classList.contains('ok')).toBe(true)
-    expect(within(pane).queryByRole('button', { name: UPDATE })).toBeNull()
-    expect(within(pane).getByRole('button', { name: CHECK_AGAIN })).toBeTruthy()
+    expect(within(pane).queryByRole('button', { name: copy.update })).toBeNull()
+    expect(within(pane).getByRole('button', { name: copy.checkAgain })).toBeTruthy()
   })
 
   it('always offers Update extensions, with the note that says what it updates', () => {
@@ -91,27 +85,27 @@ describe('the Updates pane', () => {
     // is offered with everything up to date too.
     const pane = draw(current())
     const extensions = within(pane).getByRole('button', {
-      name: UPDATE_EXTENSIONS,
+      name: copy.updateExtensions,
     }) as HTMLButtonElement
 
     expect(extensions.disabled).toBe(false)
-    expect(within(pane).getByText(UPDATE_EXTENSIONS_IN_TERMINAL)).toBeTruthy()
+    expect(within(pane).getByText(copy.updateExtensionsInTerminal)).toBeTruthy()
     // It sits next to Check again, in the card's own action row.
-    expect(extensions.closest('.acts')?.textContent).toContain(CHECK_AGAIN)
+    expect(extensions.closest('.acts')?.textContent).toContain(copy.checkAgain)
   })
 
   it('offers Update extensions before the check has answered, and never checks', () => {
     const pane = draw(updates({ status: 'Unknown' }))
 
-    expect(within(pane).getByRole('button', { name: UPDATE_EXTENSIONS })).toBeTruthy()
-    expect(within(pane).getByRole('button', { name: CHECK_AGAIN })).toBeTruthy()
+    expect(within(pane).getByRole('button', { name: copy.updateExtensions })).toBeTruthy()
+    expect(within(pane).getByRole('button', { name: copy.checkAgain })).toBeTruthy()
     expect(intents()).toEqual([])
   })
 
   it('opens the extensions update in a terminal window with every chat closed', async () => {
     const pane = draw(current())
 
-    await fireEvent.click(within(pane).getByRole('button', { name: UPDATE_EXTENSIONS }))
+    await fireEvent.click(within(pane).getByRole('button', { name: copy.updateExtensions }))
     expect(handlerArgs('open_terminal')).toEqual([{ action: 'UpdateExtensions' }])
     expect(intents()).toEqual([])
   })
@@ -119,9 +113,9 @@ describe('the Updates pane', () => {
   it('keeps Update extensions dead while a chat is open, and says why', () => {
     const pane = draw(updates(), 1)
     const extensions = within(pane).getByRole('button', {
-      name: UPDATE_EXTENSIONS,
+      name: copy.updateExtensions,
     }) as HTMLButtonElement
-    const hint = within(pane).getByText(gateHint(1))
+    const hint = within(pane).getByText(copy.gateHint(1))
 
     expect(extensions.disabled).toBe(true)
     expect(hint.getAttribute('role')).toBe('status')
@@ -133,10 +127,10 @@ describe('the Updates pane', () => {
   it('draws the checking line without taking the pane away', () => {
     const pane = draw(updates({ status: 'Checking' }))
 
-    expect(within(pane).getByText(CHECKING)).toBeTruthy()
+    expect(within(pane).getByText(copy.checking)).toBeTruthy()
     // The versions it already showed stay, and Check again stays usable.
     expect(pane.querySelector('.versions')).toBeTruthy()
-    expect(within(pane).getByRole('button', { name: CHECK_AGAIN })).toBeTruthy()
+    expect(within(pane).getByRole('button', { name: copy.checkAgain })).toBeTruthy()
   })
 
   it('puts the check before the two terminal actions, with no accent on it', () => {
@@ -149,11 +143,11 @@ describe('the Updates pane', () => {
       button.textContent?.replace(/\s+/g, ' ').trim(),
     )
 
-    expect(names).toEqual([CHECK_AGAIN, UPDATE, UPDATE_EXTENSIONS])
-    const check = within(pane).getByRole('button', { name: CHECK_AGAIN })
+    expect(names).toEqual([copy.checkAgain, copy.update, copy.updateExtensions])
+    const check = within(pane).getByRole('button', { name: copy.checkAgain })
     expect(check.classList.contains('accent')).toBe(false)
     expect([...row.querySelectorAll('.accent')].map((button) => button.textContent?.trim())).toEqual([
-      UPDATE,
+      copy.update,
     ])
   })
 
@@ -165,20 +159,20 @@ describe('the Updates pane', () => {
 
   it('disables Update and says why while any chat is open', () => {
     const pane = draw(updates(), 2)
-    const update = within(pane).getByRole('button', { name: UPDATE }) as HTMLButtonElement
+    const update = within(pane).getByRole('button', { name: copy.update }) as HTMLButtonElement
 
     expect(update.disabled).toBe(true)
-    const hint = within(pane).getByText(gateHint(2))
+    const hint = within(pane).getByText(copy.gateHint(2))
     expect(hint.getAttribute('role')).toBe('status')
     expect(update.getAttribute('aria-describedby')).toBe(hint.id)
   })
 
   it('lets Update run with every chat closed, in a terminal window', async () => {
     const pane = draw()
-    const update = within(pane).getByRole('button', { name: UPDATE }) as HTMLButtonElement
+    const update = within(pane).getByRole('button', { name: copy.update }) as HTMLButtonElement
 
     expect(update.disabled).toBe(false)
-    expect(within(pane).queryByText(gateHint(2))).toBeNull()
+    expect(within(pane).queryByText(copy.gateHint(2))).toBeNull()
     await fireEvent.click(update)
     expect(handlerArgs('open_terminal')).toEqual([{ action: 'Update' }])
   })
@@ -186,7 +180,7 @@ describe('the Updates pane', () => {
   it('asks for a check again, and only ever a check', async () => {
     const pane = draw()
 
-    await fireEvent.click(within(pane).getByRole('button', { name: CHECK_AGAIN }))
+    await fireEvent.click(within(pane).getByRole('button', { name: copy.checkAgain }))
     expect(intents()).toEqual([{ type: 'CheckUpdates' }])
     expect(handlerArgs('open_terminal')).toEqual([])
   })

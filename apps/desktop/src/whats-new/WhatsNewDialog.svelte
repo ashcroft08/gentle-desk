@@ -14,13 +14,17 @@
   import { Dialog } from 'bits-ui'
   import { storeLastRunVersion } from '../bridge'
   import type { WhatsNewView } from '../contract/bindings'
+  import { language } from '../i18n/language.svelte'
   import Markdown from '../thread/Markdown.svelte'
   import { createMarkdownCache } from '../thread/markdown'
-  import { DISMISS, ESC_HINT, HEADING, sinceLabel } from './copy'
+  import { sinceLabel, whatsNewCopy } from './copy'
 
   const markdown = createMarkdownCache()
 
   let { whatsNew }: { whatsNew: WhatsNewView | null } = $props()
+
+  /** The modal's own words in the language the app holds (0.2.0, S3/D4). */
+  const copy = $derived(whatsNewCopy(language.current))
 
   /** Whether the modal stands; the slice says which version, this says if drawn. */
   let open = $state(false)
@@ -66,19 +70,21 @@
       <Dialog.Content class="dlg whatsnew" onOpenAutoFocus={(event) => event.preventDefault()}>
         <header>
           <Dialog.Title class="dt">
-            {HEADING} <span class="ver">{whatsNew.version}</span>
+            {copy.heading} <span class="ver">{whatsNew.version}</span>
           </Dialog.Title>
-          {#if sinceLabel(whatsNew.version, whatsNew.previous_version)}
-            <span class="since">{sinceLabel(whatsNew.version, whatsNew.previous_version)}</span>
+          {#if sinceLabel(whatsNew.version, whatsNew.previous_version, copy)}
+            <span class="since"
+              >{sinceLabel(whatsNew.version, whatsNew.previous_version, copy)}</span
+            >
           {/if}
         </header>
         <Dialog.Description class="notes">
           <Markdown html={markdown.htmlFor('whats-new', whatsNew.notes)} />
         </Dialog.Description>
         <div class="acts">
-          <span class="hint">{ESC_HINT}</span>
+          <span class="hint">{copy.escHint}</span>
           <button class="btn primary" type="button" bind:this={dismiss} onclick={putAway}>
-            {DISMISS}
+            {copy.dismiss}
           </button>
         </div>
       </Dialog.Content>

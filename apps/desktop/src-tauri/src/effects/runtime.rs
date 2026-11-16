@@ -21,18 +21,15 @@ use gentle_backend::chat_host::{
 };
 use gentle_backend::home::{with_home_flag, HomeChoice, HomeEnv};
 use gentle_backend::launcher::{self, LauncherEnv};
+use gentle_core::i18n::{messages, Language};
 use gentle_runtime::chat_runtime::{ChatRuntime, Outcome};
 
 use super::ChatExecutor;
 use crate::bridge::AppStateHolder;
-use crate::close::CLOSING;
+use crate::close::closing;
 use crate::events::EventPump;
 use crate::images;
 use crate::pending::PendingFolders;
-
-/// The message every command of a run without a host answers with, the one the
-/// iced shell used when gentle-shell could not be resolved at all.
-const NO_HOST: &str = "gentle-shell is not available";
 
 /// Runs chat commands against the real children, building the host the first
 /// time one arrives.
@@ -168,7 +165,7 @@ impl RuntimeExecutor {
     /// The spawner of this run, built once and remembered. It starts on the mode
     /// the user already chose, if they chose one before the first chat.
     fn spawner(&self) -> Result<Arc<ProcessSpawner>, String> {
-        let spawner = Arc::new(spawner(self.home_choice)?);
+        let spawner = Arc::new(spawner(self.holder.language(), self.home_choice)?);
         spawner.set_orchestrator_mode(*lock(&self.mode));
         *lock(&self.spawner) = Some(Arc::clone(&spawner));
         Ok(spawner)
@@ -181,7 +178,7 @@ impl ChatExecutor for RuntimeExecutor {
         // closing answers the closing line without resolving a launcher, building
         // a host or starting a child.
         if self.is_closed() {
-            return refuse(command);
+            return refuse(self.holder.language(), command);
         }
         let folder = match &command {
             ChatCommand::OpenProcess { chat } => self.folders.take(chat),
@@ -192,7 +189,7 @@ impl ChatExecutor for RuntimeExecutor {
         // prompt that was folded is the one this send is.
         let command = self.with_images(command);
         match self.runtime() {
-            Ok(runtime) => runtime.execute_in(command, folder),
+            Ok(runtime) => runtime.execute_in_language(self.holder.language(), command, folder),
             Err(message) => match command {
                 ChatCommand::OpenProcess { chat } => Outcome::OpenFailed { chat, message },
                 ChatCommand::Send { chat, .. } => Outcome::SendFailed { chat, message },
@@ -233,9 +230,10 @@ impl RuntimeExecutor {
 }
 
 /// The outcome of a command that arrived after the close: the failed open or
-/// failed send the reducer already knows, carrying [`CLOSING`].
-fn refuse(command: ChatCommand) -> Outcome {
-    let message = CLOSING.to_owned();
+/// failed send the reducer already knows, carrying [`closing`]'s line in the
+/// language this run speaks (0.2.0, S3).
+fn refuse(language: Language, command: ChatCommand) -> Outcome {
+    let message = closing(language);
     match command {
         ChatCommand::OpenProcess { chat } => Outcome::OpenFailed { chat, message },
         ChatCommand::Send { chat, .. } => Outcome::SendFailed { chat, message },
@@ -248,7 +246,7 @@ fn refuse(command: ChatCommand) -> Outcome {
 /// The spawner of one child per chat, with the launcher this run resolves and
 /// the arguments this process was started with (a home flag is added when they
 /// name none).
-fn spawner(choice: Option<HomeChoice>) -> Result<ProcessSpawner, String> {
+fn spawner(language: Language, choice: Option<HomeChoice>) -> Result<ProcessSpawner, String> {
     let args: Vec<OsString> = with_home_flag(
         std::env::args_os().skip(1).collect(),
         &HomeEnv {
@@ -259,8 +257,9 @@ fn spawner(choice: Option<HomeChoice>) -> Result<ProcessSpawner, String> {
     let launcher = launcher::resolve(&LauncherEnv::from_process()).map_err(|error| {
         // Logged once, here: a notice saying "not available" is for the user,
         // the reason is for whoever reads the bridge's output.
-        eprintln!("{NO_HOST}: {error}");
-        NO_HOST.to_owned()
+        let message = messages::shell_not_available(language);
+        eprintln!("{message}: {error}");
+        message.to_owned()
     })?;
     Ok(ProcessSpawner::new(launcher).with_args(args))
 }

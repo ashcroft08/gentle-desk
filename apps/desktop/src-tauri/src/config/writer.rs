@@ -31,6 +31,7 @@ use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::Duration;
 
+use gentle_core::i18n::{messages, Language};
 use gentle_runtime::app_config::{self, AppConfig};
 
 /// What to call when a save fails: one line for the user. Shared, because the
@@ -183,7 +184,9 @@ fn write_loop(jobs: Receiver<Job>, path: &Path, failure: &Mutex<Failure>, finish
         }
         written = job.version;
         if let Err(error) = app_config::save(path, &job.config) {
-            let message = message(&error);
+            // The snapshot is in hand, so the language is too: `None` is English
+            // (D2), exactly as the config's own readers treat it.
+            let message = message(job.config.language.unwrap_or(Language::En), &error);
             // stderr as well as the installed handler: a save that fails during
             // the close has no window left to draw a notice in, and a lost save
             // must never be silent.
@@ -215,9 +218,10 @@ fn report(slot: &Mutex<Failure>, message: String) {
     }
 }
 
-/// The one line a failed save shows the user.
-fn message(error: &io::Error) -> String {
-    format!("The app config file could not be saved: {error}")
+/// The one line a failed save shows the user, in the language the snapshot it
+/// tried to write carried (0.2.0, S3).
+fn message(language: Language, error: &io::Error) -> String {
+    messages::config_save_failed(language, &error.to_string())
 }
 
 /// A lock that survives a poisoned mutex: nothing here may panic because a

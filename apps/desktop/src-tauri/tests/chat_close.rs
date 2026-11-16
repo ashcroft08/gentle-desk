@@ -10,6 +10,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicU32, Ordering};
 
 use gentle_app::{close_working, ChatCommand, ChatId, Input, Intent, SessionItem};
+use gentle_core::i18n::Language;
 use gentle_core::rpc::RpcEvent;
 use gentle_desk_lib::bridge::AppStateHolder;
 use gentle_desk_lib::contract::UiIntent;
@@ -137,7 +138,7 @@ fn a_working_chat_is_refused_and_stays_open_with_the_delete_flows_words() {
     let notice = view.notices.last().expect("the refusal is one notice");
     assert_eq!(
         notice.text,
-        close_working(),
+        close_working(Language::En),
         "the refusal is the sentence the delete flow refuses with"
     );
     assert_eq!(

@@ -4,16 +4,9 @@
   // is the shell's view-local choice; this component only reports the tab the
   // user asked for and keeps the roving tab order (one tab stop, arrows walk).
   import Mark from '../icons/Mark.svelte'
-  import {
-    PANEL_IDS,
-    TABS,
-    TABS_LABEL,
-    TAB_COPY,
-    TAB_IDS,
-    tabAfter,
-    workingBadgeName,
-    type ViewTab,
-  } from './tabs'
+  import { language } from '../i18n/language.svelte'
+  import { chatCopy } from './copy'
+  import { PANEL_IDS, TABS, TAB_IDS, tabAfter, type ViewTab } from './tabs'
 
   let {
     tab,
@@ -28,6 +21,9 @@
     onSelect: (tab: ViewTab) => void
   } = $props()
 
+  /** The tablist's words in the language the app holds (0.2.0, S3, D4). */
+  const copy = $derived(chatCopy(language.current))
+
   /** A key that walks the tabs also takes the focus with it. */
   function keyed(event: KeyboardEvent, from: ViewTab): void {
     const next = tabAfter(event.key, from)
@@ -38,7 +34,7 @@
   }
 </script>
 
-<div class="seg" role="tablist" aria-label={TABS_LABEL}>
+<div class="seg" role="tablist" aria-label={copy.tabsLabel}>
   {#each TABS as item (item)}
     <button
       type="button"
@@ -50,11 +46,12 @@
       onclick={() => onSelect(item)}
       onkeydown={(event) => keyed(event, item)}
     >
-      {TAB_COPY[item]}
+      {copy.tabs[item]}
       {#if item === 'helpers' && running > 0}
         <!-- The badge is the chat's Working mark; its name says how many run,
-             so the count is text, never a number read off a picture. -->
-        <Mark kind="Working" label={workingBadgeName(running)} />
+             so the count is text, never a number read off a picture. The name is
+             the header's own word, so it is drawn in the tablist's language. -->
+        <Mark kind="Working" label={copy.workingBadge(running)} />
       {/if}
     </button>
   {/each}

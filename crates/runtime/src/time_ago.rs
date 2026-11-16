@@ -1,14 +1,21 @@
 //! "5m", "3h", "2d": how long ago something happened, for the sidebar, and how
 //! long until something happens, for the subscription usage's reset countdown.
+//!
+//! The unit suffixes are the same symbols in both languages; the only word here
+//! is "now", which the catalog holds (`gentle_core::i18n::messages`), so both
+//! functions take the language the caller holds: the age from the sidebar's
+//! rows, the wait from the subscription usage's reset countdown.
+
+use gentle_core::i18n::{messages, Language};
 
 /// A short age of `then_ms` as seen at `now_ms` (both epoch milliseconds).
-/// Future or identical times read as "now".
-pub fn time_ago(now_ms: u64, then_ms: u64) -> String {
+/// Future or identical times read as "now", in `language`.
+pub fn time_ago(language: Language, now_ms: u64, then_ms: u64) -> String {
     let minutes = now_ms.saturating_sub(then_ms) / 60_000;
     let hours = minutes / 60;
     let days = hours / 24;
     match () {
-        _ if minutes < 1 => "now".to_owned(),
+        _ if minutes < 1 => messages::time_now(language).to_owned(),
         _ if hours < 1 => format!("{minutes}m"),
         _ if days < 1 => format!("{hours}h"),
         _ if days < 30 => format!("{days}d"),
@@ -23,7 +30,7 @@ pub fn time_ago(now_ms: u64, then_ms: u64) -> String {
 /// Rounded UP, the other way from an age: a countdown that says "3h" when 3h40m
 /// remain understates the wait, and a reset under a minute still needs a minute
 /// on the clock rather than "0m". A time that has passed, or is now, reads
-/// "now".
+/// "now", in `language`.
 ///
 /// The same rounding at every step, so a wait is never drawn shorter than it is.
 ///
@@ -32,9 +39,9 @@ pub fn time_ago(now_ms: u64, then_ms: u64) -> String {
 /// Never: a `now_ms` at or after `at_ms` is "now". A caller with a past time
 /// generally wants [`time_ago`]'s rule instead; the usage rule asks this one
 /// only after checking the order, and gets "now" either way.
-pub fn time_until(now_ms: u64, at_ms: u64) -> String {
+pub fn time_until(language: Language, now_ms: u64, at_ms: u64) -> String {
     if at_ms <= now_ms {
-        return "now".to_owned();
+        return messages::time_now(language).to_owned();
     }
     const MINUTE: u64 = 60_000;
     const HOUR: u64 = 60 * MINUTE;

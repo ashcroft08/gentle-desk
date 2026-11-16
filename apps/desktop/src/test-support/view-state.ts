@@ -15,6 +15,8 @@ import type {
 export function viewState(overrides: Partial<ViewState_Serialize> = {}): ViewState_Serialize {
   return {
     theme: 'system',
+    // No preference stored yet: the web starts from the system's own locale.
+    language: null,
     // No pi found, nothing chosen, nothing asked.
     shell: {
       pi_path: null,

@@ -10,6 +10,8 @@
 //! the folder would not be the one the user named), and never a device name
 //! (`CON`, `NUL`, `COM1`...), which names a device however it is extended.
 
+use gentle_core::i18n::{messages, Language};
+
 /// The device names Windows reserves: any of them, with or without an
 /// extension, names a device and never a folder.
 const DEVICES: [&str; 22] = [
@@ -21,34 +23,32 @@ const DEVICES: [&str; 22] = [
 const FORBIDDEN: [char; 9] = ['<', '>', ':', '"', '|', '?', '*', '/', '\\'];
 
 /// The trimmed name of a new workspace folder, or the reason it cannot be one,
-/// as one line of plain text for the user.
-pub fn check(name: &str) -> Result<String, String> {
+/// as one line of plain text for the user in `language`.
+pub fn check(language: Language, name: &str) -> Result<String, String> {
     let trimmed = name.trim();
     if trimmed.is_empty() {
-        return Err("A workspace name cannot be empty.".to_owned());
+        return Err(messages::workspace_name_empty(language).to_owned());
     }
     // Checked on the name AS TYPED: `trim` is what would hide the trailing
     // space, and Windows would silently drop it, so the folder the user gets
     // would not be the folder they named.
     if name.chars().next_back().is_some_and(char::is_whitespace) {
-        return Err("A workspace name cannot end with a space.".to_owned());
+        return Err(messages::workspace_name_trailing_space(language).to_owned());
     }
     if trimmed.contains(['/', '\\']) {
-        return Err("A workspace name cannot contain a path separator.".to_owned());
+        return Err(messages::workspace_name_path_separator(language).to_owned());
     }
     if trimmed.contains("..") {
-        return Err("A workspace name cannot contain two dots in a row.".to_owned());
+        return Err(messages::workspace_name_double_dot(language).to_owned());
     }
     if trimmed.contains(FORBIDDEN) || trimmed.chars().any(char::is_control) {
-        return Err(
-            "A workspace name cannot contain any of these characters: < > : \" | ? *".to_owned(),
-        );
+        return Err(messages::workspace_name_forbidden_chars(language).to_owned());
     }
     if trimmed.ends_with('.') {
-        return Err("A workspace name cannot end with a dot.".to_owned());
+        return Err(messages::workspace_name_trailing_dot(language).to_owned());
     }
     if is_device(trimmed) {
-        return Err("That name is reserved by Windows.".to_owned());
+        return Err(messages::workspace_name_device(language).to_owned());
     }
     Ok(trimmed.to_owned())
 }

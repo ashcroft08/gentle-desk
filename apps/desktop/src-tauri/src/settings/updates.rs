@@ -18,6 +18,7 @@
 //! Nothing here installs anything: the pane's buttons are the web's and run the
 //! terminal's own commands.
 
+use gentle_core::i18n::Language;
 use gentle_runtime::updates::{self as rule, ShellVersions};
 use gentle_runtime::whats_new::Latest;
 
@@ -31,13 +32,20 @@ pub const PI_REGISTRY: &str = "https://registry.npmjs.org/@earendil-works/pi-cod
 /// The pane's slice, from the facts the seams answer. Every failure is local to
 /// its row: a registry that did not answer leaves pi's `latest` unknown and the
 /// other two rows untouched.
+///
+/// `language` is handed to the version probe, which words its own failure in it
+/// (0.2.0, S3). The pane has no row for that failure - a probe that could not
+/// run leaves both its versions unknown - so the word is inert here and travels
+/// only because the seam, like the provider probe beside it, is asked in a
+/// language.
 pub fn view(
     desk_version: Option<&str>,
     manifest: Option<&str>,
     web: &WebGet,
     versions: &VersionProbe,
+    language: Language,
 ) -> UpdatesView {
-    let ShellVersions { shell, pi } = versions.as_ref()()
+    let ShellVersions { shell, pi } = versions.as_ref()(language)
         .map(|text| rule::parse_version_output(&text))
         .unwrap_or_default();
     let desk_latest = manifest.and_then(|url| manifest_version(web, url));
@@ -104,7 +112,7 @@ mod tests {
     }
 
     fn versions(text: Result<String, String>) -> VersionProbe {
-        Arc::new(move || text.clone())
+        Arc::new(move |_language: Language| text.clone())
     }
 
     /// The real `gentle-shell --version` output of a linked home.
@@ -124,6 +132,7 @@ mod tests {
                 Some(r#"{"name":"@earendil-works/pi-coding-agent","version":"2.0.5"}"#),
             ),
             &versions(shell_output("1.5.2")),
+            Language::En,
         );
 
         assert_eq!(view.status, UpdatesStatusView::Ready);
@@ -149,6 +158,7 @@ mod tests {
             Some(MANIFEST),
             &web(None, None),
             &versions(shell_output("1.5.2")),
+            Language::En,
         );
         assert_eq!(view.pi.current.as_deref(), Some("1.5.2"));
         assert_eq!(view.pi.latest, None);
@@ -164,6 +174,7 @@ mod tests {
             None,
             &web(None, Some(r#"{"version":"2.0.5"}"#)),
             &versions(Err("gentle-shell is not installed".to_owned())),
+            Language::En,
         );
         assert_eq!(view.pi.current, None);
         assert_eq!(view.pi.latest.as_deref(), Some("2.0.5"));
@@ -182,6 +193,7 @@ mod tests {
             None,
             &web(None, Some(r#"{"version":"2.0.5-beta.1"}"#)),
             &versions(shell_output("1.5.2")),
+            Language::En,
         );
         assert_eq!(view.pi.latest.as_deref(), Some("2.0.5-beta.1"));
         assert_eq!(view.pi.update_available, Some(false));
@@ -194,6 +206,7 @@ mod tests {
             Some(MANIFEST),
             &web(Some(r#"{"version":"0.1.12"}"#), None),
             &versions(shell_output("1.5.2")),
+            Language::En,
         );
         assert_eq!(view.desk.update_available, Some(true));
     }
@@ -205,6 +218,7 @@ mod tests {
             Some(MANIFEST),
             &web(Some(r#"{"notes":"..."}"#), None),
             &versions(shell_output("1.5.2")),
+            Language::En,
         );
         assert_eq!(view.desk.latest, None);
         assert_eq!(view.desk.update_available, None);

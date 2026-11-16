@@ -17,12 +17,18 @@
 pub mod bridge;
 pub mod flow;
 
+use gentle_core::i18n::{messages, Language};
+
 pub use bridge::BridgeSteps;
 pub use flow::{CloseFlow, CloseSteps, Deadlines, SPAWN_ATTEMPTS};
 
 /// What a chat command answers once the close has stopped new work. One line,
-/// the same one the reducer's failed-open path carries.
-pub const CLOSING: &str = "the app is closing";
+/// the same one the reducer's failed-open path carries, worded in the language
+/// this run speaks (0.2.0, S3): the gate is asked per command, so the line
+/// follows a switch up to the last command the window answers.
+pub fn closing(language: Language) -> String {
+    messages::closing(language).to_owned()
+}
 
 /// The last step of the orderly close: leave, or start the app again when the
 /// run asked for a relaunch (a home chosen at the welcome question only applies

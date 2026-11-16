@@ -50,6 +50,11 @@ pub struct ConfigNotice {
 impl ConfigNotice {
     /// The reason, as one line of plain text for any surface to show as it
     /// likes. Carries no markup and no locale.
+    ///
+    /// English, always, and never translated (0.2.0, S3): the notice describes
+    /// the config file that could not be read, and that file is the one that
+    /// would have named the user's language. `gentle_core::i18n::messages`
+    /// records the same edge from the catalog's side.
     pub fn message(&self) -> String {
         let kept = match &self.aside {
             Some(aside) => format!("It was kept at {}", aside.display()),

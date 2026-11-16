@@ -8,6 +8,7 @@
 
 use std::path::Path;
 
+use gentle_core::i18n::{messages, Language};
 use gentle_runtime::auth::{self as rule, AuthStatus};
 
 use super::{FileRead, ProviderProbe};
@@ -21,16 +22,25 @@ use crate::contract::{AuthProviderView, AuthStatusView, AuthView, ProviderStatus
 /// A check that could not run at all is that provider's `Error`, never a silent
 /// absence: a provider the page lists is always a provider it says something
 /// about.
-pub fn view(read: &FileRead, path: Option<&Path>, probe: &ProviderProbe) -> AuthView {
+///
+/// `language` is the language this run speaks (0.2.0, S3): the two sentences the
+/// pane itself words - no agent folder, no readable store - and the checks' own
+/// refusals come out in it, so a switch applies to the next read.
+pub fn view(
+    read: &FileRead,
+    path: Option<&Path>,
+    probe: &ProviderProbe,
+    language: Language,
+) -> AuthView {
     let Some(path) = path else {
         return AuthView {
             status: AuthStatusView::Failed(
-                "the shell's agent folder could not be found on this machine".to_owned(),
+                messages::shell_agent_folder_missing(language).to_owned(),
             ),
             providers: Vec::new(),
         };
     };
-    let text = match read(path) {
+    let text = match read(path, language) {
         Ok(text) => text,
         Err(reason) => {
             return AuthView {
@@ -44,14 +54,14 @@ pub fn view(read: &FileRead, path: Option<&Path>, probe: &ProviderProbe) -> Auth
         status: AuthStatusView::Ready,
         providers: names
             .iter()
-            .map(|name| provider_view(name, probe))
+            .map(|name| provider_view(name, probe, language))
             .collect(),
     }
 }
 
 /// One provider and its check.
-fn provider_view(name: &str, probe: &ProviderProbe) -> AuthProviderView {
-    match probe(name) {
+fn provider_view(name: &str, probe: &ProviderProbe, language: Language) -> AuthProviderView {
+    match probe(name, language) {
         Ok(answer) => {
             let check = rule::check(answer.exit_code, &answer.stdout);
             // A custom provider (one pi's own registry does not name, the way
@@ -105,7 +115,7 @@ mod tests {
 
     fn reader(text: Option<&str>) -> FileRead {
         let text = text.map(str::to_owned);
-        Arc::new(move |_path: &Path| Ok(text.clone()))
+        Arc::new(move |_path: &Path, _language: Language| Ok(text.clone()))
     }
 
     /// A probe that answers the exit code and line of a chosen provider and
@@ -114,7 +124,7 @@ mod tests {
         answers: &'static [(&'static str, i32, &'static str)],
         asked: Arc<std::sync::Mutex<Vec<String>>>,
     ) -> ProviderProbe {
-        Arc::new(move |provider: &str| {
+        Arc::new(move |provider: &str, _language: Language| {
             asked
                 .lock()
                 .expect("the log is not poisoned")
@@ -156,6 +166,7 @@ mod tests {
             &reader(Some(STORE)),
             Some(&PathBuf::from("C:/pi/agent/auth.json")),
             &probe,
+            Language::En,
         );
 
         assert_eq!(view.providers[1].status, ProviderStatusView::Unverified);
@@ -186,6 +197,7 @@ mod tests {
             &reader(Some(STORE)),
             Some(&PathBuf::from("C:/pi/agent/auth.json")),
             &probe,
+            Language::En,
         );
 
         assert_eq!(view.status, AuthStatusView::Ready);
@@ -212,6 +224,7 @@ mod tests {
             &reader(Some(STORE)),
             Some(&PathBuf::from("auth.json")),
             &probe(&[("anthropic", 0, "{}"), ("commandcode", 0, "{}")], asked),
+            Language::En,
         );
         let carried = format!("{view:?}");
         assert!(!carried.contains("SECRET"), "{carried}");
@@ -221,13 +234,15 @@ mod tests {
 
     #[test]
     fn a_check_that_cannot_run_is_that_providers_error() {
-        let failing: ProviderProbe =
-            Arc::new(|provider: &str| Err(format!("gentle-shell could not run for {provider}")));
+        let failing: ProviderProbe = Arc::new(|provider: &str, _language: Language| {
+            Err(format!("gentle-shell could not run for {provider}"))
+        });
 
         let view = view(
             &reader(Some(STORE)),
             Some(&PathBuf::from("auth.json")),
             &failing,
+            Language::En,
         );
 
         assert_eq!(view.providers.len(), 2);
@@ -248,6 +263,7 @@ mod tests {
             &reader(None),
             Some(&PathBuf::from("auth.json")),
             &probe(&[], asked),
+            Language::En,
         );
         assert_eq!(view.status, AuthStatusView::Ready);
         assert!(view.providers.is_empty());
@@ -255,12 +271,14 @@ mod tests {
 
     #[test]
     fn a_store_that_cannot_be_read_says_why() {
-        let failing: FileRead = Arc::new(|_path: &Path| Err("permission denied".to_owned()));
+        let failing: FileRead =
+            Arc::new(|_path: &Path, _language: Language| Err("permission denied".to_owned()));
         let asked = Arc::new(std::sync::Mutex::new(Vec::new()));
         let view = view(
             &failing,
             Some(&PathBuf::from("auth.json")),
             &probe(&[], asked),
+            Language::En,
         );
         assert_eq!(
             view.status,
@@ -271,7 +289,7 @@ mod tests {
     #[test]
     fn no_agent_folder_is_said_plainly() {
         let asked = Arc::new(std::sync::Mutex::new(Vec::new()));
-        let view = view(&reader(Some(STORE)), None, &probe(&[], asked));
+        let view = view(&reader(Some(STORE)), None, &probe(&[], asked), Language::En);
         match view.status {
             AuthStatusView::Failed(reason) => assert!(reason.contains("agent folder"), "{reason}"),
             other => panic!("no folder must say so, got {other:?}"),

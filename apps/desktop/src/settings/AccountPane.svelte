@@ -11,22 +11,13 @@
   // refreshes a token (the check passes `--no-refresh` on the shell's side).
   import { dispatchIntent, openTerminal } from '../bridge'
   import type { AuthView_Serialize as AuthView, ProviderStatusView } from '../contract/bindings'
-  import {
-    CHECK_AGAIN,
-    CONNECTED,
-    ERROR,
-    FAILED,
-    INVALID,
-    OPEN_SHELL,
-    NOT_READY,
-    UNVERIFIED,
-    NOTE,
-    NO_PROVIDERS,
-    READING,
-    RETRY_SAFE,
-  } from './account-copy'
+  import { language } from '../i18n/language.svelte'
+  import { accountCopy } from './account-copy'
 
   let { auth }: { auth: AuthView | null } = $props()
+
+  /** The pane's own words in the language the app holds (0.2.0, D4). */
+  const copy = $derived(accountCopy(language.current))
 
   /** What the terminal said when it could not open, or `null`. */
   let terminalError = $state<string | null>(null)
@@ -65,11 +56,11 @@
 
   /** One provider's check as the row draws it: its word and its tone. */
   function drawn(status: ProviderStatusView): { label: string; tone: string } {
-    if (status === 'Ready') return { label: CONNECTED, tone: 'ok' }
-    if (status === 'Unverified') return { label: UNVERIFIED, tone: 'quiet' }
-    if (status === 'NotReady') return { label: NOT_READY, tone: 'warn' }
-    if (status === 'Invalid') return { label: INVALID, tone: 'bad' }
-    return { label: ERROR, tone: 'bad' }
+    if (status === 'Ready') return { label: copy.connected, tone: 'ok' }
+    if (status === 'Unverified') return { label: copy.unverified, tone: 'quiet' }
+    if (status === 'NotReady') return { label: copy.notReady, tone: 'warn' }
+    if (status === 'Invalid') return { label: copy.invalid, tone: 'bad' }
+    return { label: copy.error, tone: 'bad' }
   }
 
   async function open(where: 'Login' | 'Logout'): Promise<void> {
@@ -79,12 +70,12 @@
 
 {#if failed !== null}
   <!-- The store is there and could not be read: say why, and that a check is safe. -->
-  <p class="quiet" role="status">{FAILED(failed)}</p>
-  <p class="quiet">{RETRY_SAFE}</p>
+  <p class="quiet" role="status">{copy.failed(failed)}</p>
+  <p class="quiet">{copy.retrySafe}</p>
 {:else if !ready}
-  <p class="quiet">{READING}</p>
+  <p class="quiet">{copy.reading}</p>
 {:else if providers.length === 0}
-  <p class="quiet">{NO_PROVIDERS}</p>
+  <p class="quiet">{copy.noProviders}</p>
 {:else}
   <ul class="providers">
     {#each providers as provider (provider.name)}
@@ -100,10 +91,10 @@
 {/if}
 
 <div class="acts">
-  <button class="btn accent" type="button" onclick={() => void open('Login')}>{OPEN_SHELL}</button>
-  <button class="btn" type="button" onclick={check}>{CHECK_AGAIN}</button>
+  <button class="btn accent" type="button" onclick={() => void open('Login')}>{copy.openShell}</button>
+  <button class="btn" type="button" onclick={check}>{copy.checkAgain}</button>
 </div>
-<p class="note">{NOTE}</p>
+<p class="note">{copy.note}</p>
 {#if terminalError !== null}
   <p class="quiet" role="status">{terminalError}</p>
 {/if}

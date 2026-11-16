@@ -9,26 +9,13 @@
   // is how it moves on once it is there.
   import { dispatchIntent } from '../bridge'
   import type { InstallView } from '../contract/bindings'
-  import {
-    CHECK_AGAIN,
-    COMMAND,
-    COMMAND_INTRO,
-    DONE,
-    elapsed,
-    FAILED_HINT,
-    FAILED_TITLE,
-    HOME,
-    INSTALL,
-    INSTALLS,
-    LOOKED_IN,
-    PROGRESS,
-    RUNNING,
-    TITLE,
-    WARNING,
-    WHY,
-  } from './copy'
+  import { language } from '../i18n/language.svelte'
+  import { COMMAND, installCopy } from './copy'
 
   let { install }: { install: InstallView } = $props()
+
+  /** The screen's own words in the language the app holds (0.2.0, S3/D4). */
+  const copy = $derived(installCopy(language.current))
 
   /** Set by the first press: until the push says Running, no second one goes out. */
   let asked = $state(false)
@@ -72,33 +59,33 @@
 
 <main class="welcome" aria-labelledby="missing-title">
   <div class="welcome-card">
-    <h1 id="missing-title">{TITLE}</h1>
-    <p class="welcome-intro">{WHY}</p>
-    <p class="welcome-intro">{LOOKED_IN}</p>
+    <h1 id="missing-title">{copy.title}</h1>
+    <p class="welcome-intro">{copy.why}</p>
+    <p class="welcome-intro">{copy.lookedIn}</p>
 
-    <section class="welcome-found" aria-label={COMMAND_INTRO}>
-      <h2>{COMMAND_INTRO}</h2>
+    <section class="welcome-found" aria-label={copy.commandIntro}>
+      <h2>{copy.commandIntro}</h2>
       <p class="welcome-path">{COMMAND}</p>
     </section>
-    <p class="welcome-intro">{INSTALLS}</p>
-    <p class="welcome-intro">{HOME}</p>
-    <p class="welcome-skip">{WARNING}</p>
+    <p class="welcome-intro">{copy.installs}</p>
+    <p class="welcome-intro">{copy.home}</p>
+    <p class="welcome-skip">{copy.warning}</p>
 
     {#if failure !== null}
       <div class="install-failed" role="alert">
-        <strong>{FAILED_TITLE}</strong>
+        <strong>{copy.failedTitle}</strong>
         <pre>{failure}</pre>
-        <p class="install-hint">{FAILED_HINT}</p>
+        <p class="install-hint">{copy.failedHint}</p>
       </div>
     {/if}
     {#if running}
-      <p class="welcome-applying" role="status">{RUNNING}</p>
-      <div class="install-progress" role="progressbar" aria-label={PROGRESS}>
+      <p class="welcome-applying" role="status">{copy.running}</p>
+      <div class="install-progress" role="progressbar" aria-label={copy.progress}>
         <span class="install-progress-bar"></span>
       </div>
-      <p class="welcome-elapsed">{elapsed(seconds)}</p>
+      <p class="welcome-elapsed">{copy.elapsed(seconds)}</p>
     {:else if done}
-      <p class="welcome-applying" role="status">{DONE}</p>
+      <p class="welcome-applying" role="status">{copy.done}</p>
     {/if}
 
     <div class="install-actions">
@@ -109,7 +96,7 @@
           disabled={running || asked}
           onclick={ask}
         >
-          {INSTALL}
+          {copy.install}
         </button>
       {/if}
       <button
@@ -118,7 +105,7 @@
         disabled={running}
         onclick={again}
       >
-        {CHECK_AGAIN}
+        {copy.checkAgain}
       </button>
     </div>
   </div>

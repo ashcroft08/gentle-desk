@@ -24,14 +24,17 @@ use std::sync::Arc;
 
 use gentle_app::ChatActivity;
 use gentle_backend::session_rename::{self, DiskFiles, SessionFiles};
+use gentle_core::i18n::{messages, Language};
 use tauri::AppHandle;
 
 use crate::bridge::AppStateHolder;
 use crate::commands::{emit_state, Bridge};
 use crate::contract::ViewState;
 
-/// The one line a user reads when they asked to rename a chat that is mid-turn.
-pub const WORKING_CHILD: &str = "This chat is working. Rename it when the turn ends.";
+/// The one line a user reads when they asked to rename a chat that is mid-turn,
+/// in English: the catalog holds it in both languages and the command uses the
+/// language the config carries.
+pub const WORKING_CHILD: &str = messages::rename_working_refusal(Language::En);
 
 /// Whether the chat behind a session file has a child that is running a turn right
 /// now. The app already knows it (the host's working mark, as the reducer reports
@@ -69,8 +72,9 @@ pub fn rename(
     name: &str,
 ) -> Renamed {
     if working.is_working(session) {
+        let refusal = messages::rename_working_refusal(holder.language()).to_owned();
         return Renamed {
-            view: holder.note_sessions_problem(WORKING_CHILD.to_owned()),
+            view: holder.note_sessions_problem(refusal),
             written: false,
         };
     }
@@ -104,6 +108,7 @@ pub async fn rename_session(
     app: AppHandle<tauri::Wry>,
 ) -> Result<ViewState, String> {
     bridge.accepting_work()?;
+    let language = bridge.holder.language();
     let holder = Arc::clone(&bridge.holder);
     let renamed = tauri::async_runtime::spawn_blocking(move || {
         rename(
@@ -115,7 +120,7 @@ pub async fn rename_session(
         )
     })
     .await
-    .map_err(|error| format!("the rename could not run: {error}"))?;
+    .map_err(|error| messages::rename_failed(language, &error.to_string()))?;
     emit_state(&app, &renamed.view)?;
     if renamed.written {
         bridge.sessions.request();

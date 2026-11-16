@@ -14,9 +14,14 @@ use std::io::Read;
 use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
 
-/// What runs the install. `Err` is the sentence the permission screen shows.
+use gentle_core::i18n::{messages, Language};
+
+/// What runs the install. `Err` is the sentence the permission screen shows,
+/// worded in the language it is asked in (0.2.0, S3): the install starts on the
+/// user's click, so the run's choice is read then and a switch applies to the
+/// next attempt.
 pub trait Installer: Send + Sync {
-    fn install(&self) -> Result<(), String>;
+    fn install(&self, language: Language) -> Result<(), String>;
 }
 
 /// How much of the command's output is kept, per stream.
@@ -77,7 +82,7 @@ impl CommandInstaller {
 }
 
 impl Installer for CommandInstaller {
-    fn install(&self) -> Result<(), String> {
+    fn install(&self, language: Language) -> Result<(), String> {
         let mut command = Command::new(&self.program);
         command
             .args(&self.args)
@@ -91,9 +96,10 @@ impl Installer for CommandInstaller {
             command.creation_flags(0x0800_0000);
         }
         let mut child = command.spawn().map_err(|error| {
-            format!(
-                "could not start {}: {error}",
-                self.program.to_string_lossy()
+            messages::install_command_could_not_start(
+                language,
+                &self.program.to_string_lossy(),
+                &error.to_string(),
             )
         })?;
         let out = child.stdout.take().map(drain);
@@ -109,11 +115,11 @@ impl Installer for CommandInstaller {
                 Ok(None) => {
                     kill_tree(&mut child);
                     let _ = child.wait();
-                    return Err(
-                        "the install did not finish in 20 minutes and was stopped".to_owned()
-                    );
+                    return Err(messages::install_did_not_finish(language).to_owned());
                 }
-                Err(error) => return Err(format!("could not wait for the install: {error}")),
+                Err(error) => {
+                    return Err(messages::install_wait_failed(language, &error.to_string()))
+                }
             }
         };
         let mut output = Vec::new();

@@ -30,6 +30,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use gentle_backend::session_delete::{self, DiskRemovals, SessionRemovals};
+use gentle_core::i18n::{messages, Language};
 use gentle_runtime::app_config::folder_key;
 use tauri::AppHandle;
 
@@ -42,14 +43,14 @@ use crate::contract::ViewState;
 /// The delete never stops the child itself (S-T3.5): the user does. Its rule and
 /// its words are shared with Close chat (0.1.14), which says the same sentence
 /// with its own verb, so a row menu never grows a second wording.
-pub fn working_child() -> String {
-    format!("{}, then delete it.", gentle_app::WORKING_CHAT)
+pub fn working_child(language: Language) -> String {
+    messages::delete_working_refusal(language)
 }
 
 /// What the user reads when the last chat of a derived workspace is deleted and
 /// that workspace was the current one: its row is gone from the tree.
-pub fn workspace_gone(label: &str) -> String {
-    format!("{label} has no chats left, so its workspace row is gone.")
+pub fn workspace_gone(language: Language, label: &str) -> String {
+    messages::workspace_gone(language, label)
 }
 
 /// What one delete came to: the slice to push, and whether the session file was
@@ -80,8 +81,9 @@ pub fn delete(
         };
     }
     if working.is_working(session) {
+        let refusal = working_child(holder.language());
         return Deleted {
-            view: holder.note_sessions_problem(working_child()),
+            view: holder.note_sessions_problem(refusal),
             removed: false,
         };
     }
@@ -92,7 +94,7 @@ pub fn delete(
         Ok(()) => {
             holder.clear_sessions_notice();
             if let Some(label) = vanished {
-                holder.note_workspace_problem(workspace_gone(&label));
+                holder.note_workspace_problem(workspace_gone(holder.language(), &label));
             }
             Deleted {
                 view: holder.view(),
@@ -122,6 +124,7 @@ pub async fn delete_session(
     app: AppHandle<tauri::Wry>,
 ) -> Result<ViewState, String> {
     bridge.accepting_work()?;
+    let language = bridge.holder.language();
     let holder = Arc::clone(&bridge.holder);
     let deleted = tauri::async_runtime::spawn_blocking(move || {
         delete(
@@ -133,7 +136,7 @@ pub async fn delete_session(
         )
     })
     .await
-    .map_err(|error| format!("the delete could not run: {error}"))?;
+    .map_err(|error| messages::delete_failed(language, &error.to_string()))?;
     emit_state(&app, &deleted.view)?;
     if deleted.removed {
         bridge.sessions.request();

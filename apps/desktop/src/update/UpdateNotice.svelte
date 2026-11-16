@@ -2,7 +2,8 @@
   // The update line, drawn only when there is something to say: a newer version
   // to install, its progress, or the reason it could not be installed. It sits
   // above everything else and never blocks the window (S3).
-  import { DOWNLOADING, DISMISS, FAILED, INSTALL, READY, RETRY, found } from './copy'
+  import { language } from '../i18n/language.svelte'
+  import { updateCopy } from './copy'
   import type { UpdateState } from './state'
 
   let {
@@ -17,6 +18,9 @@
     onDismiss: () => void
   } = $props()
 
+  /** The line's own words in the language the app holds (0.2.0, S3/D4). */
+  const copy = $derived(updateCopy(language.current))
+
   const version = $derived('version' in state ? state.version : null)
   const percent = $derived(
     state.kind === 'downloading' && state.total !== null && state.total > 0
@@ -28,20 +32,20 @@
 {#if state.kind === 'available' || state.kind === 'downloading' || state.kind === 'ready' || state.kind === 'failed'}
   <div class="update" role="status">
     {#if state.kind === 'available'}
-      <span class="update-m">{found(version ?? '')}</span>
-      <button type="button" class="update-go" onclick={onInstall}>{INSTALL}</button>
-      <button type="button" class="update-quiet" onclick={onDismiss}>{DISMISS}</button>
+      <span class="update-m">{copy.found(version ?? '')}</span>
+      <button type="button" class="update-go" onclick={onInstall}>{copy.install}</button>
+      <button type="button" class="update-quiet" onclick={onDismiss}>{copy.dismiss}</button>
     {:else if state.kind === 'downloading'}
-      <span class="update-m">{DOWNLOADING(version ?? '', percent)}</span>
+      <span class="update-m">{copy.downloading(version ?? '', percent)}</span>
       {#if percent !== null}
         <progress class="update-bar" max="100" value={percent}></progress>
       {/if}
     {:else if state.kind === 'ready'}
-      <span class="update-m">{READY(version ?? '')}</span>
+      <span class="update-m">{copy.ready(version ?? '')}</span>
     {:else if state.kind === 'failed'}
-      <span class="update-m">{FAILED(version, state.message)}</span>
-      <button type="button" class="update-go" onclick={onRetry}>{RETRY}</button>
-      <button type="button" class="update-quiet" onclick={onDismiss}>{DISMISS}</button>
+      <span class="update-m">{copy.failed(version, state.message)}</span>
+      <button type="button" class="update-go" onclick={onRetry}>{copy.retry}</button>
+      <button type="button" class="update-quiet" onclick={onDismiss}>{copy.dismiss}</button>
     {/if}
   </div>
 {/if}

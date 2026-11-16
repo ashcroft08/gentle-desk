@@ -8,6 +8,7 @@
 
 use gentle_app::AppState;
 use gentle_core::helpers::{HelperTask, HelperThreadItem};
+use gentle_core::i18n::Language;
 use gentle_runtime::helper_text::format::{args_line, output_preview, tool_status, ToolStatus};
 use gentle_runtime::helper_text::{status_label, task_title};
 use gentle_runtime::text::truncate;
@@ -34,20 +35,24 @@ const PROMPT_CHARS: usize = 300;
 pub(crate) fn thread(state: &AppState) -> Option<HelperThreadView> {
     let chat = state.chats.foreground()?;
     let activity = &state.chats.state(chat)?.helpers;
-    open(&activity.tasks, state.selected_helper.as_deref()?)
+    let task = open(&activity.tasks, state.selected_helper.as_deref()?)?;
+    Some(view(task, state.language()))
 }
 
-/// The thread of the task `selected` names among `tasks`. A selection only ever
-/// names a card the panel draws (the reducer checks that), so an id that names
-/// no task has no thread: the view then keeps drawing the list.
-fn open(tasks: &[HelperTask], selected: &str) -> Option<HelperThreadView> {
-    let task = tasks.iter().find(|task| task.id == selected)?;
-    Some(view(task))
+/// The task `selected` names among `tasks`. A selection only ever names a card
+/// the panel draws (the reducer checks that), so an id that names no task has no
+/// thread: the view then keeps drawing the list.
+///
+/// It answers the TASK and not its view on purpose: which task a selection
+/// opens is one rule, and the words the view carries are another (they are the
+/// catalog's, in the language the state speaks).
+fn open<'a>(tasks: &'a [HelperTask], selected: &str) -> Option<&'a HelperTask> {
+    tasks.iter().find(|task| task.id == selected)
 }
 
 /// One task's thread as the thread view draws it: the header iced draws above
 /// the items, then the tail of the items themselves.
-fn view(task: &HelperTask) -> HelperThreadView {
+fn view(task: &HelperTask, language: Language) -> HelperThreadView {
     let total = task.thread.items.len();
     let start = total.saturating_sub(THREAD_ITEMS_PUSHED);
     HelperThreadView {
@@ -55,7 +60,7 @@ fn view(task: &HelperTask) -> HelperThreadView {
         title: task_title(task),
         agent: task.agent.clone(),
         status: view_status(task.status),
-        status_label: status_label(task.status).to_owned(),
+        status_label: status_label(language, task.status).to_owned(),
         prompt: truncate(&task.prompt, PROMPT_CHARS),
         dropped: dropped(task.thread.dropped, start),
         items: task.thread.items[start..].iter().map(item).collect(),

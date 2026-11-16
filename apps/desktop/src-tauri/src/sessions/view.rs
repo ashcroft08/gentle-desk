@@ -8,6 +8,7 @@
 //! second implementation here.
 
 use gentle_app::{AppState, ChatId, ListStatus, SessionItem};
+use gentle_core::i18n::{messages, Language};
 use gentle_runtime::text::truncate;
 use gentle_runtime::time_ago::time_ago;
 
@@ -20,7 +21,7 @@ const TITLE_CHARS: usize = 32;
 /// started a moment ago has no stored title to draw, and a blank header would
 /// read as no chat at all. The words are the shell's own (the iced header's
 /// button said the same), never the session's.
-pub const NEW_CHAT_TITLE: &str = "New chat";
+pub const NEW_CHAT_TITLE: &str = messages::new_chat_title(Language::En);
 
 /// How complete the list is, as the contract says it. The counters narrow to
 /// `u32`: a home has files, not billions of them, and a saturating value would
@@ -43,29 +44,30 @@ pub fn total(state: &AppState) -> u32 {
 }
 
 /// One row of the list, flattened for display, with its age as seen at
-/// `now_ms`. The one mapping of a session to a row: the window that serves the
-/// rows uses it, so every row of every page reads the same way.
-pub fn row(session: &SessionItem, now_ms: u64) -> SessionRowView {
+/// `now_ms` and the app's own words in `language`. The one mapping of a session
+/// to a row: the window that serves the rows uses it, so every row of every page
+/// reads the same way.
+pub fn row(session: &SessionItem, now_ms: u64, language: Language) -> SessionRowView {
     SessionRowView {
         id: session.path.clone(),
         title: truncate(&session.title, TITLE_CHARS),
         project: session.project().to_owned(),
         message_count: session.message_count,
-        modified_ago: time_ago(now_ms, session.modified_ms),
+        modified_ago: time_ago(language, now_ms, session.modified_ms),
     }
 }
 
 /// The title the chat header draws for `chat`: the stored session's own title,
 /// which is the text a sidebar row draws, untruncated here because the header cuts
 /// it for its own width and keeps the whole name for whoever asks. A chat whose
-/// session file does not exist yet reads [`NEW_CHAT_TITLE`]. The lookup goes
-/// through the same list the rows come from, so the header and the row can never
-/// name the same chat differently.
+/// session file does not exist yet reads [`NEW_CHAT_TITLE`], in the language the
+/// state speaks. The lookup goes through the same list the rows come from, so the
+/// header and the row can never name the same chat differently.
 pub fn header_title(state: &AppState, chat: &ChatId) -> String {
     chat.session_path()
         .and_then(|path| state.sessions.iter().find(|session| session.path == path))
         .map_or_else(
-            || NEW_CHAT_TITLE.to_owned(),
+            || messages::new_chat_title(state.language()).to_owned(),
             |session| session.title.clone(),
         )
 }

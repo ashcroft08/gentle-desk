@@ -5,8 +5,9 @@
   // changes, which is what empties the field for the next question.
   import { Dialog } from 'bits-ui'
   import type { DialogAnswer, DialogView } from '../contract/bindings'
+  import { language } from '../i18n/language.svelte'
   import { CANCELLED, valueAnswer } from './answer'
-  import { CANCEL, SUBMIT } from './copy'
+  import { dialogsCopy } from './copy'
 
   let {
     dialog,
@@ -15,6 +16,9 @@
     dialog: Extract<DialogView, { kind: 'Input' }>
     onAnswer: (answer: DialogAnswer) => void
   } = $props()
+
+  /** The buttons' words in the language the dialog is drawn in (D4). */
+  const copy = $derived(dialogsCopy(language.current))
 
   let typed = $state('')
   let field = $state<HTMLInputElement | null>(null)
@@ -47,6 +51,6 @@
   onkeydown={keyed}
 />
 <div class="acts">
-  <button class="btn" type="button" onclick={() => onAnswer(CANCELLED)}>{CANCEL}</button>
-  <button class="btn primary" type="button" onclick={submit}>{SUBMIT}</button>
+  <button class="btn" type="button" onclick={() => onAnswer(CANCELLED)}>{copy.cancel}</button>
+  <button class="btn primary" type="button" onclick={submit}>{copy.submit}</button>
 </div>

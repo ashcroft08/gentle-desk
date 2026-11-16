@@ -3,6 +3,7 @@
 
 use gentle_core::chat::{reduce_chat, reduce_chat_at, ChatState};
 use gentle_core::helpers::{HelperStatus, HelpersSummary};
+use gentle_core::i18n::Language;
 use gentle_core::rpc::{decode_line, Decoded};
 use serde_json::{json, Value};
 
@@ -42,7 +43,7 @@ fn task(id: &str, status: &str, extra: Value) -> Value {
 }
 
 fn apply(state: ChatState, key: &str, lines: Vec<String>, now: Option<u64>) -> ChatState {
-    reduce_chat_at(state, &widget_event(key, Some(lines)), now)
+    reduce_chat_at(Language::En, state, &widget_event(key, Some(lines)), now)
 }
 
 fn statuses(state: &ChatState) -> Vec<(&str, HelperStatus)> {
@@ -159,6 +160,7 @@ fn a_task_dropped_by_gentle_agents_is_kept_as_done_stamped_with_the_arrival_time
 #[test]
 fn without_a_clock_the_promoted_task_simply_has_no_end_time() {
     let running = reduce_chat(
+        Language::En,
         ChatState::default(),
         &widget_event(
             "gentle-agents",
@@ -169,6 +171,7 @@ fn without_a_clock_the_promoted_task_simply_has_no_end_time() {
         ),
     );
     let state = reduce_chat(
+        Language::En,
         running,
         &widget_event("gentle-agents", Some(frame(counts(0, 0, 0, 1), json!([])))),
     );
@@ -323,7 +326,7 @@ fn an_explicit_clear_zeroes_the_counters_but_finished_work_stays_listed() {
         widget_event("gentle-agents", None),
         widget_event("gentle-agents", Some(vec![])),
     ] {
-        let state = reduce_chat_at(running.clone(), &clear, Some(NOW));
+        let state = reduce_chat_at(Language::En, running.clone(), &clear, Some(NOW));
         assert_eq!(state.helpers.summary, HelpersSummary::default());
         assert_eq!(statuses(&state), [("t", HelperStatus::Done)]);
     }
@@ -336,7 +339,7 @@ fn non_string_widget_lines_are_skipped() {
     let Decoded::Event(event) = decode_line(&raw.to_string()) else {
         panic!("event")
     };
-    let state = reduce_chat(ChatState::default(), &event);
+    let state = reduce_chat(Language::En, ChatState::default(), &event);
     assert_eq!(statuses(&state), [("t", HelperStatus::Running)]);
 }
 
@@ -346,7 +349,7 @@ fn the_recorded_gentle_agents_stream_folds_as_the_reference_app_does() {
     let mut seen = Vec::new();
     for line in FIXTURE.lines() {
         if let Decoded::Event(event) = decode_line(line) {
-            state = reduce_chat_at(state, &event, Some(NOW));
+            state = reduce_chat_at(Language::En, state, &event, Some(NOW));
             seen.push((
                 state.helpers.summary,
                 statuses(&state)

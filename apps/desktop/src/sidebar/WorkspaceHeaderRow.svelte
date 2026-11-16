@@ -9,6 +9,8 @@
   // gone"). There is no "..." menu on the row (D5).
   import Icon from '../icons/Icon.svelte'
   import type { WorkspaceRow } from '../sessions/rows'
+  import { language } from '../i18n/language.svelte'
+  import { sidebarCopy } from './copy'
 
   let {
     row,
@@ -36,6 +38,11 @@
 
   const reasonId = $derived(`ws-reason-${row.key.replace(/[^a-zA-Z0-9]+/g, '-')}`)
   const reason = $derived(row.available ? null : row.reason)
+  /**
+   * The icon's own words, in the language this run is set to (0.2.0, S3/D4). The
+   * workspace label inside the name is Rust's and travels through untouched (D7).
+   */
+  const copy = $derived(sidebarCopy(language.current))
 
   function newChat(): void {
     // A folder that is not there cannot host a child: the icon says why instead.
@@ -67,10 +74,10 @@
   <button
     class="ic nc tip-r"
     type="button"
-    aria-label={`New chat in ${row.label}`}
+    aria-label={copy.newChatIn(row.label)}
     aria-disabled={row.available ? undefined : 'true'}
     aria-describedby={row.available ? undefined : reasonId}
-    data-tip="New chat"
+    data-tip={copy.newChatTip}
     data-visible={revealed ? 'true' : 'false'}
     tabindex={active ? 0 : -1}
     onclick={newChat}

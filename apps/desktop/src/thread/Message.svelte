@@ -5,12 +5,16 @@
   // the model-error box. Copy never shows on an errored message: the iced thread
   // returns its danger box before the Copy row.
   import type { MessageView } from '../contract/bindings'
+  import { language } from '../i18n/language.svelte'
   import AssistantMessage from './AssistantMessage.svelte'
   import ModelError from './ModelError.svelte'
   import UserMessage from './UserMessage.svelte'
-  import { ASSISTANT_SAID, YOU_SAID } from './copy'
+  import { threadCopy } from './copy'
 
   let { message, html = '' }: { message: MessageView; html?: string } = $props()
+
+  /** The author line in the language the app holds (0.2.0, S3/D4). */
+  const copy = $derived(threadCopy(language.current))
 
   const fromUser = $derived(message.role === 'User')
   const whoId = $derived(`msg-who-${message.id}`)
@@ -19,7 +23,7 @@
 <article class="msg" class:u={fromUser} class:a={!fromUser} aria-labelledby={whoId}>
   <!-- The author, for a screen reader only: the bubble is drawn without a
        visible name, and the article is what a reader navigates by. -->
-  <p class="vh" id={whoId}>{fromUser ? YOU_SAID : ASSISTANT_SAID}</p>
+  <p class="vh" id={whoId}>{fromUser ? copy.youSaid : copy.assistantSaid}</p>
   {#if fromUser}
     <UserMessage text={message.text} images={message.images} />
   {:else if message.error != null}

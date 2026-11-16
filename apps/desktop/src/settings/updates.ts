@@ -16,7 +16,7 @@ import type {
   UpdatesView_Serialize as UpdatesView,
   VersionRowView_Serialize as VersionRow,
 } from '../contract/bindings'
-import { APP_LABEL, PI_LABEL, SHELL_LABEL } from './updates-copy'
+import type { UpdatesCopy } from './updates-copy'
 
 /** One piece of this machine, as the quiet versions row names it. */
 export type VersionLine = { label: string; version: string | null }
@@ -43,16 +43,20 @@ export type UpdatesCard = {
 }
 
 /** The three rows of the check, with the labels the pane draws them under. */
-function rows(updates: UpdatesView): { label: string; row: VersionRow }[] {
+function rows(updates: UpdatesView, copy: UpdatesCopy): { label: string; row: VersionRow }[] {
   return [
-    { label: APP_LABEL, row: updates.desk },
-    { label: PI_LABEL, row: updates.pi },
-    { label: SHELL_LABEL, row: updates.shell },
+    { label: copy.appLabel, row: updates.desk },
+    { label: copy.piLabel, row: updates.pi },
+    { label: copy.shellLabel, row: updates.shell },
   ]
 }
 
-/** The whole card, from the check Rust pushed. */
-export function cardOf(updates: UpdatesView | null): UpdatesCard {
+/**
+ * The whole card, from the check Rust pushed, named in the language the pane is
+ * drawn in (0.2.0, D4): the labels are the app's own words, so they arrive as the
+ * pane's dictionary answers them; the versions inside them are the check's (D7).
+ */
+export function cardOf(updates: UpdatesView | null, copy: UpdatesCopy): UpdatesCard {
   const empty: UpdatesCard = {
     checked: false,
     checking: false,
@@ -64,7 +68,7 @@ export function cardOf(updates: UpdatesView | null): UpdatesCard {
   }
   if (updates === null) return empty
 
-  const all = rows(updates)
+  const all = rows(updates, copy)
   const versions = all.map(({ label, row }) => ({ label, version: row.current }))
   const behind = all.filter(({ row }) => row.update_available === true)
   const available = behind.length > 0

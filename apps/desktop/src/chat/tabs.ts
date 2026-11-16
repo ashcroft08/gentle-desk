@@ -1,18 +1,16 @@
-// Which tab of the Chat | Helpers tablist a key moves to, and the name the
-// working badge on the Helpers tab carries (01b). Both are plain rules so the
-// component only draws a decision, and jsdom can test the decision itself.
+// Which tab of the Chat | Helpers tablist a key moves to. The rule is plain data so
+// the component only draws a decision, and jsdom can test the decision itself.
+//
+// The tablist's own words are NOT here (0.2.0, S3, D5): the header is drawn in the
+// language the app holds, so `chat/copy.ts` - the module that owns the area - keeps
+// the tablist's name, the two tab words and the working badge, and this module keeps
+// the order, the ids and the walking.
 
 /** The two views the chat header switches between. */
 export type ViewTab = 'chat' | 'helpers'
 
 /** The tabs in the order the tablist draws them. */
 export const TABS: ViewTab[] = ['chat', 'helpers']
-
-/** The tablist's accessible name, as 01b writes it. */
-export const TABS_LABEL = 'View'
-
-/** The tab's own word. */
-export const TAB_COPY: Record<ViewTab, string> = { chat: 'Chat', helpers: 'Helpers' }
 
 /** The id of each tab, so its panel can name it with `aria-labelledby`. */
 export const TAB_IDS: Record<ViewTab, string> = { chat: 't-chat', helpers: 't-help' }
@@ -41,13 +39,4 @@ export function tabAfter(key: string, from: ViewTab): ViewTab | null {
     default:
       return null
   }
-}
-
-/**
- * The working badge's accessible name: one helper is singular, every other
- * count plural. The badge is drawn only while something runs, so this is never
- * asked for zero.
- */
-export function workingBadgeName(running: number): string {
-  return running === 1 ? '1 helper working' : `${running} helpers working`
 }

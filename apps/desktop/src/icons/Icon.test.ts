@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { render } from '@testing-library/svelte'
 import Icon from './Icon.svelte'
-import type { IconName } from './shapes'
+import { MARK_LABELS, markLabelsCopy, type IconName, type MarkKind } from './shapes'
 
 const NAMES: IconName[] = [
   'plus',
@@ -77,5 +77,55 @@ describe('Icon', () => {
     )
     expect(ring?.getAttribute('r')).toBe('10')
     expect(info.container.querySelector('rect')).toBeNull()
+  })
+})
+
+describe('the mark names', () => {
+  // The six chat states a row marks are this app's own words, so they read in the
+  // language the app is set to (0.2.0, S3/D4). `MARK_LABELS` stays the English
+  // column, because it is also the default name a bare `Mark` draws.
+  const ENGLISH: Record<MarkKind, string> = {
+    Working: 'Working',
+    Queued: 'Queued',
+    Opening: 'Opening',
+    NewReply: 'New reply',
+    NeedsAttention: 'Needs attention',
+    Ended: 'Ended',
+  }
+
+  const SPANISH: Record<MarkKind, string> = {
+    Working: 'Trabajando',
+    Queued: 'En cola',
+    Opening: 'Abriendo',
+    NewReply: 'Respuesta nueva',
+    NeedsAttention: 'Necesita atención',
+    Ended: 'Terminado',
+  }
+
+  const KINDS: MarkKind[] = [
+    'Working',
+    'Queued',
+    'Opening',
+    'NewReply',
+    'NeedsAttention',
+    'Ended',
+  ]
+
+  it('names each state in English exactly as the mark already did', () => {
+    expect(markLabelsCopy('en')).toEqual(ENGLISH)
+    // The dictionary a bare `Mark` draws its default name from is that column.
+    expect(MARK_LABELS).toEqual(ENGLISH)
+  })
+
+  it('names each state in Spanish', () => {
+    expect(markLabelsCopy('es')).toEqual(SPANISH)
+  })
+
+  it('translates every state: no name is left in English', () => {
+    const english = markLabelsCopy('en')
+    const spanish = markLabelsCopy('es')
+
+    expect(Object.keys(spanish).sort()).toEqual(Object.keys(english).sort())
+    for (const kind of KINDS) expect(spanish[kind], kind).not.toBe(english[kind])
   })
 })

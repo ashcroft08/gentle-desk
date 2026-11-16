@@ -4,6 +4,7 @@ use std::path::PathBuf;
 
 use gentle_app::{ChatCommand, ChatId};
 use gentle_backend::chat_host::Opened;
+use gentle_core::i18n::{messages, Language};
 use gentle_core::rpc::RpcCommand;
 
 use super::ChatRuntime;
@@ -33,15 +34,25 @@ impl ChatRuntime {
     }
 
     /// Runs one command with the folder a workspace named for the chat it
-    /// opens. The folder only matters for a child that is actually started: an
-    /// open of a chat that is already live keeps the folder it started in, and a
-    /// send goes to a child that already has one. An open in a folder that
-    /// cannot host a child fails the way the host says it does, before anything
-    /// is started.
+    /// opens, worded in English: the form a caller that holds no language uses,
+    /// which in this workspace is this crate's own tests. The app holds one, so
+    /// it calls [`Self::execute_in_language`].
     pub fn execute_in(&self, command: ChatCommand, folder: Option<PathBuf>) -> Outcome {
+        self.execute_in_language(Language::En, command, folder)
+    }
+
+    /// [`Self::execute_in`], with the app's own words in `language` in its
+    /// answer. Only the two refusals this module words itself are translated:
+    /// a failure the host reports travels as it arrived (D7).
+    pub fn execute_in_language(
+        &self,
+        language: Language,
+        command: ChatCommand,
+        folder: Option<PathBuf>,
+    ) -> Outcome {
         match command {
-            ChatCommand::OpenProcess { chat } => self.open(chat, folder),
-            ChatCommand::Send { chat, rpc } => self.send(chat, &rpc),
+            ChatCommand::OpenProcess { chat } => self.open(language, chat, folder),
+            ChatCommand::Send { chat, rpc } => self.send(language, chat, &rpc),
             // The child is stopped here, on the caller's thread: the host's grace
             // is up to 2 s and nothing of the window may wait on it (0.1.14).
             ChatCommand::CloseProcess { chat } => {
@@ -51,7 +62,7 @@ impl ChatRuntime {
         }
     }
 
-    fn open(&self, chat: ChatId, folder: Option<PathBuf>) -> Outcome {
+    fn open(&self, language: Language, chat: ChatId, folder: Option<PathBuf>) -> Outcome {
         // The registry lock ends before `open`, which waits for the child.
         let key = {
             let mut keys = self.keys();
@@ -60,7 +71,7 @@ impl ChatRuntime {
         let Some(key) = key else {
             return Outcome::OpenFailed {
                 chat,
-                message: "this chat has no process to open".to_owned(),
+                message: messages::chat_has_no_process_to_open(language).to_owned(),
             };
         };
         match self.host.open_in(key, folder) {
@@ -72,12 +83,12 @@ impl ChatRuntime {
         }
     }
 
-    fn send(&self, chat: ChatId, rpc: &RpcCommand) -> Outcome {
+    fn send(&self, language: Language, chat: ChatId, rpc: &RpcCommand) -> Outcome {
         let key = self.keys().key_of(&chat);
         let Some(key) = key else {
             return Outcome::SendFailed {
                 chat,
-                message: "this chat has no process yet".to_owned(),
+                message: messages::chat_has_no_process_yet(language).to_owned(),
             };
         };
         match self.host.send(&key, rpc) {

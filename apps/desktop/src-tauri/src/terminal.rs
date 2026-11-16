@@ -40,6 +40,7 @@ use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
 use gentle_backend::launcher::{self, Launcher, LauncherEnv};
+use gentle_core::i18n::{messages, Language};
 
 use crate::contract::TerminalActionView;
 
@@ -108,27 +109,34 @@ pub fn command_for(
 
 /// Opens a visible terminal window on `action`, with the home flags the chats'
 /// children get.
-pub fn open(action: TerminalActionView, home_args: &[OsString]) -> Result<(), String> {
-    let launcher = launcher::resolve(&LauncherEnv::from_process()).map_err(|error| {
-        format!("The terminal could not be opened: gentle-shell could not be found ({error})")
-    })?;
+pub fn open(
+    language: Language,
+    action: TerminalActionView,
+    home_args: &[OsString],
+) -> Result<(), String> {
+    let launcher = launcher::resolve(&LauncherEnv::from_process())
+        .map_err(|error| messages::terminal_shell_not_found(language, &error.to_string()))?;
     let (program, args) = command_for(action, &launcher, home_args);
-    launch(action, &program, &args)
+    launch(language, action, &program, &args)
 }
 
-/// The plain label one action's window and tab wear, in the pane's own words:
-/// the user pressed a button named this, so the window says the same thing.
-/// ASCII, no file, no product's command line.
-pub fn action_label(action: TerminalActionView) -> &'static str {
+/// The plain label one action's window and tab wear, in the pane's own words and
+/// in `language`: the user pressed a button named this, so the window says the
+/// same thing. No file, no product's command line.
+pub fn action_label(language: Language, action: TerminalActionView) -> &'static str {
     match action {
-        TerminalActionView::Profiles => "Profiles",
+        TerminalActionView::Profiles => messages::terminal_action_profiles(language),
         // The buttons are pi's own `/login` and `/logout` inside the shell, so
         // the labels are the words those buttons would wear.
-        TerminalActionView::Login => "Sign in",
-        TerminalActionView::Logout => "Sign out",
-        TerminalActionView::Update => "Update",
-        TerminalActionView::UpdateExtensions => "Update extensions",
-        TerminalActionView::InstallUsageSources => "Install usage sources",
+        TerminalActionView::Login => messages::terminal_action_login(language),
+        TerminalActionView::Logout => messages::terminal_action_logout(language),
+        TerminalActionView::Update => messages::terminal_action_update(language),
+        TerminalActionView::UpdateExtensions => {
+            messages::terminal_action_update_extensions(language)
+        }
+        TerminalActionView::InstallUsageSources => {
+            messages::terminal_action_install_usage_sources(language)
+        }
     }
 }
 
@@ -161,11 +169,15 @@ pub fn wrapper_path(action: TerminalActionView) -> PathBuf {
 /// the quoted part there and run whatever follows (the rule the earlier
 /// `console_line` had). Every line is CRLF, cmd's own ending, and the content
 /// is ASCII.
-pub fn wrapper_script(program: &Path, args: &[OsString]) -> Result<String, String> {
-    let mut line = quote_part(&program.to_string_lossy())?;
+pub fn wrapper_script(
+    language: Language,
+    program: &Path,
+    args: &[OsString],
+) -> Result<String, String> {
+    let mut line = quote_part(language, &program.to_string_lossy())?;
     for arg in args {
         line.push(' ');
-        line.push_str(&quote_part(&arg.to_string_lossy())?);
+        line.push_str(&quote_part(language, &arg.to_string_lossy())?);
     }
 
     Ok(format!("@echo off\r\n{line}\r\necho.\r\npause\r\n"))
@@ -173,11 +185,9 @@ pub fn wrapper_script(program: &Path, args: &[OsString]) -> Result<String, Strin
 
 /// One part of the wrapper's command line, in double quotes, with the
 /// separators cmd wants.
-fn quote_part(part: &str) -> Result<String, String> {
+fn quote_part(language: Language, part: &str) -> Result<String, String> {
     if part.contains('"') {
-        return Err(format!(
-            "The terminal could not be opened: {part} carries a double quote, which a cmd line cannot pass on"
-        ));
+        return Err(messages::terminal_part_has_quote(language, part));
     }
     Ok(format!("\"{}\"", part.replace('/', "\\")))
 }
@@ -185,11 +195,22 @@ fn quote_part(part: &str) -> Result<String, String> {
 /// The arguments Windows Terminal gets: one new window, one tab wearing the
 /// action's label, then the wrapper cmd after `--`. Pure, so the shape is
 /// pinned by a test.
-pub fn windows_terminal_args(action: TerminalActionView, wrapper: &Path) -> Vec<OsString> {
-    let mut argv: Vec<OsString> = ["-w", "-1", "new-tab", "--title", action_label(action), "--"]
-        .iter()
-        .map(OsString::from)
-        .collect();
+pub fn windows_terminal_args(
+    language: Language,
+    action: TerminalActionView,
+    wrapper: &Path,
+) -> Vec<OsString> {
+    let mut argv: Vec<OsString> = [
+        "-w",
+        "-1",
+        "new-tab",
+        "--title",
+        action_label(language, action),
+        "--",
+    ]
+    .iter()
+    .map(OsString::from)
+    .collect();
     argv.push(wrapper.as_os_str().to_owned());
     argv
 }
@@ -226,7 +247,12 @@ fn windows_terminal() -> Option<PathBuf> {
 /// and the output stays readable (L22). The wrapper is a cmd file, so the
 /// fallback never uses it - it spawns `program` itself.
 #[cfg(windows)]
-fn launch(action: TerminalActionView, program: &Path, args: &[OsString]) -> Result<(), String> {
+fn launch(
+    language: Language,
+    action: TerminalActionView,
+    program: &Path,
+    args: &[OsString],
+) -> Result<(), String> {
     use std::os::windows::process::CommandExt;
 
     /// `CREATE_NEW_CONSOLE`: the fallback console that is visible on its own.
@@ -236,16 +262,17 @@ fn launch(action: TerminalActionView, program: &Path, args: &[OsString]) -> Resu
     const DETACHED_PROCESS: u32 = 0x0000_0008;
 
     if let Some(wt) = windows_terminal() {
-        let script = wrapper_script(program, args)?;
+        let script = wrapper_script(language, program, args)?;
         let wrapper = wrapper_path(action);
         std::fs::write(&wrapper, script).map_err(|error| {
-            format!(
-                "The terminal could not be opened: {} could not be written ({error})",
-                wrapper.display()
+            messages::terminal_wrapper_unwritable(
+                language,
+                &wrapper.display().to_string(),
+                &error.to_string(),
             )
         })?;
         let started = std::process::Command::new(wt)
-            .args(windows_terminal_args(action, &wrapper))
+            .args(windows_terminal_args(language, action, &wrapper))
             .creation_flags(DETACHED_PROCESS)
             .spawn();
         if started.is_ok() {
@@ -258,7 +285,7 @@ fn launch(action: TerminalActionView, program: &Path, args: &[OsString]) -> Resu
         .creation_flags(CREATE_NEW_CONSOLE)
         .spawn()
         .map(|_| ())
-        .map_err(|error| format!("The terminal could not be opened: {error}"))
+        .map_err(|error| messages::terminal_open_failed(language, &error.to_string()))
 }
 
 /// Everywhere else there is no console flag to set: the launcher is started as
@@ -266,12 +293,17 @@ fn launch(action: TerminalActionView, program: &Path, args: &[OsString]) -> Resu
 /// ships on Windows, where the console above is what makes the window visible,
 /// so no wrapper is written here.
 #[cfg(not(windows))]
-fn launch(_action: TerminalActionView, program: &Path, args: &[OsString]) -> Result<(), String> {
+fn launch(
+    language: Language,
+    _action: TerminalActionView,
+    program: &Path,
+    args: &[OsString],
+) -> Result<(), String> {
     std::process::Command::new(program)
         .args(args)
         .spawn()
         .map(|_| ())
-        .map_err(|error| format!("The terminal could not be opened: {error}"))
+        .map_err(|error| messages::terminal_open_failed(language, &error.to_string()))
 }
 
 #[cfg(test)]
@@ -373,6 +405,7 @@ mod tests {
     #[test]
     fn the_wrapper_quotes_every_part_and_turns_slashes_into_backslashes() {
         let script = wrapper_script(
+            Language::En,
             Path::new("C:/Program Files/nodejs/node.exe"),
             &os(&[
                 "C:/npm/gentle-shell.mjs",
@@ -397,7 +430,12 @@ mod tests {
     /// line ends in CRLF, cmd's own ending, and nothing outside ASCII.
     #[test]
     fn the_wrapper_waits_for_a_key_before_it_closes() {
-        let script = wrapper_script(Path::new("C:/node/node.exe"), &os(&["update"])).unwrap();
+        let script = wrapper_script(
+            Language::En,
+            Path::new("C:/node/node.exe"),
+            &os(&["update"]),
+        )
+        .unwrap();
 
         assert_eq!(
             script.split("\r\n").collect::<Vec<_>>(),
@@ -418,14 +456,18 @@ mod tests {
     /// `console_line` had, refused rather than mangled.
     #[test]
     fn a_part_with_a_double_quote_is_refused() {
-        let error = wrapper_script(Path::new("C:/node/node.exe"), &os(&["C:/a\"b.mjs"]))
-            .expect_err("an argument with a double quote is refused");
+        let error = wrapper_script(
+            Language::En,
+            Path::new("C:/node/node.exe"),
+            &os(&["C:/a\"b.mjs"]),
+        )
+        .expect_err("an argument with a double quote is refused");
         assert!(
             error.contains("double quote"),
             "the reason names what cannot be passed on: {error}"
         );
         assert!(
-            wrapper_script(Path::new("C:/no\"de/node.exe"), &[]).is_err(),
+            wrapper_script(Language::En, Path::new("C:/no\"de/node.exe"), &[]).is_err(),
             "the program itself is checked too"
         );
     }
@@ -479,7 +521,11 @@ mod tests {
             TerminalActionView::InstallUsageSources,
         ];
 
-        let labels: Vec<&str> = actions.iter().copied().map(action_label).collect();
+        let labels: Vec<&str> = actions
+            .iter()
+            .copied()
+            .map(|action| action_label(Language::En, action))
+            .collect();
         assert_eq!(
             labels,
             vec![
@@ -502,6 +548,7 @@ mod tests {
     #[test]
     fn windows_terminal_opens_one_titled_tab_on_the_wrapper() {
         let argv = windows_terminal_args(
+            Language::En,
             TerminalActionView::UpdateExtensions,
             Path::new("C:/tmp/gentle-desk-update-extensions.cmd"),
         );

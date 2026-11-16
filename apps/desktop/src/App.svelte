@@ -25,16 +25,24 @@
   import UpdateNotice from './update/UpdateNotice.svelte'
   import { downloadAndInstall, findUpdate } from './update/plugin'
   import { stillIdle, available, downloading, dismissed, failed, ready, type UpdateState } from './update/state'
+  import { updateCopy } from './update/copy'
   import { createThreadView } from './thread/view'
   import MissingShell from './install/MissingShell.svelte'
   import Welcome from './welcome/Welcome.svelte'
   import WhatsNewDialog from './whats-new/WhatsNewDialog.svelte'
+  import { appCopy } from './app-copy'
+  import { language } from './i18n/language.svelte'
 
   const thread = createThreadView()
   const chrome = createChatView()
   const model = $derived($thread)
   const chat = $derived($chrome)
   const shownNotices = $derived(visibleNotices(chat.notices))
+  // The shell's own words, in the language this run is set to (0.2.0, S3/D4).
+  const copy = $derived(appCopy(language.current))
+  // The update line's own words: the retry's reason is one of them (0.2.0, T9),
+  // because the sentence it completes is the line's (`update/copy.ts`).
+  const updateWords = $derived(updateCopy(language.current))
 
   // The active view is the shell's own choice, never Rust's state: it survives a
   // push and a chat switch, and the next start begins on Chat.
@@ -89,7 +97,7 @@
   async function retry(): Promise<void> {
     const found = pending ?? (await findUpdate())
     if (found === null) {
-      update = failed(update, 'no newer version was found')
+      update = failed(update, updateWords.noNewerVersion)
       return
     }
     pending = found
@@ -122,7 +130,7 @@
        appears once the app can run. -->
   <MissingShell install={chat.shell.install} />
 {:else}
-<a class="skip" href="#main">Skip to chat</a>
+<a class="skip" href="#main">{copy.skipToChat}</a>
 {#if chat.fatal !== null}
   <FatalBanner text={chat.fatal} />
 {/if}
@@ -133,7 +141,7 @@
     <button
       type="button"
       class="scrim"
-      aria-label="Close sidebar"
+      aria-label={copy.closeSidebar}
       onclick={() => (manualCollapsed = true)}
     ></button>
   {/if}
@@ -141,9 +149,9 @@
     {#if model.chat === null}
       <header class="mh">
         <SidebarToggle collapsed={sidebarCollapsed} onToggle={() => (manualCollapsed = !sidebarCollapsed)} />
-        <h1>No chat open</h1>
+        <h1>{copy.noChatOpen}</h1>
       </header>
-      <p class="placeholder">Choose a chat in the workspace tree, or start a new session.</p>
+      <p class="placeholder">{copy.noChatHint}</p>
     {:else}
       <ChatHeader
         title={chat.title ?? ''}

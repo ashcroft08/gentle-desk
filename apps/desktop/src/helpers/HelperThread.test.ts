@@ -17,21 +17,19 @@ import {
 } from '../test-support/helper-thread'
 import { handlerArgs, resetTauriMock, setHandler, viewState } from '../test-support/tauri-mock'
 import HelperThread from './HelperThread.svelte'
-import {
-  BACK_TO_HELPERS,
-  HELPER_THREAD_LABEL,
-  NO_ACTIVITY,
-  droppedLine,
-} from './copy'
+import { helpersCopy } from './copy'
 
 vi.mock('@tauri-apps/api/core', () => import('../test-support/tauri-mock').then((m) => m.coreModule()))
 vi.mock('@tauri-apps/api/event', () => import('../test-support/tauri-mock').then((m) => m.eventModule()))
+
+/** The thread's own words, as it drew them before 0.2.0 (English). */
+const copy = helpersCopy('en')
 
 /** Draws one thread and answers its region plus the Back spy. */
 function draw(thread: HelperThreadModel = helperThread()) {
   const onBack = vi.fn()
   const view = render(HelperThread, { props: { thread, onBack } })
-  const region = screen.getByRole('region', { name: HELPER_THREAD_LABEL })
+  const region = screen.getByRole('region', { name: copy.threadLabel })
   /** The scroll box the items live in, which jsdom cannot lay out. */
   const body = region.querySelector('.body') as HTMLElement
   return { onBack, region, body, rerender: view.rerender }
@@ -132,7 +130,7 @@ describe('HelperThread', () => {
   it('says how many earlier items were left out, with iced own words', () => {
     const { region } = draw(helperThread({ dropped: 3, items: [saidItem('the tail')] }))
 
-    expect(within(region).getByText(droppedLine(3)).textContent).toBe(
+    expect(within(region).getByText(copy.droppedLine(3)).textContent).toBe(
       '3 earlier items were dropped',
     )
   })
@@ -140,13 +138,13 @@ describe('HelperThread', () => {
   it('says a helper with an empty thread has no activity yet', () => {
     const { region } = draw()
 
-    expect(within(region).getByText(NO_ACTIVITY).textContent).toBe('No activity yet')
+    expect(within(region).getByText(copy.noActivity).textContent).toBe('No activity yet')
   })
 
   it('takes the focus with its Back control, the only control of the thread', () => {
     draw()
 
-    expect(document.activeElement).toBe(screen.getByRole('button', { name: BACK_TO_HELPERS }))
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: copy.back }))
   })
 
   it('sends nothing on Escape: iced leaves a thread from its Back control only', async () => {
@@ -156,13 +154,13 @@ describe('HelperThread', () => {
 
     expect(onBack).not.toHaveBeenCalled()
     expect(handlerArgs('dispatch_intent')).toEqual([])
-    expect(screen.getByRole('region', { name: HELPER_THREAD_LABEL })).toBeTruthy()
+    expect(screen.getByRole('region', { name: copy.threadLabel })).toBeTruthy()
   })
 
   it('goes back once when its Back control is pressed', async () => {
     const { onBack } = draw()
 
-    await fireEvent.click(screen.getByRole('button', { name: BACK_TO_HELPERS }))
+    await fireEvent.click(screen.getByRole('button', { name: copy.back }))
 
     expect(onBack).toHaveBeenCalledTimes(1)
   })
@@ -172,7 +170,7 @@ describe('HelperThread', () => {
     const view = render(HelperThread, {
       props: { thread: helperThread({ items: [saidItem('first')] }), onBack },
     })
-    const region = screen.getByRole('region', { name: HELPER_THREAD_LABEL })
+    const region = screen.getByRole('region', { name: copy.threadLabel })
     const body = region.querySelector('.body') as HTMLElement
     // jsdom lays nothing out, so the box reports its numbers the way a tall
     // thread does: more content than it shows.

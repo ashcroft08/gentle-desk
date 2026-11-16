@@ -21,13 +21,14 @@
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use gentle_app::Command;
+use gentle_core::i18n::messages;
 use gentle_runtime::whats_new::{self, Decision, Latest, UpdateRun};
 use tauri::{AppHandle, Manager};
 use tauri_specta::Event;
 
 use crate::bridge::{AppStateHolder, CommandSink};
 use crate::clipboard::{self, Clipboard, SystemClipboard};
-use crate::close::{self, BridgeSteps, CloseFlow, CLOSING};
+use crate::close::{self, BridgeSteps, CloseFlow};
 use crate::config::{ConfigSnapshot, ConfigWriter};
 use crate::contract::{
     OrchestratorModeView, StateChanged, TerminalActionView, UiIntent, UpdatesStatusView,
@@ -423,12 +424,17 @@ impl Bridge {
                 let started = std::thread::Builder::new()
                     .name("shell-install".to_owned())
                     .spawn(move || {
-                        let view = after_install(&holder, installer.install(), launcher.as_ref());
+                        // The language is read when the install starts, on the
+                        // thread that owns it: a switch applies from the next
+                        // attempt on (0.2.0, S3).
+                        let language = holder.language();
+                        let view =
+                            after_install(&holder, installer.install(language), launcher.as_ref());
                         push(&emit, view);
                     });
                 if started.is_err() {
-                    self.holder
-                        .finish_install(Err("could not start the install".to_owned()));
+                    let failure = messages::install_could_not_start(self.holder.language());
+                    self.holder.finish_install(Err(failure.to_owned()));
                 }
             }
             let view = self.holder.view();
@@ -542,7 +548,7 @@ impl Bridge {
     /// one stops the work before it is even folded.
     pub(crate) fn accepting_work(&self) -> Result<(), String> {
         if self.executor.is_closed() {
-            return Err(CLOSING.to_owned());
+            return Err(close::closing(self.holder.language()));
         }
         Ok(())
     }
@@ -627,7 +633,11 @@ impl Bridge {
     /// (no launcher, no console) reaches the button that asked.
     pub fn open_terminal(&self, action: TerminalActionView) -> Result<(), String> {
         self.accepting_work()?;
-        crate::terminal::open(action, &self.settings.paths.home_args)
+        crate::terminal::open(
+            self.holder.language(),
+            action,
+            &self.settings.paths.home_args,
+        )
     }
 
     /// The Profiles pane's read (0.1.12, T2): the config home's `profiles.json`
@@ -645,6 +655,7 @@ impl Bridge {
             self.settings.paths.profiles.as_deref(),
             self.settings.paths.fallbacks.as_deref(),
             self.holder.orchestrator_mode(),
+            self.holder.language(),
         ));
         emit_view(&emit, &view)?;
         Ok(view)
@@ -664,6 +675,7 @@ impl Bridge {
             &self.settings.files,
             self.settings.paths.auth.as_deref(),
             &self.settings.probe,
+            self.holder.language(),
         ));
         emit_view(&emit, &view)?;
         Ok(view)
@@ -716,6 +728,7 @@ impl Bridge {
                     home.as_deref(),
                     &node,
                     gentle_runtime::clock::now_ms(),
+                    holder.language(),
                 );
                 push(&thread_emit, holder.note_usage(answered));
             });
@@ -723,7 +736,9 @@ impl Bridge {
             // No thread to read on: the pane says the read could not run rather
             // than staying on "Reading...".
             let view = self.holder.note_usage(UsageView {
-                status: UsageStatusView::Failed("the usage read could not start".to_owned()),
+                status: UsageStatusView::Failed(
+                    messages::usage_read_could_not_start(self.holder.language()).to_owned(),
+                ),
                 ..UsageView::default()
             });
             push(&emit, view);
@@ -758,8 +773,13 @@ impl Bridge {
         let spawned = std::thread::Builder::new()
             .name("update-check".to_owned())
             .spawn(move || {
-                let checked =
-                    settings::updates_view(desk.as_deref(), manifest.as_deref(), &web, &versions);
+                let checked = settings::updates_view(
+                    desk.as_deref(),
+                    manifest.as_deref(),
+                    &web,
+                    &versions,
+                    holder.language(),
+                );
                 push(&thread_emit, holder.note_updates(checked));
             });
         if spawned.is_err() {

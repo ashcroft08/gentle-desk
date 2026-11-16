@@ -17,6 +17,7 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use gentle_backend::chat_host::OrchestratorMode;
+use gentle_core::i18n::{messages, Language};
 use serde::Deserialize;
 
 /// The `kind` every agent-model-profiles document carries.
@@ -114,37 +115,51 @@ impl Fallbacks {
 /// chain, a model outside the safe pattern, or an effort gentle-pi does not know.
 /// A chain with no steps names no fallback at all and is dropped, as gentle-pi
 /// drops it.
-pub fn parse_fallbacks(text: &str) -> Result<Fallbacks, String> {
-    let envelope: FallbacksEnvelope = serde_json::from_str(text)
-        .map_err(|error| format!("{FALLBACKS_FILE} is not readable: {error}"))?;
+///
+/// The refusal is a whole sentence worded in `language` (0.2.0, S3): the pane
+/// draws it, so the shell's choice words it where it is produced.
+pub fn parse_fallbacks(language: Language, text: &str) -> Result<Fallbacks, String> {
+    let envelope: FallbacksEnvelope = serde_json::from_str(text).map_err(|error| {
+        messages::profiles_file_unreadable(language, FALLBACKS_FILE, &error.to_string())
+    })?;
     if envelope.kind != FALLBACKS_KIND {
-        return Err(format!(
-            "{FALLBACKS_FILE} is not a {FALLBACKS_KIND} document, it says {:?}",
-            envelope.kind
+        return Err(messages::profiles_not_a_document(
+            language,
+            FALLBACKS_FILE,
+            FALLBACKS_KIND,
+            &envelope.kind,
         ));
     }
     if envelope.version != FALLBACKS_VERSION {
-        return Err(format!(
-            "{FALLBACKS_FILE} is version {}, this view reads version {FALLBACKS_VERSION}",
-            envelope.version
+        return Err(messages::profiles_wrong_version(
+            language,
+            FALLBACKS_FILE,
+            envelope.version,
+            FALLBACKS_VERSION,
         ));
     }
     let mut profiles: BTreeMap<String, BTreeMap<String, Vec<FallbackStep>>> = BTreeMap::new();
     for (name, agents) in envelope.profiles {
         if !is_valid_profile_name(&name) {
-            return Err(format!(
-                "{FALLBACKS_FILE} names a profile no reader accepts: {name:?}"
+            return Err(messages::profiles_name_refused(
+                language,
+                FALLBACKS_FILE,
+                &name,
             ));
         }
         let mut chains: BTreeMap<String, Vec<FallbackStep>> = BTreeMap::new();
         for (agent, steps) in agents {
             if agent != DEFAULT_CHAIN_KEY && !is_safe_agent_name(&agent) {
-                return Err(format!(
-                    r#"{FALLBACKS_FILE}: {name:?} names the agent {agent:?}"#
+                return Err(messages::profiles_agent_refused(
+                    language,
+                    FALLBACKS_FILE,
+                    &name,
+                    &agent,
                 ));
             }
-            let chain = chain_of(&steps)
-                .ok_or_else(|| format!(r#"{FALLBACKS_FILE}: {name:?}/{agent:?} is not a chain"#))?;
+            let chain = chain_of(&steps).ok_or_else(|| {
+                messages::profiles_not_a_chain(language, FALLBACKS_FILE, &name, &agent)
+            })?;
             if !chain.is_empty() {
                 chains.insert(agent, chain);
             }
@@ -246,20 +261,26 @@ pub struct Profiles {
 
 /// Reads one `profiles.json`. A document of another kind or version is a
 /// refusal with the reason, so the view can say it cannot read the file
-/// instead of drawing a wrong one.
-pub fn parse(text: &str) -> Result<Profiles, String> {
-    let envelope: Envelope = serde_json::from_str(text)
-        .map_err(|error| format!("profiles.json is not readable: {error}"))?;
+/// instead of drawing a wrong one. The reason is a whole sentence worded in
+/// `language` (0.2.0, S3).
+pub fn parse(language: Language, text: &str) -> Result<Profiles, String> {
+    let envelope: Envelope = serde_json::from_str(text).map_err(|error| {
+        messages::profiles_file_unreadable(language, PROFILES_FILE, &error.to_string())
+    })?;
     if envelope.kind != KIND {
-        return Err(format!(
-            "profiles.json is not a {KIND} document, it says {:?}",
-            envelope.kind
+        return Err(messages::profiles_not_a_document(
+            language,
+            PROFILES_FILE,
+            KIND,
+            &envelope.kind,
         ));
     }
     if envelope.version != VERSION {
-        return Err(format!(
-            "profiles.json is version {}, this view reads version {VERSION}",
-            envelope.version
+        return Err(messages::profiles_wrong_version(
+            language,
+            PROFILES_FILE,
+            envelope.version,
+            VERSION,
         ));
     }
     let profiles = envelope
@@ -423,7 +444,7 @@ mod tests {
 
     #[test]
     fn the_active_profile_and_its_orchestrator_route_are_read() {
-        let profiles = parse(&document()).expect("the real envelope reads");
+        let profiles = parse(Language::En, &document()).expect("the real envelope reads");
         assert_eq!(profiles.active.as_deref(), Some("Claude-CommandCode"));
 
         let active = &profiles.profiles["Claude-CommandCode"];
@@ -440,7 +461,7 @@ mod tests {
 
     #[test]
     fn a_profile_with_no_workflow_names_none() {
-        let profiles = parse(&document()).expect("the document reads");
+        let profiles = parse(Language::En, &document()).expect("the document reads");
         let plain = &profiles.profiles["Plain"];
         assert_eq!(plain.workflow, None);
         assert_eq!(
@@ -455,7 +476,8 @@ mod tests {
     #[test]
     fn a_document_of_another_kind_is_refused() {
         let wrong = document().replace(KIND, "someone.else.profiles");
-        let error = parse(&wrong).expect_err("another kind is not this view's document");
+        let error =
+            parse(Language::En, &wrong).expect_err("another kind is not this view's document");
         assert!(
             error.contains("not a gentle-pi.agent_model_profiles document"),
             "{error}"
@@ -466,23 +488,31 @@ mod tests {
     #[test]
     fn a_document_of_another_version_is_refused() {
         let wrong = document().replace("\"version\": 1", "\"version\": 2");
-        let error = parse(&wrong).expect_err("a version this reader does not know is refused");
+        let error = parse(Language::En, &wrong)
+            .expect_err("a version this reader does not know is refused");
         assert!(error.contains("version 2"), "{error}");
     }
 
     #[test]
     fn a_document_with_no_envelope_or_no_json_is_refused() {
-        assert!(parse("").is_err());
-        assert!(parse("null").is_err());
-        assert!(parse(r#"{"kind":"gentle-pi.agent_model_profiles"}"#).is_err());
+        assert!(parse(Language::En, "").is_err());
+        assert!(parse(Language::En, "null").is_err());
+        assert!(parse(Language::En, r#"{"kind":"gentle-pi.agent_model_profiles"}"#).is_err());
         // A version that is text, not a number, is not this reader's either.
-        assert!(parse(r#"{"kind":"gentle-pi.agent_model_profiles","version":"1"}"#).is_err());
+        assert!(parse(
+            Language::En,
+            r#"{"kind":"gentle-pi.agent_model_profiles","version":"1"}"#
+        )
+        .is_err());
     }
 
     #[test]
     fn an_account_with_no_profiles_is_an_empty_document_not_an_error() {
-        let profiles = parse(r#"{"kind":"gentle-pi.agent_model_profiles","version":1}"#)
-            .expect("the envelope is enough");
+        let profiles = parse(
+            Language::En,
+            r#"{"kind":"gentle-pi.agent_model_profiles","version":1}"#,
+        )
+        .expect("the envelope is enough");
         assert_eq!(profiles.active, None);
         assert!(profiles.profiles.is_empty());
     }
@@ -584,7 +614,8 @@ mod tests {
 
     #[test]
     fn the_real_fallbacks_document_reads_and_names_a_chain() {
-        let fallbacks = parse_fallbacks(&fallbacks_document()).expect("the real document reads");
+        let fallbacks =
+            parse_fallbacks(Language::En, &fallbacks_document()).expect("the real document reads");
         let chain = fallbacks.chain_for("home", "worker");
         assert_eq!(chain.len(), 1);
         assert_eq!(chain[0].model, "fby/second-model");
@@ -597,7 +628,8 @@ mod tests {
 
     #[test]
     fn an_agents_own_chain_wins_over_the_profiles_default() {
-        let fallbacks = parse_fallbacks(&fallbacks_with_agent_chain()).expect("the document reads");
+        let fallbacks = parse_fallbacks(Language::En, &fallbacks_with_agent_chain())
+            .expect("the document reads");
         assert_eq!(
             fallbacks.chain_for("home", "orchestrator")[0].model,
             "orx/backup",
@@ -613,7 +645,8 @@ mod tests {
     #[test]
     fn a_fallbacks_document_of_another_kind_or_version_is_refused() {
         let wrong_kind = fallbacks_document().replace(FALLBACKS_KIND, "someone.else.fallbacks");
-        let error = parse_fallbacks(&wrong_kind).expect_err("another kind is not this document");
+        let error = parse_fallbacks(Language::En, &wrong_kind)
+            .expect_err("another kind is not this document");
         assert!(
             error.contains("not a gentle-pi.profile_model_fallbacks document"),
             "{error}"
@@ -621,8 +654,8 @@ mod tests {
         assert!(error.contains("someone.else.fallbacks"), "{error}");
 
         let wrong_version = fallbacks_document().replace("\"version\": 1", "\"version\": 2");
-        let error =
-            parse_fallbacks(&wrong_version).expect_err("a version this reader does not know");
+        let error = parse_fallbacks(Language::En, &wrong_version)
+            .expect_err("a version this reader does not know");
         assert!(error.contains("version 2"), "{error}");
     }
 
@@ -668,7 +701,7 @@ mod tests {
         ];
         for document in refused {
             assert!(
-                parse_fallbacks(&document).is_err(),
+                parse_fallbacks(Language::En, &document).is_err(),
                 "gentle-pi refuses this, so the desk must too: {document}"
             );
         }
@@ -679,7 +712,8 @@ mod tests {
         let document = format!(
             r#"{{"kind":"{FALLBACKS_KIND}","version":1,"profiles":{{"home":{{"*":[]}}}}}}"#
         );
-        let fallbacks = parse_fallbacks(&document).expect("an empty chain is a valid document");
+        let fallbacks =
+            parse_fallbacks(Language::En, &document).expect("an empty chain is a valid document");
         assert!(
             fallbacks.profiles.is_empty(),
             "a profile with no step left is dropped, exactly as gentle-pi drops it"
@@ -721,9 +755,9 @@ mod tests {
 
     #[test]
     fn the_chains_attach_to_the_profile_that_is_named_and_no_other() {
-        let mut profiles = parse(&document()).expect("the profiles document reads");
+        let mut profiles = parse(Language::En, &document()).expect("the profiles document reads");
         let text = fallbacks_with_agent_chain().replace("\"home\"", "\"Plain\"");
-        let fallbacks = parse_fallbacks(&text).expect("the fallbacks document reads");
+        let fallbacks = parse_fallbacks(Language::En, &text).expect("the fallbacks document reads");
 
         attach_fallbacks(&mut profiles, &fallbacks);
 

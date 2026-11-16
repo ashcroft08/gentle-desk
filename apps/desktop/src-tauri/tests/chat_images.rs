@@ -14,6 +14,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
 use gentle_app::{ChatCommand, ChatId};
+use gentle_core::i18n::Language;
 use gentle_core::rpc::{encode_command, ImageContent, RpcCommand};
 use gentle_desk_lib::bridge::AppStateHolder;
 use gentle_desk_lib::commands::{Bridge as AppBridge, Emit};
@@ -70,7 +71,7 @@ fn a_dropped_png_is_read_once_and_held_for_its_chat() {
     let path = scratch.file("shot.png", PNG);
     let images = Images::default();
 
-    images.attach(CHAT, &[path]);
+    images.attach(Language::En, CHAT, &[path]);
 
     let held = images.pending(CHAT);
     assert_eq!(held.len(), 1, "the drop attaches one image");
@@ -103,7 +104,7 @@ fn a_file_that_is_not_an_image_is_refused_with_a_plain_reason_and_nothing_attach
     let notes = scratch.file("notes.txt", b"not an image");
     let images = Images::default();
 
-    images.attach(CHAT, &[notes]);
+    images.attach(Language::En, CHAT, &[notes]);
 
     assert!(images.pending(CHAT).is_empty(), "nothing is attached");
     let notice = images.notice().expect("a refusal says why");
@@ -125,7 +126,7 @@ fn a_file_that_is_no_longer_there_is_refused() {
     let gone = text(&scratch.0.path().join("gone.png"));
     let images = Images::default();
 
-    images.attach(CHAT, &[gone]);
+    images.attach(Language::En, CHAT, &[gone]);
 
     assert!(images.pending(CHAT).is_empty());
     let notice = images.notice().expect("a refusal says why");
@@ -140,7 +141,7 @@ fn a_folder_is_refused_even_when_it_is_named_like_an_image() {
     std::fs::create_dir(&folder).unwrap();
     let images = Images::default();
 
-    images.attach(CHAT, &[text(&folder)]);
+    images.attach(Language::En, CHAT, &[text(&folder)]);
 
     assert!(images.pending(CHAT).is_empty());
     let notice = images.notice().expect("a refusal says why");
@@ -156,7 +157,7 @@ fn a_message_holds_at_most_eight_images() {
         .collect();
     let images = Images::default();
 
-    images.attach(CHAT, &paths);
+    images.attach(Language::En, CHAT, &paths);
 
     assert_eq!(
         images.pending(CHAT).len(),
@@ -179,7 +180,7 @@ fn a_message_holds_at_most_the_64_mb_of_the_cap() {
     let second = scratch.sparse("second.png", images::MAX_TOTAL / 2 + 1);
     let images = Images::default();
 
-    images.attach(CHAT, &[big, second]);
+    images.attach(Language::En, CHAT, &[big, second]);
 
     assert_eq!(
         images.pending(CHAT).len(),
@@ -198,7 +199,7 @@ fn a_file_larger_than_the_whole_cap_is_refused_without_being_read() {
     let huge = scratch.sparse("huge.png", images::MAX_TOTAL + 1);
     let images = Images::default();
 
-    images.attach(CHAT, &[huge]);
+    images.attach(Language::En, CHAT, &[huge]);
 
     assert!(images.pending(CHAT).is_empty());
     let notice = images.notice().expect("a refusal says why");
@@ -211,7 +212,7 @@ fn removing_an_image_takes_it_away_and_its_send_no_longer_carries_it() {
     let one = scratch.file("one.png", PNG);
     let two = scratch.file("two.png", PNG);
     let images = Images::default();
-    images.attach(CHAT, &[one, two]);
+    images.attach(Language::En, CHAT, &[one, two]);
     let first = images.pending(CHAT)[0].id.clone();
 
     let removed = images.remove(&first);
@@ -230,7 +231,7 @@ fn the_send_carries_the_path_as_text_and_the_image_in_pis_field() {
     let scratch = Scratch::new();
     let path = scratch.file("shot.png", PNG);
     let images = Images::default();
-    images.attach(CHAT, std::slice::from_ref(&path));
+    images.attach(Language::En, CHAT, std::slice::from_ref(&path));
     let attachments = images.take(CHAT);
 
     let sent = images::with_attachments(
@@ -295,7 +296,7 @@ fn a_send_for_another_chat_carries_no_images() {
     let scratch = Scratch::new();
     let path = scratch.file("shot.png", PNG);
     let images = Images::default();
-    images.attach(CHAT, &[path]);
+    images.attach(Language::En, CHAT, &[path]);
 
     let other = images.take("/sessions/b.jsonl");
 
@@ -314,7 +315,7 @@ fn the_preview_scheme_serves_the_dropped_files_and_nothing_else() {
     let scratch = Scratch::new();
     let path = scratch.file("shot.png", PNG);
     let images = Images::default();
-    images.attach(CHAT, &[path]);
+    images.attach(Language::En, CHAT, &[path]);
     let id = images.pending(CHAT)[0].id.clone();
 
     let served = images.read(&id).expect("the dropped file is served");

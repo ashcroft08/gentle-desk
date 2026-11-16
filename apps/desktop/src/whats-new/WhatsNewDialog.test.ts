@@ -9,7 +9,10 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/sve
 import { handlerArgs, resetTauriMock, setHandler, viewState } from '../test-support/tauri-mock'
 import type { WhatsNewView } from '../contract/bindings'
 import WhatsNewDialog from './WhatsNewDialog.svelte'
-import { DISMISS } from './copy'
+import { whatsNewCopy } from './copy'
+
+/** The modal's one answer, read through the dictionary of the language it draws. */
+const DISMISS = whatsNewCopy('en').dismiss
 
 vi.mock('@tauri-apps/api/core', () => import('../test-support/tauri-mock').then((m) => m.coreModule()))
 vi.mock('@tauri-apps/api/event', () => import('../test-support/tauri-mock').then((m) => m.eventModule()))

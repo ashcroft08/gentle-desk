@@ -20,6 +20,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard};
 
 use gentle_app::ChatCommand;
+use gentle_core::i18n::{messages, Language};
 use gentle_core::rpc::{base64, ImageContent, RpcCommand};
 
 use crate::contract::ImageView;
@@ -134,13 +135,13 @@ struct Served {
 
 impl Images {
     /// Attaches the files the drop named to `chat`, refusing what it cannot
-    /// take with one plain sentence each. A refusal attaches nothing of that
-    /// file; the rest of the drop still arrives.
+    /// take with one plain sentence each, in `language`. A refusal attaches
+    /// nothing of that file; the rest of the drop still arrives.
     ///
     /// The files are read under the lock: a drop is the user's own pace, and the
     /// read is bounded by [`MAX_TOTAL`], so a slice that waits for it waits for
     /// a disk read of at most that.
-    pub fn attach(&self, chat: &str, paths: &[String]) {
+    pub fn attach(&self, language: Language, chat: &str, paths: &[String]) {
         if paths.is_empty() {
             return;
         }
@@ -154,7 +155,7 @@ impl Images {
         let mut refusals: Vec<String> = Vec::new();
         for path in paths {
             let id = inner.next_id();
-            match read(path, id, held, bytes) {
+            match read(language, path, id, held, bytes) {
                 Ok(attachment) => {
                     held += 1;
                     bytes = bytes.saturating_add(attachment.size);
@@ -359,36 +360,47 @@ fn image_ref(attachment: &Attachment) -> ImageRef {
     }
 }
 
-/// Reads and checks one dropped file. `held` and `bytes` are what the chat holds
-/// already, so the cap is the message's, never the drop's.
-fn read(path: &str, id: String, held: usize, bytes: u64) -> Result<Attachment, String> {
+/// Reads and checks one dropped file, refusing in `language`. `held` and `bytes`
+/// are what the chat holds already, so the cap is the message's, never the
+/// drop's.
+fn read(
+    language: Language,
+    path: &str,
+    id: String,
+    held: usize,
+    bytes: u64,
+) -> Result<Attachment, String> {
     let path = Path::new(path);
     let name = file_name(path);
     let mime = path
         .extension()
         .and_then(|extension| extension.to_str())
         .and_then(Mime::of_extension)
-        .ok_or_else(|| refuse_not_an_image(&name))?;
+        .ok_or_else(|| messages::image_not_an_image(language, &name))?;
     let metadata = match std::fs::metadata(path) {
         Ok(metadata) => metadata,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-            return Err(refuse_missing(&name))
+            return Err(messages::image_missing(language, &name))
         }
-        Err(_) => return Err(refuse_unreadable(&name)),
+        Err(_) => return Err(messages::image_unreadable(language, &name)),
     };
     if metadata.is_dir() {
-        return Err(refuse_folder(&name));
+        return Err(messages::image_is_folder(language, &name));
     }
     if held >= MAX_IMAGES {
-        return Err(refuse_count(&name));
+        return Err(messages::image_count(language, &name, MAX_IMAGES));
     }
     let size = metadata.len();
     if size > MAX_TOTAL || bytes.saturating_add(size) > MAX_TOTAL {
-        return Err(refuse_weight(&name));
+        return Err(messages::image_weight(
+            language,
+            &name,
+            MAX_TOTAL / (1024 * 1024),
+        ));
     }
     // Read once, here: the file that disappeared between the metadata and this
     // read is refused like any other it cannot read.
-    let contents = std::fs::read(path).map_err(|_| refuse_unreadable(&name))?;
+    let contents = std::fs::read(path).map_err(|_| messages::image_unreadable(language, &name))?;
     Ok(Attachment {
         id,
         name,
@@ -404,33 +416,4 @@ fn file_name(path: &Path) -> String {
     path.file_name()
         .map(|name| name.to_string_lossy().into_owned())
         .unwrap_or_else(|| path.display().to_string())
-}
-
-/// The plain sentences a refusal reaches the user with: what was not attached,
-/// and why. ASCII, one line each, no jargon.
-fn refuse_not_an_image(name: &str) -> String {
-    format!("{name} was not attached: only png, jpg, jpeg, webp and gif images can be.")
-}
-
-fn refuse_missing(name: &str) -> String {
-    format!("{name} was not attached: the file is no longer there.")
-}
-
-fn refuse_unreadable(name: &str) -> String {
-    format!("{name} was not attached: the file cannot be read.")
-}
-
-fn refuse_folder(name: &str) -> String {
-    format!("{name} was not attached: it is a folder, not an image file.")
-}
-
-fn refuse_count(name: &str) -> String {
-    format!("{name} was not attached: a message holds at most {MAX_IMAGES} images.")
-}
-
-fn refuse_weight(name: &str) -> String {
-    format!(
-        "{name} was not attached: a message holds at most {} MB of images.",
-        MAX_TOTAL / (1024 * 1024)
-    )
 }

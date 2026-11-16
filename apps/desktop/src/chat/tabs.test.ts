@@ -1,9 +1,11 @@
-// The two rules of the Chat | Helpers tablist and the tab's badge, one test per
-// rule: the arrow keys walk the list and wrap, Home and End jump to its ends,
-// and every other key keeps its own meaning.
+// The two rules of the Chat | Helpers tablist, one test per rule: the arrow keys
+// walk the list and wrap, Home and End jump to its ends, and every other key keeps
+// its own meaning. The tab words and the badge's name are the header's own copy,
+// so they are pinned in `copy.test.ts` beside the dictionary that holds them
+// (0.2.0, S3, D5).
 
 import { describe, expect, it } from 'vitest'
-import { TABS, tabAfter, workingBadgeName } from './tabs'
+import { TABS, tabAfter } from './tabs'
 
 describe('tabAfter', () => {
   it('walks the list with the arrow keys, wrapping at both ends', () => {
@@ -24,16 +26,5 @@ describe('tabAfter', () => {
     for (const key of ['Enter', 'Tab', 'Escape', 'ArrowRightish', 'a']) {
       expect(tabAfter(key, 'chat')).toBeNull()
     }
-  })
-})
-
-describe('workingBadgeName', () => {
-  it('names one working helper in the singular', () => {
-    expect(workingBadgeName(1)).toBe('1 helper working')
-  })
-
-  it('names every other count in the plural', () => {
-    expect(workingBadgeName(2)).toBe('2 helpers working')
-    expect(workingBadgeName(11)).toBe('11 helpers working')
   })
 })

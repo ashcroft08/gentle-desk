@@ -1,5 +1,6 @@
 use super::*;
 use gentle_core::helpers::HelperThread;
+use gentle_core::i18n::Language;
 
 fn task(label: &str, prompt: &str, agent: &str) -> HelperTask {
     HelperTask {
@@ -40,13 +41,16 @@ fn the_summary_line_lists_the_four_counters() {
         finished: 4,
     };
     assert_eq!(
-        summary_line(&summary),
+        summary_line(Language::En, &summary),
         "1 running · 2 queued · 3 waiting · 4 finished"
     );
 }
 
 #[test]
 fn every_status_has_a_label() {
-    assert_eq!(status_label(HelperStatus::Cancelled), "cancelled");
-    assert_eq!(status_label(HelperStatus::Waiting), "waiting");
+    assert_eq!(
+        status_label(Language::En, HelperStatus::Cancelled),
+        "cancelled"
+    );
+    assert_eq!(status_label(Language::En, HelperStatus::Waiting), "waiting");
 }

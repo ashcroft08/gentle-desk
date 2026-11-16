@@ -14,6 +14,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
 use gentle_app::{ChatId, Input};
+use gentle_core::i18n::Language;
 use gentle_core::rpc::{decode_line, Decoded};
 use gentle_desk_lib::commands::{Bridge, Emit};
 use gentle_desk_lib::contract::{
@@ -159,7 +160,7 @@ fn probe(
     asked: &Arc<Mutex<Vec<String>>>,
 ) -> ProviderProbe {
     let asked = Arc::clone(asked);
-    Arc::new(move |provider: &str| {
+    Arc::new(move |provider: &str, _language: Language| {
         lock(&asked).push(provider.to_owned());
         let answer = answers
             .iter()
@@ -175,7 +176,7 @@ fn probe(
 
 /// The real `gentle-shell --version` output of the user's linked machine.
 fn versions(pi: &'static str) -> VersionProbe {
-    Arc::new(move || {
+    Arc::new(move |_language: Language| {
         Ok(format!(
             "gentle-shell 4.7.0\npi {pi}\nhome linked C:\\Users\\u\\.pi\\agent\n"
         ))

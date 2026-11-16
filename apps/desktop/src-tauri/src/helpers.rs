@@ -11,6 +11,7 @@
 
 use gentle_app::AppState;
 use gentle_core::helpers::{HelperStatus, HelpersActivity};
+use gentle_core::i18n::Language;
 use gentle_runtime::helper_text::{status_label, summary_line, task_title};
 
 use crate::contract::{HelperRowView, HelperStatusView, HelpersView};
@@ -20,31 +21,39 @@ use crate::contract::{HelperRowView, HelperStatusView, HelpersView};
 /// list), so only "no chat" is absent.
 pub(crate) fn helpers(state: &AppState) -> Option<HelpersView> {
     let chat = state.chats.foreground()?;
-    state.chats.state(chat).map(|chat| view(&chat.helpers))
+    let language = state.language();
+    state
+        .chats
+        .state(chat)
+        .map(|chat| view(&chat.helpers, language))
 }
 
-/// One chat's activity as the panel shows it.
-fn view(helpers: &HelpersActivity) -> HelpersView {
+/// One chat's activity as the panel shows it, in `language`.
+fn view(helpers: &HelpersActivity, language: Language) -> HelpersView {
     let summary = helpers.summary;
     HelpersView {
-        summary_line: summary_line(&summary),
+        summary_line: summary_line(language, &summary),
         running: narrow(summary.running),
         queued: narrow(summary.queued),
         waiting: narrow(summary.waiting),
         finished: narrow(summary.finished),
-        tasks: helpers.tasks.iter().map(row).collect(),
+        tasks: helpers
+            .tasks
+            .iter()
+            .map(|task| row(task, language))
+            .collect(),
     }
 }
 
 /// One task as its card shows it. The title and the status text are the rules'
 /// (`helper_text`), never re-spelled here.
-fn row(task: &gentle_core::helpers::HelperTask) -> HelperRowView {
+fn row(task: &gentle_core::helpers::HelperTask, language: Language) -> HelperRowView {
     HelperRowView {
         id: task.id.clone(),
         title: task_title(task),
         agent: task.agent.clone(),
         status: view_status(task.status),
-        status_label: status_label(task.status).to_owned(),
+        status_label: status_label(language, task.status).to_owned(),
         turns: narrow(task.turns),
         tool_calls: narrow(task.tool_calls),
         last_step: task.last_step.clone(),

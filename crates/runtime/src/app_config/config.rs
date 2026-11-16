@@ -9,11 +9,13 @@
 //! loads with [`Theme::System`], and a value this version does not know loads the
 //! same way, so the document version does not move (`CONFIG_VERSION`). The version
 //! the last run of the app was ([`AppConfig::last_run_version`]) is additive the
-//! same way.
+//! same way, and so is the chosen language ([`AppConfig::language`]), which is
+//! absent until the user chooses one.
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 
 use gentle_backend::home::HomeChoice;
+use gentle_core::i18n::Language;
 
 use super::last_run;
 use super::shell_home;
@@ -35,6 +37,17 @@ pub struct AppConfig {
     /// file, so the workspaces below are never discarded for it.
     #[serde(default, deserialize_with = "theme::or_default")]
     pub theme: Theme,
+    /// The language the app's own words are written in, `None` until the user
+    /// chooses one. An ADDITIVE field like the theme, read leniently: an absent
+    /// value, one that is not a stored tag (`"ES"` and `" es "` are, `"xx"`, an
+    /// empty string, a number and an object are not) or a value of another type
+    /// is `None`, never a damaged file. A stored preference always wins: nothing
+    /// here detects the system language, which is the web side's first-run rule
+    /// and is only persisted by the write path. What a saved file holds is the
+    /// write shape's decision alone (`store::document`'s `DocumentRef`), so this
+    /// field carries no `skip_serializing_if` of its own.
+    #[serde(default, deserialize_with = "language_or_none")]
+    pub language: Option<Language>,
     /// Which home the user chose on the welcome screen, `None` until they do.
     /// An ADDITIVE field like the theme, read leniently: a value this version
     /// does not know is `None`, never a damaged file.
@@ -66,12 +79,32 @@ impl Default for AppConfig {
         Self {
             version: CONFIG_VERSION,
             theme: Theme::default(),
+            language: None,
             shell_home: None,
             window: None,
             last_run_version: None,
             workspaces: Vec::new(),
         }
     }
+}
+
+/// Reads the stored language through [`Language::parse`], the one reader of a
+/// stored tag: case-insensitive, ignoring surrounding spaces, and answering
+/// `None` for anything that is not `en`/`es`.
+///
+/// Never the derived deserializer: a value this version does not know must read
+/// as "no preference yet" instead of turning the whole document into a damaged
+/// one, so the workspaces under it survive and the version does not move. Only
+/// text is a tag: a number, a flag, a list or an object reads as nothing stored.
+fn language_or_none<'de, D>(deserializer: D) -> Result<Option<Language>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let stored = Option::<serde_json::Value>::deserialize(deserializer)?;
+    Ok(stored
+        .as_ref()
+        .and_then(serde_json::Value::as_str)
+        .and_then(Language::parse))
 }
 
 /// One folder the user added, with its state in the sidebar.
@@ -92,6 +125,18 @@ impl AppConfig {
             return false;
         }
         self.theme = theme;
+        true
+    }
+
+    /// Sets the language the app's own words are written in. Answers whether it
+    /// changed: the same language again changes nothing, so nothing is saved and
+    /// no revision moves. The choice is the user's from here on, which is why
+    /// nothing re-detects the system language once this stored value exists.
+    pub fn set_language(&mut self, language: Language) -> bool {
+        if self.language == Some(language) {
+            return false;
+        }
+        self.language = Some(language);
         true
     }
 

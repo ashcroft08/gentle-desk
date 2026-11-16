@@ -17,8 +17,10 @@
   import { DropdownMenu } from 'bits-ui'
   import Icon from '../icons/Icon.svelte'
   import Mark from '../icons/Mark.svelte'
-  import type { MarkKind } from '../icons/shapes'
+  import { markLabelsCopy, type MarkKind } from '../icons/shapes'
+  import { language } from '../i18n/language.svelte'
   import type { ChatRow } from '../sessions/rows'
+  import { sidebarCopy } from './copy'
 
   let {
     row,
@@ -64,7 +66,15 @@
   /** Whether the actions menu is open, so its button keeps the slot it holds. */
   let menuOpen = $state(false)
 
-  const actions = $derived(`Chat actions for ${row.title}`)
+  /**
+   * The row's own words, in the language this run is set to (0.2.0, S3/D4). The
+   * title inside the actions name is Rust's and travels through untouched (D7);
+   * the mark's name is this app's own word for the state, so it comes from the
+   * mark dictionary of the same language.
+   */
+  const copy = $derived(sidebarCopy(language.current))
+  const markLabels = $derived(markLabelsCopy(language.current))
+  const actions = $derived(copy.chatActions(row.title))
 
   $effect(() => {
     if (renaming && field !== null) {
@@ -124,7 +134,7 @@
       <input
         class="rn"
         type="text"
-        aria-label="Chat name"
+        aria-label={copy.chatName}
         bind:value={draft}
         bind:this={field}
         onkeydown={typing}
@@ -136,14 +146,14 @@
     {/if}
     <span class="ago">{row.modified_ago}</span>
     {#if mark !== null}
-      <Mark kind={mark} />
+      <Mark kind={mark} label={markLabels[mark]} />
     {/if}
   </div>
   <DropdownMenu.Root bind:open={menuOpen}>
     <DropdownMenu.Trigger
       class="ic nc tip-r"
       aria-label={actions}
-      data-tip="Chat actions"
+      data-tip={copy.chatActionsTip}
       tabindex={active ? 0 : -1}
     >
       <Icon name="more" size={16} />
@@ -162,9 +172,9 @@
         sideOffset={6}
         collisionPadding={12}
       >
-        <DropdownMenu.Item onSelect={startRename}>Rename</DropdownMenu.Item>
-        <DropdownMenu.Item onSelect={() => onClose(row)}>Close chat</DropdownMenu.Item>
-        <DropdownMenu.Item class="d" onSelect={() => onDelete(row)}>Delete</DropdownMenu.Item>
+        <DropdownMenu.Item onSelect={startRename}>{copy.rename}</DropdownMenu.Item>
+        <DropdownMenu.Item onSelect={() => onClose(row)}>{copy.closeChat}</DropdownMenu.Item>
+        <DropdownMenu.Item class="d" onSelect={() => onDelete(row)}>{copy.deleteChat}</DropdownMenu.Item>
       </DropdownMenu.Content>
     </DropdownMenu.Portal>
   </DropdownMenu.Root>
