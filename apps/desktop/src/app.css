@@ -423,6 +423,7 @@ p {
 .mh {
   display: flex;
   align-items: center;
+  flex-wrap: nowrap;
   gap: 8px;
   height: 52px;
   padding: 0 20px;
@@ -436,6 +437,48 @@ p {
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;
+}
+
+/* The row's one flexible child (S2): everything left of it keeps its size and
+   the Chat | Helpers switch takes the right edge, whatever the title's length. */
+.mh .sp {
+  flex: 1;
+  min-width: 8px;
+}
+
+/* The switch itself never grows, shrinks or wraps: the title is what gives way. */
+.mh .seg {
+  flex: none;
+}
+
+/* The header's inline rename (S2): the row's own field, in the title's slot. */
+.mh .rn {
+  flex: 1;
+  min-width: 0;
+  height: 26px;
+  padding: 0 6px;
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+}
+
+/* A narrow window (01a): the row tightens and the title drops a step instead of
+   pushing the switch out; the tabs' two words keep their place. */
+@media (max-width: 900px) {
+  .mh {
+    height: 48px;
+    padding: 0 12px;
+  }
+
+  .mh h1 {
+    font-size: 14px;
+  }
+
+  .mh .seg [role='tab'] {
+    padding: 4px 10px;
+  }
 }
 
 /* The restart notices: the states board's `.notice err` cards, stacked under the
@@ -2283,6 +2326,19 @@ p {
   stroke-linejoin: round;
 }
 
+/* The Working mark breathes while the chat works (01a, chat-chrome-helpers S1):
+   one state class, so the five still marks never move. Reduced motion stops it
+   (the house rule at the end of this file). */
+.mark.m-working {
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
 .empty {
   padding: 18px 10px;
   text-align: left;
@@ -2582,6 +2638,11 @@ p {
   * {
     transition: none !important;
     animation: none !important;
+  }
+
+  /* The Working mark keeps its glyph and its colour, still (S1). */
+  .mark.m-working {
+    animation: none;
   }
 
   /* The install bar keeps its meaning without moving: a still bar across the

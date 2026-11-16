@@ -14,6 +14,10 @@ import { chatCopy } from './copy'
 const ENGLISH = {
   tabsLabel: 'View',
   tabs: { chat: 'Chat', helpers: 'Helpers' },
+  // The pencil that renames the chat in place (chat-chrome-helpers S2), and the
+  // name its field carries (the row's own field word, reused).
+  renameChat: 'Rename chat',
+  chatName: 'Chat name',
 }
 
 /** The Spanish words: neutral Spanish, no voseo, no regionalisms, accents kept. */
@@ -21,6 +25,8 @@ const SPANISH = {
   tabsLabel: 'Vista',
   // "Chat" is the same word in Spanish, so it is shared on purpose.
   tabs: { chat: 'Chat', helpers: 'Ayudantes' },
+  renameChat: 'Renombrar el chat',
+  chatName: 'Nombre del chat',
 }
 
 /** The one tab both languages spell the same. */
@@ -29,7 +35,12 @@ const SAME_IN_BOTH = new Set<'chat' | 'helpers'>(['chat'])
 /** The plain words of one language: the badge's name is a line, not a word. */
 function words(language: 'en' | 'es'): unknown {
   const copy = chatCopy(language)
-  return { tabsLabel: copy.tabsLabel, tabs: copy.tabs }
+  return {
+    tabsLabel: copy.tabsLabel,
+    tabs: copy.tabs,
+    renameChat: copy.renameChat,
+    chatName: copy.chatName,
+  }
 }
 
 describe('the chat copy', () => {
@@ -46,6 +57,8 @@ describe('the chat copy', () => {
     const spanish = chatCopy('es')
 
     expect(spanish.tabsLabel).not.toBe(english.tabsLabel)
+    expect(spanish.renameChat).not.toBe(english.renameChat)
+    expect(spanish.chatName).not.toBe(english.chatName)
     expect(Object.keys(spanish.tabs).sort()).toEqual(Object.keys(english.tabs).sort())
     for (const tab of ['chat', 'helpers'] as const) {
       if (SAME_IN_BOTH.has(tab)) {

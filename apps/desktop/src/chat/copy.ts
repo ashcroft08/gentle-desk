@@ -21,6 +21,16 @@ export interface ChatCopy {
   /** Each tab's own word, in the order the tablist draws them. */
   tabs: Record<ViewTab, string>
   /**
+   * The pencil's one word: what the button does, drawn as its tooltip and read
+   * as its accessible name (chat-chrome-helpers S2).
+   */
+  renameChat: string
+  /**
+   * The inline rename field's name. It is the row's own word for the same field
+   * (the sidebar's `chatName`), so the two doors ask for the name the same way.
+   */
+  chatName: string
+  /**
    * The working badge's accessible name: one helper is singular, every other
    * count plural. The badge is drawn only while something runs, so this is never
    * asked for zero.
@@ -32,6 +42,8 @@ export interface ChatCopy {
 const ENGLISH: ChatCopy = {
   tabsLabel: 'View',
   tabs: { chat: 'Chat', helpers: 'Helpers' },
+  renameChat: 'Rename chat',
+  chatName: 'Chat name',
   workingBadge: (running) => (running === 1 ? '1 helper working' : `${running} helpers working`),
 }
 
@@ -40,6 +52,8 @@ const SPANISH: typeof ENGLISH = {
   tabsLabel: 'Vista',
   // "Chat" is the same word in Spanish, so it is shared on purpose.
   tabs: { chat: 'Chat', helpers: 'Ayudantes' },
+  renameChat: 'Renombrar el chat',
+  chatName: 'Nombre del chat',
   workingBadge: (running) =>
     running === 1 ? '1 ayudante trabajando' : `${running} ayudantes trabajando`,
 }

@@ -7,9 +7,10 @@
 // columns themselves are pinned in `copy.test.ts`.
 import '../test-support/dom-env'
 import { afterEach, describe, expect, it } from 'vitest'
-import { cleanup, render, screen, within } from '@testing-library/svelte'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/svelte'
 import { tick } from 'svelte'
 import { setLanguage } from '../i18n/language.svelte'
+import Header from './Header.svelte'
 import ViewTabs from './ViewTabs.svelte'
 
 afterEach(cleanup)
@@ -43,6 +44,23 @@ describe('a drawn tablist', () => {
     await tick()
 
     expect(screen.getByRole('img', { name: '2 ayudantes trabajando' })).toBeTruthy()
+
+    setLanguage('en')
+  })
+
+  it('flips the header pencil and the field it opens in the same tick', async () => {
+    setLanguage('en')
+    render(Header, { props: { title: 'Idle one' } })
+
+    expect(screen.getByRole('button', { name: 'Rename chat' })).toBeTruthy()
+
+    setLanguage('es')
+    await tick()
+
+    const pencil = screen.getByRole('button', { name: 'Renombrar el chat' })
+    expect(pencil.getAttribute('data-tip')).toBe('Renombrar el chat')
+    await fireEvent.click(pencil)
+    expect(screen.getByRole('textbox', { name: 'Nombre del chat' })).toBeTruthy()
 
     setLanguage('en')
   })
