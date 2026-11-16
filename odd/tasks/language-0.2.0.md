@@ -175,10 +175,17 @@ fragments in 12 files.
       survey needed beyond the 13 were approved by the parent as mechanical-only
       (Log L8). Route: writer. Commit df6740e (RED 78×E0425; GREEN 152/260/215/370/15,
       0 failed; clippy -D warnings across five crates; fmt clean).
-- [ ] T10 (S5) close: version 0.2.0 in apps/desktop/package.json,
-      apps/desktop/src-tauri/Cargo.toml and apps/desktop/src-tauri/tauri.conf.json, the
-      what's-new entry, the shipped note in odd/tasks/tauri-settings-roadmap.md, then
-      the full verification plan. Route: writer. Commit: pending.
+- [x] T10 (S5) close: version 0.2.0 in apps/desktop/package.json,
+      apps/desktop/src-tauri/Cargo.toml and apps/desktop/src-tauri/tauri.conf.json (+ the
+      repo-root Cargo.lock; the handoff's src-tauri lock path does not exist), the
+      shipped-on-branch note in odd/tasks/tauri-settings-roadmap.md, then the full
+      verification plan. Route: writer. Commit 37c8918 (writer's verification:
+      cargo test --workspace 1243/0 — core 152, backend 231, term 15, app 215, runtime
+      260, desk-app 370; clippy -D warnings clean; fmt clean; drift guard green with
+      byte-identical bindings; vitest 634/0; svelte-check 0; eslint 0). The what's-new
+      body is written at publish (latest.json embeds the release body). The real-window
+      checks ran on the maintainer's machine 2026-11-14 (tauri dev, v0.2.0; the
+      maintainer reviewed and approved the launch).
       Delivered (writer, 2026-11-14): 0.2.0 in exactly the three carriers, plus the one locked
       `gentle-desk-app` version in the workspace lock — the lock lives at the REPO ROOT
       (`Cargo.lock`); the handoff's `apps/desktop/src-tauri/Cargo.lock` does not exist, and
