@@ -179,7 +179,7 @@ session index, not a folder-name encoding).
   this review; the maintainer picks which ones ride a pre-release fix batch.
 - L11 (parent, 2026-11-16, pre-release fix batch, maintainer-approved): the
   writer fixed exactly three of L10's advisory findings, RED observed for all
-  three, commit 1d25b65. R3-002/R4-dialog: a failed/refused offer read now
+  three, commit fe24b33. R3-002/R4-dialog: a failed/refused offer read now
   renders a bilingual danger line + the normal action row (Cancel, no invented
   count, nothing sent). R3-003/R4-err-path: `removeWorkspace` propagates the
   Rust `Err` and call failures; the dialog stays open with a second bilingual
