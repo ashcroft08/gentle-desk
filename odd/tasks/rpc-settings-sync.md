@@ -211,3 +211,28 @@ editor and the subagents/jobs slices.
   and flushes) but that analysis is NOT verified; a one-line reorder plus an
   ignored-event test would close it, and it should ride with the next slice that
   touches `watch.rs`.
+- L9 (parent, 2026-11-16): T3b-2 delivered — the web half: `settings/files-changed.ts`
+  (`followSettingsFiles(group, refresh)` listens to the typed `settings-files-changed`
+  event while a pane is mounted and returns its unsubscribe; `coalesced(read)` = one
+  read at a time, one queued), ProfilesPane (group `profiles`) and AccountPane
+  (group `account`) route mount, window focus, buttons AND the event through ONE
+  coalesced read of their EXISTING refresh intent, the focus refresh stays as the
+  fallback, a failed subscription is swallowed, and no copy was added; commit
+  a0a4066, independently verified (vitest 724/724, svelte-check 0/0, eslint).
+  Native review, lineage review-b65316b497eb21ad (reliability, 349 lines): the lens
+  raised a CRITICAL candidate, the refuter (asked separately) CONFIRMED it — R3-001:
+  the coalescer had no cancellation tied to pane teardown, so a read queued during
+  an in-flight one still started AFTER the pane unmounted (for Account that is the
+  `auth check` subprocess running with Settings closed, against the slice's own
+  guarantee). One bounded correction (plan 60 lines; the real diff was 99, 89+/10-,
+  mostly tests, under the review's cap of 175), commit d0d5a72: `coalesced()`
+  returns a read carrying `cancel()`, the panes' effect cleanup calls it after the
+  unsubscribe, an in-flight read may finish but starts nothing after, a fresh mount
+  gets a fresh coalescer; RED observed (`expected 2 to be 1`), 726/726, svelte-check
+  0/0, eslint, independently verified. Targeted validation passed, APPROVED,
+  authority burned. Cost ~$0.027 across 3 model runs, each asked first (the run
+  facade handled the validator slot because the manual capture binding bounced
+  for it, as it did in the transport review). BACKLOG: R3-002 — a rejected
+  in-flight read drops the queued follow-up (the caller already resolved), so a
+  transient dispatch failure leaves the pane stale until the next event; the focus
+  refresh bounds it.
