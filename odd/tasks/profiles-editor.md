@@ -121,7 +121,7 @@ es valor de producto".
       writing switch is T3 (`set_config` of `workflow`). Route: worker, real-window look.
 - [ ] T2d (L21, L22) remove Settings > Profiles (pane, its tests and copy, the
       session-only env switch); "Edit in terminal" moves to the tab. Separate slice.
-- [x] T3-mode (L23, L24) (4deee32 with its review correction, real window L26) the Profile tab's orchestrator-mode switch: Organic / Full
+- [x] T3-mode (L23, L24) (0fe4ec3 on feat/profile-mode-routes, PR #194, base feat/profile-freeze-fix; review lineage review-d03b31465c34b5e2 approved and acknowledged; real window L26) the Profile tab's orchestrator-mode switch: Organic / Full
       delegation for the USED profile, written as `set_config` of the whole `profiles`
       document read by `get_config` (its `value`, canonical form) with only
       `workflow.<profile>` changed (full-delegation sets it, organic REMOVES the entry,
