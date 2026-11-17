@@ -1,0 +1,930 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1440">
+<title>Profiles editor — D: composer chip and popover</title>
+<style>
+/* Tokens: design/system.md (apps/desktop/src/theme.css). Dark is the drawn theme;
+   the light block is included so the pair can be checked, and every value below
+   is a token, never a new color. */
+:root,[data-theme="dark"]{--bg:#0e1116;--surface:#151a21;--surface2:#1c222b;--border:#2b333d;--text:#e4e8ee;--muted:#9aa4b2;--faint:#7d8593;--accent:#7aa2f7;--tint:rgba(122,162,247,.14);--success:#7edc9a;--warning:#e7b455;--danger:#ff8585;--shadow:0 8px 24px rgba(0,0,0,.45);--chat-max:880px;--row-h:34px}
+[data-theme="light"]{--bg:#f2f4f7;--surface:#ffffff;--surface2:#e9edf2;--border:#cfd5dd;--text:#17202a;--muted:#576272;--faint:#6b7686;--accent:#2e5bd7;--tint:rgba(46,91,215,.10);--success:#166e38;--warning:#8a5800;--danger:#c22f37;--shadow:0 8px 24px rgba(23,32,42,.18)}
+[hidden]{display:none!important}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+button,input,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+h1,h2,h3,h4,p,ol,ul,dl,dd,dt{margin:0}
+.mono{font-family:ui-monospace,"Cascadia Code",Consolas,monospace}
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.i{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.i.s{width:12px;height:12px}
+
+/* ---------- the artboard's own chrome: title, state switcher, legend ---------- */
+.board{padding:16px 24px 12px;border-bottom:1px solid var(--border);background:var(--surface)}
+.kicker{margin:0 0 3px;font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--faint)}
+.board h1{margin:0 0 5px;font-size:18px;font-weight:600}
+.lead{margin:0 0 10px;max-width:1010px;color:var(--muted);font-size:12.5px;line-height:1.55}
+.lead strong{color:var(--text);font-weight:600}
+.states{display:flex;flex-wrap:wrap;gap:6px}
+.states button{border:1px solid var(--border);background:transparent;color:var(--muted);border-radius:8px;padding:4px 10px;font-size:12px;cursor:pointer;transition:background-color 120ms ease,color 120ms ease,border-color 120ms ease}
+.states button:hover{background:var(--surface2);color:var(--text)}
+.states button[aria-pressed="true"]{background:var(--tint);color:var(--accent);border-color:var(--accent);font-weight:600}
+.legend{margin:8px 0 0;font-size:11.5px;color:var(--faint);max-width:1030px;line-height:1.5}
+
+/* ---------- the app shell this editor lives inside ---------- */
+.stage{padding:14px 24px 6px}
+.app{position:relative;display:grid;grid-template-columns:280px minmax(0,1fr);height:740px;background:var(--bg);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.side{background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;min-height:0;padding:12px 10px 8px}
+.new{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:38px;border:1px solid var(--border);border-radius:10px;background:var(--surface2);color:var(--text);cursor:pointer;font-weight:600;font-size:14px}
+.new:hover{border-color:var(--accent)}
+.wh{display:flex;align-items:center;margin:14px 0 6px;padding-left:10px}
+.wh h2{flex:1;font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.02em}
+.tree{flex:1;overflow:auto;margin:0 -4px;padding:0 4px}
+.row{display:flex;align-items:center;gap:8px;min-height:var(--row-h);padding:0 10px;border-radius:8px;font-size:13px;cursor:pointer;user-select:none}
+.row:hover{background:var(--surface2);box-shadow:inset 0 0 0 1px var(--border)}
+.row[aria-selected="true"]{background:var(--tint)}
+.row .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .sub{display:block;color:var(--muted);font-size:12px;line-height:1.2}
+.row.folder{font-weight:600}
+.row.chat{padding-left:42px}
+.row svg.fi{width:16px;height:16px;flex:none;fill:none;stroke:var(--muted);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.foot{display:flex;gap:6px;padding-top:8px;border-top:1px solid var(--border)}
+.ic{position:relative;width:32px;height:32px;display:inline-grid;place-items:center;border:0;background:transparent;color:var(--muted);border-radius:8px;cursor:pointer;padding:0;flex:none}
+.ic:hover{background:var(--surface2);color:var(--text);box-shadow:inset 0 0 0 1px var(--border)}
+.ic[aria-disabled="true"]{opacity:.4;cursor:not-allowed}
+.ic[data-tip]::after{content:attr(data-tip);position:absolute;top:calc(100% + 6px);left:50%;transform:translateX(-50%);background:var(--text);color:var(--bg);font-size:12px;line-height:1;padding:6px 8px;border-radius:6px;white-space:nowrap;opacity:0;pointer-events:none;z-index:20}
+.ic[data-tip]:hover::after,.ic[data-tip]:focus-visible::after{opacity:1}
+.ic.tip-l::after{left:0;transform:none}
+.ic.tip-r::after{left:auto;right:0;transform:none}
+main{display:grid;grid-template-rows:auto minmax(0,1fr);min-height:0}
+.mh{display:flex;align-items:center;gap:8px;height:52px;padding:0 20px;border-bottom:1px solid var(--border)}
+.mh h1{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.mh .sp{flex:1}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:10px;padding:2px;gap:2px;background:var(--surface)}
+.seg [role="tab"]{border:0;background:transparent;color:var(--muted);padding:4px 14px;border-radius:8px;cursor:pointer;font-size:13px;display:inline-flex;align-items:center;gap:6px}
+.seg [role="tab"]:hover{color:var(--text)}
+.seg [role="tab"][aria-selected="true"]{background:var(--tint);color:var(--text);box-shadow:inset 0 0 0 1px var(--accent)}
+.view{position:relative;min-height:0;display:flex;flex-direction:column}
+.panel{flex:1;min-height:0}
+.panel.chat{display:grid;grid-template-rows:minmax(0,1fr) auto}
+.thread-wrap{position:relative;min-height:0;overflow:hidden}
+.thread{height:100%;overflow:auto;padding:28px 24px 12px}
+.thread-in{max-width:var(--chat-max);margin:0 auto;display:flex;flex-direction:column;gap:18px}
+.msg{max-width:100%}
+.msg.u{align-self:flex-end;background:var(--tint);border-radius:14px 14px 4px 14px;padding:8px 14px;max-width:78%}
+.msg.a{padding:0 4px}
+code{font-family:ui-monospace,"Cascadia Code",Consolas,monospace;font-size:12.5px}
+
+/* composer: what the app draws today, with the profile pill as a new sibling */
+.composer-dock{position:relative;width:min(var(--chat-max),calc(100% - 48px));margin:0 auto 18px}
+.composer{display:flex;align-items:flex-end;gap:8px;border:1px solid var(--border);border-radius:18px;background:var(--surface);padding:10px 10px 10px 16px}
+.composer:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+.composer textarea{flex:1;border:0;background:transparent;resize:none;outline:none;min-height:24px;max-height:120px;line-height:1.5;padding:4px 0}
+.composer textarea::placeholder{color:var(--faint)}
+.send{width:36px;height:36px;border-radius:999px;border:0;background:var(--accent);color:var(--bg);display:inline-grid;place-items:center;cursor:pointer;flex:none}
+.stop{width:36px;height:36px;border-radius:999px;border:0;background:var(--danger);color:var(--bg);display:inline-grid;place-items:center;cursor:pointer;flex:none}
+.dock-bottom{display:flex;align-items:center;gap:10px;margin-top:8px;padding:0 4px}
+.keys{flex:1;font-size:12px;color:var(--faint)}
+.chip{display:flex;align-items:center;gap:2px;flex:none}
+.pill-select{position:relative}
+.pill{display:inline-flex;align-items:center;gap:4px;white-space:nowrap;border:0;background:transparent;border-radius:10px;padding:3px 6px;color:var(--faint);font-size:12px;cursor:pointer;transition:background-color 120ms ease,color 120ms ease}
+.pill:hover{background:var(--surface2)}
+.pill .value{color:inherit;font-weight:600}
+.pill.faint .value{font-weight:400}
+.pill.profile{box-shadow:inset 0 0 0 1px var(--border);color:var(--text);padding-right:8px}
+.pill.profile:hover{box-shadow:inset 0 0 0 1px var(--accent)}
+.pill.profile[aria-disabled="true"]{opacity:.55;cursor:not-allowed}
+.pill.profile[aria-disabled="true"]:hover{box-shadow:inset 0 0 0 1px var(--border)}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--muted);flex:none}
+.dot.global{background:var(--accent)}
+.dot.here{background:var(--success)}
+.tag{font-size:11px;font-weight:600;border-radius:999px;padding:2px 8px;border:1px solid currentColor;white-space:nowrap;display:inline-block}
+.tag.ok{color:var(--success)}
+.tag.warn{color:var(--warning)}
+.tag.quiet{color:var(--muted)}
+.tag.bad{color:var(--danger)}
+.tag.here{color:var(--accent)}
+
+/* the themed popover the model chip already opens, reused for profiles */
+.popover{position:absolute;z-index:30;background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.4);padding:4px}
+.profiles-pop{right:0;bottom:calc(100% + 6px);width:330px}
+.pop-head{padding:6px 8px 4px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--faint)}
+.options{list-style:none;margin:0;padding:0}
+.option{display:flex;align-items:baseline;gap:8px;width:100%;text-align:left;border:0;background:transparent;border-radius:8px;padding:6px 8px;font-size:12.5px;cursor:pointer}
+.option:hover,.option.active{background:var(--surface2)}
+.option[aria-selected="true"]{color:var(--accent)}
+.option[aria-selected="true"] .value{font-weight:600}
+.option .value{color:var(--text)}
+.option .use{margin-left:auto;font-size:11px;color:var(--accent)}
+.option .note{font-size:11px;color:var(--faint)}
+.pop-note{margin:4px 2px 2px;padding:6px 8px;border-top:1px solid var(--border);font-size:11.5px;color:var(--muted);line-height:1.45}
+.pop-acts{display:flex;gap:6px;padding:4px 2px 2px;border-top:1px solid var(--border);margin-top:2px}
+.pop-acts .btn{flex:1;justify-content:center}
+
+/* ---------- the editor sheet over the thread ---------- */
+.scrim{position:absolute;inset:0;background:rgba(0,0,0,.45);z-index:10}
+.sheet{position:absolute;z-index:11;left:50%;top:10px;bottom:10px;transform:translateX(-50%);width:min(760px,calc(100% - 32px));background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);display:flex;flex-direction:column;overflow:hidden}
+.sh-top{display:flex;align-items:flex-start;gap:10px;padding:14px 16px 10px;border-bottom:1px solid var(--border)}
+.sh-top .grow{flex:1;min-width:0}
+.sh-kicker{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--faint)}
+.sh-top h2{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px;margin-top:2px}
+.sh-sub{font-size:12px;color:var(--muted);padding:8px 16px 0}
+.sh-body{flex:1;min-height:0;overflow:auto;padding:10px 16px 12px}
+.sh-foot{border-top:1px solid var(--border);padding:10px 16px 12px;background:var(--surface2)}
+.sh-foot .acts{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.sh-foot .count{margin-left:auto;font-size:12px;color:var(--muted)}
+.scopes{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:8px;font-size:11.5px;color:var(--muted);line-height:1.45}
+.scopes b{color:var(--text);font-weight:600}
+
+/* sections inside the sheet */
+.sect{margin-top:14px;padding-top:12px;border-top:1px solid var(--border)}
+.sect:first-child{margin-top:0;padding-top:0;border-top:0}
+.sect h3{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);margin-bottom:8px}
+.key{font-family:ui-monospace,"Cascadia Code",Consolas,monospace;font-size:11px;letter-spacing:0;color:var(--accent);background:var(--tint);border-radius:4px;padding:1px 5px}
+.note{margin:8px 0 0;font-size:11.5px;color:var(--faint);line-height:1.5}
+table.agents{width:100%;border-collapse:collapse;font-size:13px}
+table.agents caption{text-align:left}
+table.agents th{font-size:11px;font-weight:600;color:var(--faint);text-align:left;text-transform:uppercase;letter-spacing:.05em;padding:4px 8px 8px;border-bottom:1px solid var(--border)}
+table.agents th.effc{text-align:right}
+table.agents td{padding:4px 8px;vertical-align:middle}
+table.agents tbody th{font-size:13px;font-weight:400;text-transform:none;letter-spacing:0;color:var(--text);padding:4px 8px;border:0;width:120px}
+table.agents td.eff{text-align:right;width:110px}
+table.agents tr:hover td,table.agents tr:hover tbody th{background:var(--surface2)}
+.field{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);border-radius:6px;padding:2px 7px;font-size:12px;cursor:pointer}
+.field:hover{border-color:var(--accent)}
+.field.wide{display:flex;width:100%;justify-content:space-between;min-width:0}
+.field .v{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.field .v.mono{font-family:ui-monospace,"Cascadia Code",Consolas,monospace;font-size:12px}
+.field[aria-invalid="true"]{border-color:var(--danger)}
+.field[aria-disabled="true"]{opacity:.55;cursor:not-allowed}
+.cellpop{position:relative;min-width:0}
+.cellpop .popover{left:0;top:calc(100% + 6px);width:300px}
+.picker .filter{width:calc(100% - 4px);margin:2px;padding:6px 8px;border:1px solid var(--border);border-radius:8px;background:transparent;font-size:12px;outline:none}
+.picker .filter:focus{border-color:var(--accent)}
+.picker .options{max-height:180px;overflow:auto}
+.picker .hint{margin-left:auto;font-size:11px;color:var(--faint)}
+.changed{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--accent);margin-left:6px;vertical-align:middle}
+.changed.warn{background:var(--warning)}
+.steps{margin:0;padding:0;list-style:none;border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.steps li{display:flex;align-items:center;gap:6px;padding:5px 7px;border-bottom:1px solid var(--border)}
+.steps li:last-child{border-bottom:0}
+.steps li.tinted{background:var(--tint)}
+.steps .step{width:16px;flex:none;text-align:center;font:600 11px/1 ui-monospace,"Cascadia Code",Consolas,monospace;color:var(--muted)}
+.stepmain{flex:1;min-width:0}
+.step-err{margin:3px 0 0;font-size:11.5px;color:var(--danger);line-height:1.4}
+.iconbtn{width:24px;height:24px;flex:none;display:inline-grid;place-items:center;border:1px solid transparent;border-radius:6px;background:transparent;color:var(--muted);cursor:pointer}
+.iconbtn:hover{background:var(--surface2);color:var(--text)}
+.iconbtn[aria-disabled="true"]{opacity:.4;cursor:not-allowed}
+.addstep{display:flex;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap}
+.limit{font-size:11.5px;color:var(--warning)}
+.pinrow{display:flex;align-items:center;gap:8px;margin-top:6px}
+.pinrow .plab{width:52px;flex:none;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--faint)}
+.pinrow .field{flex:1;min-width:0}
+.banner{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:8px 10px 8px 12px;box-shadow:inset 3px 0 0 var(--accent);font-size:12.5px;margin-bottom:12px}
+.banner .bt{font-weight:600}
+.banner .why{margin-top:3px;color:var(--muted);font-size:12px;line-height:1.5}
+.banner.warn{box-shadow:inset 3px 0 0 var(--warning)}
+.banner.bad{box-shadow:inset 3px 0 0 var(--danger)}
+.banner.bad .bt{color:var(--danger)}
+.bacts{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}
+.code{font-family:ui-monospace,"Cascadia Code",Consolas,monospace;font-size:11.5px;color:var(--muted);background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:1px 5px}
+.example{margin-top:14px;padding-top:12px;border-top:1px dashed var(--border)}
+.ex-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);margin-bottom:6px}
+.nowork{border:1px solid var(--border);border-radius:10px;padding:10px 12px;background:var(--surface2)}
+.unavailable{padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--surface2);box-shadow:inset 3px 0 0 var(--warning);font-size:12.5px}
+.unavailable p{margin:0}
+.unavailable .why{margin-top:4px;color:var(--muted);font-size:12px;line-height:1.5}
+.btn{border:1px solid var(--border);background:var(--surface2);color:var(--text);border-radius:8px;padding:5px 12px;font-size:12.5px;cursor:pointer}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{border-color:var(--accent);background:var(--accent);color:var(--bg);font-weight:600}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.quiet{background:transparent;color:var(--muted)}
+.btn[aria-disabled="true"]{opacity:.55;cursor:not-allowed}
+.btn[aria-disabled="true"]:hover{border-color:var(--border)}
+
+/* ---------- overlays: the channel's confirmation and Settings (the global view) ---------- */
+.ovl{position:absolute;inset:0;background:rgba(0,0,0,.5);z-index:40}
+.confirm{position:absolute;z-index:41;left:50%;top:50%;transform:translate(-50%,-50%);width:min(440px,calc(100% - 32px));background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);padding:18px}
+.confirm h2{font-size:15px;font-weight:600;margin-bottom:6px}
+.confirm p{font-size:12.5px;color:var(--muted);line-height:1.55;margin-bottom:8px}
+.confirm p strong{color:var(--text);font-weight:600}
+.confirm .cacts{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;border:0;background:none;padding:0}
+.dlg{position:absolute;z-index:41;left:50%;top:50%;transform:translate(-50%,-50%);width:min(680px,calc(100% - 32px));background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);padding:18px;display:flex;flex-direction:column;gap:14px}
+.dlg h2{font-size:15px;font-weight:600}
+.dlg .body{display:flex;gap:18px;min-height:0}
+.rail{flex:none;width:184px;display:flex;flex-direction:column;gap:2px;border-right:1px solid var(--border)}
+.rail .opt{display:flex;align-items:center;gap:9px;height:32px;padding:0 10px;border-radius:8px;font-size:13px;color:var(--muted)}
+.rail .opt.on{background:var(--tint);color:var(--accent)}
+.pane{flex:1;min-width:0;display:flex;flex-direction:column}
+.pane h3{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
+.hint{margin:2px 0 12px;font-size:12px;color:var(--muted)}
+.def{border:1px solid var(--border);background:var(--surface2);border-radius:12px;padding:10px 12px;margin-bottom:8px}
+.def .dh{display:flex;align-items:baseline;gap:8px}
+.def .pname{font-size:14px;font-weight:600;color:var(--accent)}
+.def .dmeta{margin-left:auto;font-size:11.5px;color:var(--faint)}
+.def .dline{margin:4px 0 0;font-size:12px;color:var(--muted)}
+.def .dline .mono{color:var(--text)}
+.def .dline .lv{color:var(--accent)}
+.globalrow{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--accent);border-radius:10px;background:var(--tint);margin-bottom:12px;font-size:12.5px}
+.globalrow strong{font-weight:600}
+
+.pulse{display:inline-flex;gap:3px;vertical-align:middle}
+.pulse i{width:4px;height:4px;border-radius:50%;background:var(--accent);animation:pp 1.2s ease-in-out infinite}
+.pulse i:nth-child(2){animation-delay:.2s}
+.pulse i:nth-child(3){animation-delay:.4s}
+@keyframes pp{0%,100%{opacity:.25}50%{opacity:1}}
+@media (prefers-reduced-motion: reduce){
+  *{animation:none!important;transition:none!important}
+  .pulse i{opacity:.8}
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+<symbol id="i-folder" viewBox="0 0 24 24"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></symbol>
+<symbol id="i-folder-open" viewBox="0 0 24 24"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></symbol>
+<symbol id="i-circle-plus" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/><path d="M12 8v8"/></symbol>
+<symbol id="i-pencil" viewBox="0 0 24 24"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></symbol>
+<symbol id="i-send" viewBox="0 0 24 24"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></symbol>
+<symbol id="i-stop" viewBox="0 0 24 24"><g fill="currentColor" stroke="none"><rect width="18" height="18" x="3" y="3" rx="2"/></g></symbol>
+<symbol id="i-chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+<symbol id="i-up" viewBox="0 0 24 24"><path d="m18 15-6-6-6 6"/></symbol>
+<symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+<symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 5.2a3.5 3.5 0 0 1 0 6.6"/><path d="M18 20a6.4 6.4 0 0 0-2-4.6"/></symbol>
+<symbol id="i-terminal" viewBox="0 0 24 24"><path d="M12 19h8"/><path d="m4 17 6-6-6-6"/></symbol>
+<symbol id="i-theme" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 18a6 6 0 0 0 0-12v12z"/></symbol>
+<symbol id="i-house" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></symbol>
+<symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V21a2 2 0 0 1-4 0v-.1A1.7 1.7 0 0 0 7 19.4a1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 3 15a2 2 0 0 1-2-2 2 2 0 0 1 2-2 1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 9 3.6V3a2 2 0 0 1 4 0v.1A1.7 1.7 0 0 0 15 4.6l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A1.7 1.7 0 0 0 19.4 9H21a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.5 2z"/></symbol>
+<symbol id="i-warn" viewBox="0 0 24 24"><path d="m21.7 18-8-14a2 2 0 0 0-3.4 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
+<symbol id="i-refresh" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="m20 6-11 11-5-5"/></symbol>
+<symbol id="m-working" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></symbol>
+<symbol id="m-done" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m16 9-5.5 5.5L8 12"/></symbol>
+<symbol id="m-reply" viewBox="0 0 24 24"><path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"/></symbol>
+</defs></svg>
+
+<header class="board">
+  <p class="kicker">Direction D · composer profile chip and popover</p>
+  <h1>A profile chip in the composer row, next to the model chip</h1>
+  <p class="lead">The control sits where the model already sits: the row under the box. The pill names this chat's profile and, in one word, its scope; its popover lists the saved profiles, says which one <strong>this chat</strong> runs and which one is the <strong>default</strong>, and one action opens the editor sheet over the thread. The composer stays live under that sheet, so <em>Use in this chat</em> is unmistakably about this chat. Nothing here looks global: the global choice is one labelled row in the same sheet, and Settings only lists what is stored.</p>
+  <div class="states" role="group" aria-label="Artboard states">
+    <button type="button" data-go="default" aria-pressed="true">1 · uses default</button>
+    <button type="button" data-go="session" aria-pressed="false">2 · this chat only</button>
+    <button type="button" data-go="edit" aria-pressed="false">3 · editing</button>
+    <button type="button" data-go="chain" aria-pressed="false">4 · fallback chain</button>
+    <button type="button" data-go="pin" aria-pressed="false">5 · pin</button>
+    <button type="button" data-go="conflict" aria-pressed="false">6 · revision conflict</button>
+    <button type="button" data-go="rejected" aria-pressed="false">7 · rejected draft</button>
+    <button type="button" data-go="outcomes" aria-pressed="false">8 · three outcomes</button>
+    <button type="button" data-go="saved" aria-pressed="false">9 · saved, not used</button>
+    <button type="button" data-go="child" aria-pressed="false">10 · chat unavailable</button>
+    <button type="button" data-go="settings" aria-pressed="false">11 · Settings, global</button>
+  </div>
+  <p class="legend" id="legend" aria-live="polite"></p>
+</header>
+
+<main class="stage">
+  <div class="app" id="app">
+    <aside class="side" aria-label="Workspaces">
+      <button class="new" type="button"><svg class="i" aria-hidden="true"><use href="#i-plus"/></svg>New session</button>
+      <div class="wh"><h2>Workspace</h2></div>
+      <nav class="tree" aria-label="Workspaces">
+        <div role="tree" aria-label="Workspaces">
+          <div role="treeitem" aria-level="1" aria-expanded="true" tabindex="-1" class="row folder"><svg class="fi" aria-hidden="true"><use href="#i-folder-open"/></svg><span class="t">gentle-desk</span></div>
+          <div role="group">
+            <div role="treeitem" aria-level="2" aria-selected="true" tabindex="-1" class="row chat"><span class="t">Tauri skeleton: window and bridge</span></div>
+            <div role="treeitem" aria-level="2" aria-selected="false" tabindex="-1" class="row chat"><span class="t">Badge shows queued as working</span><svg class="i s" aria-hidden="true" style="color:var(--accent)"><use href="#m-working"/></svg></div>
+            <div role="treeitem" aria-level="2" aria-selected="false" tabindex="-1" class="row chat"><span class="t">Close freezes the window</span><svg class="i s" aria-hidden="true" style="color:var(--success)"><use href="#m-reply"/></svg></div>
+          </div>
+          <div role="treeitem" aria-level="1" aria-expanded="true" tabindex="-1" class="row folder"><svg class="fi" aria-hidden="true"><use href="#i-folder-open"/></svg><span class="t">gentle-shell</span></div>
+          <div role="group">
+            <div role="treeitem" aria-level="2" aria-selected="false" tabindex="-1" class="row chat"><span class="t">Helper threads reading order</span></div>
+            <div role="treeitem" aria-level="2" aria-selected="false" tabindex="-1" class="row chat"><span class="t">Theme loader fallbacks</span></div>
+          </div>
+          <div role="treeitem" aria-level="1" aria-expanded="false" tabindex="-1" class="row folder"><svg class="fi" aria-hidden="true"><use href="#i-folder"/></svg><span class="t">notes-site</span></div>
+        </div>
+      </nav>
+      <div class="foot">
+        <button class="ic tip-l" type="button" data-tip="Theme" aria-label="Theme"><svg aria-hidden="true"><use href="#i-theme"/></svg></button>
+        <button class="ic tip-l" type="button" data-tip="Settings" aria-label="Settings"><svg aria-hidden="true"><use href="#i-gear"/></svg></button>
+      </div>
+    </aside>
+
+    <main>
+      <header class="mh">
+        <h1 id="chat-title">Tauri skeleton: window and bridge</h1>
+        <button class="ic" type="button" data-tip="Rename chat" aria-label="Rename chat"><svg aria-hidden="true"><use href="#i-pencil"/></svg></button>
+        <span class="sp"></span>
+        <div class="seg" role="tablist" aria-label="View">
+          <button type="button" role="tab" aria-selected="true">Chat</button>
+          <button type="button" role="tab" aria-selected="false">Helpers</button>
+        </div>
+      </header>
+
+      <div class="view">
+        <section class="panel chat" role="tabpanel" aria-label="Chat">
+          <div class="thread-wrap">
+            <div class="thread">
+              <div class="thread-in">
+                <p class="msg u">Sketch the Tauri skeleton: one window, one state bridge.</p>
+                <p class="msg a">Start with a single window and one command that returns the app state. The bridge pushes changes as events, so the web side stays a pure view.</p>
+                <p class="msg u">Keep the components small enough to read in one screen.</p>
+                <p class="msg a">Done: each component has one responsibility and stays under 200 lines. Next I would add the sessions list, then the helpers view.</p>
+              </div>
+            </div>
+
+            <!-- ===== the editor sheet, over the thread, composer still live below ===== -->
+            <div class="scrim" data-slot="sheet-edit sheet-chain sheet-pin sheet-conflict sheet-rejected sheet-outcomes sheet-saved sheet-child" hidden></div>
+
+            <!-- 3 · editing: model + thinking per agent, the picker open on explore -->
+            <section class="sheet" role="dialog" aria-labelledby="sh-edit-t" data-slot="sheet-edit" hidden>
+              <header class="sh-top">
+                <div class="grow">
+                  <p class="sh-kicker">Edit profile</p>
+                  <h2 id="sh-edit-t">team <span class="tag quiet">stored definition</span></h2>
+                </div>
+                <button class="ic tip-r" type="button" data-tip="Close" aria-label="Close the editor"><svg aria-hidden="true"><use href="#i-x"/></svg></button>
+              </header>
+              <p class="sh-sub">gentle-pi stores this file · read at 14:18 · this chat runs it as the default</p>
+              <div class="sh-body">
+                <div class="sect">
+                  <h3>Model and thinking per agent</h3>
+                  <table class="agents">
+                    <caption class="vh">Model and thinking level for each agent of team</caption>
+                    <thead><tr><th scope="col">Agent</th><th scope="col">Model</th><th scope="col" class="effc">Thinking</th></tr></thead>
+                    <tbody>
+                      <tr><th scope="row">orchestrator</th>
+                        <td><button class="field wide" type="button"><span class="v mono">anthropic/claude-sonnet-4</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></td>
+                        <td class="eff"><button class="field" type="button"><span class="v mono">high</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></td></tr>
+                      <tr><th scope="row">explore <span class="changed" aria-hidden="true"></span><span class="vh">changed</span></th>
+                        <td>
+                          <div class="cellpop">
+                            <button class="field wide" type="button" aria-expanded="true" aria-controls="pick-1"><span class="v mono">anthropic/claude-haiku-4-5</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button>
+                            <div class="popover picker" id="pick-1" role="group" aria-label="Choose a model">
+                              <input class="filter" type="search" value="claude" aria-label="Filter models" readonly>
+                              <ul class="options">
+                                <li><button class="option" type="button" aria-selected="true"><span class="mono">anthropic/claude-haiku-4-5</span><span class="hint">anthropic</span></button></li>
+                                <li><button class="option" type="button" aria-selected="false"><span class="mono">anthropic/claude-sonnet-4</span><span class="hint">anthropic</span></button></li>
+                                <li><button class="option" type="button" aria-selected="false"><span class="mono">anthropic/claude-opus-4-1</span><span class="hint">anthropic</span></button></li>
+                                <li><button class="option" type="button" aria-selected="false"><span class="mono">openai/gpt-5-codex</span><span class="hint">openai</span></button></li>
+                              </ul>
+                            </div>
+                          </div>
+                        </td>
+                        <td class="eff"><button class="field" type="button"><span class="v mono">low</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></td></tr>
+                      <tr><th scope="row">verify</th>
+                        <td><button class="field wide" type="button"><span class="v mono">anthropic/claude-sonnet-4</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></td>
+                        <td class="eff"><button class="field" type="button"><span class="v mono">medium</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></td></tr>
+                      <tr><th scope="row">worker</th>
+                        <td><button class="field wide" type="button"><span class="v mono">openai/gpt-5-codex</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></td>
+                        <td class="eff"><button class="field" type="button"><span class="v mono">high</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></td></tr>
+                    </tbody>
+                  </table>
+                  <p class="note">Thinking: off · minimal · low · medium · high · xhigh · max. The picker is the app's own model catalog, the same list the model chip opens.</p>
+                </div>
+                <div class="sect">
+                  <h3>Fallback chain <span class="key">*</span></h3>
+                  <p class="dline" style="font-size:12.5px;color:var(--muted)">3 steps · <span class="mono">anthropic/claude-haiku-4-5</span> first</p>
+                </div>
+                <div class="sect">
+                  <h3>Pin · workspace gentle-desk</h3>
+                  <p class="dline" style="font-size:12.5px;color:var(--muted)">Repo <span class="mono">fast</span> · local <span class="mono">team</span></p>
+                </div>
+              </div>
+              <footer class="sh-foot">
+                <div class="acts">
+                  <button class="btn primary" type="button">Save</button>
+                  <button class="btn" type="button">Use in this chat</button>
+                  <button class="btn" type="button">Make default</button>
+                  <span class="count">1 unsaved change</span>
+                </div>
+                <div class="scopes">
+                  <span><b>Save</b> stores the definition only</span>
+                  <span><b>Use in this chat</b> this chat's own child · other chats keep theirs</span>
+                  <span><b>Make default</b> global · new chats read it · asks first</span>
+                </div>
+              </footer>
+            </section>
+
+            <!-- 4 · the fallback chain: reorder, remove, add, 8-step limit, a repeat -->
+            <section class="sheet" role="dialog" aria-labelledby="sh-chain-t" data-slot="sheet-chain" hidden>
+              <header class="sh-top">
+                <div class="grow">
+                  <p class="sh-kicker">Edit profile</p>
+                  <h2 id="sh-chain-t">team <span class="tag quiet">stored definition</span></h2>
+                </div>
+                <button class="ic tip-r" type="button" data-tip="Close" aria-label="Close the editor"><svg aria-hidden="true"><use href="#i-x"/></svg></button>
+              </header>
+              <p class="sh-sub">Fallback chain <span class="key">*</span> — the chain every agent falls back to</p>
+              <div class="sh-body">
+                <div class="sect">
+                  <h3>Fallback chain <span class="key">*</span> <span class="tag warn">8 of 8</span></h3>
+                  <ol class="steps">
+                    <li><span class="step">1</span><div class="stepmain"><button class="field wide" type="button"><span class="v mono">anthropic/claude-haiku-4-5</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></div>
+                      <button class="iconbtn" type="button" aria-label="Move step 1 up" aria-disabled="true"><svg class="i" aria-hidden="true"><use href="#i-up"/></svg></button>
+                      <button class="iconbtn" type="button" aria-label="Move step 1 down"><svg class="i" aria-hidden="true"><use href="#i-down"/></svg></button>
+                      <button class="iconbtn" type="button" aria-label="Remove step 1"><svg class="i" aria-hidden="true"><use href="#i-x"/></svg></button></li>
+                    <li class="tinted"><span class="step">2</span><div class="stepmain"><button class="field wide" type="button"><span class="v mono">openai/gpt-5-codex</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></div>
+                      <button class="iconbtn" type="button" aria-label="Move step 2 up"><svg class="i" aria-hidden="true"><use href="#i-up"/></svg></button>
+                      <button class="iconbtn" type="button" aria-label="Move step 2 down"><svg class="i" aria-hidden="true"><use href="#i-down"/></svg></button>
+                      <button class="iconbtn" type="button" aria-label="Remove step 2"><svg class="i" aria-hidden="true"><use href="#i-x"/></svg></button></li>
+                    <li><span class="step">3</span><div class="stepmain"><button class="field wide" type="button"><span class="v mono">google/gemini-2.5-pro</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></div>
+                      <button class="iconbtn" type="button" aria-label="Move step 3 up"><svg class="i" aria-hidden="true"><use href="#i-up"/></svg></button>
+                      <button class="iconbtn" type="button" aria-label="Move step 3 down"><svg class="i" aria-hidden="true"><use href="#i-down"/></svg></button>
+                      <button class="iconbtn" type="button" aria-label="Remove step 3"><svg class="i" aria-hidden="true"><use href="#i-x"/></svg></button></li>
+                    <li><span class="step">4</span><div class="stepmain">
+                      <button class="field wide" type="button" aria-invalid="true" aria-describedby="rep-err"><span class="v mono">google/gemini-2.5-pro</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button>
+                      <p class="step-err" id="rep-err">Already step 3 · a model appears once per chain</p></div>
+                      <button class="iconbtn" type="button" aria-label="Move step 4 up"><svg class="i" aria-hidden="true"><use href="#i-up"/></svg></button>
+                      <button class="iconbtn" type="button" aria-label="Move step 4 down"><svg class="i" aria-hidden="true"><use href="#i-down"/></svg></button>
+                      <button class="iconbtn" type="button" aria-label="Remove step 4"><svg class="i" aria-hidden="true"><use href="#i-x"/></svg></button></li>
+                    <li><span class="step">5</span><div class="stepmain"><button class="field wide" type="button"><span class="v mono">mistral/codestral-2508</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></div>
+                      <button class="iconbtn" type="button" aria-label="Move step 5 up"><svg class="i" aria-hidden="true"><use href="#i-up"/></svg></button>
+                      <button class="iconbtn" type="button" aria-label="Move step 5 down"><svg class="i" aria-hidden="true"><use href="#i-down"/></svg></button>
+                      <button class="iconbtn" type="button" aria-label="Remove step 5"><svg class="i" aria-hidden="true"><use href="#i-x"/></svg></button></li>
+                    <li><span class="step">6</span><div class="stepmain"><button class="field wide" type="button"><span class="v mono">openai/gpt-5-mini</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></div>
+                      <button class="iconbtn" type="button" aria-label="Move step 6 up"><svg class="i" aria-hidden="true"><use href="#i-up"/></svg></button>
+                      <button class="iconbtn" type="button" aria-label="Move step 6 down"><svg class="i" aria-hidden="true"><use href="#i-down"/></svg></button>
+                      <button class="iconbtn" type="button" aria-label="Remove step 6"><svg class="i" aria-hidden="true"><use href="#i-x"/></svg></button></li>
+                    <li><span class="step">7</span><div class="stepmain"><button class="field wide" type="button"><span class="v mono">anthropic/claude-opus-4-1</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></div>
+                      <button class="iconbtn" type="button" aria-label="Move step 7 up"><svg class="i" aria-hidden="true"><use href="#i-up"/></svg></button>
+                      <button class="iconbtn" type="button" aria-label="Move step 7 down"><svg class="i" aria-hidden="true"><use href="#i-down"/></svg></button>
+                      <button class="iconbtn" type="button" aria-label="Remove step 7"><svg class="i" aria-hidden="true"><use href="#i-x"/></svg></button></li>
+                    <li><span class="step">8</span><div class="stepmain"><button class="field wide" type="button"><span class="v mono">openai/o4-mini</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></div>
+                      <button class="iconbtn" type="button" aria-label="Move step 8 up"><svg class="i" aria-hidden="true"><use href="#i-up"/></svg></button>
+                      <button class="iconbtn" type="button" aria-label="Move step 8 down" aria-disabled="true"><svg class="i" aria-hidden="true"><use href="#i-down"/></svg></button>
+                      <button class="iconbtn" type="button" aria-label="Remove step 8"><svg class="i" aria-hidden="true"><use href="#i-x"/></svg></button></li>
+                  </ol>
+                  <div class="addstep">
+                    <button class="btn" type="button" aria-disabled="true" aria-describedby="lim-8">Add step</button>
+                    <span class="limit" id="lim-8">Limit reached: 8 of 8. Remove one to add another.</span>
+                  </div>
+                  <p class="note">Steps carry a model and, optionally, a thinking level. <span class="key">*</span> is the profile-wide chain; the repeat above is refused here, before the write.</p>
+                </div>
+              </div>
+              <footer class="sh-foot">
+                <div class="acts">
+                  <button class="btn primary" type="button" aria-disabled="true" aria-describedby="rep-err">Save</button>
+                  <button class="btn" type="button" aria-disabled="true">Use in this chat</button>
+                  <button class="btn" type="button" aria-disabled="true">Make default</button>
+                  <span class="count">1 unsaved change · 1 refused</span>
+                </div>
+                <div class="scopes">
+                  <span>Nothing can be applied while the chain has a repeated model.</span>
+                </div>
+              </footer>
+            </section>
+
+            <!-- 5 · the pin: local vs repo, the workspace named, and the no-worktree case -->
+            <section class="sheet" role="dialog" aria-labelledby="sh-pin-t" data-slot="sheet-pin" hidden>
+              <header class="sh-top">
+                <div class="grow">
+                  <p class="sh-kicker">Edit profile</p>
+                  <h2 id="sh-pin-t">Pin <span class="tag quiet">workspace gentle-desk</span></h2>
+                </div>
+                <button class="ic tip-r" type="button" data-tip="Close" aria-label="Close the editor"><svg aria-hidden="true"><use href="#i-x"/></svg></button>
+              </header>
+              <p class="sh-sub">Pins belong to this chat's workspace, not to the app</p>
+              <div class="sh-body">
+                <div class="sect">
+                  <h3>Pin · /dev/gentle-desk</h3>
+                  <div class="pinrow"><span class="plab">Repo</span>
+                    <button class="field wide" type="button"><span class="v mono">fast</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button>
+                    <button class="btn quiet" type="button">Clear</button></div>
+                  <div class="pinrow"><span class="plab">Local</span>
+                    <button class="field wide" type="button"><span class="v mono">team</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button>
+                    <button class="btn quiet" type="button">Clear</button></div>
+                  <p class="note">Repo wins inside gentle-desk; local wins in every other folder. Clear writes <span class="code">null</span> and leaves that layer unpinned.</p>
+                  <p class="note">Pins are read when the editor opens and are not watched: a pin changed in the terminal stays invisible until you reopen it.</p>
+                </div>
+                <div class="example">
+                  <p class="ex-label">The same section in a chat with no worktree</p>
+                  <div class="nowork">
+                    <div class="unavailable">
+                      <p><strong>Pin unavailable.</strong> <span class="code">worktree_unresolved</span></p>
+                      <p class="why">This chat has no working directory inside a resolvable Git worktree, so there is no file to write. No pin write is accepted, and nothing was written.</p>
+                    </div>
+                    <div class="pinrow"><span class="plab">Repo</span>
+                      <button class="field wide" type="button" aria-disabled="true" aria-describedby="nw-why"><span class="v mono">unavailable</span></button></div>
+                    <div class="pinrow"><span class="plab">Local</span>
+                      <button class="field wide" type="button" aria-disabled="true" aria-describedby="nw-why"><span class="v mono">unavailable</span></button></div>
+                    <p class="note" id="nw-why">The rest of the editor still works: a profile is stored by gentle-pi itself, not by this folder.</p>
+                  </div>
+                </div>
+              </div>
+              <footer class="sh-foot">
+                <div class="acts">
+                  <button class="btn primary" type="button">Save</button>
+                  <button class="btn" type="button">Use in this chat</button>
+                  <button class="btn" type="button">Make default</button>
+                  <span class="count">1 unsaved pin change</span>
+                </div>
+                <div class="scopes">
+                  <span><b>Save</b> writes the complete pins document of this workspace</span>
+                  <span>In the no-worktree case the editor refuses the pin write and says why</span>
+                </div>
+              </footer>
+            </section>
+
+            <!-- 6 · revision_conflict: changed since you opened it -->
+            <section class="sheet" role="dialog" aria-labelledby="sh-conf-t" data-slot="sheet-conflict" hidden>
+              <header class="sh-top">
+                <div class="grow">
+                  <p class="sh-kicker">Edit profile</p>
+                  <h2 id="sh-conf-t">team <span class="tag quiet">stored definition</span></h2>
+                </div>
+                <button class="ic tip-r" type="button" data-tip="Close" aria-label="Close the editor"><svg aria-hidden="true"><use href="#i-x"/></svg></button>
+              </header>
+              <div class="sh-body">
+                <div class="banner warn" role="alert">
+                  <p class="bt">This file changed since you opened it.</p>
+                  <p class="why">Nothing was written. <span class="code">revision_conflict</span> — the revision this editor holds is stale, so the write was refused.</p>
+                  <div class="bacts">
+                    <button class="btn primary" type="button">Keep my draft</button>
+                    <button class="btn" type="button">Reload</button>
+                  </div>
+                </div>
+                <div class="sect">
+                  <h3>Your draft · 2 changes</h3>
+                  <table class="agents">
+                    <caption class="vh">Draft in the editor, kept as it was</caption>
+                    <thead><tr><th scope="col">Agent</th><th scope="col">Model</th><th scope="col" class="effc">Thinking</th></tr></thead>
+                    <tbody>
+                      <tr><th scope="row">orchestrator</th><td><span class="mono" style="font-size:12px">anthropic/claude-sonnet-4</span></td><td class="eff"><span class="mono" style="color:var(--accent);font-size:12px">high</span></td></tr>
+                      <tr><th scope="row">explore</th><td><span class="mono" style="font-size:12px">anthropic/claude-haiku-4-5</span></td><td class="eff"><span class="mono" style="color:var(--accent);font-size:12px">low</span></td></tr>
+                      <tr><th scope="row">verify <span class="changed" aria-hidden="true"></span><span class="vh">changed</span></th><td><span class="mono" style="font-size:12px">anthropic/claude-sonnet-4</span></td><td class="eff"><span class="mono" style="color:var(--accent);font-size:12px">xhigh</span></td></tr>
+                      <tr><th scope="row">worker <span class="changed" aria-hidden="true"></span><span class="vh">changed</span></th><td><span class="mono" style="font-size:12px">openai/gpt-5-codex</span></td><td class="eff"><span class="mono" style="color:var(--accent);font-size:12px">medium</span></td></tr>
+                    </tbody>
+                  </table>
+                  <p class="note">Keep my draft re-reads the file, writes your draft over the new revision, and asks once more. Reload throws your draft away and shows theirs.</p>
+                </div>
+              </div>
+              <footer class="sh-foot">
+                <div class="acts">
+                  <button class="btn primary" type="button">Keep my draft</button>
+                  <button class="btn quiet" type="button">Reload</button>
+                  <span class="count">2 unsaved changes, kept</span>
+                </div>
+                <div class="scopes"><span>Neither action has written anything yet.</span></div>
+              </footer>
+            </section>
+
+            <!-- 7 · invalid_data: the owner rejected it, the draft is kept -->
+            <section class="sheet" role="dialog" aria-labelledby="sh-rej-t" data-slot="sheet-rejected" hidden>
+              <header class="sh-top">
+                <div class="grow">
+                  <p class="sh-kicker">Edit profile</p>
+                  <h2 id="sh-rej-t">team <span class="tag quiet">stored definition</span></h2>
+                </div>
+                <button class="ic tip-r" type="button" data-tip="Close" aria-label="Close the editor"><svg aria-hidden="true"><use href="#i-x"/></svg></button>
+              </header>
+              <div class="sh-body">
+                <div class="banner bad" role="alert">
+                  <p class="bt">gentle-pi rejected this draft.</p>
+                  <p class="why">Nothing was written. Your draft is kept exactly as you left it.</p>
+                  <p class="why"><span class="code">invalid_data · profiles.team.worker.thinking: unknown level "ultra"</span></p>
+                  <div class="bacts">
+                    <button class="btn primary" type="button">Back to the draft</button>
+                    <button class="btn quiet" type="button">Discard draft</button>
+                  </div>
+                </div>
+                <div class="sect">
+                  <h3>Model and thinking per agent</h3>
+                  <table class="agents">
+                    <caption class="vh">The refused field is worker's thinking level</caption>
+                    <thead><tr><th scope="col">Agent</th><th scope="col">Model</th><th scope="col" class="effc">Thinking</th></tr></thead>
+                    <tbody>
+                      <tr><th scope="row">orchestrator</th><td><span class="mono" style="font-size:12px">anthropic/claude-sonnet-4</span></td><td class="eff"><span class="mono" style="color:var(--accent);font-size:12px">high</span></td></tr>
+                      <tr><th scope="row">explore</th><td><span class="mono" style="font-size:12px">anthropic/claude-haiku-4-5</span></td><td class="eff"><span class="mono" style="color:var(--accent);font-size:12px">low</span></td></tr>
+                      <tr><th scope="row">verify</th><td><span class="mono" style="font-size:12px">anthropic/claude-sonnet-4</span></td><td class="eff"><span class="mono" style="color:var(--accent);font-size:12px">medium</span></td></tr>
+                      <tr><th scope="row">worker <span class="changed warn" aria-hidden="true"></span><span class="vh">refused</span></th>
+                        <td><span class="mono" style="font-size:12px">openai/gpt-5-codex</span></td>
+                        <td class="eff"><button class="field" type="button" aria-invalid="true" aria-describedby="rej-why"><span class="v mono">ultra</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></td></tr>
+                    </tbody>
+                  </table>
+                  <p class="note" id="rej-why">The owner is the authority: gentle-pi's writer refused the level, not this editor. Fix the field and save again.</p>
+                </div>
+              </div>
+              <footer class="sh-foot">
+                <div class="acts">
+                  <button class="btn primary" type="button">Save</button>
+                  <button class="btn" type="button" aria-disabled="true">Use in this chat</button>
+                  <button class="btn" type="button" aria-disabled="true">Make default</button>
+                  <span class="count">Draft kept · 1 field refused</span>
+                </div>
+                <div class="scopes"><span>Apply stays out of reach until the draft is accepted.</span></div>
+              </footer>
+            </section>
+
+            <!-- 8 · the three-way outcome, with the channel's own confirmation over it -->
+            <section class="sheet" role="dialog" aria-labelledby="sh-out-t" data-slot="sheet-outcomes" hidden>
+              <header class="sh-top">
+                <div class="grow">
+                  <p class="sh-kicker">Edit profile</p>
+                  <h2 id="sh-out-t">team <span class="tag quiet">stored definition</span></h2>
+                </div>
+                <button class="ic tip-r" type="button" data-tip="Close" aria-label="Close the editor"><svg aria-hidden="true"><use href="#i-x"/></svg></button>
+              </header>
+              <div class="sh-body">
+                <div class="sect">
+                  <h3>The three outcomes, and what each one touches</h3>
+                  <table class="agents">
+                    <caption class="vh">Outcome, its scope and what it writes</caption>
+                    <thead><tr><th scope="col">Outcome</th><th scope="col">Scope</th><th scope="col">What it does</th></tr></thead>
+                    <tbody>
+                      <tr><th scope="row">Save</th><td><span class="tag quiet">definition</span></td><td><span style="font-size:12.5px">Writes the file. Applies nothing.</span></td></tr>
+                      <tr><th scope="row">Use in this chat</th><td><span class="tag here">this chat</span></td><td><span style="font-size:12.5px">Sends the profile to this chat's own child.</span></td></tr>
+                      <tr><th scope="row">Make default</th><td><span class="tag warn">global</span></td><td><span style="font-size:12.5px">New chats in every workspace start on it.</span></td></tr>
+                    </tbody>
+                  </table>
+                  <p class="note">A save alone is not usable: the profile changes nothing until one of the two applies runs.</p>
+                </div>
+              </div>
+              <footer class="sh-foot">
+                <div class="acts">
+                  <button class="btn primary" type="button">Save</button>
+                  <button class="btn" type="button">Use in this chat</button>
+                  <button class="btn" type="button">Make default</button>
+                  <span class="count">2 unsaved changes</span>
+                </div>
+                <div class="scopes">
+                  <span><b>Make default</b> is global: every new chat, every workspace. gentle-pi asks before it runs.</span>
+                </div>
+              </footer>
+            </section>
+
+            <!-- 9 · saved, not used -->
+            <section class="sheet" role="dialog" aria-labelledby="sh-saved-t" data-slot="sheet-saved" hidden>
+              <header class="sh-top">
+                <div class="grow">
+                  <p class="sh-kicker">Edit profile</p>
+                  <h2 id="sh-saved-t">team <span class="tag quiet">stored definition</span></h2>
+                </div>
+                <button class="ic tip-r" type="button" data-tip="Close" aria-label="Close the editor"><svg aria-hidden="true"><use href="#i-x"/></svg></button>
+              </header>
+              <div class="sh-body">
+                <div class="banner" role="status">
+                  <p class="bt">Saved. This chat is still on what it started with.</p>
+                  <p class="why">The definition is stored, and nothing is applied. This chat keeps its routing until you use the profile here; other open chats keep theirs either way.</p>
+                </div>
+                <div class="sect">
+                  <h3>team · now stored</h3>
+                  <table class="agents">
+                    <caption class="vh">What was written for team</caption>
+                    <thead><tr><th scope="col">Agent</th><th scope="col">Model</th><th scope="col" class="effc">Thinking</th></tr></thead>
+                    <tbody>
+                      <tr><th scope="row">orchestrator</th><td><span class="mono" style="font-size:12px">anthropic/claude-sonnet-4</span></td><td class="eff"><span class="mono" style="color:var(--accent);font-size:12px">high</span></td></tr>
+                      <tr><th scope="row">explore</th><td><span class="mono" style="font-size:12px">anthropic/claude-haiku-4-5</span></td><td class="eff"><span class="mono" style="color:var(--accent);font-size:12px">low</span></td></tr>
+                      <tr><th scope="row">verify</th><td><span class="mono" style="font-size:12px">anthropic/claude-sonnet-4</span></td><td class="eff"><span class="mono" style="color:var(--accent);font-size:12px">xhigh</span></td></tr>
+                      <tr><th scope="row">worker</th><td><span class="mono" style="font-size:12px">openai/gpt-5-codex</span></td><td class="eff"><span class="mono" style="color:var(--accent);font-size:12px">high</span></td></tr>
+                    </tbody>
+                  </table>
+                  <p class="note">team is already the default for new chats, so they read this version from now on. This chat does not.</p>
+                </div>
+              </div>
+              <footer class="sh-foot">
+                <div class="acts">
+                  <button class="btn primary" type="button">Use in this chat</button>
+                  <button class="btn" type="button">Make default</button>
+                  <button class="btn quiet" type="button">Done</button>
+                  <span class="count">Saved at 14:24</span>
+                </div>
+                <div class="scopes"><span>Saved, and honest about it: nothing is applied by a save.</span></div>
+              </footer>
+            </section>
+
+            <!-- 10 · the chat's own child is working / ended / never answered -->
+            <section class="sheet" role="dialog" aria-labelledby="sh-child-t" data-slot="sheet-child" hidden>
+              <header class="sh-top">
+                <div class="grow">
+                  <p class="sh-kicker">Profile</p>
+                  <h2 id="sh-child-t">team <span class="tag quiet">default</span></h2>
+                </div>
+                <button class="ic tip-r" type="button" data-tip="Close" aria-label="Close the editor"><svg aria-hidden="true"><use href="#i-x"/></svg></button>
+              </header>
+              <div class="sh-body">
+                <div class="unavailable" role="status">
+                  <p><strong>Apply and edit wait for this chat's child.</strong> <span class="pulse" aria-hidden="true"><i></i><i></i><i></i></span></p>
+                  <p class="why">A profile reaches this chat through its own child, so the three outcomes need it: working, ended, or never answered all leave nothing to send. Saved definitions are unaffected.</p>
+                  <ul class="why" style="margin:6px 0 0;padding-left:18px">
+                    <li>Working — Use in this chat is offered again when the turn ends.</li>
+                    <li>Ended — the chat's child is gone; send a message to start one.</li>
+                    <li>No answer — the child did not answer the channel, so editing falls back to the files.</li>
+                  </ul>
+                  <div class="bacts">
+                    <button class="btn" type="button">Try again</button>
+                    <button class="btn quiet" type="button"><svg class="i s" aria-hidden="true"><use href="#i-terminal"/></svg> Edit in terminal</button>
+                  </div>
+                </div>
+                <div class="sect">
+                  <h3>What this chat runs</h3>
+                  <p style="font-size:12.5px;color:var(--muted)">team · default for new chats · 4 agents · chain of 3 · repo pin <span class="mono">fast</span></p>
+                  <p class="note">Read from the files, so the view stays useful while the writing half is unavailable.</p>
+                </div>
+              </div>
+              <footer class="sh-foot">
+                <div class="acts">
+                  <button class="btn primary" type="button" aria-disabled="true" aria-describedby="child-why">Save</button>
+                  <button class="btn" type="button" aria-disabled="true" aria-describedby="child-why">Use in this chat</button>
+                  <button class="btn" type="button" aria-disabled="true" aria-describedby="child-why">Make default</button>
+                  <span class="count" id="child-why">Unavailable while this chat's child is not answering</span>
+                </div>
+                <div class="scopes"><span>Edit in terminal is the way out that always works.</span></div>
+              </footer>
+            </section>
+          </div>
+
+          <div class="composer-dock">
+            <form class="composer" onsubmit="return false">
+              <textarea rows="1" aria-label="Message" placeholder="Message gentle-desk">Add the sessions list next.</textarea>
+              <button class="send" type="submit" aria-label="Send" data-composer="send"><svg class="i" aria-hidden="true"><use href="#i-send"/></svg></button>
+              <button class="stop" type="button" aria-label="Stop this chat" data-composer="stop" hidden><svg class="i" aria-hidden="true"><use href="#i-stop"/></svg></button>
+            </form>
+            <div class="dock-bottom">
+              <p class="keys">Enter to send · Shift+Enter for a new line</p>
+              <div class="chip">
+                <div class="pill-select">
+                  <button class="pill profile" type="button" id="profile-pill" aria-haspopup="dialog" aria-controls="prof-pop" aria-expanded="false">
+                    <span class="dot global" id="pill-dot"></span>
+                    <span class="value" id="pill-name">team</span>
+                    <span class="tag quiet" id="pill-tag">default</span>
+                    <svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg>
+                  </button>
+                  <span class="vh" id="pill-why">Editing and applying wait for this chat's child; the profile panel says why.</span>
+                </div>
+                <button class="pill" type="button"><span class="value" id="model-pill">anthropic/claude-sonnet-4</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button>
+                <button class="pill faint" type="button"><span class="value" id="level-pill">high</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button>
+              </div>
+            </div>
+
+            <!-- the profile popover: the list, this chat's profile, the default -->
+            <div class="popover profiles-pop" id="prof-pop" role="dialog" aria-labelledby="pop-t" data-slot="prof" hidden>
+              <p class="pop-head" id="pop-t">Profile for this chat</p>
+              <ul class="options" role="listbox" aria-label="Saved profiles">
+                <li><button class="option" type="button" role="option" data-row="team" aria-selected="true">
+                  <span class="value">team</span><span class="note">4 agents</span><span class="use">in this chat</span></button></li>
+                <li><button class="option" type="button" role="option" data-row="fast" aria-selected="false">
+                  <span class="value">fast</span><span class="note">2 agents</span><span class="use"></span></button></li>
+                <li><button class="option" type="button" role="option" data-row="solo" aria-selected="false">
+                  <span class="value">solo</span><span class="note">1 agent</span><span class="use"></span></button></li>
+              </ul>
+              <p class="pop-note" id="pop-note">This chat uses the default, so it follows the global choice.</p>
+              <div class="pop-acts">
+                <button class="btn primary" type="button">Edit…</button>
+                <button class="btn quiet" type="button">All profiles…</button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <!-- 8 · the channel's own confirmation, over the sheet -->
+    <div class="ovl" data-slot="confirm" hidden></div>
+    <div class="confirm" role="alertdialog" aria-modal="true" aria-labelledby="conf-t" aria-describedby="conf-d" data-slot="confirm" hidden>
+      <h2 id="conf-t">Apply profile "team"?</h2>
+      <p id="conf-d"><strong>New chats start on team.</strong> Chats already open keep their routing.</p>
+      <p>This folder is pinned to <span class="mono">fast</span>, so fast stays the default inside gentle-desk until the pin changes.</p>
+      <p style="font-size:12px;color:var(--faint)">gentle-pi asks this itself; the editor only offers the action.</p>
+      <div class="cacts">
+        <button class="btn" type="button">Cancel</button>
+        <button class="btn primary" type="button">Apply</button>
+      </div>
+    </div>
+
+    <!-- 11 · Settings > Profiles, the global view -->
+    <div class="ovl" data-slot="settings" hidden></div>
+    <div class="dlg" role="dialog" aria-modal="true" aria-labelledby="set-t" data-slot="settings" hidden>
+      <h2 id="set-t">Settings</h2>
+      <div class="body">
+        <nav class="rail" aria-label="Settings sections">
+          <span class="opt"><svg class="i" aria-hidden="true"><use href="#i-theme"/></svg>Appearance</span>
+          <span class="opt"><svg class="i" aria-hidden="true"><use href="#i-house"/></svg>Shell home</span>
+          <span class="opt on" aria-current="true"><svg class="i" aria-hidden="true"><use href="#i-users"/></svg>Profiles</span>
+          <span class="opt"><svg class="i" aria-hidden="true"><use href="#i-gear"/></svg>About</span>
+        </nav>
+        <div class="pane">
+          <h3>Profiles <span class="tag quiet">global</span></h3>
+          <p class="hint">The definitions gentle-pi stores, and the default new chats start on. Nothing here is this chat's.</p>
+          <div class="globalrow"><svg class="i" aria-hidden="true"><use href="#i-check"/></svg><span>Default for new chats: <strong>team</strong></span><span class="tag quiet" style="margin-left:auto">all workspaces</span></div>
+          <div class="def">
+            <div class="dh"><span class="pname">team</span><span class="tag quiet">default</span><span class="dmeta">4 agents · chain 3</span></div>
+            <p class="dline"><span class="mono">orchestrator</span> anthropic/claude-sonnet-4 <span class="lv">high</span> · <span class="mono">explore</span> anthropic/claude-haiku-4-5 <span class="lv">low</span></p>
+            <p class="dline"><span class="mono">verify</span> anthropic/claude-sonnet-4 <span class="lv">medium</span> · <span class="mono">worker</span> openai/gpt-5-codex <span class="lv">high</span></p>
+          </div>
+          <div class="def">
+            <div class="dh"><span class="pname">fast</span><span class="dmeta">2 agents · chain 2</span></div>
+            <p class="dline"><span class="mono">orchestrator</span> anthropic/claude-haiku-4-5 <span class="lv">low</span> · <span class="mono">worker</span> openai/gpt-5-mini <span class="lv">low</span></p>
+          </div>
+          <div class="def">
+            <div class="dh"><span class="pname">solo</span><span class="dmeta">1 agent · chain 1</span></div>
+            <p class="dline"><span class="mono">orchestrator</span> anthropic/claude-opus-4-1 <span class="lv">medium</span></p>
+          </div>
+          <p class="hint" style="margin-top:10px">Pins are not here: a pin belongs to a chat's workspace.</p>
+          <div style="display:flex;gap:8px;align-items:center;margin-top:auto;padding-top:12px">
+            <button class="btn quiet" type="button">Edit in a chat <svg class="i s" aria-hidden="true"><use href="#i-terminal"/></svg></button>
+            <span class="hint" style="margin:0">Editing opens where Use in this chat exists.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<p class="legend" style="padding:0 24px 18px;max-width:1030px">
+  Copy is English and short so Spanish fits: the longest button is <em>Use in this chat</em>, the longest scope line <em>Use in this chat — this chat's own child · other chats keep theirs</em>. Not drawn: creating a brand-new profile (its valid shape is the unverified half of the spec) and <span class="mono">profile_apply_busy</span>.
+</p>
+
+<script>
+(function(){
+  var LEGEND = {
+    default:"State 1: the pill says team, and its tag says default. The popover names the default once and says this chat follows it. Nothing global is edited from here.",
+    session:"State 2: after Use in this chat the pill switches to fast and tags it this chat only; the popover still shows team as the default, so the two scopes never blur.",
+    edit:"State 3: the editor sheet over the thread. Model and thinking per agent, the app's own model picker open on explore, and the composer still live below the sheet.",
+    chain:"State 4: eight steps, the ninth refused by the limit line, and a model repeated from step 3 refused inline. Save and both applies stay out of reach while the chain is invalid.",
+    pin:"State 5: the pin belongs to the workspace, both layers named, Clear writes null. The second block is the same section in a chat with no worktree: unavailable, with the reason.",
+    conflict:"State 6: revision_conflict. Nothing was written, the draft is intact and on screen, and the two answers are Keep my draft or Reload.",
+    rejected:"State 7: the owner refused the draft with invalid_data. Nothing was written; the draft stays, the refused field is marked, and the answer is to fix it.",
+    outcomes:"State 8: the three outcomes with their scopes, and gentle-pi's own confirmation over it. Make default is labelled global and the sentence says open chats keep their routing.",
+    saved:"State 9: saved is not applied, and the editor says exactly that. This chat keeps what it started with until Use in this chat runs here.",
+    child:"State 10: a profile reaches a chat through its own child, so working, ended or a child that never answered leave the write actions unavailable. The chip still opens the read-only sheet and Edit in terminal is offered.",
+    settings:"State 11: Settings > Profiles is the global view only - the default for new chats and the definitions, scope labelled - and it points at a chat for editing."
+  };
+  var STATES = {
+    default:{show:['prof'], chip:{name:'team',tag:'default',tone:'global'}, use:'team', note:'This chat uses the default, so it follows the global choice.'},
+    session:{show:['prof'], chip:{name:'fast',tag:'this chat only',tone:'here'}, use:'fast', note:'This chat only. The other chats you have open keep their own profile.'},
+    edit:{show:['sheet-edit'], chip:{name:'team',tag:'default',tone:'global'}},
+    chain:{show:['sheet-chain'], chip:{name:'team',tag:'default',tone:'global'}},
+    pin:{show:['sheet-pin'], chip:{name:'team',tag:'default',tone:'global'}},
+    conflict:{show:['sheet-conflict'], chip:{name:'team',tag:'default',tone:'global'}},
+    rejected:{show:['sheet-rejected'], chip:{name:'team',tag:'default',tone:'global'}},
+    outcomes:{show:['sheet-outcomes','confirm'], chip:{name:'team',tag:'default',tone:'global'}},
+    saved:{show:['sheet-saved'], chip:{name:'team',tag:'default',tone:'global'}},
+    child:{show:['sheet-child'], chip:{name:'team',tag:'waiting',tone:'quiet',waiting:true}},
+    settings:{show:['settings'], chip:{name:'team',tag:'default',tone:'global'}}
+  };
+  var buttons = [].slice.call(document.querySelectorAll('[data-go]'));
+  var legend = document.getElementById('legend');
+  var pill = document.getElementById('profile-pill');
+  var pillName = document.getElementById('pill-name');
+  var pillTag = document.getElementById('pill-tag');
+  var pillDot = document.getElementById('pill-dot');
+  var popNote = document.getElementById('pop-note');
+  var modelPill = document.getElementById('model-pill');
+  var levelPill = document.getElementById('level-pill');
+  var rows = [].slice.call(document.querySelectorAll('[data-row]'));
+
+  function show(id){
+    var state = STATES[id];
+    if(!state) return;
+    document.querySelectorAll('[data-slot]').forEach(function(el){
+      var slots = el.dataset.slot.split(/\s+/);
+      var any = slots.some(function(slot){ return state.show.indexOf(slot) >= 0; });
+      el.hidden = !any;
+    });
+    // the composer's own send/stop pair, which the child state swaps
+    var stop = document.querySelector('[data-composer="stop"]');
+    var send = document.querySelector('[data-composer="send"]');
+    if(stop && send){ stop.hidden = id !== 'child'; send.hidden = id === 'child'; }
+
+    pillName.textContent = state.chip.name;
+    pillTag.textContent = state.chip.tag;
+    pillTag.className = 'tag ' + (state.chip.tone === 'here' ? 'here' : 'quiet');
+    pillDot.className = 'dot ' + (state.chip.tone === 'here' ? 'here' : (state.chip.tone === 'global' ? 'global' : ''));
+    if(state.chip.waiting){
+      pill.setAttribute('aria-describedby', 'pill-why');
+    } else {
+      pill.removeAttribute('aria-describedby');
+    }
+    pill.setAttribute('aria-expanded', state.show.indexOf('prof') >= 0 ? 'true' : 'false');
+
+    if(state.use){
+      rows.forEach(function(row){
+        var mine = row.dataset.row === state.use;
+        row.setAttribute('aria-selected', mine ? 'true' : 'false');
+        var use = row.querySelector('.use');
+        if(use) use.textContent = mine ? 'in this chat' : '';
+        var note = row.querySelector('.note');
+        if(note && row.dataset.row === 'team') note.textContent = '4 agents · default';
+        if(note && row.dataset.row === 'fast') note.textContent = '2 agents';
+      });
+      popNote.textContent = state.note;
+    }
+    // the model chip is this chat's too: after Use in this chat it reads fast's orchestrator
+    var onFast = state.use === 'fast';
+    if(modelPill) modelPill.textContent = onFast ? 'anthropic/claude-haiku-4-5' : 'anthropic/claude-sonnet-4';
+    if(levelPill) levelPill.textContent = onFast ? 'low' : 'high';
+    buttons.forEach(function(b){ b.setAttribute('aria-pressed', b.dataset.go === id ? 'true' : 'false'); });
+    legend.textContent = LEGEND[id] || '';
+  }
+  buttons.forEach(function(b){ b.addEventListener('click', function(){ show(b.dataset.go); }); });
+  show('default');
+})();
+</script>
+</body>
+</html>

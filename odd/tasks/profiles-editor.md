@@ -174,3 +174,27 @@ es valor de producto".
   PREVIEW: `gentle_design` reads the main checkout's `design/`, which lacks this
   slug, so the artboards were served from the worktree by a static loopback
   server (port 5190) instead of the canvas.
+- L6 (parent, 2026-11-17): the maintainer's ruling S9 (in-chat editor) came from his own
+  comparison with the terminal ("hace parecer como si fuera global"); the parent had
+  framed the editor as a Settings screen and had discarded `apply_profile` mode
+  `session` as useless because it bound to a control child. Both were wrong for the
+  same reason: every chat child already speaks the channel. Spec evidence for the
+  scope: pin writes need a session with a working directory in a resolvable worktree
+  (desktop-rpc.md :263, :381, :947), which a workspace-less control child cannot have.
+  T1 redone: `design/profiles-editor/` 04-chip-and-popover.html (profile chip in the
+  composer row beside the model chip, popover, editor sheet), 05-header-and-sheet.html
+  (chip in the header beside the pencil, a 470 px slide-over), 06-profile-tab.html (a
+  third Profile tab beside Chat | Helpers). 01-03 stay as superseded alternatives
+  (titles marked in design.json). Each shows 11 states, including the three outcomes
+  (Save / Use in this chat / Make default with the channel's confirmation and "chats
+  already open keep their routing"), the no-worktree pin case, revision_conflict,
+  invalid_data, a working/ended chat that cannot apply, and Settings > Profiles as the
+  GLOBAL view. NOT drawn: new-profile creation, profile_apply_busy, unknown_profile,
+  read_only, the empty/orchestrator-only confirmations. Not rendered in a browser by
+  the writer. OPEN, to verify LIVE with a probe the maintainer approves before T3b:
+  (a) whether `apply_profile` mode `session` on a chat's own child re-routes model AND
+  thinking of subagents already running, survives a restart of that chat's child, and
+  leaves other chats untouched; (b) whether `session` mode also answers
+  `confirmation_required`; (c) whether a chat that is mid-turn may apply at all;
+  (d) whether the writer refuses the whole `pins` store or only `repo` without a
+  worktree; (e) `active`: writable by the editor, or only via `apply_profile`.
