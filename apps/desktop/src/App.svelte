@@ -1,13 +1,13 @@
 <script lang="ts">
   // The app shell: the workspace sidebar on the left and the main area on the
   // right. With a foreground chat the main area is that chat's chrome (T6: the
-  // header with its Chat | Helpers tabs, its notices), then the view the tab
-  // names: the thread and its composer (T5b), or the helpers panel (T7b-1).
-  // With none it stays the placeholder that names what to do next. Over all of
-  // it sit the two T7a layers: the fatal launcher bar at the top, which belongs
-  // to no chat, and the blocking extension dialog as a modal. The Helpers view
-  // draws the list or, once a card is selected, that helper's own thread
-  // (T7b-2).
+  // header with its Chat | Helpers | Profile tabs, its notices), then the view the
+  // tab names: the thread and its composer (T5b), the helpers panel (T7b-1), or
+  // this chat's own profile (profiles-editor T2c). With none it stays the
+  // placeholder that names what to do next. Over all of it sit the two T7a layers:
+  // the fatal launcher bar at the top, which belongs to no chat, and the blocking
+  // extension dialog as a modal. The Helpers view draws the list or, once a card is
+  // selected, that helper's own thread (T7b-2).
   import ChatHeader from './chat/Header.svelte'
   import FatalBanner from './chat/FatalBanner.svelte'
   import type { ViewTab } from './chat/tabs'
@@ -17,6 +17,7 @@
   import HelpersPanel from './helpers/HelpersPanel.svelte'
   import Notices from './notices/Notices.svelte'
   import { visibleNotices } from './notices/visible'
+  import ProfilePanel from './profile/ProfilePanel.svelte'
   import Sidebar from './sidebar/Sidebar.svelte'
   import SidebarToggle from './chat/SidebarToggle.svelte'
   import { collapsedOf, overlayOf } from './sidebar/collapse'
@@ -212,6 +213,11 @@
               thread={chat.helperThread}
             />
           {/if}
+        </div>
+        <!-- The chat's own profile (profiles-editor T2c): a view OF this chat, so
+             it is mounted with the others and reads only while it is the open one. -->
+        <div class="view" id="p-profile" role="tabpanel" aria-labelledby="t-profile" hidden={tab !== 'profile'}>
+          <ProfilePanel chatId={chat.chat} view={chat.chatProfile} active={tab === 'profile'} />
         </div>
       </div>
     {/if}

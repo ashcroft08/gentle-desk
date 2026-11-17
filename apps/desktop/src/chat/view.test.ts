@@ -12,6 +12,7 @@ import {
   setHandler,
   viewState,
 } from '../test-support/tauri-mock'
+import { chatProfile } from '../test-support/chat-profile'
 import { helperRow, helpersPanel } from '../test-support/helpers'
 import { helperThread as openThread } from '../test-support/helper-thread'
 import { chatOf, createChatView } from './view'
@@ -52,6 +53,8 @@ describe('chatOf', () => {
       },
       // How full its context is: null until the chat's own child answers.
       contextUsage: { tokens: null, percent: null, window: null },
+      // Nothing read this chat's profile yet (the Profile tab reads it).
+      chatProfile: null,
       fatal: null,
       whatsNew: null,
       shell: { pi_path: null, choice: null, ask: false, launcher_found: true, install: { type: 'Idle' }, restart_needed: false },
@@ -65,6 +68,15 @@ describe('chatOf', () => {
     })
 
     expect(chatOf(state).contextUsage).toEqual({ tokens: 70_000, percent: 35, window: 200_000 })
+  })
+
+  it("carries the profile view the shell holds for the foreground chat", () => {
+    const view = chatProfile({ chat_id: 'chat-1' })
+    const state = viewState({ foreground_chat: 'chat-1', chat_profile: view })
+
+    expect(chatOf(state).chatProfile).toBe(view)
+    // The Profile tab is a view OF a chat: with none open there is none either.
+    expect(chatOf(viewState({ chat_profile: view })).chatProfile).toBeNull()
   })
 
   it('leaves an idle chat unmarked, so its composer is ready', () => {
@@ -115,6 +127,7 @@ describe('chatOf', () => {
       imagesNotice: null,
       modelChip: null,
       contextUsage: null,
+      chatProfile: null,
       fatal: null,
       whatsNew: null,
       shell: { pi_path: null, choice: null, ask: false, launcher_found: true, install: { type: 'Idle' }, restart_needed: false },

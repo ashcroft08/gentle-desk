@@ -1,5 +1,5 @@
-// The header's Chat | Helpers tablist, one test per rule: the ARIA wiring 01b
-// draws (tablist, tab, aria-controls, roving tabindex), the arrow/Home/End walk
+// The header's Chat | Helpers | Profile tablist, one test per rule: the ARIA wiring
+// 01b draws (tablist, tab, aria-controls, roving tabindex), the arrow/Home/End walk
 // that takes the focus with it, and the working badge that only appears while a
 // helper runs.
 
@@ -18,12 +18,13 @@ function draw(over: { tab?: ViewTab; running?: number } = {}): ReturnType<typeof
 }
 
 describe('ViewTabs', () => {
-  it('wires a tablist of two tabs to the two panels it switches', () => {
+  it('wires a tablist of three tabs to the three panels it switches', () => {
     draw()
 
     const list = screen.getByRole('tablist', { name: 'View' })
     const chat = within(list).getByRole('tab', { name: 'Chat' })
     const helpers = within(list).getByRole('tab', { name: 'Helpers' })
+    const profile = within(list).getByRole('tab', { name: 'Profile' })
 
     expect(chat.getAttribute('aria-selected')).toBe('true')
     expect(chat.getAttribute('aria-controls')).toBe('p-chat')
@@ -31,6 +32,11 @@ describe('ViewTabs', () => {
     expect(helpers.getAttribute('aria-selected')).toBe('false')
     expect(helpers.getAttribute('aria-controls')).toBe('p-helpers')
     expect(helpers.id).toBe('t-help')
+    expect(profile.getAttribute('aria-selected')).toBe('false')
+    expect(profile.getAttribute('aria-controls')).toBe('p-profile')
+    expect(profile.id).toBe('t-profile')
+    // The third tab is the LAST one, as the artboard draws it.
+    expect(list.lastElementChild).toBe(profile)
   })
 
   it('keeps one tab in the tab order: the selected one', () => {
@@ -38,6 +44,13 @@ describe('ViewTabs', () => {
 
     expect(screen.getByRole('tab', { name: 'Chat' }).getAttribute('tabindex')).toBe('-1')
     expect(screen.getByRole('tab', { name: 'Helpers' }).getAttribute('tabindex')).toBe('0')
+    expect(screen.getByRole('tab', { name: 'Profile' }).getAttribute('tabindex')).toBe('-1')
+
+    cleanup()
+    draw({ tab: 'profile' })
+
+    expect(screen.getByRole('tab', { name: 'Profile' }).getAttribute('tabindex')).toBe('0')
+    expect(screen.getByRole('tab', { name: 'Chat' }).getAttribute('tabindex')).toBe('-1')
   })
 
   it('walks the tabs with the arrow keys, taking the focus along', async () => {
@@ -55,11 +68,11 @@ describe('ViewTabs', () => {
     const helpers = screen.getByRole('tab', { name: 'Helpers' })
 
     await fireEvent.keyDown(helpers, { key: 'ArrowRight' })
-    expect(onSelect).toHaveBeenLastCalledWith('chat')
+    expect(onSelect).toHaveBeenLastCalledWith('profile')
     await fireEvent.keyDown(helpers, { key: 'Home' })
     expect(onSelect).toHaveBeenLastCalledWith('chat')
     await fireEvent.keyDown(helpers, { key: 'End' })
-    expect(onSelect).toHaveBeenLastCalledWith('helpers')
+    expect(onSelect).toHaveBeenLastCalledWith('profile')
   })
 
   it('leaves every other key to the tab itself', async () => {

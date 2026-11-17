@@ -1,4 +1,4 @@
-// The chat header's own words (0.2.0, S3 and D5): the tablist's name, the two
+// The chat header's own words (0.2.0, S3 and D5): the tablist's name, the three
 // tabs and the working badge live in ONE language-keyed dictionary, beside the
 // rule module that keeps their order, their ids and their walk (`./tabs`). This
 // file pins the two columns; the words a DRAWN tablist shows are pinned in
@@ -13,7 +13,7 @@ import { chatCopy } from './copy'
 /** The English words, exactly as the header drew them before 0.2.0. */
 const ENGLISH = {
   tabsLabel: 'View',
-  tabs: { chat: 'Chat', helpers: 'Helpers' },
+  tabs: { chat: 'Chat', helpers: 'Helpers', profile: 'Profile' },
   // The pencil that renames the chat in place (chat-chrome-helpers S2), and the
   // name its field carries (the row's own field word, reused).
   renameChat: 'Rename chat',
@@ -26,14 +26,14 @@ const ENGLISH = {
 const SPANISH = {
   tabsLabel: 'Vista',
   // "Chat" is the same word in Spanish, so it is shared on purpose.
-  tabs: { chat: 'Chat', helpers: 'Ayudantes' },
+  tabs: { chat: 'Chat', helpers: 'Ayudantes', profile: 'Perfil' },
   renameChat: 'Renombrar el chat',
   chatName: 'Nombre del chat',
   renameReason: 'Ningún chat abierto para renombrar.',
 }
 
 /** The one tab both languages spell the same. */
-const SAME_IN_BOTH = new Set<'chat' | 'helpers'>(['chat'])
+const SAME_IN_BOTH = new Set<'chat' | 'helpers' | 'profile'>(['chat'])
 
 /** The plain words of one language: the badge's name is a line, not a word. */
 function words(language: 'en' | 'es'): unknown {
@@ -65,7 +65,7 @@ describe('the chat copy', () => {
     expect(spanish.chatName).not.toBe(english.chatName)
     expect(spanish.renameReason).not.toBe(english.renameReason)
     expect(Object.keys(spanish.tabs).sort()).toEqual(Object.keys(english.tabs).sort())
-    for (const tab of ['chat', 'helpers'] as const) {
+    for (const tab of ['chat', 'helpers', 'profile'] as const) {
       if (SAME_IN_BOTH.has(tab)) {
         expect(spanish.tabs[tab], tab).toBe(english.tabs[tab])
         continue
