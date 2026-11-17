@@ -85,6 +85,16 @@ fn run_into(command: ChatCommand, executor: &dyn ChatExecutor, ran: &mut Ran) {
             chat,
             expected: true,
         }),
+        // The user's stop of ONE helper, and the child accepted it: that helper
+        // reads `Cancelled` from now on (the `Ended` mark both windows draw),
+        // while the chat keeps running (helper-stop S2).
+        Outcome::Stopped { chat, helper_id } => {
+            ran.inputs.push(Input::HelperStopped { chat, helper_id })
+        }
+        // No stop happened - no child, an inactive host, a timeout, a closed
+        // child or a refusal - and today's behaviour is exactly that: the helper
+        // keeps the mark it had and nothing is said (S7).
+        Outcome::NotStopped { .. } => {}
     }
 }
 

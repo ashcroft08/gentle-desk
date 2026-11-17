@@ -25,14 +25,15 @@ vi.mock('@tauri-apps/api/event', () => import('../test-support/tauri-mock').then
 /** The thread's own words, as it drew them before 0.2.0 (English). */
 const copy = helpersCopy('en')
 
-/** Draws one thread and answers its region plus the Back spy. */
+/** Draws one thread and answers its region plus the Back and Stop spies. */
 function draw(thread: HelperThreadModel = helperThread()) {
   const onBack = vi.fn()
-  const view = render(HelperThread, { props: { thread, onBack } })
+  const onStop = vi.fn()
+  const view = render(HelperThread, { props: { thread, onBack, onStop } })
   const region = screen.getByRole('region', { name: copy.threadLabel })
   /** The scroll box the items live in, which jsdom cannot lay out. */
   const body = region.querySelector('.body') as HTMLElement
-  return { onBack, region, body, rerender: view.rerender }
+  return { onBack, onStop, region, body, rerender: view.rerender }
 }
 
 afterEach(cleanup)
@@ -175,8 +176,9 @@ describe('HelperThread', () => {
 
   it('follows the pushed end while the reader is at the end, and leaves them be when not', async () => {
     const onBack = vi.fn()
+    const onStop = vi.fn()
     const view = render(HelperThread, {
-      props: { thread: helperThread({ items: [saidItem('first')] }), onBack },
+      props: { thread: helperThread({ items: [saidItem('first')] }), onBack, onStop },
     })
     const region = screen.getByRole('region', { name: copy.threadLabel })
     const body = region.querySelector('.body') as HTMLElement
@@ -191,6 +193,7 @@ describe('HelperThread', () => {
     await view.rerender({
       thread: helperThread({ items: [saidItem('first'), saidItem('second')] }),
       onBack,
+      onStop,
     })
     await waitFor(() => expect(body.scrollTop).toBe(100))
 
@@ -203,6 +206,7 @@ describe('HelperThread', () => {
         items: [saidItem('first'), saidItem('second'), saidItem('third')],
       }),
       onBack,
+      onStop,
     })
     await waitFor(() => expect(body.scrollTop).toBe(1100))
   })

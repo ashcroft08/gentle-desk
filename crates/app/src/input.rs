@@ -27,6 +27,13 @@ pub enum Intent {
     SetSessionQuery(String),
     /// Open the thread of the helper with this id.
     SelectHelper(String),
+    /// Stop the RUNNING helper of the foreground chat, named by the id the
+    /// helpers panel drew (helper-stop S2). One helper, never the chat: its child
+    /// keeps running, its other helpers are untouched, and no turn is aborted.
+    /// A helper that is not running cannot be stopped and an id that names no
+    /// task changes nothing - the rule `SelectHelper` already follows - so the
+    /// intent answers one command for the chat's own child or nothing at all.
+    StopHelper(String),
     /// Back from a helper's thread to the helpers list.
     CloseHelper,
     /// Ask the child for the models it offers (the chip's dropdown).
@@ -140,6 +147,16 @@ pub enum Input {
     ChatOpened {
         chat: ChatId,
     },
+    /// One helper of that chat was STOPPED at the user's ask: its child accepted
+    /// the desktop channel's `cancel_subagent` (helper-stop S2). That helper reads
+    /// `Cancelled` - the `Ended` mark both windows draw - from now on, while the
+    /// chat keeps running and its other helpers are untouched. A stop that did
+    /// not happen sends nothing at all: no child, an inactive channel, a timeout
+    /// or a refusal is silent degradation, never a notice (S7).
+    HelperStopped {
+        chat: ChatId,
+        helper_id: String,
+    },
 }
 
 /// A side effect for the shell to run.
@@ -177,6 +194,12 @@ pub enum ChatCommand {
     /// chat with no child (never opened, already gone) is simply closed, so the
     /// command is safe to run twice.
     CloseProcess { chat: ChatId },
+    /// Ask that chat's OWN child to cancel one delegated helper (helper-stop
+    /// S2, S6): the request travels the desktop channel as `cancel_subagent`, so
+    /// it can only ever reach the chat that named the helper, and the chat itself
+    /// keeps running. A stop that cannot be made is silent: the helper keeps the
+    /// mark it had and nothing is said (S7).
+    StopHelper { chat: ChatId, helper_id: String },
 }
 
 impl ChatCommand {
@@ -186,6 +209,7 @@ impl ChatCommand {
             Self::OpenProcess { chat } | Self::Send { chat, .. } | Self::CloseProcess { chat } => {
                 chat
             }
+            Self::StopHelper { chat, .. } => chat,
         }
     }
 }

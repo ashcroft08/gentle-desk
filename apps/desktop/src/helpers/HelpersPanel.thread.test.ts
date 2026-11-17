@@ -13,7 +13,7 @@ import { helperRow, helpersPanel } from '../test-support/helpers'
 import { helperThread } from '../test-support/helper-thread'
 import { handlerArgs, resetTauriMock, setHandler, viewState } from '../test-support/tauri-mock'
 import HelpersPanel from './HelpersPanel.svelte'
-import { helpersCopy } from './copy'
+import { helpersCopy, threadHeading } from './copy'
 
 vi.mock('@tauri-apps/api/core', () => import('../test-support/tauri-mock').then((m) => m.coreModule()))
 vi.mock('@tauri-apps/api/event', () => import('../test-support/tauri-mock').then((m) => m.eventModule()))
@@ -167,5 +167,37 @@ describe('the helpers panel two columns', () => {
 
     expect(document.activeElement).toBe(options()[0])
     expect(options()[0].getAttribute('tabindex')).toBe('0')
+  })
+})
+
+describe('the thread bar\u2019s stop square', () => {
+  it('sends StopHelper for the helper whose thread is open, and nothing else', async () => {
+    draw('h1', helperThread({ id: 'h1', status: 'Running' }))
+
+    await fireEvent.click(
+      screen.getByRole('button', {
+        name: copy.stopNamed(threadHeading('explore', 'Inventory of sidebar modules')),
+      }),
+    )
+
+    expect(intents()).toEqual([{ type: 'StopHelper', data: { helper_id: 'h1' } }])
+  })
+
+  it('names the helper of the open thread, so the panel never stops another one', async () => {
+    const view = draw('h1', helperThread({ id: 'h1', status: 'Running' }))
+
+    // The other card is selected: the square that is drawn belongs to h2.
+    await view.rerender({
+      helpers: helpersPanel(ROWS),
+      selected: 'h2',
+      thread: helperThread({ id: 'h2', agent: 'verify', title: 'Contract tests for the bridge' }),
+    })
+    await fireEvent.click(
+      screen.getByRole('button', {
+        name: copy.stopNamed(threadHeading('verify', 'Contract tests for the bridge')),
+      }),
+    )
+
+    expect(intents()).toEqual([{ type: 'StopHelper', data: { helper_id: 'h2' } }])
   })
 })

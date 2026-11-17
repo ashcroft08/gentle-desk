@@ -8,6 +8,7 @@ use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
 
+use gentle_core::rpc::helper_stop::{stop_helper, StopOutcome};
 use gentle_core::rpc::{
     decode_line, ChannelReply, DesktopChannel, DesktopClient, DesktopOutcome, DesktopRequest,
     NoAnswer,
@@ -310,4 +311,140 @@ fn a_client_reads_the_documented_answer_from_the_real_host() {
         asker.join().expect("the asker ends"),
         DesktopOutcome::Data { request_id, .. } if request_id == "desktop-1"
     ));
+}
+
+// ---------------------------------------------------------------------------
+// Stopping one delegated helper (helper-stop T3): the same channel, one method
+// deeper. The child is the fake one above; nothing here starts a process.
+// ---------------------------------------------------------------------------
+
+/// The contract this child reports: the subagents slice advertised.
+const CAPABILITIES_ANSWER: &str = concat!(
+    r#"{"schema":"gentle-shell.desktop-rpc/v1","kind":"response","requestId":"desktop-1","#,
+    r#""ok":true,"data":{"schema":"gentle-shell.desktop-rpc/v1","command":"gentle:desktop","#,
+    r#""widget":"gentle-desktop-rpc","methods":["capabilities","list_subagents","#,
+    r#""cancel_subagent"],"events":["agents_update"]}}"#,
+);
+
+/// The answer the channel documents for a cancel it accepted.
+const CANCEL_ANSWER: &str = concat!(
+    r#"{"schema":"gentle-shell.desktop-rpc/v1","kind":"response","requestId":"desktop-2","#,
+    r#""ok":true,"data":{"agent":{"id":"h1","agent":"worker","status":"cancelled"}}}"#,
+);
+
+/// The typed refusal the channel documents for an id it cannot find.
+const NOT_FOUND_ANSWER: &str = concat!(
+    r#"{"schema":"gentle-shell.desktop-rpc/v1","kind":"response","requestId":"desktop-2","#,
+    r#""ok":false,"error":{"code":"not_found","message":"No subagent h1 in this session"}}"#,
+);
+
+/// The contract of a child that has no subagents slice.
+const CAPABILITIES_WITHOUT_CANCEL: &str = concat!(
+    r#"{"schema":"gentle-shell.desktop-rpc/v1","kind":"response","requestId":"desktop-1","#,
+    r#""ok":true,"data":{"schema":"gentle-shell.desktop-rpc/v1","methods":["capabilities"],"#,
+    r#""events":[]}}"#,
+);
+
+/// Waits until the child was written `count` commands, so a frame pushed next is
+/// never faster than the registration that must catch it.
+fn wait_for_commands(child: &FakeChild, count: usize) {
+    let deadline = Instant::now() + WAIT;
+    while child.commands().len() < count {
+        assert!(
+            Instant::now() < deadline,
+            "the child was only written {} commands",
+            child.commands().len()
+        );
+        thread::sleep(Duration::from_millis(1));
+    }
+}
+
+#[test]
+fn a_helper_stop_writes_the_documented_cancel_subagent_request() {
+    let (spawner, host) = live(true);
+    let child = spawner.child(&chat());
+    let mut client = DesktopClient::new(host.desktop_channel(chat()).with_deadline(WAIT));
+    let stopper = thread::spawn(move || stop_helper(&mut client, "h1"));
+
+    // The client's first call of the session: capabilities.
+    wait_for_commands(&child, 1);
+    child.push(frame(CAPABILITIES_ANSWER));
+    // Then the cancel itself, with the exact body the contract accepts.
+    wait_for_commands(&child, 2);
+    let asked = child.commands();
+    let message = asked[1].prompt_text().expect("a prompt");
+    let envelope = message
+        .strip_prefix("/gentle:desktop ")
+        .expect("the desktop command prefix");
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(envelope).expect("one JSON envelope"),
+        json!({
+            "schema": "gentle-shell.desktop-rpc/v1",
+            "requestId": "desktop-2",
+            "method": "cancel_subagent",
+            "params": { "id": "h1" },
+        }),
+        "the request body is exactly the id, and never another key"
+    );
+
+    child.push(frame(CANCEL_ANSWER));
+
+    assert_eq!(
+        stopper.join().expect("the stopper ends"),
+        StopOutcome::Stopped
+    );
+}
+
+#[test]
+fn a_not_found_answer_is_a_typed_refusal_and_not_a_stop() {
+    let (spawner, host) = live(true);
+    let child = spawner.child(&chat());
+    let mut client = DesktopClient::new(host.desktop_channel(chat()).with_deadline(WAIT));
+    let stopper = thread::spawn(move || stop_helper(&mut client, "h1"));
+
+    wait_for_commands(&child, 1);
+    child.push(frame(CAPABILITIES_ANSWER));
+    wait_for_commands(&child, 2);
+    child.push(frame(NOT_FOUND_ANSWER));
+
+    match stopper.join().expect("the stopper ends") {
+        StopOutcome::Rejected(error) => assert_eq!(error.code, "not_found"),
+        other => panic!("expected the typed refusal, got {other:?}"),
+    }
+}
+
+#[test]
+fn a_child_without_the_method_is_never_written_the_cancel() {
+    let (spawner, host) = live(true);
+    let child = spawner.child(&chat());
+    let mut client = DesktopClient::new(host.desktop_channel(chat()).with_deadline(WAIT));
+    let stopper = thread::spawn(move || stop_helper(&mut client, "h1"));
+
+    wait_for_commands(&child, 1);
+    child.push(frame(CAPABILITIES_WITHOUT_CANCEL));
+
+    assert_eq!(
+        stopper.join().expect("the stopper ends"),
+        StopOutcome::Unsupported
+    );
+    let asked = child.commands();
+    assert_eq!(
+        asked.len(),
+        1,
+        "nothing past the capabilities ask was written to the child"
+    );
+}
+
+#[test]
+fn a_stop_for_a_chat_with_no_child_degrades_silently() {
+    // Not opened: the chat has no child, so no request is written and the caller
+    // gets today's behaviour (no stop possible), never an error the user sees.
+    let spawner = Arc::new(FakeSpawner::new().with_interactive());
+    let host = host_with(&spawner);
+    let mut client = DesktopClient::new(host.desktop_channel(chat()).with_deadline(WAIT));
+
+    assert_eq!(
+        stop_helper(&mut client, "h1"),
+        StopOutcome::NoAnswer(NoAnswer::NotConnected)
+    );
 }

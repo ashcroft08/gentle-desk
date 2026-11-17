@@ -182,7 +182,9 @@ impl ChatExecutor for RuntimeExecutor {
         }
         let folder = match &command {
             ChatCommand::OpenProcess { chat } => self.folders.take(chat),
-            ChatCommand::Send { .. } | ChatCommand::CloseProcess { .. } => None,
+            ChatCommand::Send { .. }
+            | ChatCommand::CloseProcess { .. }
+            | ChatCommand::StopHelper { .. } => None,
         };
         // The chat's attached images are merged in HERE, beside the folder and
         // never through `crates/app`: `ChatCommand` carries no image, and the
@@ -196,6 +198,10 @@ impl ChatExecutor for RuntimeExecutor {
                 // A run with no host has no children, so the chat is already
                 // closed: the slice needs no failure line for it.
                 ChatCommand::CloseProcess { chat } => Outcome::Closed { chat },
+                // And no child is no stop: today's behaviour, silently (S7).
+                ChatCommand::StopHelper { chat, helper_id } => {
+                    Outcome::NotStopped { chat, helper_id }
+                }
             },
         }
     }
@@ -240,6 +246,9 @@ fn refuse(language: Language, command: ChatCommand) -> Outcome {
         // The app is going away, and the close flow stops every child: this is
         // the one command that asks for what is already happening.
         ChatCommand::CloseProcess { chat } => Outcome::Closed { chat },
+        // A stop that arrives while the window closes changes nothing: the
+        // helpers go with their children, and nothing is said (S7).
+        ChatCommand::StopHelper { chat, helper_id } => Outcome::NotStopped { chat, helper_id },
     }
 }
 

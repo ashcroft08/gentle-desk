@@ -17,11 +17,14 @@ use gentle_backend::chat_host::{ChatHost, TaggedEvent};
 
 use crate::chat_keys::ChatKeys;
 
+use self::stop::Stoppers;
+
 mod events;
 mod execute;
 mod host;
 mod open;
 mod rekey;
+mod stop;
 
 pub use events::Converted;
 pub use execute::Outcome;
@@ -32,6 +35,10 @@ pub use rekey::session_file_of;
 pub struct ChatRuntime {
     host: Arc<ChatHost>,
     keys: Mutex<ChatKeys>,
+    /// The desktop stop clients, one per chat: each holds that chat's own
+    /// `requestId` counter and the capabilities its child reported (helper-stop
+    /// S8). Empty until the first helper is stopped.
+    pub(super) stops: Stoppers,
 }
 
 impl ChatRuntime {
@@ -42,6 +49,7 @@ impl ChatRuntime {
         let runtime = Self {
             host: Arc::new(host),
             keys: Mutex::new(ChatKeys::default()),
+            stops: Mutex::new(Default::default()),
         };
         (runtime, events)
     }

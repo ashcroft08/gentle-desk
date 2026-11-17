@@ -227,6 +227,14 @@ pub enum UiIntent {
     /// Back from a helper's thread to the helpers list: the same intent the
     /// iced panel's Back sends (`crates/ui/src/app.rs`).
     CloseHelper,
+    /// Stop the RUNNING helper whose thread is open (helper-stop S2): one helper,
+    /// never the chat. The id is the one [`HelperRowView::id`] carried, and the
+    /// reducer only stops a helper of the foreground chat that is running and is
+    /// that chat's own: any other id changes nothing and asks nothing of the
+    /// child.
+    StopHelper {
+        helper_id: String,
+    },
     /// Ask the child what models it offers: what the chip's dropdown shows
     /// (0.1.11). The answer travels back on
     /// [`ViewState::model_chip`].

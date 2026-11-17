@@ -5,9 +5,14 @@
   //
   // Two parts of this view are decisions the design does not draw: the Follow
   // live toggle and the Show tool details toggle are NOT here (iced always
-  // follows and always shows tools, decided in T7b-1), and there is no Stop:
-  // the only control is the drawn Back. So the thread sticks to the end while
-  // the reader is at the end, and shows every tool call, with no switch.
+  // follows and always shows tools, decided in T7b-1), so the thread sticks to
+  // the end while the reader is at the end and shows every tool call, with no
+  // switch.
+  //
+  // The bar's other control IS the design's (helper-stop T1/T4): the red square
+  // 01b draws at the right of the bar. It stops THIS helper and nothing else -
+  // the chat keeps running - so it is enabled only while the helper is running
+  // and stays a real, disabled button afterwards, with the tip saying so.
   //
   // Since T3 the thread is drawn BESIDE the helper list, never in its place, so
   // it takes no focus when it appears: the list it sits next to keeps the
@@ -24,11 +29,14 @@
   let {
     thread,
     onBack,
+    onStop,
   }: {
     /** The selected helper's thread, as Rust pushed it. */
     thread: HelperThread
     /** Back to the helpers list: the panel sends CloseHelper. */
     onBack: () => void
+    /** Stop this helper: the panel sends StopHelper with the thread's own id. */
+    onStop: (id: string) => void
   } = $props()
 
   /** The one markdown cache of this thread, keyed by the item's place. */
@@ -38,6 +46,13 @@
   const copy = $derived(helpersCopy(language.current))
 
   const heading = $derived(threadHeading(thread.agent, thread.title))
+
+  /**
+   * Whether this helper can be stopped right now. Only a RUNNING helper can: the
+   * reducer refuses every other mark, so the square says the same thing the
+   * state does instead of asking a child to cancel something that is not working.
+   */
+  const running = $derived(thread.status === 'Running')
 
   /** Every item with the html only a `Said` one draws. */
   const rows = $derived.by(() =>
@@ -88,6 +103,16 @@
     </button>
     <h2 class="name">{heading}</h2>
     <Mark kind={markOfStatus(thread.status)} label={thread.status_label} />
+    <button
+      class="ic danger tip-r stop"
+      type="button"
+      data-tip={running ? copy.stop : copy.stopped}
+      aria-label={running ? copy.stopNamed(heading) : copy.alreadyStopped(heading)}
+      disabled={!running}
+      onclick={() => onStop(thread.id)}
+    >
+      <Icon name="stop" size={14} />
+    </button>
   </div>
   <p class="prompt">{thread.prompt}</p>
   <div class="body" bind:this={box} onscroll={onScroll}>
@@ -138,6 +163,37 @@
     background: var(--surface2);
     color: var(--text);
     box-shadow: inset 0 0 0 1px var(--border);
+  }
+
+  /* The bar's stop square (01b's `.ht-bar .stop`): 32x32, the danger colour,
+     and the hover IS the fill - the same rule the composer's Stop follows. A
+     helper that is not running keeps the button (and its place in the bar) and
+     goes faint instead. Nothing here animates, so there is no motion to reduce. */
+  .stop {
+    position: relative;
+    flex: none;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border-radius: 8px;
+    color: var(--danger);
+  }
+
+  .stop:hover:not(:disabled),
+  .stop:focus-visible:not(:disabled) {
+    background: var(--danger);
+    color: var(--bg);
+    box-shadow: none;
+  }
+
+  .stop:disabled {
+    color: var(--faint);
+    cursor: default;
+  }
+
+  .stop:disabled:hover {
+    background: transparent;
+    box-shadow: none;
   }
 
   .name {

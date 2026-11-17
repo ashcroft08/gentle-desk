@@ -37,6 +37,8 @@ const ENGLISH = {
   noHelpers: 'No helpers for this chat',
   back: 'Back to helpers',
   noActivity: 'No activity yet',
+  stop: 'Stop',
+  stopped: 'Stopped',
 }
 
 /** The Spanish dictionary: neutral Spanish, no voseo and no regionalisms. */
@@ -46,10 +48,20 @@ const SPANISH = {
   noHelpers: 'Este chat no tiene ayudantes',
   back: 'Volver a los ayudantes',
   noActivity: 'Todavía no hay actividad',
+  stop: 'Detener',
+  stopped: 'Detenido',
 }
 
 /** The words of one language, as the panel and the card draw them. */
-const WORDS = ['listLabel', 'threadLabel', 'noHelpers', 'back', 'noActivity'] as const
+const WORDS = [
+  'listLabel',
+  'threadLabel',
+  'noHelpers',
+  'back',
+  'noActivity',
+  'stop',
+  'stopped',
+] as const
 
 // The testing library only cleans up on its own with vitest globals on.
 afterEach(cleanup)
@@ -116,6 +128,24 @@ describe('the thread words', () => {
     expect(spanish.toolStatus('Failed')).toBe('falló')
     expect(spanish.toolStatus('Ok')).toBe('correcto')
   })
+
+  it('names the stop control for the helper it would stop', () => {
+    expect(english.stopNamed('explore - Inventory of sidebar modules')).toBe(
+      'Stop explore - Inventory of sidebar modules',
+    )
+    expect(english.alreadyStopped('explore - Inventory of sidebar modules')).toBe(
+      'explore - Inventory of sidebar modules already stopped',
+    )
+  })
+
+  it('names the stop control in Spanish, for the helper it would stop', () => {
+    expect(spanish.stopNamed('explore - Inventory of sidebar modules')).toBe(
+      'Detener explore - Inventory of sidebar modules',
+    )
+    expect(spanish.alreadyStopped('explore - Inventory of sidebar modules')).toBe(
+      'explore - Inventory of sidebar modules ya está detenido',
+    )
+  })
 })
 
 describe('the helpers copy', () => {
@@ -142,6 +172,8 @@ describe('the helpers copy', () => {
     for (const status of ['Running', 'Failed', 'Ok'] as const) {
       expect(spanish.toolStatus(status), status).not.toBe(english.toolStatus(status))
     }
+    expect(spanish.stopNamed('h')).not.toBe(english.stopNamed('h'))
+    expect(spanish.alreadyStopped('h')).not.toBe(english.alreadyStopped('h'))
   })
 })
 

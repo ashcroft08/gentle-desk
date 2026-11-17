@@ -27,7 +27,7 @@ pub use activity::ChatActivity;
 pub use id::ChatId;
 pub use store::Chats;
 
-pub(crate) use inputs::{closed, failed, push_death_notice, rekeyed, stderr};
+pub(crate) use inputs::{closed, failed, helper_stopped, push_death_notice, rekeyed, stderr};
 pub(crate) use intents::apply as apply_intent;
 
 use gentle_core::i18n::{messages, Language};
