@@ -8,7 +8,7 @@ use std::sync::mpsc::{channel, Sender};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use gentle_app::{ChatId, Input, Intent};
+use gentle_app::{ChatCommand, ChatId, Input, Intent};
 use gentle_core::rpc::{AssistantMessageEvent, RpcEvent, RpcMessage};
 use gentle_desk_lib::bridge::AppStateHolder;
 use gentle_desk_lib::contract::ViewState;
@@ -20,14 +20,21 @@ const STOP_LIMIT: Duration = Duration::from_secs(5);
 
 const SESSION_PATH: &str = "/sessions/a.jsonl";
 
-/// A pump fed by hand, with the slices it pushed recorded in order.
+/// A pump fed by hand, with the slices it pushed recorded in order and the
+/// per-chat commands it handed to the holder's sink recorded too.
 pub struct Pump {
     source: Sender<Converted>,
     pushed: Arc<Mutex<Vec<ViewState>>>,
+    delivered: Arc<Mutex<Vec<ChatCommand>>>,
     thread: std::thread::JoinHandle<()>,
 }
 
 impl Pump {
+    /// Starts the pump over `holder` and arms the chat-commands sink to record.
+    ///
+    /// A real run's sink starts one `chat-command` worker per command; here the
+    /// only thing a test can observe is what was handed over, so nothing is
+    /// spawned, no child exists and no pipe is written.
     pub fn start(holder: &Arc<AppStateHolder>) -> Self {
         let (source, receiver) = channel();
         let pushed = Arc::new(Mutex::new(Vec::new()));
@@ -35,11 +42,20 @@ impl Pump {
         let push: Push = Box::new(move |view| {
             recorded.lock().expect("pushed mutex").push(view);
         });
+        let delivered = Arc::new(Mutex::new(Vec::new()));
+        let recorded_commands = Arc::clone(&delivered);
+        holder.arm_chat_commands(Arc::new(move |commands| {
+            recorded_commands
+                .lock()
+                .expect("delivered mutex")
+                .extend(commands);
+        }));
         let thread =
             spawn_pump(receiver, Arc::clone(holder), push).expect("the pump thread starts");
         Self {
             source,
             pushed,
+            delivered,
             thread,
         }
     }
@@ -50,17 +66,28 @@ impl Pump {
 
     /// Closes the source, which must end the thread, and answers what it pushed.
     pub fn finish(self) -> Vec<ViewState> {
+        self.finish_recording().0
+    }
+
+    /// [`Self::finish`], and the per-chat commands the armed sink was handed on
+    /// the way (chat-event-commands, S5).
+    pub fn finish_recording(self) -> (Vec<ViewState>, Vec<ChatCommand>) {
         let Pump {
             source,
             pushed,
+            delivered,
             thread,
         } = self;
         drop(source);
         join_within(thread);
-        Arc::try_unwrap(pushed)
+        let pushed = Arc::try_unwrap(pushed)
             .expect("the pump thread ended, so it holds no record")
             .into_inner()
-            .expect("pushed mutex")
+            .expect("pushed mutex");
+        // Drained rather than unwrapped: the holder keeps the recording sink
+        // armed, so it still holds a handle to the record after the pump ends.
+        let delivered = std::mem::take(&mut *delivered.lock().expect("delivered mutex"));
+        (pushed, delivered)
     }
 }
 
@@ -127,6 +154,22 @@ pub fn errored_turn(chat: &ChatId, text: &str, error: &str) -> Vec<Converted> {
         serde_json::json!({ "stopReason": "error", "errorMessage": error }),
     ));
     turn
+}
+
+/// The end of a turn as the child reports it: `agent_settled`, the event the
+/// reducer folds by asking that chat's child for its context reading.
+pub fn settled(chat: &ChatId) -> Converted {
+    Converted::Input(settled_input(chat))
+}
+
+/// The same settled turn as the reducer input, for a test that folds it through
+/// an entry point of its own.
+pub fn settled_input(chat: &ChatId) -> Input {
+    Input::ChatEventAt {
+        chat: chat.clone(),
+        event: RpcEvent::AgentSettled,
+        now_ms: 10,
+    }
 }
 
 /// One event of `chat`'s child, as the translating thread reports it.
