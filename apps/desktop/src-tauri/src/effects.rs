@@ -98,6 +98,10 @@ fn run_into(command: ChatCommand, executor: &dyn ChatExecutor, ran: &mut Ran) {
         // child or a refusal - and today's behaviour is exactly that: the helper
         // keeps the mark it had and nothing is said (S7).
         Outcome::NotStopped { .. } => {}
+        // A chat's profile configuration arrived (profiles-editor T2b): the
+        // shell's own view takes it, not the reducer, so nothing is folded here.
+        // A read that failed leaves the pane exactly as it was drawn (S6).
+        Outcome::ChatProfile { .. } => {}
     }
 }
 

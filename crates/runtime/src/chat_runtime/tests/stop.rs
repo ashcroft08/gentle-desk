@@ -1,5 +1,7 @@
-//! Stopping one helper (helper-stop S8): one stop client per chat, and a fresh
-//! one when the chat is (re)opened.
+//! Stopping one helper (helper-stop S8): one desktop client per chat, and a
+//! fresh one when the chat is (re)opened. This is the client the chat's profile
+//! read shares (profiles-editor T2b), so what it pins is one counter per chat, not
+//! one client per feature.
 //!
 //! The client is what carries the chat's `requestId` counter and the
 //! capabilities its child reported, so these two facts - the same client for one
@@ -15,20 +17,26 @@ use gentle_app::ChatId;
 use super::{open, runtime};
 
 #[test]
-fn one_chat_keeps_one_stop_client_and_another_chat_gets_its_own() {
+fn one_chat_keeps_one_desktop_client_and_another_chat_gets_its_own() {
     let (runtime, _spawner) = runtime();
     let one = ChatId::fresh();
     let other = ChatId::fresh();
     runtime.execute(open(&one));
     runtime.execute(open(&other));
 
-    let first = runtime.stopper(&one).expect("an open chat has a key");
-    let again = runtime.stopper(&one).expect("the same chat is still open");
-    let theirs = runtime.stopper(&other).expect("the other chat is open too");
+    let first = runtime
+        .desktop_client(&one)
+        .expect("an open chat has a key");
+    let again = runtime
+        .desktop_client(&one)
+        .expect("the same chat is still open");
+    let theirs = runtime
+        .desktop_client(&other)
+        .expect("the other chat is open too");
 
     assert!(
         Arc::ptr_eq(&first, &again),
-        "one client per chat: a second stop of the same chat is numbered by the same counter"
+        "one client per chat: a stop and a profile read of the same chat share one counter"
     );
     assert!(
         !Arc::ptr_eq(&first, &theirs),
@@ -37,17 +45,19 @@ fn one_chat_keeps_one_stop_client_and_another_chat_gets_its_own() {
 }
 
 #[test]
-fn reopening_a_live_chat_keeps_its_stop_client() {
+fn reopening_a_live_chat_keeps_its_desktop_client() {
     let (runtime, spawner) = runtime();
     let chat = ChatId::fresh();
     runtime.execute(open(&chat));
-    let before = runtime.stopper(&chat).expect("the chat was opened");
+    let before = runtime.desktop_client(&chat).expect("the chat was opened");
 
     // Clicking an already-open chat only focuses it: the same child answers, so
     // the client's counter and the capabilities it cached still belong to it.
     // Dropping them would restart the requestId at desktop-1 (S8).
     runtime.execute(open(&chat));
-    let after = runtime.stopper(&chat).expect("the chat is still open");
+    let after = runtime
+        .desktop_client(&chat)
+        .expect("the chat is still open");
 
     assert_eq!(spawner.started().len(), 1, "one child, not two");
     assert!(
@@ -57,17 +67,19 @@ fn reopening_a_live_chat_keeps_its_stop_client() {
 }
 
 #[test]
-fn a_new_child_gets_a_fresh_stop_client() {
+fn a_new_child_gets_a_fresh_desktop_client() {
     let (runtime, spawner) = runtime();
     let chat = ChatId::fresh();
     runtime.execute(open(&chat));
-    let before = runtime.stopper(&chat).expect("the chat was opened");
+    let before = runtime.desktop_client(&chat).expect("the chat was opened");
 
     // Close chat stops the child; opening the chat again starts a NEW one, and
     // capabilities belong to the child that reported them.
     runtime.execute(super::closing(&chat));
     runtime.execute(open(&chat));
-    let after = runtime.stopper(&chat).expect("the chat is open again");
+    let after = runtime
+        .desktop_client(&chat)
+        .expect("the chat is open again");
 
     assert_eq!(spawner.started().len(), 2, "the reopen started a new child");
     assert!(
@@ -77,11 +89,11 @@ fn a_new_child_gets_a_fresh_stop_client() {
 }
 
 #[test]
-fn a_chat_the_host_never_opened_has_no_stop_client() {
+fn a_chat_the_host_never_opened_has_no_desktop_client() {
     let (runtime, _spawner) = runtime();
 
     assert!(
-        runtime.stopper(&ChatId::fresh()).is_none(),
+        runtime.desktop_client(&ChatId::fresh()).is_none(),
         "no child, no channel: the stop degrades to nothing (S7)"
     );
 }

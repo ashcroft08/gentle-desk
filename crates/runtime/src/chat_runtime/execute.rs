@@ -7,11 +7,14 @@ use gentle_backend::chat_host::Opened;
 use gentle_core::i18n::{messages, Language};
 use gentle_core::rpc::RpcCommand;
 
-use super::ChatRuntime;
+use super::{ChatConfigRead, ChatRuntime};
 
 /// What running a [`ChatCommand`] came to. Plain data: a failure is a message
 /// for the shell to show, never a panic and never fatal for the whole app.
-#[derive(Debug, Clone, PartialEq, Eq)]
+///
+/// Not `Eq`: a read of a chat's profile carries the owner's own answer for each
+/// store, which is compared but not totally ordered.
+#[derive(Debug, Clone, PartialEq)]
 pub enum Outcome {
     /// The chat's child is up (started now, or already was).
     Opened { chat: ChatId, how: Opened },
@@ -40,6 +43,18 @@ pub enum Outcome {
     /// The host's working mark was set for that chat, or a chat the host does
     /// not know was named (nothing to mark, nothing to answer).
     Working { chat: ChatId, working: bool },
+    /// One chat's profile configuration, read through that chat's own child
+    /// (profiles-editor T2b, S9): the three stores each carry their own answer,
+    /// so one that failed never hides another. A read that could not be made is
+    /// what [`StoreRead::Unread`](super::StoreRead::Unread) and
+    /// [`StoreRead::Skipped`](super::StoreRead::Skipped) say, and today's
+    /// read-only pane stays as it was (S6).
+    ChatProfile {
+        chat: ChatId,
+        /// Boxed: the three typed stores make this variant far larger than the
+        /// rest of the enum, and every `Outcome` pays for its largest variant.
+        read: Box<ChatConfigRead>,
+    },
 }
 
 impl ChatRuntime {
@@ -68,12 +83,13 @@ impl ChatRuntime {
         match command {
             ChatCommand::OpenProcess { chat } => {
                 let outcome = self.open(language, chat.clone(), folder);
-                // The capabilities a stop caches (and its requestId counter)
-                // belong to the child that reported them. Focusing a chat whose
-                // child is already up, or on its way, reaches that SAME child, so
-                // its client stays; any other result (a child started now, one
-                // discarded, a failed start) leaves a different child or none,
-                // so the next stop asks again (helper-stop S8).
+                // The capabilities the chat's desktop client caches (and its
+                // requestId counter) belong to the child that reported them.
+                // Focusing a chat whose child is already up, or on its way,
+                // reaches that SAME child, so its client stays; any other
+                // result (a child started now, one discarded, a failed start)
+                // leaves a different child or none, so the next request asks
+                // again (helper-stop S8, profiles-editor S8).
                 let same_child = matches!(
                     outcome,
                     Outcome::Opened {
@@ -82,7 +98,7 @@ impl ChatRuntime {
                     }
                 );
                 if !same_child {
-                    self.forget_stopper(&chat);
+                    self.forget_desktop_client(&chat);
                 }
                 outcome
             }
@@ -102,6 +118,14 @@ impl ChatRuntime {
                 } else {
                     Outcome::NotStopped { chat, helper_id }
                 }
+            }
+            // The chat's own profile configuration, over the desktop channel
+            // into that chat's own child (profiles-editor T2b, S9). Blocking on
+            // the channel's deadline - once, because the three reads are
+            // sequential - so the caller runs it off the window's thread.
+            ChatCommand::ReadChatProfile { chat } => {
+                let read = Box::new(self.read_chat_profile(&chat));
+                Outcome::ChatProfile { chat, read }
             }
             // The host owns the mark's effect (protection, reaping); the app
             // owns the mark itself, so this carries no answer to fold back.
