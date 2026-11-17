@@ -16,6 +16,8 @@ const ENGLISH = {
   messageLabel: 'Message',
   messagePlaceholder: 'Tell Gentle what you need...',
   keysHint: 'Enter to send \u00b7 Shift+Enter for a new line \u00b7 Esc to stop',
+  keysHintWorking:
+    'Enter is off while Gentle works \u00b7 Shift+Enter for a new line \u00b7 Esc to stop',
   send: 'Send',
   stop: 'Stop',
   openingReason: 'Send is available once the chat is ready.',
@@ -38,6 +40,8 @@ const SPANISH = {
   messageLabel: 'Mensaje',
   messagePlaceholder: 'Cuéntale a Gentle lo que necesitas...',
   keysHint: 'Enter para enviar \u00b7 Shift+Enter para una línea nueva \u00b7 Esc para detener',
+  keysHintWorking:
+    'Enter no envía mientras Gentle trabaja \u00b7 Shift+Enter para una línea nueva \u00b7 Esc para detener',
   send: 'Enviar',
   stop: 'Detener',
   openingReason: 'Enviar estará disponible cuando el chat esté listo.',

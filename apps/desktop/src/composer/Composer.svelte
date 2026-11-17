@@ -70,8 +70,15 @@
   const rule = $derived(composerStateOf(mark, copy))
   const text = $derived(chat === null ? '' : (drafts[chat] ?? ''))
 
-  /** Whether a send would do anything: a chat, an unlocked composer, real text. */
-  const sendable = $derived(chat !== null && !rule.disabled && text.trim() !== '')
+  /**
+   * Whether a send would do anything: a chat, a box that is actually Send (not
+   * Stop), an unlocked composer, real text. A working or queued chat shows Stop
+   * because it takes one turn at a time, so an Enter there sends nothing and the
+   * draft stays where it is for the turn after (the reducer would drop it).
+   */
+  const sendable = $derived(
+    chat !== null && rule.mode === 'send' && !rule.disabled && text.trim() !== '',
+  )
 
   // Opening a chat, or starting one, puts the cursor where the user will type.
   // It runs only when the chat changes, never on every keystroke.
@@ -209,9 +216,10 @@
   {/if}
   <!-- The chip shares the keys-hint line (S7): the hints take the left, the
        context chip sits beside the model pills (0.1.12, S5), and the pills take
-       the right, so no blank row is left under the box. -->
+       the right, so no blank row is left under the box. Stop mode is Working or
+       Queued, where Enter sends nothing, so the hint stops promising it. -->
   <div class="dock-bottom">
-    <p class="keys">{copy.keysHint}</p>
+    <p class="keys">{rule.mode === 'stop' ? copy.keysHintWorking : copy.keysHint}</p>
     <ContextChip usage={contextUsage} />
     <ModelChip {chip} />
   </div>
