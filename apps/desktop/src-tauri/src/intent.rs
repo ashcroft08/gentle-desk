@@ -67,19 +67,17 @@ pub fn to_intent(state: &gentle_app::AppState, intent: UiIntent) -> Option<gentl
         UiIntent::SelectThinkingLevel { level } => {
             gentle_app::Intent::SelectThinkingLevel { level }
         }
-        // The Settings pane's intents (0.1.12) are the shell's: they read a
-        // file, run the shell's own check, or pass a mode to the children, so
-        // the bridge answers them before it asks this (`Bridge::dispatch`).
+        // The Settings panes' intents (0.1.12) are the shell's: they read a
+        // file or run the shell's own check, so the bridge answers them before
+        // it asks this (`Bridge::dispatch`).
         // `RefreshChatProfile` (profiles-editor T2b-2, L11) is the same: it asks
         // ONE chat's own child for its configuration, so the shell answers it
         // with a command of its own (`AppStateHolder::dispatch_commands`).
-        UiIntent::RefreshProfiles
-        | UiIntent::RefreshChatProfile { .. }
+        UiIntent::RefreshChatProfile { .. }
         | UiIntent::SaveChatProfileMode { .. }
         | UiIntent::RefreshAuth
         | UiIntent::CheckUpdates
-        | UiIntent::RefreshUsage
-        | UiIntent::SetOrchestratorMode { .. } => return None,
+        | UiIntent::RefreshUsage => return None,
     })
 }
 

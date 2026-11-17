@@ -53,8 +53,8 @@ export interface ProfileCopy {
   /** The block that says which pairs the used profile runs (L19), and its own
    * accessible name, because both a pair and the agents table name a model. */
   routesLabel: string
-  /** The two pairs Settings > Profiles draws for a profile, worded as it words
-   * them so the two views cannot drift apart. */
+  /** The two pairs Settings > Profiles drew for a profile, worded as it worded
+   * them so the two views cannot drift apart (the pane itself is gone: T2d). */
   orchestratorLabel: string
   fallbackLabel: string
   /** The profile's own orchestration mode: what `workflow.<profile>` stores, and
@@ -102,8 +102,13 @@ export interface ProfileCopy {
   stores: Record<StoreName, string>
   /** One store could not be read: the line drawn where its content would be. */
   storeMissing: (store: StoreName) => string
-  /** The footer's one word: what this tab saves, and what it does not. */
+  /** The footer's one line: what this tab saves (the used profile's mode, T3-mode)
+   * and what it does not - every other profile edit is the terminal's (T2d). */
   footer: string
+  /** The footer's one action (T2d, L21-L22): the terminal, where profiles ARE
+   * written, and the note that keeps it honest about what it opens. */
+  editInTerminal: string
+  editNote: string
 }
 
 /** English: the artboard's copy, and the house's own words where it has none. */
@@ -152,6 +157,9 @@ const ENGLISH: ProfileCopy = {
   stores: { profiles: 'profiles', fallbacks: 'fallbacks', pins: 'pins' },
   storeMissing: (store) => `The ${ENGLISH.stores[store]} store could not be read.`,
   footer: 'Only the orchestration mode is saved from this tab.',
+  editInTerminal: 'Edit in terminal',
+  editNote:
+    'Opens the shell: type /gentle:profiles there to edit, create and switch profiles - this tab only reads them.',
 }
 
 /**
@@ -206,6 +214,9 @@ const SPANISH: ProfileCopy = {
   stores: { profiles: 'perfiles', fallbacks: 'cadenas', pins: 'fijados' },
   storeMissing: (store) => `No se pudo leer el almacén de ${SPANISH.stores[store]}.`,
   footer: 'Desde esta pestaña solo se guarda el modo de orquestación.',
+  editInTerminal: 'Editar en la terminal',
+  editNote:
+    'Abre la shell: escribe /gentle:profiles allí para editar, crear y cambiar de perfil - esta pestaña solo los lee.',
 }
 
 /** The tab's own words in `language`, the whole dictionary at once (D4). */

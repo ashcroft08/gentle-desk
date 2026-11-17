@@ -1,6 +1,6 @@
 <script lang="ts">
   // The Settings dialog (settings-dialog S2-S6, L4; 0.1.12 S1-S7; 0.2.0 S2/S4):
-  // a rail of eight sections on the left and the selected section's content in
+  // a rail of seven sections on the left and the selected section's content in
   // the pane on the right. The rail carries the two controls the footer used to
   // hold - the theme picker and the home setting - then the 0.1.12 panes, then
   // Usage, then Language (0.2.0), then About: the app's name and the version
@@ -8,6 +8,12 @@
   // same components the footer drew, with the same props and the same behavior:
   // nothing here redesigns them, it only gives them a calmer place and one
   // section at a time.
+  //
+  // Profiles left this dialog in profiles-editor T2d (L21, L22): the maintainer
+  // ruled that a Settings section made the profiles look global while they are
+  // per chat and per worktree, so the chat's own Profile tab holds them and this
+  // dialog names them nowhere. Nothing here reads a config file of its own but
+  // the auth store's pane.
   //
   // The rail's own words are read from the language-keyed dictionary through the
   // reactive language (0.2.0, D4), so choosing a language in the Language section
@@ -18,14 +24,13 @@
   // tab stop and the arrow keys, Home and End walk the rail, so the dialog opens
   // on Appearance and the focus starts there. Only the selected section is
   // drawn, so nothing off-screen can take a key, and a pane that reads the
-  // machine (Profiles) only starts reading when it is the one on screen.
+  // machine (Account) only starts reading when it is the one on screen.
   //
   // Closing sends nothing. Each section persists through the command it already
   // had, so Dismiss, Escape and the backdrop only close the card.
   import { Dialog } from 'bits-ui'
   import type {
     AuthView_Serialize as AuthView,
-    ProfilesView_Serialize as ProfilesView,
     ShellView_Serialize as ShellView,
     ThemeView,
     UpdatesView_Serialize as UpdatesView,
@@ -37,7 +42,6 @@
   import ThemePicker from '../sidebar/ThemePicker.svelte'
   import AccountPane from './AccountPane.svelte'
   import LanguagePane from './LanguagePane.svelte'
-  import ProfilesPane from './ProfilesPane.svelte'
   import UpdatesPane from './UpdatesPane.svelte'
   import UsagePane from './UsagePane.svelte'
   import { settingsCopy } from './copy'
@@ -55,7 +59,6 @@
     theme,
     shell,
     version = null,
-    profiles = null,
     auth = null,
     updates = null,
     usage = null,
@@ -69,8 +72,6 @@
     shell: ShellView | null
     /** The version this run runs as (S5), or null while the bridge named none. */
     version?: string | null
-    /** The Profiles pane's slice (0.1.12, S1), or null before the first push. */
-    profiles?: ProfilesView | null
     /** The Account pane's slice (0.1.12, S1), or null before the first push. */
     auth?: AuthView | null
     /** The Updates pane's slice (0.1.12, S2), or null before the first check. */
@@ -150,8 +151,6 @@
                 {/if}
               {:else if selected === 'updates'}
                 <UpdatesPane {updates} {openChats} />
-              {:else if selected === 'profiles'}
-                <ProfilesPane {profiles} />
               {:else if selected === 'account'}
                 <AccountPane {auth} />
               {:else if selected === 'usage'}

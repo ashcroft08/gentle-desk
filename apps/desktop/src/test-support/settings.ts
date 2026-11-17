@@ -1,7 +1,7 @@
 // The Settings dialog's test harness: the dialog opened the way the user opens
 // it (the footer's gear, through the real Sidebar), and the three readers the
 // dialog tests share - the rail, the one pane, and a pick of a section. Kept in
-// one place so the dialog's two test files stay about their own rules.
+// one place so the dialog's own test files stay about their own rules.
 import { fireEvent, render, screen, within } from '@testing-library/svelte'
 import type {
   ShellView_Serialize as ShellView,
@@ -34,7 +34,7 @@ export function shell(over: Partial<ShellView> = {}): ShellView {
 /**
  * The dialog, opened from the footer gear, over the pushed state a test gives:
  * the shell it reports, the version this run runs as, and any other slice the
- * dialog draws (0.1.12's profiles, auth and updates).
+ * dialog draws (0.1.12's auth, updates and usage).
  */
 export async function openSettings(
   over: Partial<ShellView> = {},
@@ -55,9 +55,9 @@ export function rail(dialog: HTMLElement): HTMLElement[] {
 }
 
 /**
- * The dialog's own pane: only the selected section is there. Read by id, since a
- * section may hold sub-tabs of its own whose panel is drawn inside this one
- * (0.1.12, L17: the Profiles section's Profile | Agents pair).
+ * The dialog's own pane: only the selected section is there. Read by id, so a
+ * section that draws a panel of its own inside this one cannot be mistaken for
+ * it.
  */
 export function pane(dialog: HTMLElement): HTMLElement {
   const found = within(dialog)

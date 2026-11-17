@@ -55,12 +55,6 @@ export function viewState(overrides: Partial<ViewState_Serialize> = {}): ViewSta
     // it opens, and until an answer lands it says it is reading.
     chat_profile: null,
     // The Settings panes before their first read (0.1.12): nothing known yet.
-    profiles: {
-      status: { type: 'Unknown' },
-      active: null,
-      profiles: [],
-      mode: 'organic',
-    },
     auth: { status: { type: 'Unknown' }, providers: [] },
     updates: {
       status: 'Unknown',

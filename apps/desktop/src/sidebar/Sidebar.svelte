@@ -239,14 +239,15 @@
   />
   <!-- The Settings dialog, the only home the theme picker and the home setting
        have now (S1), and where the app's name and running version live (S5).
-       The three 0.1.12 panes read their own slices from the same push (S1-S4).
+       The 0.1.12 panes read their own slices from the same push (S1-S4); the
+       profiles slice is gone with the pane (profiles-editor T2d), so the chat's
+       own Profile tab is where profiles are read and edited.
        Closing it sends nothing: each section keeps its own path. -->
   <SettingsDialog
     bind:open={settingsOpen}
     theme={model.view?.theme ?? 'system'}
     shell={model.view?.shell ?? null}
     version={model.view?.app_version ?? null}
-    profiles={model.view?.profiles ?? null}
     auth={model.view?.auth ?? null}
     updates={model.view?.updates ?? null}
     usage={model.view?.usage ?? null}

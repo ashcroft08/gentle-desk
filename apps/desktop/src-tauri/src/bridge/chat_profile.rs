@@ -11,11 +11,11 @@
 //!   approximation the maintainer accepted in L9: gentle-pi's branch replay and
 //!   corroboration are not reimplemented here.
 //!
-//! The view is SHELL-owned, next to
-//! [`ProfilesView`](crate::contract::ProfilesView): `crates/app` depends only on
-//! gentle-core while `gentle-runtime` depends on `gentle-app`, so the reducer
-//! could not name the session-file reader even if typed profile data belonged in
-//! `Input` (L11-1).
+//! The view is SHELL-owned, next to the auth and usage slices: `crates/app`
+//! depends only on gentle-core while `gentle-runtime` depends on `gentle-app`, so
+//! the reducer could not name the session-file reader even if typed profile data
+//! belonged in `Input` (L11-1). It is the ONLY profile view the shell holds now
+//! that Settings > Profiles is gone (profiles-editor T2d).
 //!
 //! A read that reached NO store changes nothing: the previous view stays and no
 //! slice is pushed (L11-4). That is helper-stop's rule (`NotStopped` folds

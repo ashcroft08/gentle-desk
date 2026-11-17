@@ -17,7 +17,7 @@ use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 
 use gentle_app::ChatCommand;
 use gentle_backend::chat_host::{
-    ChatHost, Clock, Limits, OrchestratorMode, ProcessSpawner, Spawner, SystemClock, TaggedEvent,
+    ChatHost, Clock, Limits, ProcessSpawner, Spawner, SystemClock, TaggedEvent,
 };
 use gentle_backend::home::{with_home_flag, HomeChoice, HomeEnv};
 use gentle_backend::launcher::{self, LauncherEnv};
@@ -58,9 +58,6 @@ pub struct RuntimeExecutor {
     /// the children started from now on (0.1.12, S1, T4): the host holds it as
     /// `Arc<dyn Spawner>`, and this is the same spawner.
     spawner: Mutex<Option<Arc<ProcessSpawner>>>,
-    /// The orchestrator mode every later child starts with. `None` is
-    /// gentle-pi's own default, which is a run that never switched.
-    mode: Mutex<Option<OrchestratorMode>>,
 }
 
 impl RuntimeExecutor {
@@ -77,7 +74,6 @@ impl RuntimeExecutor {
             closed: AtomicBool::new(false),
             home_choice: None,
             spawner: Mutex::new(None),
-            mode: Mutex::new(None),
         }
     }
 
@@ -85,25 +81,6 @@ impl RuntimeExecutor {
     pub fn with_home_choice(mut self, choice: Option<HomeChoice>) -> Self {
         self.home_choice = choice;
         self
-    }
-
-    /// Sets the orchestrator mode every chat opened from now on starts with
-    /// (0.1.12, S1, T4). Session-scoped: the value lives here and in the
-    /// spawner, never in the app config, and a child already running keeps the
-    /// mode it was started with.
-    pub fn set_orchestrator_mode(&self, mode: Option<OrchestratorMode>) {
-        *lock(&self.mode) = mode;
-        // Cloned out before the call, so no lock is held while the spawner takes
-        // its own.
-        let spawner = lock(&self.spawner).clone();
-        if let Some(spawner) = spawner {
-            spawner.set_orchestrator_mode(mode);
-        }
-    }
-
-    /// The mode later children start with.
-    pub fn orchestrator_mode(&self) -> Option<OrchestratorMode> {
-        *lock(&self.mode)
     }
 
     /// Stops accepting new work: the close flow's first step, and the reason a
@@ -163,7 +140,7 @@ impl RuntimeExecutor {
     }
 
     /// The host itself, with the spawner this run keeps: building it stores the
-    /// spawner, so a later mode switch reaches the host already running.
+    /// spawner, so a later switch reaches the host already running.
     fn build(&self) -> Result<(ChatRuntime, std::sync::mpsc::Receiver<TaggedEvent>), String> {
         let spawner = self.spawner()?;
         let host = ChatHost::with_parts(
@@ -174,11 +151,16 @@ impl RuntimeExecutor {
         Ok(ChatRuntime::new(host))
     }
 
-    /// The spawner of this run, built once and remembered. It starts on the mode
-    /// the user already chose, if they chose one before the first chat.
+    /// The spawner of this run, built once and remembered.
+    ///
+    /// It is told no orchestrator mode (profiles-editor T2d): the session-only
+    /// switch that used to set `GENTLE_PI_ORCHESTRATOR_MODE` here is gone, so
+    /// every child starts on gentle-pi's own default and each profile's
+    /// `workflow` is what decides the mode (`profiles.json`, T3-mode). The
+    /// spawner's own mode plumbing is kept untouched in
+    /// `gentle_backend::chat_host::spawner`; this run simply never arms it.
     fn spawner(&self) -> Result<Arc<ProcessSpawner>, String> {
         let spawner = Arc::new(spawner(self.holder.language(), self.home_choice)?);
-        spawner.set_orchestrator_mode(*lock(&self.mode));
         *lock(&self.spawner) = Some(Arc::clone(&spawner));
         Ok(spawner)
     }

@@ -119,7 +119,7 @@ es valor de producto".
       profile's orchestrator mode as `profiles.json` `workflow` stores it (absent =
       organic), labelled as the PROFILE's (every chat using it). No switch here: the
       writing switch is T3 (`set_config` of `workflow`). Route: worker, real-window look.
-- [ ] T2d (L21, L22) remove Settings > Profiles (pane, its tests and copy, the
+- [x] T2d (L21, L22) remove Settings > Profiles (pane, its tests and copy, the
       session-only env switch); "Edit in terminal" moves to the tab. Separate slice.
 - [x] T3-mode (L23, L24) (0fe4ec3 on feat/profile-mode-routes, PR #194, base feat/profile-freeze-fix; review lineage review-d03b31465c34b5e2 approved and acknowledged; real window L26) the Profile tab's orchestrator-mode switch: Organic / Full
       delegation for the USED profile, written as `set_config` of the whole `profiles`
@@ -544,3 +544,12 @@ es valor de producto".
   and the bridge accepts a second mode-save intent while one is in flight.
 - L26 (maintainer, 2026-11-17, verbatim): "si funciono cambiar lo del modo y se guardo" -
   the switch's write and its persistence SEEN in the real window.
+- L27 (parent, 2026-11-17): T2d DELIVERED and REBASED onto e892d5d (#195 merged to main,
+  so the mode switch and T2d compose): d67ed9f on feat/profile-drop-settings. The worker
+  resolved the 5-file overlap; one composition fix: the footer's read-only line is
+  main's `copy.footer` (T2d's pre-switch `readOnly` retired) and the terminal block
+  joins it in every state; the switch's tests, the rail of 7 and both suites' other
+  assertions kept. Checks re-run: cargo app 0 failed, bindings drift guard green,
+  fmt/clippy clean, vitest 795/795, svelte-check 0/0, eslint clean. NOT seen rendered
+  (maintainer's look pending); GENTLE_PI_ORCHESTRATOR_MODE machinery kept, never armed.
+

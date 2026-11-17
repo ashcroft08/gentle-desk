@@ -1184,8 +1184,11 @@ export type NoticeView_Serialize = {
 
 /**
  *  How the orchestrator runs a turn, named exactly as gentle-pi's
- *  `GENTLE_PI_ORCHESTRATOR_MODE` names them (`organic`, `full-delegation`), so
- *  neither side translates a value (0.1.12, S1, T4).
+ *  `profiles.json` `workflow.<profile>.orchestratorMode` names them (`organic`,
+ *  `full-delegation`), so neither side translates a value. The value a view
+ *  carries is the PROFILE's, which every chat using that profile runs with
+ *  (profiles-editor L20, L22); the session-only switch that used to carry it to
+ *  children at spawn time is gone with the Settings pane (T2d).
  */
 export type OrchestratorModeView = 
 /**
@@ -1193,146 +1196,6 @@ export type OrchestratorModeView =
  *  chooses. A run that never chose shows this one.
  */
 "organic" | "full-delegation";
-
-/**
- *  One role of a profile: what it runs and how hard it thinks. Every field is
- *  optional because the file allows a partial row, and a missing one is drawn as
- *  nothing rather than as a guess.
- */
-export type ProfileRoleView = ProfileRoleView_Serialize | ProfileRoleView_Deserialize;
-
-/**
- *  One role of a profile: what it runs and how hard it thinks. Every field is
- *  optional because the file allows a partial row, and a missing one is drawn as
- *  nothing rather than as a guess.
- */
-export type ProfileRoleView_Deserialize = {
-	/**  The role's name, the file's own key (`orchestrator`, `review-refuter`...). */
-	role: string,
-	model?: string | null,
-	thinking?: string | null,
-	tier?: string | null,
-};
-
-/**
- *  One role of a profile: what it runs and how hard it thinks. Every field is
- *  optional because the file allows a partial row, and a missing one is drawn as
- *  nothing rather than as a guess.
- */
-export type ProfileRoleView_Serialize = {
-	/**  The role's name, the file's own key (`orchestrator`, `review-refuter`...). */
-	role: string,
-	model: string | null,
-	thinking: string | null,
-	tier: string | null,
-};
-
-/**
- *  One agent profile as the Profiles pane draws it (0.1.12, T2): its name, its
- *  orchestrator route, its other roles, and the orchestration mode the file
- *  records for it.
- */
-export type ProfileView = ProfileView_Serialize | ProfileView_Deserialize;
-
-/**
- *  One agent profile as the Profiles pane draws it (0.1.12, T2): its name, its
- *  orchestrator route, its other roles, and the orchestration mode the file
- *  records for it.
- */
-export type ProfileView_Deserialize = {
-	name: string,
-	/**
-	 *  True for the profile the file records as active, which is the one the
-	 *  pane's header names.
-	 */
-	active: boolean,
-	/**  The reserved `orchestrator` role, drawn as the profile's summary line. */
-	orchestrator?: ProfileRoleView_Deserialize | null,
-	/**  Every other role, sorted by name. */
-	roles: ProfileRoleView_Deserialize[],
-	/**
-	 *  The mode this profile prefers, from the file's sibling `workflow` map.
-	 *  `None` for a profile that names none.
-	 */
-	mode?: OrchestratorModeView | null,
-};
-
-/**
- *  One agent profile as the Profiles pane draws it (0.1.12, T2): its name, its
- *  orchestrator route, its other roles, and the orchestration mode the file
- *  records for it.
- */
-export type ProfileView_Serialize = {
-	name: string,
-	/**
-	 *  True for the profile the file records as active, which is the one the
-	 *  pane's header names.
-	 */
-	active: boolean,
-	/**  The reserved `orchestrator` role, drawn as the profile's summary line. */
-	orchestrator: ProfileRoleView_Serialize | null,
-	/**  Every other role, sorted by name. */
-	roles: ProfileRoleView_Serialize[],
-	/**
-	 *  The mode this profile prefers, from the file's sibling `workflow` map.
-	 *  `None` for a profile that names none.
-	 */
-	mode: OrchestratorModeView | null,
-};
-
-/**
- *  Where the read of `profiles.json` stands. A file of another kind or version
- *  is `Failed` with the reason: the pane then says it cannot read the file
- *  instead of drawing a wrong one.
- */
-export type ProfilesStatusView = 
-/**  Not read yet. */
-{ type: "Unknown" } | 
-/**  Read: the profiles here are the file's. */
-{ type: "Ready" } | 
-/**
- *  The file could not be read or is not this reader's document; the string
- *  is why.
- */
-{ type: "Failed"; data: string };
-
-/**
- *  The Profiles pane (0.1.12, S1, T2), read-only: the active profile's name, its
- *  roles, and the mode the desk's next chats will start with.
- */
-export type ProfilesView = ProfilesView_Serialize | ProfilesView_Deserialize;
-
-/**
- *  The Profiles pane (0.1.12, S1, T2), read-only: the active profile's name, its
- *  roles, and the mode the desk's next chats will start with.
- */
-export type ProfilesView_Deserialize = {
-	status: ProfilesStatusView,
-	/**  The active profile's name, `None` when the file names none. */
-	active?: string | null,
-	profiles: ProfileView_Deserialize[],
-	/**
-	 *  The mode the desk passes to the chats it opens from now on. It is the
-	 *  SESSION's switch, never a stored preference (S1).
-	 */
-	mode: OrchestratorModeView,
-};
-
-/**
- *  The Profiles pane (0.1.12, S1, T2), read-only: the active profile's name, its
- *  roles, and the mode the desk's next chats will start with.
- */
-export type ProfilesView_Serialize = {
-	status: ProfilesStatusView,
-	/**  The active profile's name, `None` when the file names none. */
-	active: string | null,
-	profiles: ProfileView_Serialize[],
-	/**
-	 *  The mode the desk passes to the chats it opens from now on. It is the
-	 *  SESSION's switch, never a stored preference (S1).
-	 */
-	mode: OrchestratorModeView,
-};
 
 /**  How one provider's `auth check` stands: the four states the shell reports. */
 export type ProviderStatusView = "Ready" | "NotReady" | 
@@ -1463,11 +1326,19 @@ export type SettingsFilesChanged = SettingsFilesChangedView;
  *  the app side never tells the web side a location. A batch that touches both
  *  files of the Profiles group and the auth store carries both, so one notice
  *  covers it.
+ * 
+ *  The Profiles group is kept although no pane subscribes to it since
+ *  profiles-editor T2d removed Settings > Profiles: it is the watcher's own
+ *  description of the config home (the same directories, the same debouncer, one
+ *  group per file set), and the chat's Profile tab may take it when the pin of a
+ *  worktree starts to be read live (T6). Dropping it would touch the watcher's
+ *  tested core for no observable change.
  */
 export type SettingsFilesChangedView = {
 	/**
 	 *  `profiles.json` or its sibling `profile-fallbacks.json` in the config
-	 *  home: the Profiles pane's files.
+	 *  home: the files gentle-pi and the terminal write. Watched, and with no web
+	 *  listener since T2d.
 	 */
 	profiles: boolean,
 	/**  `auth.json` in the agent directory: the Account pane's file. */
@@ -1580,8 +1451,9 @@ export type StateChanged_Serialize = ViewState_Serialize;
  */
 export type TerminalActionView = 
 /**
- *  The shell's profiles screen, as its opening prompt: the desk's Profiles
- *  pane sends every edit, create and switch there (L9).
+ *  The shell's profiles screen, as its opening prompt: the chat's own
+ *  Profile tab sends every edit, create and switch there (L9, and T2d moved
+ *  the button out of Settings).
  */
 "Profiles" | 
 /**  The shell's own `auth login`. */
@@ -1773,13 +1645,6 @@ export type UiIntent = { type: "SendPrompt"; data: {
 	level: string,
 } } | 
 /**
- *  Re-read gentle-pi's agent profiles from the config home (0.1.12, T2). The
- *  Settings dialog sends it when the Profiles pane opens and after the
- *  terminal may have changed the file. Nothing is written: the shell owns
- *  the file. The answer travels back on [`ViewState::profiles`].
- */
-{ type: "RefreshProfiles" } | 
-/**
  *  Re-read THIS chat's own profile configuration (profiles-editor T2b-2,
  *  L11): the profiles, their fallback chains and the pin of that chat's
  *  worktree, asked of that chat's OWN child, which is the only one that knows
@@ -1832,16 +1697,7 @@ export type UiIntent = { type: "SendPrompt"; data: {
  *  Nothing of it reads a chat, so no open chat can hold it back. The answer
  *  travels back on [`ViewState::usage`].
  */
-{ type: "RefreshUsage" } | 
-/**
- *  Choose the orchestrator mode of the chats opened from now on (0.1.12,
- *  S1, T4). Session-scoped: the mode is passed to each child through
- *  `GENTLE_PI_ORCHESTRATOR_MODE` and is never stored in the config, so a new
- *  run starts on gentle-pi's own default again.
- */
-{ type: "SetOrchestratorMode"; data: {
-	mode: OrchestratorModeView,
-} };
+{ type: "RefreshUsage" };
 
 /**
  *  Where the update check stands. It runs once when the app opens (S3) and again
@@ -2251,16 +2107,11 @@ export type ViewState_Deserialize = {
 	 */
 	context_usage: ContextUsageView_Deserialize,
 	/**
-	 *  The agent profiles the shell keeps (0.1.12, T2), read on the pane's
-	 *  behalf and never written.
-	 */
-	profiles: ProfilesView_Deserialize,
-	/**
 	 *  The Profile tab's view of the FOREGROUND chat (profiles-editor T2b-2,
 	 *  L11): which profile this chat uses, the definitions, their chains and the
 	 *  pin of its own worktree, as that chat's own child answered it.
 	 * 
-	 *  Shell-owned, like [`profiles`](Self::profiles): the reducer knows nothing
+	 *  Shell-owned, like [`auth`](Self::auth): the reducer knows nothing
 	 *  about a session file or a child's config store. A read belongs to the one
 	 *  chat [`ChatProfileView::chat_id`] names and is carried only while that
 	 *  chat is the foreground one, so a read that lands after the user moved on
@@ -2471,16 +2322,11 @@ export type ViewState_Serialize = {
 	 */
 	context_usage: ContextUsageView_Serialize,
 	/**
-	 *  The agent profiles the shell keeps (0.1.12, T2), read on the pane's
-	 *  behalf and never written.
-	 */
-	profiles: ProfilesView_Serialize,
-	/**
 	 *  The Profile tab's view of the FOREGROUND chat (profiles-editor T2b-2,
 	 *  L11): which profile this chat uses, the definitions, their chains and the
 	 *  pin of its own worktree, as that chat's own child answered it.
 	 * 
-	 *  Shell-owned, like [`profiles`](Self::profiles): the reducer knows nothing
+	 *  Shell-owned, like [`auth`](Self::auth): the reducer knows nothing
 	 *  about a session file or a child's config store. A read belongs to the one
 	 *  chat [`ChatProfileView::chat_id`] names and is carried only while that
 	 *  chat is the foreground one, so a read that lands after the user moved on

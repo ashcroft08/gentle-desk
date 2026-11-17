@@ -56,6 +56,9 @@ const ENGLISH = {
   storeMissing: 'The pins store could not be read.',
   modeNote: 'Saved in the profile "team", the setting every chat with that profile uses.',
   modeNotSaved: 'The mode could not be saved. Nothing was written.',
+  editInTerminal: 'Edit in terminal',
+  editNote:
+    'Opens the shell: type /gentle:profiles there to edit, create and switch profiles - this tab only reads them.',
 }
 
 /** The same words in the app's neutral Spanish. */
@@ -101,6 +104,9 @@ const SPANISH = {
   storeMissing: 'No se pudo leer el almacén de fijados.',
   modeNote: 'Se guarda en el perfil "team", el ajuste que usan todos los chats con ese perfil.',
   modeNotSaved: 'No se pudo guardar el modo. No se escribió nada.',
+  editInTerminal: 'Editar en la terminal',
+  editNote:
+    'Abre la shell: escribe /gentle:profiles allí para editar, crear y cambiar de perfil - esta pestaña solo los lee.',
 }
 
 /** The one word both languages spell the same on purpose (`Local` is Spanish too). */
@@ -150,6 +156,8 @@ function words(language: 'en' | 'es'): typeof ENGLISH {
     storeMissing: copy.storeMissing('pins'),
     modeNote: copy.modeNote('team'),
     modeNotSaved: copy.modeNotSaved,
+    editInTerminal: copy.editInTerminal,
+    editNote: copy.editNote,
   }
 }
 

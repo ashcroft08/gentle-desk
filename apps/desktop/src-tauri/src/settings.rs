@@ -1,14 +1,20 @@
-//! What the Settings dialog reads from the machine (0.1.12): gentle-pi's agent
-//! profiles, where the shell's authentication stands, and whether the three
-//! pieces this machine runs have newer versions published.
+//! What the Settings dialog reads from the machine (0.1.12): where the shell's
+//! authentication stands, and whether the three pieces this machine runs have
+//! newer versions published.
 //!
 //! Every read is a SEAM of its own - a file reader, a per-provider check, a
 //! version probe, one GET and one run of the usage sources' script - so the
 //! bridge can be driven windowless and no test of it reaches the network, a
 //! launcher or the user's own files. The rules those seams feed are pure and
-//! live in `gentle_runtime` (`profiles`, `auth`, `updates`, `usage`); this
-//! module only turns their answers into the contract's views and supplies the
-//! real implementations.
+//! live in `gentle_runtime` (`auth`, `updates`, `usage`); this module only turns
+//! their answers into the contract's views and supplies the real
+//! implementations.
+//!
+//! The agent profiles' read lived here until profiles-editor T2d: the Settings
+//! pane that read `profiles.json` from disk is gone, and the chat's Profile tab
+//! reads its profile through that chat's own child (`bridge::chat_profile`). The
+//! paths this module resolves still name those files, because the config watcher
+//! watches their folder (`watch::Dirs`).
 //!
 //! Nothing here writes anything: gentle-desk reads gentle-pi's files and never
 //! edits them, which is the standing decision of the settings roadmap.
@@ -25,7 +31,6 @@ use gentle_core::i18n::{messages, Language};
 
 mod auth;
 mod paths;
-mod profiles;
 mod updates;
 mod usage;
 pub mod watch;
@@ -33,7 +38,6 @@ mod web;
 
 pub use auth::view as auth_view;
 pub use paths::SettingsPaths;
-pub use profiles::view as profiles_view;
 pub use updates::{view as updates_view, PI_REGISTRY};
 pub use usage::view as usage_view;
 pub use watch::{Changed, Dirs, SettingsWatch};

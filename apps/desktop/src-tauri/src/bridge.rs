@@ -38,8 +38,7 @@ use gentle_runtime::clock::now_ms;
 
 use crate::config::{ConfigSnapshot, ConfigWriter};
 use crate::contract::{
-    AuthView, ChatProfileView, ProfilesView, SessionsWindow, UiIntent, UpdatesView, UsageView,
-    ViewState,
+    AuthView, ChatProfileView, SessionsWindow, UiIntent, UpdatesView, UsageView, ViewState,
 };
 use crate::images::Images;
 use crate::sessions::cache::TreeCache;
@@ -143,9 +142,6 @@ pub struct AppStateHolder {
     /// The images each chat holds: attached in the composer, read here, taken by
     /// that chat's send and served back as previews (`bridge::images`).
     images: Images,
-    /// The Profiles pane's slice (0.1.12, T2): what the config home's
-    /// `profiles.json` said, read on the pane's behalf and never written.
-    profiles: Mutex<ProfilesView>,
     /// The Profile tab's view of one chat (profiles-editor T2b-2, L11): what that
     /// chat's own child answered and which profile its session file binds. It is
     /// that chat's and only that chat's, and it is dropped when the chat closes
@@ -435,7 +431,6 @@ impl AppStateHolder {
             theme: self.theme_value(),
             language: self.language_value(),
             shell: self.shell_view(),
-            profiles: self.profiles(),
             chat_profile: self.chat_profile(),
             auth: self.auth(),
             updates: self.updates(),

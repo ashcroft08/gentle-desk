@@ -83,8 +83,10 @@ export function usedProfile(view: ChatProfile | null): ProfileDefinition | null 
 
 /**
  * The used profile's Orchestrator pair: the row stored under the reserved
- * `orchestrator` agent, or `null` for a profile that names none - the same row
- * Settings > Profiles draws as its summary line (`ProfilesPane.svelte`).
+ * `orchestrator` agent, or `null` for a profile that names none - the row
+ * `Profile::orchestrator()` selects in `crates/runtime/src/profiles.rs`, which
+ * the pane Settings used to draw as its summary line (removed in profiles-editor
+ * T2d).
  */
 export function orchestratorOf(profile: ProfileDefinition): ProfileAgent | null {
   return profile.agents.find((agent) => agent.agent === ORCHESTRATOR_ROLE) ?? null
@@ -93,10 +95,9 @@ export function orchestratorOf(profile: ProfileDefinition): ProfileAgent | null 
 /**
  * The chain the used profile's Fallback pair draws: the orchestrator's own, else
  * the profile-wide `*` - `Profile::chain_for(ORCHESTRATOR_ROLE)` in
- * `crates/runtime/src/profiles.rs`, which is the rule Settings > Profiles draws
- * (`Profile::fallback()`, `settings/profiles.rs::profile_view`). `null` for a
- * profile that records no chain at all: no fallback is ever invented to fill the
- * row.
+ * `crates/runtime/src/profiles.rs`, the rule `Profile::fallback()` names.
+ * `null` for a profile that records no chain at all: no fallback is ever invented
+ * to fill the row.
  */
 export function fallbackChainOf(profile: ProfileDefinition): ProfileChain | null {
   return (
@@ -110,9 +111,8 @@ export function fallbackChainOf(profile: ProfileDefinition): ProfileChain | null
  * The Fallback pair of one chain, in the shape the pair has: the models in the
  * order gentle-pi would move through them, joined with an arrow, and the effort
  * only when EVERY step asks for the same one - one effort cell cannot speak for a
- * chain that changes effort per step. The rule is the Settings pane's own
- * (`settings/profiles.rs::fallback_view`), reused so the two views cannot drift
- * apart (L19).
+ * chain that changes effort per step. It is the rule the removed Settings pane
+ * drew for the same pair (L19), kept here now that the tab is the only view.
  */
 export function fallbackPair(chain: ProfileChain): { model: string; thinking: string | null } | null {
   if (chain.steps.length === 0) return null

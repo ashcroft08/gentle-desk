@@ -1,5 +1,5 @@
 //! The Profile tab's view of one chat (profiles-editor T2b-2, L8, L9, L11): the
-//! shell owns it next to `ProfilesView`, a chat's own child is what answers it,
+//! shell owns it as a view of its own, a chat's own child is what answers it,
 //! and a read that reached nothing changes nothing.
 //!
 //! No child and no window run here: the three stores arrive as the channel's

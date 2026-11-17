@@ -1,8 +1,9 @@
 // The Settings dialog (settings-dialog S2-S6, L4; 0.1.12 S1-S7): a rail of
 // seven sections on the left and the selected section's content in the pane on
 // the right - the two controls that left the footer (the theme picker and the
-// home setting), the Updates, Profiles and Account panes (0.1.12), Usage and
-// About: the app's name and the version this run runs as.
+// home setting), the Updates and Account panes (0.1.12), Usage and About: the
+// app's name and the version this run runs as. Profiles left the dialog
+// (profiles-editor T2d, L21-L22): the chat's own Profile tab holds them.
 // Its closing keys, its focus and the keyboard walk of the rail are
 // SettingsDialog.keys.test.ts's; this file is about what the pane draws.
 import '../test-support/dom-env'
@@ -19,16 +20,15 @@ const TITLE = 'Settings'
 const APPEARANCE = 'Appearance'
 const HOME = 'Shell home'
 const UPDATES = 'Updates'
-const PROFILES = 'Profiles'
 const ACCOUNT = 'Account'
 const USAGE = 'Usage'
 const ABOUT = 'About'
-/** The rail's eight entries, in the order the dialog draws them (0.1.12; 0.2.0). */
-const RAIL = [APPEARANCE, HOME, UPDATES, PROFILES, ACCOUNT, USAGE, 'Language', ABOUT]
+/** The rail's seven entries, in the order the dialog draws them (0.1.12; 0.2.0;
+ * T2d dropped Profiles). */
+const RAIL = [APPEARANCE, HOME, UPDATES, ACCOUNT, USAGE, 'Language', ABOUT]
 const APPEARANCE_HINT = 'The look of this window.'
 const HOME_HINT = 'Which pi this shell runs on.'
 const UPDATES_HINT = 'What this machine runs, and whether something newer is out.'
-const PROFILES_HINT = 'Your agent profiles, as the terminal keeps them.'
 const ACCOUNT_HINT = 'Which providers are signed in, and where to sign in or out.'
 const USAGE_HINT = "What each subscription has used, as the shell's own sources report it."
 const ABOUT_HINT = 'Which build this is.'
@@ -57,7 +57,7 @@ describe('the Settings dialog', () => {
     expect(rail(dialog).map((entry) => entry.textContent?.trim())).toEqual(RAIL)
     expect(
       rail(dialog).map((entry) => entry.getAttribute('aria-selected')),
-    ).toEqual(['true', 'false', 'false', 'false', 'false', 'false', 'false', 'false'])
+    ).toEqual(['true', 'false', 'false', 'false', 'false', 'false', 'false'])
     expect(within(dialog).getAllByRole('tabpanel')).toHaveLength(1)
     expect(within(dialog).getByRole('tabpanel', { name: APPEARANCE })).toBeTruthy()
   })
@@ -71,7 +71,6 @@ describe('the Settings dialog', () => {
     for (const [name, hint] of [
       [HOME, HOME_HINT],
       [UPDATES, UPDATES_HINT],
-      [PROFILES, PROFILES_HINT],
       [ACCOUNT, ACCOUNT_HINT],
       [USAGE, USAGE_HINT],
       [ABOUT, ABOUT_HINT],
@@ -82,15 +81,25 @@ describe('the Settings dialog', () => {
     }
   })
 
-  it('draws the three 0.1.12 panes in their own sections, one at a time', async () => {
+  // profiles-editor T2d (L21, L22): the maintainer removed the Profiles pane
+  // from Settings because a dialog made the profiles look global. They live in
+  // the chat's own Profile tab now, so the section is gone - entry, hint, pane -
+  // and opening the dialog asks the shell for nothing.
+  it('no longer offers a Profiles section: profiles live in the chat', async () => {
+    const dialog = await openSettings()
+
+    expect(rail(dialog)).toHaveLength(7)
+    expect(within(dialog).queryByRole('tab', { name: 'Profiles' })).toBeNull()
+    expect(within(dialog).queryByText('Your agent profiles, as the terminal keeps them.')).toBeNull()
+    // The pane's read is gone with it: no intent left the dialog.
+    expect(intents()).toEqual([])
+  })
+
+  it('draws the two 0.1.12 panes in their own sections, one at a time', async () => {
     const dialog = await openSettings()
 
     await pick(dialog, UPDATES)
     expect(within(pane(dialog)).getByRole('button', { name: 'Check again' })).toBeTruthy()
-
-    await pick(dialog, PROFILES)
-    expect(within(pane(dialog)).getByRole('radiogroup')).toBeTruthy()
-    expect(within(dialog).queryByRole('button', { name: 'Check again' })).toBeNull()
 
     await pick(dialog, ACCOUNT)
     expect(within(pane(dialog)).getByRole('button', { name: 'Check again' })).toBeTruthy()

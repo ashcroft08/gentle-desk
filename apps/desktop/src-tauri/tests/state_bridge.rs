@@ -10,7 +10,7 @@ use gentle_app::{ChatId, Input, Intent};
 use gentle_desk_lib::bridge::AppStateHolder;
 use gentle_desk_lib::contract::{
     AuthView, ContextUsageView, InstallView, ListStatusView, ModelChipView, ModelListStatusView,
-    NoticeLevel, ProfilesView, ShellView, ThemeView, UiIntent, UpdatesView, UsageView, ViewState,
+    NoticeLevel, ShellView, ThemeView, UiIntent, UpdatesView, UsageView, ViewState,
 };
 
 #[test]
@@ -127,7 +127,6 @@ fn the_view_state_slice_has_no_invented_fields() {
             // No file was read and no check ran before the pane asked, so both
             // panes start unknown and the next chats start on gentle-pi's own
             // default mode (0.1.12).
-            profiles: ProfilesView::default(),
             // No chat has asked for its own profile yet, and no read of one
             // answered, so the Profile tab has nothing of its own to draw
             // (profiles-editor T2b-2).

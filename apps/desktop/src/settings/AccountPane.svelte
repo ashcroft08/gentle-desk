@@ -32,7 +32,8 @@
   /**
    * The pane reads when it appears, never waiting for a button: the check runs
    * on the intent thread (~1s per provider) and the quiet "Reading..." above is
-   * the waiting state. This is the Profiles pane's own pattern (0.1.12, L17).
+   * the waiting state. It is the pattern the Profiles pane had (0.1.12, L17,
+   * gone in profiles-editor T2d).
    */
   const check = coalesced(() => dispatchIntent({ type: 'RefreshAuth' }))
 

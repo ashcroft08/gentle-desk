@@ -7,13 +7,19 @@
   // in this chat, Make default, the model pickers and the fallback editor are T3
   // and T3b: none of them is drawn here, not even disabled.
   //
+  // The one action it does offer is the terminal (T2d, L21-L22): Settings > Profiles
+  // is gone, so the profiles screen the terminal already edits is opened from this
+  // footer. It is honest about what it is - a window, not a write - and it is drawn
+  // in every state, because a chat whose read failed is exactly when a profile may
+  // need the terminal.
+  //
   // When it reads (L13): opening the tab asks ONCE for the foreground chat's view;
   // the window taking the focus back while the tab is open asks again, and so does
   // the unavailable state's own Try again. The asks are COALESCED like the Settings
   // panes' (`settings/files-changed.ts`): one read at a time, one queued, and
   // nothing at all once the tab closes - a follow-up queued while a read was in
   // flight is dropped with it. A chat with no id asks for nothing.
-  import { dispatchIntent } from '../bridge'
+  import { dispatchIntent, openTerminal } from '../bridge'
   import type {
     ChatProfileView_Serialize as ChatProfile,
     OrchestratorModeView,
@@ -54,6 +60,9 @@
 
   /** This open tab's read, so Try again and a window focus share one path. */
   let read: CoalescedRead | null = null
+
+  /** What the terminal said when it could not open, or `null` (T2d). */
+  let terminalError = $state<string | null>(null)
 
   /**
    * The chat this tab reads, as a VALUE. The parent hands `chatId` down off an
@@ -112,6 +121,16 @@
       data: { chat_id: chat, profile: used.name, mode },
     })
   }
+
+  /**
+   * The footer's one action: the shell's own profiles screen in a terminal
+   * window, the way the Settings pane opened it. Nothing of this tab is written
+   * and nothing is sent: Rust resolves the launcher, and a refusal - no launcher,
+   * no console - is the one line drawn under the button.
+   */
+  async function edit(): Promise<void> {
+    terminalError = await openTerminal('Profiles')
+  }
 </script>
 
 <div class="pv">
@@ -121,7 +140,8 @@
       <p class="quiet">{copy.reading}</p>
     {:else if shape === 'unavailable'}
       <!-- State 10: this chat's child did not answer, or no store could be read.
-           Edit in terminal is T-later and is deliberately NOT drawn. -->
+           The footer's terminal action stays: editing a profile in the terminal
+           does not depend on this chat answering. -->
       <div class="notice">
         <ProfileNotice
           title={copy.unavailable}
@@ -149,10 +169,22 @@
         {/if}
         <ProfileBody {view} {copy} />
       {/key}
-      <!-- The footer says what this slice saves: the profile's mode, and nothing
-           else yet. The three outcomes of the artboard's footer arrive with T3b. -->
-      <p class="foot">{copy.footer}</p>
+      <!-- The footer line says what this slice saves: the profile's mode, and
+           nothing else yet. The three outcomes of the artboard's footer arrive
+           with T3b. -->
+      <p class="foot-line">{copy.footer}</p>
     {/if}
+
+    <!-- The footer, in every state (T2d, L21-L22): the tab saves the used
+         profile's mode and nothing else, so the way to edit, create or switch a
+         profile is the terminal the Settings pane used to open. -->
+    <div class="foot">
+      <button class="btn" type="button" onclick={() => void edit()}>{copy.editInTerminal}</button>
+      <p class="note">{copy.editNote}</p>
+      {#if terminalError !== null}
+        <p class="quiet" role="status">{terminalError}</p>
+      {/if}
+    </div>
   </div>
 </div>
 
@@ -191,5 +223,21 @@
     margin: 16px auto 8px;
     color: var(--faint);
     font-size: 11.5px;
+  }
+
+  /* The line e892d5d drew in the footer before the terminal action joined it:
+     what this tab saves, in the footer's own quiet weight. */
+  .foot-line {
+    max-width: var(--chat-max);
+    margin: 16px auto 8px;
+    color: var(--faint);
+    font-size: 11.5px;
+  }
+
+  .note {
+    margin: 8px 0 0;
+    color: var(--muted);
+    font-size: 11.5px;
+    line-height: 1.5;
   }
 </style>
