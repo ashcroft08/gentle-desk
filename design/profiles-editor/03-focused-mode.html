@@ -1,0 +1,623 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=960">
+<title>Profiles editor — C: a focused editing mode</title>
+<style>
+/* Tokens: design/system.md, theme dark (apps/desktop/src/theme.css). */
+:root{--bg:#0e1116;--surface:#151a21;--surface2:#1c222b;--border:#2b333d;--text:#e4e8ee;--muted:#9aa4b2;--faint:#7d8593;--accent:#7aa2f7;--tint:rgba(122,162,247,.14);--success:#7edc9a;--warning:#e7b455;--danger:#ff8585;--shadow:0 8px 24px rgba(0,0,0,.45)}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.mono{font-family:ui-monospace,'Cascadia Code',Consolas,monospace}
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.i{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.i.s{width:12px;height:12px}
+/* ---- artboard chrome ---- */
+.board{padding:16px 24px 12px;border-bottom:1px solid var(--border);background:var(--surface)}
+.kicker{margin:0 0 3px;font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--faint)}
+h1{margin:0 0 5px;font-size:18px;font-weight:600}
+.lead{margin:0 0 10px;max-width:790px;color:var(--muted);font-size:12.5px;line-height:1.55}
+.states{display:flex;flex-wrap:wrap;gap:6px}
+.states button{border:1px solid var(--border);background:transparent;color:var(--muted);border-radius:8px;padding:4px 10px;font-size:12px;cursor:pointer;transition:background-color 120ms ease,color 120ms ease,border-color 120ms ease}
+.states button:hover{background:var(--surface2);color:var(--text)}
+.states button[aria-pressed="true"]{background:var(--tint);color:var(--accent);border-color:var(--accent);font-weight:600}
+.legend{margin:8px 0 0;font-size:11.5px;color:var(--faint);max-width:830px;line-height:1.5}
+/* ---- the Settings shell ---- */
+.stage{display:flex;justify-content:center;padding:16px 24px 20px}
+.dlg{position:relative;width:min(680px,100%);background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);padding:18px;display:flex;flex-direction:column;gap:14px;max-height:calc(100vh - 196px);min-height:420px}
+.dt{margin:0;font-size:15px;font-weight:600}
+.body{display:flex;gap:18px;flex:1;min-height:0}
+.rail{flex:none;width:184px;display:flex;flex-direction:column;gap:2px;border-right:1px solid var(--border)}
+.rail .opt{display:flex;align-items:center;gap:9px;height:32px;padding:0 10px;border-radius:8px;font-size:13px;color:var(--muted)}
+.rail .opt.on{background:var(--tint);color:var(--accent)}
+.pane{position:relative;flex:1;min-width:0;overflow:auto;padding-right:2px;display:flex;flex-direction:column}
+.state{display:flex;flex-direction:column;flex:1;min-height:0}
+.pane h3{margin:0;font-size:15px;font-weight:600}
+.hint{margin:2px 0 12px;font-size:12px;color:var(--muted)}
+.note{margin:6px 0 0;font-size:11.5px;color:var(--faint);line-height:1.5}
+/* ---- read-only: today's pane, with one more action ---- */
+.mode{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding-bottom:12px;border-bottom:1px solid var(--border);margin-bottom:14px}
+.mlabel{font-size:12px;font-weight:600;color:var(--muted)}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.seg span{padding:5px 12px;font-size:12.5px;color:var(--muted);cursor:default}
+.seg span[aria-checked="true"]{background:var(--accent);color:var(--bg);font-weight:600}
+.card{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px 14px}
+.pname{margin:0;font-size:15px;font-weight:600;color:var(--accent)}
+.pmark{margin:0 0 8px;font-size:12px;color:var(--faint)}
+.routes{margin:0;display:flex;flex-direction:column;gap:4px}
+.pair{display:flex;align-items:baseline;gap:8px}
+.pair dt{width:88px;flex:none;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--faint)}
+.pair dd{margin:0;font-size:12px}
+.think{color:var(--accent);font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:12px}
+.pins{margin:6px 0 0;display:flex;flex-direction:column;gap:3px}
+.pins .pair dt{width:88px}
+/* ---- the agents table, read or edited ---- */
+table.agents{width:100%;border-collapse:collapse;font-size:13px}
+table.agents th{font-size:11px;font-weight:600;color:var(--faint);text-align:left;text-transform:uppercase;letter-spacing:.05em;padding:4px 8px 8px;border-bottom:1px solid var(--border)}
+table.agents td{padding:4px 8px;vertical-align:middle}
+td.agent{width:118px}
+td.model{max-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:12px;color:var(--muted)}
+td.eff{width:84px;text-align:right;font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:12px;color:var(--accent)}
+tr:hover td{background:var(--surface2)}
+tr:focus-within td{background:var(--surface2)}
+/* ---- the focused editor ---- */
+.edbar{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--accent);border-radius:10px;background:var(--tint);margin-bottom:12px}
+.edbar .en{font-size:13px;font-weight:600}
+.edbar .em{font-size:11.5px;color:var(--muted)}
+.edbar .tag{margin-left:auto}
+.fgroup{margin-top:14px}
+.fgroup:first-of-type{margin-top:0}
+.fgroup h4{margin:0 0 7px;display:flex;align-items:center;gap:8px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--faint)}
+.key{font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:11px;letter-spacing:0;color:var(--accent);background:var(--tint);border-radius:4px;padding:1px 5px}
+.erow{display:grid;grid-template-columns:80px minmax(0,1fr) 64px;gap:6px;align-items:center;padding:3px 0}
+.erow .an{font-size:12.5px}
+.erow .an .dot{margin-left:4px}
+.field{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--border);background:var(--bg);color:var(--text);border-radius:6px;padding:2px 7px;font-size:12px;cursor:pointer;min-width:0;transition:border-color 120ms ease}
+.field:hover{border-color:var(--accent)}
+.field.wide{display:flex;width:100%;justify-content:space-between}
+.field svg{color:var(--faint)}
+.field .v{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.field .v.mono{font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:11.5px}
+.field[aria-invalid="true"]{border-color:var(--danger)}
+.cellpop{position:relative;min-width:0}
+.pop{position:absolute;z-index:30;left:0;top:calc(100% + 6px);width:300px;background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.4);padding:4px}
+.pop .filter{width:100%;border:1px solid var(--border);background:var(--bg);border-radius:8px;padding:4px 8px;font-size:12px;margin-bottom:4px}
+.pop ul{list-style:none;margin:0;padding:0;max-height:170px;overflow:auto}
+.pop .option{display:flex;align-items:baseline;gap:8px;width:100%;text-align:left;border:0;background:transparent;border-radius:8px;padding:5px 8px;font-size:11.5px;color:var(--text);cursor:pointer}
+.pop .option:hover,.pop .option.active{background:var(--surface2)}
+.pop .option[aria-selected="true"]{color:var(--accent);font-weight:600}
+.pop .prov{margin-left:auto;font-size:11px;color:var(--faint)}
+.pop .pophint{padding:2px 8px 4px;font-size:11px;color:var(--faint)}
+/* ---- chain ---- */
+.steps{margin:0;padding:0;list-style:none;border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.steps li{display:flex;align-items:center;gap:5px;padding:4px 7px;border-bottom:1px solid var(--border)}
+.steps li:last-child{border-bottom:0}
+.steps li.changed{background:var(--tint)}
+.steps .step{width:14px;flex:none;text-align:center;font:600 11px/1 ui-monospace,'Cascadia Code',Consolas,monospace;color:var(--muted)}
+.stepmain{flex:1;min-width:0}
+.step-err{margin:2px 0 0;font-size:11px;color:var(--danger);line-height:1.35}
+.iconbtn{width:22px;height:22px;flex:none;display:inline-grid;place-items:center;border:1px solid transparent;border-radius:6px;background:transparent;color:var(--muted);cursor:pointer;transition:background-color 120ms ease,color 120ms ease}
+.iconbtn:hover{background:var(--surface2);color:var(--text)}
+.iconbtn[aria-disabled="true"]{opacity:.4;cursor:not-allowed}
+.addstep{display:flex;align-items:center;gap:8px;margin-top:7px;flex-wrap:wrap}
+.limit{font-size:11px;color:var(--warning)}
+/* ---- pin ---- */
+.pinrows{display:flex;flex-direction:column;gap:6px}
+.pinrow{display:flex;align-items:center;gap:7px}
+.pinrow .plab{width:46px;flex:none;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--faint)}
+.pinrow .field{flex:1;min-width:0}
+/* ---- notices ---- */
+.banner{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:8px 10px 8px 12px;box-shadow:inset 3px 0 0 var(--accent);margin:0 0 12px;font-size:12.5px}
+.banner p{margin:0}
+.banner .bt{font-weight:600}
+.banner.warn{box-shadow:inset 3px 0 0 var(--warning)}
+.banner.bad{box-shadow:inset 3px 0 0 var(--danger)}
+.banner.bad .bt{color:var(--danger)}
+.banner .why{margin-top:3px;color:var(--muted);font-size:12px}
+.bacts{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}
+.code{font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:11.5px;color:var(--muted);background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:1px 5px}
+/* ---- buttons, tags ---- */
+.btn{border:1px solid var(--border);background:var(--surface2);color:var(--text);border-radius:8px;padding:5px 12px;font-size:12.5px;cursor:pointer;transition:border-color 120ms ease}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{border-color:var(--accent);background:var(--accent);color:var(--bg);font-weight:600}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.quiet{background:transparent;color:var(--muted)}
+.btn[aria-disabled="true"]{opacity:.55;cursor:not-allowed}
+.acts{display:flex;gap:8px;justify-content:flex-end;margin-top:auto;padding-top:12px}
+.acts.start{justify-content:flex-start}
+.tag{font-size:11px;font-weight:600;border-radius:999px;padding:2px 8px;border:1px solid currentColor;white-space:nowrap}
+.tag.ok{color:var(--success)}
+.tag.warn{color:var(--warning)}
+.tag.quiet{color:var(--muted)}
+.tag.bad{color:var(--danger)}
+.dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--accent);margin-left:5px;vertical-align:middle}
+.dot.warn{background:var(--warning)}
+/* ---- the mode's footer: Cancel / Save / Save and make default ---- */
+.editfoot{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:auto;padding-top:12px;border-top:1px solid var(--border)}
+.editfoot .fstat{font-size:12.5px;font-weight:600}
+.editfoot .fnote{font-size:11.5px;color:var(--faint)}
+.fbtns{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+/* ---- confirm card ---- */
+.ovl{position:absolute;inset:0;border-radius:14px;background:rgba(0,0,0,.5);z-index:40}
+.confirm{position:absolute;z-index:41;left:50%;top:50%;transform:translate(-50%,-50%);width:min(420px,calc(100% - 36px));background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);padding:18px}
+.confirm h4{margin:0 0 6px;font-size:15px;font-weight:600}
+.confirm p{margin:0 0 8px;font-size:12.5px;color:var(--muted);line-height:1.55}
+.confirm p strong{color:var(--text);font-weight:600}
+.confirm .cacts{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+/* ---- motion ---- */
+.pulse{display:inline-flex;gap:3px;vertical-align:middle}
+.pulse i{width:4px;height:4px;border-radius:50%;background:var(--accent);animation:pp 1.2s ease-in-out infinite}
+.pulse i:nth-child(2){animation-delay:.2s}
+.pulse i:nth-child(3){animation-delay:.4s}
+@keyframes pp{0%,100%{opacity:.25}50%{opacity:1}}
+.dim{opacity:.6}
+@media (prefers-reduced-motion: reduce){
+  *{animation:none!important;transition:none!important}
+  .pulse i{opacity:.8}
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="i-theme" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 18a6 6 0 0 0 0-12v12z"/></symbol>
+<symbol id="i-house" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></symbol>
+<symbol id="i-restart" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></symbol>
+<symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 5.2a3.5 3.5 0 0 1 0 6.6"/><path d="M18 20a6.4 6.4 0 0 0-2-4.6"/></symbol>
+<symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="m11 12 8-8"/><path d="m17 4 3 3"/><path d="m14 7 3 3"/></symbol>
+<symbol id="i-gauge" viewBox="0 0 24 24"><path d="M3.5 18a9 9 0 1 1 17 0"/><path d="m12 14 4-4"/></symbol>
+<symbol id="i-msg" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H8l-4 3V6a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2z"/></symbol>
+<symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></symbol>
+<symbol id="i-chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+<symbol id="i-up" viewBox="0 0 24 24"><path d="m18 15-6-6-6 6"/></symbol>
+<symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+<symbol id="i-term" viewBox="0 0 24 24"><path d="M12 19h8"/><path d="m4 17 6-6-6-6"/></symbol>
+</defs></svg>
+
+<header class="board">
+  <p class="kicker">Direction C · a focused editing mode</p>
+  <h1>The pane becomes the editor, and the footer commits</h1>
+  <p class="lead">The read-only pane stays exactly what it draws today, plus one primary action. Edit takes the pane over as a single form — agents, chain, pin — and the dialog's footer becomes Cancel, Save and Save and make default. There is no draft until you enter the mode, and no write until you leave it.</p>
+  <div class="states" role="group" aria-label="Artboard states">
+    <button type="button" data-go="idle" aria-pressed="true">Idle</button>
+    <button type="button" data-go="connecting" aria-pressed="false">Connecting</button>
+    <button type="button" data-go="editing" aria-pressed="false">Editing · dirty</button>
+    <button type="button" data-go="picker" aria-pressed="false">Model picker</button>
+    <button type="button" data-go="chain" aria-pressed="false">Fallback chain</button>
+    <button type="button" data-go="pin" aria-pressed="false">Pin</button>
+    <button type="button" data-go="conflict" aria-pressed="false">Revision conflict</button>
+    <button type="button" data-go="rejected" aria-pressed="false">Rejected draft</button>
+    <button type="button" data-go="apply" aria-pressed="false">Apply confirm</button>
+    <button type="button" data-go="saved" aria-pressed="false">Saved, not applied</button>
+    <button type="button" data-go="degraded" aria-pressed="false">Degraded</button>
+  </div>
+  <p class="legend" id="legend" aria-live="polite"></p>
+</header>
+
+<main class="stage">
+  <div class="dlg" id="dlg" data-state="idle" role="dialog" aria-modal="true" aria-labelledby="dt-title">
+    <h2 class="dt" id="dt-title">Settings</h2>
+    <div class="body">
+      <nav class="rail" aria-label="Settings sections">
+        <span class="opt"><svg class="i" aria-hidden="true"><use href="#i-theme"/></svg>Appearance</span>
+        <span class="opt"><svg class="i" aria-hidden="true"><use href="#i-house"/></svg>Shell home</span>
+        <span class="opt"><svg class="i" aria-hidden="true"><use href="#i-restart"/></svg>Updates</span>
+        <span class="opt on" aria-current="true"><svg class="i" aria-hidden="true"><use href="#i-users"/></svg>Profiles</span>
+        <span class="opt"><svg class="i" aria-hidden="true"><use href="#i-key"/></svg>Account</span>
+        <span class="opt"><svg class="i" aria-hidden="true"><use href="#i-gauge"/></svg>Usage</span>
+        <span class="opt"><svg class="i" aria-hidden="true"><use href="#i-msg"/></svg>Language</span>
+        <span class="opt"><svg class="i" aria-hidden="true"><use href="#i-info"/></svg>About</span>
+      </nav>
+
+      <div class="pane">
+
+        <!-- ============ 1. IDLE: today's pane, plus Edit ============ -->
+        <section class="state" data-pane="idle">
+          <h3>Profiles</h3>
+          <p class="hint">Your agent profiles, the way the shell keeps them.</p>
+          <div class="mode">
+            <span class="mlabel">Orchestrator mode</span>
+            <div class="seg" role="radiogroup" aria-label="Orchestrator mode">
+              <span role="radio" tabindex="-1" aria-checked="true">Organic</span>
+              <span role="radio" tabindex="-1" aria-checked="false">Full delegation</span>
+            </div>
+            <span class="note" style="margin:0">Stored with the profile · new chats only</span>
+          </div>
+          <div class="card">
+            <p class="pname">team</p>
+            <p class="pmark">Default for new sessions</p>
+            <dl class="routes">
+              <div class="pair"><dt>Orchestrator</dt><dd class="mono">anthropic/claude-sonnet-4</dd><dd class="think">high</dd></div>
+              <div class="pair"><dt>Fallback</dt><dd class="mono">3 steps · * chain</dd><dd class="think">low</dd></div>
+            </dl>
+          </div>
+          <table class="agents" style="margin-top:12px">
+            <thead><tr><th scope="col">Agent</th><th scope="col">Model</th><th scope="col" style="text-align:right">Effort</th></tr></thead>
+            <tbody>
+              <tr><td class="agent">orchestrator</td><td class="model">anthropic/claude-sonnet-4</td><td class="eff">high</td></tr>
+              <tr><td class="agent">explore</td><td class="model">anthropic/claude-haiku-4-5</td><td class="eff">low</td></tr>
+              <tr><td class="agent">verify</td><td class="model">anthropic/claude-sonnet-4</td><td class="eff">medium</td></tr>
+              <tr><td class="agent">worker</td><td class="model">openai/gpt-5-codex</td><td class="eff">high</td></tr>
+            </tbody>
+          </table>
+          <dl class="pins">
+            <div class="pair"><dt>Pin · repo</dt><dd class="mono">fast</dd></div>
+            <div class="pair"><dt>Pin · local</dt><dd class="mono">team</dd></div>
+          </dl>
+          <div class="acts start">
+            <button class="btn primary" type="button">Edit</button>
+            <button class="btn quiet" type="button"><svg class="i s" aria-hidden="true"><use href="#i-term"/></svg> Edit in terminal</button>
+          </div>
+          <p class="note">Edit opens the focused editor for this profile. The terminal stays for whatever the editor does not cover, and for the profiles this pane cannot write.</p>
+        </section>
+
+        <!-- ============ 2. CONNECTING ============ -->
+        <section class="state" data-pane="connecting">
+          <h3>Profiles</h3>
+          <p class="hint">The pane read the files; the editor still needs its own process.</p>
+          <div class="banner" role="status">
+            <p><span class="bt">Starting the control process</span> <span class="pulse" aria-hidden="true"><i></i><i></i><i></i></span></p>
+            <p class="why">5 to 10 seconds. Edit stays disabled and says why, so nobody waits on a button that cannot answer.</p>
+            <p class="why">Pins are read again on open.</p>
+          </div>
+          <div class="dim" aria-hidden="true">
+            <div class="mode">
+              <span class="mlabel">Orchestrator mode</span>
+              <div class="seg" role="radiogroup"><span role="radio" tabindex="-1" aria-checked="true">Organic</span><span role="radio" tabindex="-1" aria-checked="false">Full delegation</span></div>
+            </div>
+            <div class="card"><p class="pname">team</p><p class="pmark">Default for new sessions</p></div>
+            <table class="agents" style="margin-top:10px">
+              <tbody>
+                <tr><td class="agent">orchestrator</td><td class="model">anthropic/claude-sonnet-4</td><td class="eff">high</td></tr>
+                <tr><td class="agent">explore</td><td class="model">anthropic/claude-haiku-4-5</td><td class="eff">low</td></tr>
+                <tr><td class="agent">verify</td><td class="model">anthropic/claude-sonnet-4</td><td class="eff">medium</td></tr>
+                <tr><td class="agent">worker</td><td class="model">openai/gpt-5-codex</td><td class="eff">high</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="acts start">
+            <button class="btn primary" type="button" aria-disabled="true" aria-describedby="wait-3">Edit</button>
+            <button class="btn quiet" type="button"><svg class="i s" aria-hidden="true"><use href="#i-term"/></svg> Edit in terminal</button>
+          </div>
+          <p class="note" id="wait-3">Edit is aria-disabled, not removed: it keeps its place and its keyboard stop, and the reason is this line.</p>
+        </section>
+
+        <!-- ============ 3. EDITING: the focused form, dirty ============ -->
+        <section class="state" data-pane="editing">
+          <div class="edbar">
+            <span class="en">team</span>
+            <span class="em">editing · stored only when you save</span>
+            <span class="tag warn">3 unsaved changes</span>
+          </div>
+          <div class="fgroup">
+            <h4>Orchestrator mode</h4>
+            <div class="seg" role="radiogroup" aria-label="Orchestrator mode">
+              <span role="radio" tabindex="-1" aria-checked="false">Organic</span>
+              <span role="radio" tabindex="-1" aria-checked="true">Full delegation</span>
+            </div>
+            <p class="note">Changed here; the stored document carries it, and only new chats read it.</p>
+          </div>
+          <div class="fgroup">
+            <h4>Agents</h4>
+            <div class="erow"><span class="an">orchestrator</span><button class="field wide" type="button"><span class="v mono">anthropic/claude-sonnet-4</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button><button class="field" type="button"><span class="v mono">high</span></button></div>
+            <div class="erow"><span class="an">explore</span><button class="field wide" type="button"><span class="v mono">anthropic/claude-haiku-4-5</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button><button class="field" type="button"><span class="v mono">low</span></button></div>
+            <div class="erow"><span class="an">verify <span class="dot" aria-hidden="true"></span><span class="vh">changed</span></span><button class="field wide" type="button"><span class="v mono">anthropic/claude-sonnet-4</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button><button class="field" type="button"><span class="v mono">xhigh</span></button></div>
+            <div class="erow"><span class="an">worker</span><button class="field wide" type="button"><span class="v mono">openai/gpt-5-codex</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button><button class="field" type="button"><span class="v mono">high</span></button></div>
+          </div>
+          <div class="fgroup">
+            <h4>Fallback chain <span class="key">*</span> default</h4>
+            <ol class="steps">
+              <li><span class="step">1</span><div class="stepmain"><button class="field wide" type="button"><span class="v mono">anthropic/claude-haiku-4-5</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></div><button class="iconbtn" type="button" aria-label="Move step 1 up" aria-disabled="true"><svg class="i s" aria-hidden="true"><use href="#i-up"/></svg></button><button class="iconbtn" type="button" aria-label="Move step 1 down"><svg class="i s" aria-hidden="true"><use href="#i-down"/></svg></button><button class="iconbtn" type="button" aria-label="Remove step 1"><svg class="i s" aria-hidden="true"><use href="#i-x"/></svg></button></li>
+              <li class="changed"><span class="step">2</span><div class="stepmain"><button class="field wide" type="button"><span class="v mono">openai/gpt-5-codex</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></div><button class="iconbtn" type="button" aria-label="Move step 2 up"><svg class="i s" aria-hidden="true"><use href="#i-up"/></svg></button><button class="iconbtn" type="button" aria-label="Move step 2 down"><svg class="i s" aria-hidden="true"><use href="#i-down"/></svg></button><button class="iconbtn" type="button" aria-label="Remove step 2"><svg class="i s" aria-hidden="true"><use href="#i-x"/></svg></button></li>
+              <li><span class="step">3</span><div class="stepmain"><button class="field wide" type="button"><span class="v mono">google/gemini-2.5-pro</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></div><button class="iconbtn" type="button" aria-label="Move step 3 up"><svg class="i s" aria-hidden="true"><use href="#i-up"/></svg></button><button class="iconbtn" type="button" aria-label="Move step 3 down" aria-disabled="true"><svg class="i s" aria-hidden="true"><use href="#i-down"/></svg></button><button class="iconbtn" type="button" aria-label="Remove step 3"><svg class="i s" aria-hidden="true"><use href="#i-x"/></svg></button></li>
+            </ol>
+            <div class="addstep"><button class="btn" type="button">Add step</button><span class="note" style="margin:0">3 of 8</span></div>
+          </div>
+          <div class="fgroup">
+            <h4>Pin</h4>
+            <div class="pinrows">
+              <div class="pinrow"><span class="plab">Repo</span><button class="field wide" type="button"><span class="v mono">fast</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button><button class="btn quiet" type="button">Clear</button></div>
+              <div class="pinrow"><span class="plab">Local</span><button class="field wide" type="button"><span class="v mono">team</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button><button class="btn quiet" type="button">Clear</button></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ 4. MODEL PICKER ============ -->
+        <section class="state" data-pane="picker">
+          <div class="edbar">
+            <span class="en">team</span>
+            <span class="em">editing · picking a model for verify</span>
+            <span class="tag quiet">no change yet</span>
+          </div>
+          <div class="fgroup">
+            <h4>Agents</h4>
+            <div class="erow"><span class="an">orchestrator</span><button class="field wide" type="button"><span class="v mono">anthropic/claude-sonnet-4</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button><button class="field" type="button"><span class="v mono">high</span></button></div>
+            <div class="erow"><span class="an">explore</span><button class="field wide" type="button"><span class="v mono">anthropic/claude-haiku-4-5</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button><button class="field" type="button"><span class="v mono">low</span></button></div>
+            <div class="erow">
+              <span class="an">verify</span>
+              <div class="cellpop">
+                <button class="field wide" type="button" aria-expanded="true" aria-controls="pop-3"><span class="v mono">anthropic/claude-sonnet-4</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button>
+                <div class="pop" id="pop-3" role="group" aria-label="Choose a model">
+                  <input class="filter" type="search" value="sonnet" aria-label="Filter models" readonly>
+                  <ul>
+                    <li><button class="option" type="button" aria-selected="true"><span class="mono">anthropic/claude-sonnet-4</span><span class="prov">anthropic</span></button></li>
+                    <li><button class="option" type="button" aria-selected="false"><span class="mono">anthropic/claude-opus-4-1</span><span class="prov">anthropic</span></button></li>
+                    <li><button class="option" type="button" aria-selected="false"><span class="mono">openai/gpt-5-codex</span><span class="prov">openai</span></button></li>
+                    <li><button class="option" type="button" aria-selected="false"><span class="mono">google/gemini-2.5-pro</span><span class="prov">google</span></button></li>
+                  </ul>
+                  <p class="pophint">Effort stays medium · Escape closes</p>
+                </div>
+              </div>
+              <button class="field" type="button"><span class="v mono">medium</span></button>
+            </div>
+            <div class="erow"><span class="an">worker</span><button class="field wide" type="button"><span class="v mono">openai/gpt-5-codex</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button><button class="field" type="button"><span class="v mono">high</span></button></div>
+          </div>
+          <div class="fgroup">
+            <h4>Fallback chain <span class="key">*</span> default</h4>
+            <p class="note" style="margin:0">3 steps · the popover covers them while it is open, and closes on Escape with nothing written.</p>
+          </div>
+        </section>
+
+        <!-- ============ 5. FALLBACK CHAIN: limit and repeat ============ -->
+        <section class="state" data-pane="chain">
+          <div class="edbar">
+            <span class="en">team</span>
+            <span class="em">editing · fallback chain</span>
+            <span class="tag warn">8 of 8 steps</span>
+          </div>
+          <div class="fgroup">
+            <h4>Fallback chain <span class="key">*</span> default</h4>
+            <ol class="steps">
+              <li><span class="step">1</span><div class="stepmain"><button class="field wide" type="button"><span class="v mono">anthropic/claude-haiku-4-5</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></div><button class="iconbtn" type="button" aria-label="Move step 1 up" aria-disabled="true"><svg class="i s" aria-hidden="true"><use href="#i-up"/></svg></button><button class="iconbtn" type="button" aria-label="Move step 1 down"><svg class="i s" aria-hidden="true"><use href="#i-down"/></svg></button><button class="iconbtn" type="button" aria-label="Remove step 1"><svg class="i s" aria-hidden="true"><use href="#i-x"/></svg></button></li>
+              <li><span class="step">2</span><div class="stepmain"><button class="field wide" type="button"><span class="v mono">openai/gpt-5-codex</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></div><button class="iconbtn" type="button" aria-label="Move step 2 up"><svg class="i s" aria-hidden="true"><use href="#i-up"/></svg></button><button class="iconbtn" type="button" aria-label="Move step 2 down"><svg class="i s" aria-hidden="true"><use href="#i-down"/></svg></button><button class="iconbtn" type="button" aria-label="Remove step 2"><svg class="i s" aria-hidden="true"><use href="#i-x"/></svg></button></li>
+              <li><span class="step">3</span><div class="stepmain"><button class="field wide" type="button"><span class="v mono">google/gemini-2.5-pro</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></div><button class="iconbtn" type="button" aria-label="Move step 3 up"><svg class="i s" aria-hidden="true"><use href="#i-up"/></svg></button><button class="iconbtn" type="button" aria-label="Move step 3 down"><svg class="i s" aria-hidden="true"><use href="#i-down"/></svg></button><button class="iconbtn" type="button" aria-label="Remove step 3"><svg class="i s" aria-hidden="true"><use href="#i-x"/></svg></button></li>
+              <li><span class="step">4</span><div class="stepmain"><button class="field wide" type="button" aria-invalid="true" aria-describedby="rep-3"><span class="v mono">google/gemini-2.5-pro</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button><p class="step-err" id="rep-3">Already step 3 · a model appears once</p></div><button class="iconbtn" type="button" aria-label="Move step 4 up"><svg class="i s" aria-hidden="true"><use href="#i-up"/></svg></button><button class="iconbtn" type="button" aria-label="Move step 4 down"><svg class="i s" aria-hidden="true"><use href="#i-down"/></svg></button><button class="iconbtn" type="button" aria-label="Remove step 4"><svg class="i s" aria-hidden="true"><use href="#i-x"/></svg></button></li>
+              <li><span class="step">5</span><div class="stepmain"><button class="field wide" type="button"><span class="v mono">mistral/codestral-2508</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></div><button class="iconbtn" type="button" aria-label="Move step 5 up"><svg class="i s" aria-hidden="true"><use href="#i-up"/></svg></button><button class="iconbtn" type="button" aria-label="Move step 5 down"><svg class="i s" aria-hidden="true"><use href="#i-down"/></svg></button><button class="iconbtn" type="button" aria-label="Remove step 5"><svg class="i s" aria-hidden="true"><use href="#i-x"/></svg></button></li>
+              <li><span class="step">6</span><div class="stepmain"><button class="field wide" type="button"><span class="v mono">openai/gpt-5-mini</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></div><button class="iconbtn" type="button" aria-label="Move step 6 up"><svg class="i s" aria-hidden="true"><use href="#i-up"/></svg></button><button class="iconbtn" type="button" aria-label="Move step 6 down"><svg class="i s" aria-hidden="true"><use href="#i-down"/></svg></button><button class="iconbtn" type="button" aria-label="Remove step 6"><svg class="i s" aria-hidden="true"><use href="#i-x"/></svg></button></li>
+              <li><span class="step">7</span><div class="stepmain"><button class="field wide" type="button"><span class="v mono">anthropic/claude-opus-4-1</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></div><button class="iconbtn" type="button" aria-label="Move step 7 up"><svg class="i s" aria-hidden="true"><use href="#i-up"/></svg></button><button class="iconbtn" type="button" aria-label="Move step 7 down"><svg class="i s" aria-hidden="true"><use href="#i-down"/></svg></button><button class="iconbtn" type="button" aria-label="Remove step 7"><svg class="i s" aria-hidden="true"><use href="#i-x"/></svg></button></li>
+              <li><span class="step">8</span><div class="stepmain"><button class="field wide" type="button"><span class="v mono">openai/o4-mini</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></div><button class="iconbtn" type="button" aria-label="Move step 8 up"><svg class="i s" aria-hidden="true"><use href="#i-up"/></svg></button><button class="iconbtn" type="button" aria-label="Move step 8 down" aria-disabled="true"><svg class="i s" aria-hidden="true"><use href="#i-down"/></svg></button><button class="iconbtn" type="button" aria-label="Remove step 8"><svg class="i s" aria-hidden="true"><use href="#i-x"/></svg></button></li>
+            </ol>
+            <div class="addstep">
+              <button class="btn" type="button" aria-disabled="true" aria-describedby="lim-3">Add step</button>
+              <span class="limit" id="lim-3">Limit reached: 8 of 8. Remove one to add another.</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ 6. PIN ============ -->
+        <section class="state" data-pane="pin">
+          <div class="edbar">
+            <span class="en">team</span>
+            <span class="em">editing · pin</span>
+            <span class="tag warn">1 unsaved change</span>
+          </div>
+          <div class="fgroup">
+            <h4>Pin</h4>
+            <div class="banner" role="status">
+              <p><span class="bt">Pins are read when the pane opens.</span></p>
+              <p class="why">They are not watched, so a terminal edit needs a reopen.</p>
+            </div>
+            <div class="pinrows">
+              <div class="pinrow"><span class="plab">Repo</span><button class="field wide" type="button"><span class="v mono">none</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button><button class="btn quiet" type="button" aria-disabled="true" aria-describedby="clr-3">Clear</button></div>
+              <div class="pinrow"><span class="plab">Local</span><button class="field wide" type="button"><span class="v mono">team</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button><button class="btn quiet" type="button">Clear</button></div>
+            </div>
+            <p class="note" id="clr-3">Repo cleared in this draft: it writes <span class="code">{"source":"repo","profile":null}</span>, so the default profile wins in this folder.</p>
+          </div>
+          <div class="fgroup">
+            <h4>What the pin changes</h4>
+            <p class="note" style="margin:0">The repo pin wins inside this folder; the local pin wins in every other folder. Live chats are untouched either way.</p>
+          </div>
+        </section>
+
+        <!-- ============ 7. REVISION CONFLICT ============ -->
+        <section class="state" data-pane="conflict">
+          <div class="edbar">
+            <span class="en">team</span>
+            <span class="em">editing · draft from 14:22</span>
+            <span class="tag warn">3 unsaved changes</span>
+          </div>
+          <div class="banner warn" role="alert">
+            <p><span class="bt">This profile changed since you opened it.</span></p>
+            <p class="why">Nothing was written. Keep your draft and write over theirs with a fresh revision, or take their version.</p>
+            <div class="bacts">
+              <button class="btn primary" type="button">Keep my draft</button>
+              <button class="btn" type="button">Reload theirs</button>
+            </div>
+          </div>
+          <div class="fgroup">
+            <h4>Agents</h4>
+            <div class="erow"><span class="an">orchestrator</span><button class="field wide" type="button"><span class="v mono">anthropic/claude-sonnet-4</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button><button class="field" type="button"><span class="v mono">high</span></button></div>
+            <div class="erow"><span class="an">explore</span><button class="field wide" type="button"><span class="v mono">anthropic/claude-haiku-4-5</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button><button class="field" type="button"><span class="v mono">low</span></button></div>
+            <div class="erow"><span class="an">verify <span class="dot" aria-hidden="true"></span><span class="vh">changed</span></span><button class="field wide" type="button"><span class="v mono">anthropic/claude-sonnet-4</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button><button class="field" type="button"><span class="v mono">xhigh</span></button></div>
+            <div class="erow"><span class="an">worker</span><button class="field wide" type="button"><span class="v mono">openai/gpt-5-codex</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button><button class="field" type="button"><span class="v mono">high</span></button></div>
+          </div>
+          <p class="note">Reload theirs discards the dots, so it asks once more before it throws the draft away. Cancel does the same, and says so.</p>
+        </section>
+
+        <!-- ============ 8. INVALID DATA ============ -->
+        <section class="state" data-pane="rejected">
+          <div class="edbar">
+            <span class="en">team</span>
+            <span class="em">editing · draft kept</span>
+            <span class="tag bad">refused</span>
+          </div>
+          <div class="banner bad" role="alert">
+            <p><span class="bt">gentle-pi rejected this draft.</span></p>
+            <p class="why">Nothing was written. The draft is kept exactly as you left it, so nothing is lost by reading the reason.</p>
+            <p class="why"><span class="code">invalid_data · profiles.team.worker.thinking: unknown level "ultra"</span></p>
+          </div>
+          <div class="fgroup">
+            <h4>Agents</h4>
+            <div class="erow"><span class="an">orchestrator</span><button class="field wide" type="button"><span class="v mono">anthropic/claude-sonnet-4</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button><button class="field" type="button"><span class="v mono">high</span></button></div>
+            <div class="erow"><span class="an">explore</span><button class="field wide" type="button"><span class="v mono">anthropic/claude-haiku-4-5</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button><button class="field" type="button"><span class="v mono">low</span></button></div>
+            <div class="erow"><span class="an">verify</span><button class="field wide" type="button"><span class="v mono">anthropic/claude-sonnet-4</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button><button class="field" type="button"><span class="v mono">medium</span></button></div>
+            <div class="erow"><span class="an">worker <span class="dot warn" aria-hidden="true"></span><span class="vh">refused</span></span><button class="field wide" type="button"><span class="v mono">openai/gpt-5-codex</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button><button class="field" type="button" aria-invalid="true"><span class="v mono">ultra</span></button></div>
+          </div>
+          <p class="note">The effort control accepts only the seven levels the reader knows; the owner still has the last word, so this copy reports it instead of hiding the draft.</p>
+        </section>
+
+        <!-- ============ 10. SAVED, NOT APPLIED ============ -->
+        <section class="state" data-pane="saved">
+          <div class="edbar" style="border-color:var(--border);background:var(--surface2)">
+            <span class="en">team</span>
+            <span class="em">saved at 14:24 · not applied</span>
+            <span class="tag ok" style="margin-left:auto">stored</span>
+          </div>
+          <h3>Profiles</h3>
+          <p class="hint">The write landed. The default has not moved.</p>
+          <div class="banner" role="status">
+            <p><span class="bt">Saved. Not applied yet.</span></p>
+            <p class="why">New chats still start on <span class="mono">fast</span>. Chats already open keep the routing they started with.</p>
+          </div>
+          <div class="card">
+            <p class="pname">team</p>
+            <p class="pmark">Saved · not the default for new sessions</p>
+            <dl class="routes">
+              <div class="pair"><dt>Orchestrator</dt><dd class="mono">anthropic/claude-sonnet-4</dd><dd class="think">high</dd></div>
+              <div class="pair"><dt>Mode</dt><dd class="mono">full delegation</dd></div>
+              <div class="pair"><dt>Chain</dt><dd class="mono">8 steps · * chain</dd></div>
+            </dl>
+          </div>
+          <dl class="pins">
+            <div class="pair"><dt>Pin · repo</dt><dd class="mono">fast</dd><dd><span class="tag warn">wins here</span></dd></div>
+            <div class="pair"><dt>Pin · local</dt><dd class="mono">team</dd></div>
+          </dl>
+          <p class="note">This repo is pinned to fast, so fast stays the default in this folder even after team is made default.</p>
+        </section>
+
+        <!-- ============ 11. DEGRADED ============ -->
+        <section class="state" data-pane="degraded">
+          <h3>Profiles</h3>
+          <p class="hint">Read-only view, the one this pane draws today</p>
+          <div class="banner bad" role="alert">
+            <p><span class="bt">The control process did not answer.</span></p>
+            <p class="why">Editing needs it. This view still shows what the shell read from the files.</p>
+            <div class="bacts">
+              <button class="btn" type="button">Try again</button>
+              <button class="btn quiet" type="button"><svg class="i s" aria-hidden="true"><use href="#i-term"/></svg> Edit in terminal</button>
+            </div>
+          </div>
+          <div class="card">
+            <p class="pname">team</p>
+            <p class="pmark">Default for new sessions</p>
+            <dl class="routes">
+              <div class="pair"><dt>Orchestrator</dt><dd class="mono">anthropic/claude-sonnet-4</dd><dd class="think">high</dd></div>
+              <div class="pair"><dt>Fallback</dt><dd class="mono">3 steps · * chain</dd><dd class="think">low</dd></div>
+            </dl>
+          </div>
+          <table class="agents" style="margin-top:12px">
+            <tbody>
+              <tr><td class="agent">orchestrator</td><td class="model">anthropic/claude-sonnet-4</td><td class="eff">high</td></tr>
+              <tr><td class="agent">explore</td><td class="model">anthropic/claude-haiku-4-5</td><td class="eff">low</td></tr>
+              <tr><td class="agent">verify</td><td class="model">anthropic/claude-sonnet-4</td><td class="eff">medium</td></tr>
+              <tr><td class="agent">worker</td><td class="model">openai/gpt-5-codex</td><td class="eff">high</td></tr>
+            </tbody>
+          </table>
+          <div class="acts start">
+            <button class="btn primary" type="button" aria-disabled="true" aria-describedby="deg-3">Edit</button>
+            <button class="btn" type="button"><svg class="i s" aria-hidden="true"><use href="#i-term"/></svg> Edit in terminal</button>
+          </div>
+          <p class="note" id="deg-3">The editor's own reason line: editing needs the control process, and the terminal is the way through until it answers.</p>
+        </section>
+
+      </div><!-- /pane -->
+    </div><!-- /body -->
+
+    <!-- read-only states -->
+    <div class="acts" data-foot="idle"><button class="btn" type="button">Close</button></div>
+    <div class="acts" data-foot="connecting"><button class="btn" type="button">Close</button></div>
+    <div class="acts" data-foot="degraded"><button class="btn" type="button">Close</button></div>
+
+    <!-- the mode's footer: one bar for every editing state, its words follow the state -->
+    <div class="editfoot" data-foot="edit" hidden>
+      <span class="fstat" id="fstat">3 unsaved changes</span>
+      <span class="fnote" id="fnote">Cancel keeps the stored profile</span>
+      <span class="fbtns">
+        <button class="btn quiet" type="button" id="fcancel">Cancel</button>
+        <button class="btn" type="button" id="fsave">Save</button>
+        <button class="btn primary" type="button" id="fsavemake">Save and make default</button>
+      </span>
+    </div>
+
+    <!-- saved, not applied: the second action lives in the footer -->
+    <div class="editfoot" data-foot="saved" hidden>
+      <span class="fstat">Saved · not applied</span>
+      <span class="fnote">New chats still start on fast</span>
+      <span class="fbtns">
+        <button class="btn quiet" type="button">Done</button>
+        <button class="btn primary" type="button">Make default for new sessions</button>
+      </span>
+    </div>
+
+    <div class="ovl" data-overlay="apply" hidden></div>
+    <div class="confirm" data-overlay="apply" role="alertdialog" aria-modal="true" aria-labelledby="conf-t" hidden>
+      <h4 id="conf-t">Apply profile "team"?</h4>
+      <p><strong>New chats start on team.</strong> Chats already open keep their routing.</p>
+      <p>This repo is pinned to <span class="mono">fast</span>, so fast stays the default in this folder.</p>
+      <p class="note" style="margin:6px 0 0">gentle-pi asks this itself; the editor only offers the action.</p>
+      <div class="cacts">
+        <button class="btn" type="button">Cancel</button>
+        <button class="btn primary" type="button">Apply</button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<p class="legend" style="padding:0 24px 18px;max-width:900px">
+  Copy is English and kept short so Spanish fits: the longest button is <em>Make default for new sessions</em> (31 characters in Spanish, 31 in English), the longest sentence 78. The mode is the direction's whole point, so the footer never disappears while editing: leaving it is always Cancel, Save or Save and make default.
+</p>
+
+<script>
+(function(){
+  /* One entry per state: the legend, which dialog footer it uses, and — for the
+     editing states — the words the shared footer carries and the controls it holds. */
+  var STATES = {
+    idle: { foot:"idle", legend:"The pane exactly as it draws today, with one primary action added where Edit in terminal used to be the only way out. Nothing is a draft until Edit is pressed." },
+    connecting: { foot:"connecting", legend:"The temporary control child is starting (5–10 s, ~400 MB). Edit keeps its place, its keyboard stop and the reason line; the read view stays untouched." },
+    editing: { foot:"edit", stat:"3 unsaved changes", note:"Cancel keeps the stored profile", legend:"The pane has become one form and the footer became the commit point: Cancel, Save, Save and make default. Changed agents carry a dot, the chain and the pin sit in the same form." },
+    picker: { foot:"edit", stat:"No changes yet", note:"Escape closes, nothing written", legend:"The catalog opens in the form, over the rows below. Choosing writes one field; the footer's count only moves when something is actually picked." },
+    chain: { foot:"edit", stat:"1 unsaved change", note:"resolve the repeat to save", saveDisabled:true, legend:"Step 8 refuses a ninth and the repeated gemini is refused before the write. The footer's Save is aria-disabled and points at the repeat, while Cancel still leaves cleanly." },
+    pin: { foot:"edit", stat:"1 unsaved change", note:"Clear writes null", legend:"The pin is part of the same form: repo and local, one profile each, Clear writing null. The notice says pins are read on open, never watched." },
+    conflict: { foot:"edit", stat:"3 unsaved changes, kept", note:"a fresh revision is read on retry", legend:"revision_conflict with the form intact: nothing was written, the three dots are still there, and the choice is keep my draft or reload theirs — Cancel asks before discarding." },
+    rejected: { foot:"edit", stat:"Draft kept · 1 field refused", note:"the owner has the last word", legend:"The owner's invalid_data answer in the form, with the refused field marked and the draft kept. Saving again sends the same draft, which is why the copy says nothing was written." },
+    apply: { foot:"saved", legend:"The channel's own confirmation over the saved pane: it names the profile, says open chats keep their routing, and reports that the repo pin still wins here." },
+    saved: { foot:"saved", legend:"Saved and not applied, said plainly: the stored card changed, the default did not, and the second action sits in the footer where the commit was." },
+    degraded: { foot:"degraded", legend:"No answer from the child. Today's read-only pane returns, Edit goes aria-disabled with its reason, and the terminal is the way through." }
+  };
+  var BASE = { apply:"saved" };
+  var dlg = document.getElementById("dlg");
+  var legend = document.getElementById("legend");
+  var fstat = document.getElementById("fstat");
+  var fnote = document.getElementById("fnote");
+  var fsave = document.getElementById("fsave");
+  var fsavemake = document.getElementById("fsavemake");
+  var buttons = [].slice.call(document.querySelectorAll("[data-go]"));
+
+  function show(id){
+    var s = STATES[id] || STATES.idle;
+    var base = BASE[id] || id;
+    dlg.setAttribute("data-state", id);
+    document.querySelectorAll("[data-pane]").forEach(function(p){ p.hidden = p.dataset.pane !== base; });
+    document.querySelectorAll("[data-foot]").forEach(function(f){ f.hidden = f.dataset.foot !== s.foot; });
+    document.querySelectorAll("[data-overlay]").forEach(function(o){ o.hidden = o.dataset.overlay !== id; });
+    if (s.foot === "edit") {
+      fstat.textContent = s.stat || "";
+      fnote.textContent = s.note || "";
+      fsave.setAttribute("aria-disabled", s.saveDisabled ? "true" : "false");
+      fsavemake.setAttribute("aria-disabled", s.saveDisabled ? "true" : "false");
+      fsave.setAttribute("aria-describedby", s.saveDisabled ? "rep-3" : "");
+      fsavemake.setAttribute("aria-describedby", s.saveDisabled ? "rep-3" : "");
+    }
+    buttons.forEach(function(b){ b.setAttribute("aria-pressed", b.dataset.go === id ? "true" : "false"); });
+    legend.textContent = s.legend;
+  }
+  buttons.forEach(function(b){ b.addEventListener("click", function(){ show(b.dataset.go); }); });
+  show("idle");
+})();
+</script>
+</body>
+</html>

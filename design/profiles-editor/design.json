@@ -1,0 +1,49 @@
+{
+  "title": "Profiles, fallbacks and pin editor",
+  "brief": "An editor for gentle-pi profiles. S9 (maintainer RULING, 2026-11-17): the editor lives INSIDE THE CHAT with the terminal's three outcomes - Save, Use in this chat (apply_profile mode session, to that chat's own child) and Make default (mode default, global, labelled as such, with the channel's confirmation), because a Settings editor made the profile look global. Settings > Profiles stays the GLOBAL view (the default and the definitions, scope labelled) and points at the chat for editing. 04-06 draw that framing; 01-03 framed the same editor inside Settings and are kept as alternatives only. Each artboard walks eleven states through an in-artboard switcher: this chat on the default, this chat on a session profile (this chat only), the per-agent model and thinking editor with the app's model picker, the fallback chain (8-step limit, a repeated model refused), the repo pin with its no-worktree case, revision_conflict, invalid_data, the three-way outcome with the channel's confirmation, saved-but-not-used, the chat unavailable (working, ended, child did not answer) with Edit in terminal, and Settings as the global view.",
+  "feature": "odd/tasks/profiles-editor.md",
+  "artboards": [
+    {
+      "file": "01-edit-in-place.html",
+      "title": "A: the ledger rows become the fields (Settings framing, superseded by S9)",
+      "tradeoff": "Makes easy: one screen, no mode to learn, every agent's model and effort changed where it already stands, and one sticky bar with a single count for the whole draft. Costs: a dense table where the model popover covers the rows below and the effort cells are small targets; the chain and the pin have no column, so they become stacked blocks under the table; a stray click on a value has already started a draft; and a conflicting or rejected write has to be reported in a banner that must not push the bar out of reach. Superseded by S9: drawn inside Settings, which is what made the profile look global.",
+      "width": 960,
+      "height": 800
+    },
+    {
+      "file": "02-detail-panel.html",
+      "title": "B: the ledger stays read-only, a profile opens in a panel (Settings framing, superseded by S9)",
+      "tradeoff": "Makes easy: reading is always one untouched screen, writing is always one profile, the panel has room for the owner's rejection and for what a save does and does not do, and the ledger can never mutate under the pointer. Costs: two steps for one field and one save per profile; at the dialog's 680 px the panel is only 322 px wide, so it is a slide-over that hides most of the ledger and truncates model ids; the chain and the pin need their own views inside the panel, which adds a second navigation level; and comparing two profiles means closing one to open the other. Superseded by S9: no chat, so no Use in this chat and no workspace for the pin.",
+      "width": 960,
+      "height": 800
+    },
+    {
+      "file": "03-focused-mode.html",
+      "title": "C: an explicit Edit mode with a Cancel / Save / Save and make default footer (Settings framing, superseded by S9)",
+      "tradeoff": "Makes easy: unambiguous commit semantics - a draft exists only inside the mode, and leaving it is always Cancel, Save or Save and make default; the form has the whole pane for agents, chain and pin; and the apply step sits where the save happened. Costs: an extra mode to learn and an extra click to start; nothing is comparable while editing, so checking another profile means cancelling; a dirty draft forces a keep-or-discard decision to leave; and the read-only view has to keep a second, permanent way out (the terminal) for what the editor does not cover. Superseded by S9: 'Save and make default' was the only apply, so the session scope the terminal offers was missing.",
+      "width": 960,
+      "height": 800
+    },
+    {
+      "file": "04-chip-and-popover.html",
+      "title": "D: a profile chip in the composer row, its popover, and an editor sheet over the thread",
+      "tradeoff": "Makes easy: the control sits where the model already sits, in the row under the box, so the profile reads as this chat's setting before it is opened; the popover answers the two questions the ruling was about - which profile this chat runs, which one is the default - with no mode and no screen; the editor sheet leaves the composer live underneath, so Use in this chat plainly belongs to the chat; and Make default is one labelled row inside the sheet, never the first action. Costs: two pills of different kinds share one row and the new one can be misread as part of the model chip; the sheet covers the thread, so the conversation is out of sight while editing; the 330 px popover truncates long profile names; and the popover is only found by noticing the pill, so the first visit costs a click before anything is explained. Answers 'looks global': by placement (the composer is this chat's) plus a tag reading default or this chat only, with the global action confined to the sheet's labelled row.",
+      "width": 1440,
+      "height": 1010
+    },
+    {
+      "file": "05-header-and-sheet.html",
+      "title": "E: a profile chip in the chat header and a sheet that slides over the thread",
+      "tradeoff": "Makes easy: the profile is named at the top of the chat, beside the pencil that renames it, so it is obviously a property of this chat and not of the app; one click reaches the whole editor; the slide-over stops at the composer, so the chat and the three outcomes stay in view together; and the scope word sits in the chip, exactly where the 'looks global' doubt starts. Costs: the header now holds two controls about the chat's identity (rename and profile) and at 900 px the header is the first thing to crowd, so the pill must shrink to its name; the 470 px sheet truncates model ids and forces a stacked row per agent; the slide is motion the reduced-motion rule has to remove; and the sheet hides the thread while open, so comparing the profile with what the chat is doing means closing it. Answers 'looks global': by placement inside the chat header, by the scope word in the chip, and by keeping the global action in the sheet's footer behind the channel's confirmation.",
+      "width": 1440,
+      "height": 1010
+    },
+    {
+      "file": "06-profile-tab.html",
+      "title": "F: a third Profile tab beside Chat and Helpers",
+      "tradeoff": "Makes easy: nothing to discover - the profile is one of the chat's own views, exactly like Helpers, so its scope is structural rather than stated; the accordion gives agents, chain and pin a full-width home with room for the eight-step chain and both pin layers; and the three outcomes keep a permanent footer, so the applies are never more than a scroll away. Costs: a third tab competes with Helpers for a 52 px header and implies the profile always deserves a tab; one group open at a time means chain and pin edits cannot be compared, so the switcher has to keep the accordion in step; a full view hides the conversation entirely, so Use in this chat is chosen without seeing the thread; and Helpers' working badge has no equivalent here - nothing on the tab says the profile is dirty. Answers 'looks global': the tab belongs to the chat, the name carries default or this chat only, and Settings keeps only the global list.",
+      "width": 1440,
+      "height": 1010
+    }
+  ]
+}

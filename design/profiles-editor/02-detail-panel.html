@@ -1,0 +1,650 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=960">
+<title>Profiles editor — B: detail panel</title>
+<style>
+/* Tokens: design/system.md, theme dark (apps/desktop/src/theme.css). */
+:root{--bg:#0e1116;--surface:#151a21;--surface2:#1c222b;--border:#2b333d;--text:#e4e8ee;--muted:#9aa4b2;--faint:#7d8593;--accent:#7aa2f7;--tint:rgba(122,162,247,.14);--success:#7edc9a;--warning:#e7b455;--danger:#ff8585;--shadow:0 8px 24px rgba(0,0,0,.45)}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.mono{font-family:ui-monospace,'Cascadia Code',Consolas,monospace}
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.i{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.i.s{width:12px;height:12px}
+/* ---- artboard chrome ---- */
+.board{padding:16px 24px 12px;border-bottom:1px solid var(--border);background:var(--surface)}
+.kicker{margin:0 0 3px;font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--faint)}
+h1{margin:0 0 5px;font-size:18px;font-weight:600}
+.lead{margin:0 0 10px;max-width:790px;color:var(--muted);font-size:12.5px;line-height:1.55}
+.states{display:flex;flex-wrap:wrap;gap:6px}
+.states button{border:1px solid var(--border);background:transparent;color:var(--muted);border-radius:8px;padding:4px 10px;font-size:12px;cursor:pointer;transition:background-color 120ms ease,color 120ms ease,border-color 120ms ease}
+.states button:hover{background:var(--surface2);color:var(--text)}
+.states button[aria-pressed="true"]{background:var(--tint);color:var(--accent);border-color:var(--accent);font-weight:600}
+.legend{margin:8px 0 0;font-size:11.5px;color:var(--faint);max-width:830px;line-height:1.5}
+/* ---- the Settings shell ---- */
+.stage{display:flex;justify-content:center;padding:16px 24px 20px}
+.dlg{position:relative;width:min(680px,100%);background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);padding:18px;display:flex;flex-direction:column;gap:14px;max-height:calc(100vh - 196px);min-height:420px}
+.dt{margin:0;font-size:15px;font-weight:600}
+.body{display:flex;gap:18px;flex:1;min-height:0}
+.rail{flex:none;width:184px;display:flex;flex-direction:column;gap:2px;border-right:1px solid var(--border)}
+.rail .opt{display:flex;align-items:center;gap:9px;height:32px;padding:0 10px;border-radius:8px;font-size:13px;color:var(--muted)}
+.rail .opt.on{background:var(--tint);color:var(--accent)}
+.pane{position:relative;flex:1;min-width:0;overflow:auto;padding-right:2px;display:flex;flex-direction:column}
+.state{display:flex;flex-direction:column;flex:1;min-height:0}
+.pane h3{margin:0;font-size:15px;font-weight:600}
+.hint{margin:2px 0 12px;font-size:12px;color:var(--muted)}
+.note{margin:6px 0 0;font-size:11.5px;color:var(--faint);line-height:1.5}
+/* ---- the read-only ledger: rows that open a panel ---- */
+.ledger{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.lrow{display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:0;background:transparent;border-radius:8px;padding:7px 8px;cursor:pointer;color:inherit;transition:background-color 120ms ease}
+.lrow:hover{background:var(--surface2)}
+.lrow[aria-current="true"]{background:var(--tint)}
+.ltext{display:flex;flex-direction:column;gap:1px;min-width:0}
+.lname{font-size:13px;font-weight:600}
+.lmeta{font-size:11.5px;color:var(--faint)}
+.lright{margin-left:auto;display:flex;align-items:center;gap:6px}
+.lright .i{color:var(--faint)}
+/* ---- the split: ledger kept on the left, the panel on the right ---- */
+.split{display:grid;grid-template-columns:112px minmax(0,1fr);gap:8px;flex:1;min-height:0}
+.miniledger{border-right:1px solid var(--border);padding-right:6px;display:flex;flex-direction:column;gap:1px;min-height:0;overflow:auto}
+.ml-title{margin:0 0 6px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--faint)}
+.mrow{display:flex;flex-direction:column;gap:1px;padding:5px 6px;border-radius:6px;font-size:12px;color:var(--muted)}
+.mrow[aria-current="true"]{background:var(--tint);color:var(--text);font-weight:600}
+.mrow .cm{font-size:11px;font-weight:400;color:var(--muted)}
+.mrow .cm.def{color:var(--accent)}
+/* ---- the detail sheet ---- */
+.sheet{display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.shead{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--border)}
+.sname{margin:0;font-size:13px;font-weight:600}
+.smeta{margin:0;font-size:11px;color:var(--faint)}
+.sbody{padding:8px 10px 4px;overflow:auto;flex:1;min-height:0}
+.sbody.noscroll{overflow:visible}
+.srow{display:grid;grid-template-columns:72px minmax(0,1fr) 62px;gap:5px;align-items:center;padding:3px 0}
+.an{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sfoot{border-top:1px solid var(--border);padding:7px 10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--surface2)}
+.sfoot .sstat{font-size:11.5px;font-weight:600}
+.sfoot .snote{font-size:11px;color:var(--muted)}
+.sfoot .sacts{margin-left:auto;display:flex;gap:6px}
+.crumb{display:flex;align-items:center;gap:5px;margin:0 0 6px;font-size:11.5px;color:var(--faint)}
+/* the stored orchestrator mode, at the panel's width */
+.mline{display:flex;align-items:center;gap:6px;padding:5px 10px;border-bottom:1px solid var(--border)}
+.mlab{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);flex:none}
+.segmini{display:inline-flex;margin-left:auto;border:1px solid var(--border);border-radius:6px;overflow:hidden}
+.segmini span{padding:1px 7px;font-size:11px;color:var(--muted)}
+.segmini span[aria-checked="true"]{background:var(--accent);color:var(--bg);font-weight:600}
+.mval{margin-left:auto;font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:11px;color:var(--accent)}
+/* ---- fields ---- */
+.field{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--border);background:var(--bg);color:var(--text);border-radius:6px;padding:1px 6px;font-size:11.5px;cursor:pointer;min-width:0;transition:border-color 120ms ease}
+.field:hover{border-color:var(--accent)}
+.field.wide{display:flex;width:100%;justify-content:space-between}
+.field svg{color:var(--faint)}
+.field .v{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.field .v.mono{font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:11px}
+.field[aria-invalid="true"]{border-color:var(--danger)}
+.cellpop{position:relative;min-width:0}
+.pop{position:absolute;z-index:30;left:0;top:calc(100% + 6px);width:284px;background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.4);padding:4px}
+.pop .filter{width:100%;border:1px solid var(--border);background:var(--bg);border-radius:8px;padding:4px 8px;font-size:12px;margin-bottom:4px}
+.pop ul{list-style:none;margin:0;padding:0;max-height:150px;overflow:auto}
+.pop .option{display:flex;align-items:baseline;gap:8px;width:100%;text-align:left;border:0;background:transparent;border-radius:8px;padding:5px 8px;font-size:11.5px;color:var(--text);cursor:pointer}
+.pop .option:hover,.pop .option.active{background:var(--surface2)}
+.pop .option[aria-selected="true"]{color:var(--accent);font-weight:600}
+.pop .prov{margin-left:auto;font-size:11px;color:var(--faint)}
+.pop .pophint{padding:2px 8px 4px;font-size:11px;color:var(--faint)}
+/* ---- chain and pin inside the sheet ---- */
+.sect{margin-top:10px;padding-top:8px;border-top:1px solid var(--border)}
+.sect h4{margin:0 0 6px;display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--faint)}
+.key{font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:11px;letter-spacing:0;color:var(--accent);background:var(--tint);border-radius:4px;padding:1px 4px}
+.chainro{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:1px}
+.chainro li{display:flex;align-items:baseline;gap:6px;font-size:11.5px}
+.chainro .step{width:12px;flex:none;font:600 11px/1.6 ui-monospace,'Cascadia Code',Consolas,monospace;color:var(--faint)}
+.chainro .think{margin-left:auto;font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:11px;color:var(--accent)}
+.steps{margin:0;padding:0;list-style:none;border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.steps li{display:flex;align-items:center;gap:4px;padding:4px 6px;border-bottom:1px solid var(--border)}
+.steps li:last-child{border-bottom:0}
+.steps li.changed{background:var(--tint)}
+.steps .step{width:12px;flex:none;text-align:center;font:600 11px/1 ui-monospace,'Cascadia Code',Consolas,monospace;color:var(--muted)}
+.stepmain{flex:1;min-width:0}
+.step-err{margin:2px 0 0;font-size:11px;color:var(--danger);line-height:1.35}
+.iconbtn{width:22px;height:22px;flex:none;display:inline-grid;place-items:center;border:1px solid transparent;border-radius:6px;background:transparent;color:var(--muted);cursor:pointer;transition:background-color 120ms ease,color 120ms ease}
+.iconbtn:hover{background:var(--surface2);color:var(--text)}
+.iconbtn[aria-disabled="true"]{opacity:.4;cursor:not-allowed}
+.addstep{display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap}
+.limit{font-size:11px;color:var(--warning)}
+.pinrows{display:flex;flex-direction:column;gap:7px}
+.pinrow{display:flex;align-items:center;gap:6px}
+.pinrow .plab{width:42px;flex:none;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--faint)}
+.pinrow .field{flex:1;min-width:0}
+.pinrow dd{margin:0}
+.pins{margin:0;display:flex;flex-direction:column;gap:3px}
+.pins .pinrow dd{font-size:11.5px}
+/* ---- notices ---- */
+.banner{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:7px 9px 7px 11px;box-shadow:inset 3px 0 0 var(--accent);margin:0 0 10px;font-size:11.5px}
+.banner p{margin:0}
+.banner .bt{font-weight:600;font-size:12px}
+.banner.warn{box-shadow:inset 3px 0 0 var(--warning)}
+.banner.bad{box-shadow:inset 3px 0 0 var(--danger)}
+.banner.bad .bt{color:var(--danger)}
+.banner .why{margin-top:2px;color:var(--muted)}
+.bacts{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.code{font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:11px;color:var(--muted);background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:1px 4px}
+/* ---- buttons, tags ---- */
+.btn{border:1px solid var(--border);background:var(--surface2);color:var(--text);border-radius:8px;padding:4px 10px;font-size:12px;cursor:pointer;transition:border-color 120ms ease}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{border-color:var(--accent);background:var(--accent);color:var(--bg);font-weight:600}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.quiet{background:transparent;color:var(--muted)}
+.btn[aria-disabled="true"]{opacity:.55;cursor:not-allowed}
+.acts{display:flex;gap:8px;justify-content:flex-end;margin-top:auto;padding-top:12px}
+.acts.start{justify-content:flex-start}
+.tag{font-size:11px;font-weight:600;border-radius:999px;padding:1px 7px;border:1px solid currentColor;white-space:nowrap}
+.tag.ok{color:var(--success)}
+.tag.warn{color:var(--warning)}
+.tag.quiet{color:var(--muted)}
+.tag.bad{color:var(--danger)}
+.dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--accent);margin-left:4px;vertical-align:middle}
+.dot.warn{background:var(--warning)}
+/* ---- confirm card ---- */
+.ovl{position:absolute;inset:0;border-radius:14px;background:rgba(0,0,0,.5);z-index:40}
+.confirm{position:absolute;z-index:41;left:50%;top:50%;transform:translate(-50%,-50%);width:min(420px,calc(100% - 36px));background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);padding:18px}
+.confirm h4{margin:0 0 6px;font-size:15px;font-weight:600}
+.confirm p{margin:0 0 8px;font-size:12.5px;color:var(--muted);line-height:1.55}
+.confirm p strong{color:var(--text);font-weight:600}
+.confirm .cacts{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+/* ---- motion ---- */
+.pulse{display:inline-flex;gap:3px;vertical-align:middle}
+.pulse i{width:4px;height:4px;border-radius:50%;background:var(--accent);animation:pp 1.2s ease-in-out infinite}
+.pulse i:nth-child(2){animation-delay:.2s}
+.pulse i:nth-child(3){animation-delay:.4s}
+@keyframes pp{0%,100%{opacity:.25}50%{opacity:1}}
+.dim{opacity:.6}
+@media (prefers-reduced-motion: reduce){
+  *{animation:none!important;transition:none!important}
+  .pulse i{opacity:.8}
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="i-theme" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 18a6 6 0 0 0 0-12v12z"/></symbol>
+<symbol id="i-house" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></symbol>
+<symbol id="i-restart" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></symbol>
+<symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 5.2a3.5 3.5 0 0 1 0 6.6"/><path d="M18 20a6.4 6.4 0 0 0-2-4.6"/></symbol>
+<symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="m11 12 8-8"/><path d="m17 4 3 3"/><path d="m14 7 3 3"/></symbol>
+<symbol id="i-gauge" viewBox="0 0 24 24"><path d="M3.5 18a9 9 0 1 1 17 0"/><path d="m12 14 4-4"/></symbol>
+<symbol id="i-msg" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H8l-4 3V6a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2z"/></symbol>
+<symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></symbol>
+<symbol id="i-chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+<symbol id="i-back" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></symbol>
+<symbol id="i-up" viewBox="0 0 24 24"><path d="m18 15-6-6-6 6"/></symbol>
+<symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+<symbol id="i-term" viewBox="0 0 24 24"><path d="M12 19h8"/><path d="m4 17 6-6-6-6"/></symbol>
+</defs></svg>
+
+<header class="board">
+  <p class="kicker">Direction B · detail panel</p>
+  <h1>The ledger stays read-only; a profile opens in a panel</h1>
+  <p class="lead">Profiles stay a quiet list you can trust. Choosing one opens its editor beside the list, with the agents, the fallback chain and the pin, and that panel saves on its own. Reading is always one screen; writing is always one object.</p>
+  <div class="states" role="group" aria-label="Artboard states">
+    <button type="button" data-go="idle" aria-pressed="true">Idle</button>
+    <button type="button" data-go="connecting" aria-pressed="false">Connecting</button>
+    <button type="button" data-go="editing" aria-pressed="false">Editing · dirty</button>
+    <button type="button" data-go="picker" aria-pressed="false">Model picker</button>
+    <button type="button" data-go="chain" aria-pressed="false">Fallback chain</button>
+    <button type="button" data-go="pin" aria-pressed="false">Pin</button>
+    <button type="button" data-go="conflict" aria-pressed="false">Revision conflict</button>
+    <button type="button" data-go="rejected" aria-pressed="false">Rejected draft</button>
+    <button type="button" data-go="apply" aria-pressed="false">Apply confirm</button>
+    <button type="button" data-go="saved" aria-pressed="false">Saved, not applied</button>
+    <button type="button" data-go="degraded" aria-pressed="false">Degraded</button>
+  </div>
+  <p class="legend" id="legend" aria-live="polite"></p>
+</header>
+
+<main class="stage">
+  <div class="dlg" id="dlg" data-state="idle" role="dialog" aria-modal="true" aria-labelledby="dt-title">
+    <h2 class="dt" id="dt-title">Settings</h2>
+    <div class="body">
+      <nav class="rail" aria-label="Settings sections">
+        <span class="opt"><svg class="i" aria-hidden="true"><use href="#i-theme"/></svg>Appearance</span>
+        <span class="opt"><svg class="i" aria-hidden="true"><use href="#i-house"/></svg>Shell home</span>
+        <span class="opt"><svg class="i" aria-hidden="true"><use href="#i-restart"/></svg>Updates</span>
+        <span class="opt on" aria-current="true"><svg class="i" aria-hidden="true"><use href="#i-users"/></svg>Profiles</span>
+        <span class="opt"><svg class="i" aria-hidden="true"><use href="#i-key"/></svg>Account</span>
+        <span class="opt"><svg class="i" aria-hidden="true"><use href="#i-gauge"/></svg>Usage</span>
+        <span class="opt"><svg class="i" aria-hidden="true"><use href="#i-msg"/></svg>Language</span>
+        <span class="opt"><svg class="i" aria-hidden="true"><use href="#i-info"/></svg>About</span>
+      </nav>
+
+      <div class="pane">
+
+        <!-- ============ 1. IDLE: the read-only ledger ============ -->
+        <section class="state" data-pane="idle">
+          <h3>Profiles</h3>
+          <p class="hint">Three profiles · choose one to open its editor</p>
+          <ul class="ledger">
+            <li>
+              <button class="lrow" type="button" aria-current="true">
+                <span class="ltext"><span class="lname">team</span><span class="lmeta">4 agents · 3 fallbacks · default for new sessions</span></span>
+                <span class="lright"><span class="tag quiet">local</span><svg class="i" aria-hidden="true"><use href="#i-chev"/></svg></span>
+              </button>
+            </li>
+            <li>
+              <button class="lrow" type="button">
+                <span class="ltext"><span class="lname">fast</span><span class="lmeta">2 agents · 1 fallback · pinned in this repo</span></span>
+                <span class="lright"><span class="tag quiet">repo</span><svg class="i" aria-hidden="true"><use href="#i-chev"/></svg></span>
+              </button>
+            </li>
+            <li>
+              <button class="lrow" type="button">
+                <span class="ltext"><span class="lname">solo</span><span class="lmeta">1 agent · no fallback chain</span></span>
+                <span class="lright"><svg class="i" aria-hidden="true"><use href="#i-chev"/></svg></span>
+              </button>
+            </li>
+          </ul>
+          <p class="note">The badges name the layer that pins a profile, never what this profile is. Nothing on this list is editable, so a scan cannot start a draft.</p>
+          <section class="sect" aria-labelledby="mode-idle">
+            <h4 id="mode-idle">Orchestrator mode</h4>
+            <p class="note" style="margin:0"><span class="mono" style="color:var(--accent)">organic</span> · stored with each profile · new chats only</p>
+          </section>
+        </section>
+
+        <!-- ============ 2. CONNECTING ============ -->
+        <section class="state" data-pane="connecting">
+          <h3>Profiles</h3>
+          <p class="hint">The list is read; the editor needs its own process.</p>
+          <div class="banner" role="status">
+            <p><span class="bt">Starting the control process</span> <span class="pulse" aria-hidden="true"><i></i><i></i><i></i></span></p>
+            <p class="why">5 to 10 seconds, then a profile opens in the panel. Keep this pane open.</p>
+            <p class="why">Pins are read again now, so a terminal edit made meanwhile appears.</p>
+          </div>
+          <ul class="ledger dim" aria-hidden="true">
+            <li><span class="lrow" aria-current="true"><span class="ltext"><span class="lname">team</span><span class="lmeta">4 agents · 3 fallbacks · default</span></span><span class="lright"><svg class="i" aria-hidden="true"><use href="#i-chev"/></svg></span></span></li>
+            <li><span class="lrow"><span class="ltext"><span class="lname">fast</span><span class="lmeta">2 agents · 1 fallback</span></span><span class="lright"><svg class="i" aria-hidden="true"><use href="#i-chev"/></svg></span></span></li>
+            <li><span class="lrow"><span class="ltext"><span class="lname">solo</span><span class="lmeta">1 agent</span></span><span class="lright"><svg class="i" aria-hidden="true"><use href="#i-chev"/></svg></span></span></li>
+          </ul>
+          <p class="note" id="wait-why">Choosing a profile answers nothing until the process is up; the row keeps its place and the reason is announced here.</p>
+        </section>
+
+        <!-- ============ 3. EDITING: the panel, dirty ============ -->
+        <section class="state" data-pane="editing">
+          <div class="split">
+            <nav class="miniledger" aria-label="Profiles">
+              <p class="ml-title">Profiles</p>
+              <span class="mrow" aria-current="true">team<span class="cm def">default</span></span>
+              <span class="mrow">fast<span class="cm">pin · repo</span></span>
+              <span class="mrow">solo</span>
+            </nav>
+            <div class="sheet" role="group" aria-label="Profile team">
+              <div class="shead">
+                <button class="iconbtn" type="button" aria-label="Back to profiles"><svg class="i" aria-hidden="true"><use href="#i-back"/></svg></button>
+                <div><p class="sname">team</p><p class="smeta">Default for new sessions</p></div>
+              </div>
+              <div class="mline"><span class="mlab">Mode</span><span class="segmini" role="radiogroup" aria-label="Orchestrator mode"><span role="radio" tabindex="-1" aria-checked="true">Organic</span><span role="radio" tabindex="-1" aria-checked="false">Full delegation</span></span></div>
+              <div class="sbody">
+                <div class="srow"><span class="an">orchestrator</span><button class="field wide" type="button" title="anthropic/claude-sonnet-4"><span class="v mono">anthropic/claude-sonnet-4</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button><button class="field" type="button"><span class="v mono">high</span></button></div>
+                <div class="srow"><span class="an">explore</span><button class="field wide" type="button" title="anthropic/claude-haiku-4-5"><span class="v mono">anthropic/claude-haiku…</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button><button class="field" type="button"><span class="v mono">low</span></button></div>
+                <div class="srow"><span class="an">verify <span class="dot" aria-hidden="true"></span><span class="vh">changed</span></span><button class="field wide" type="button" title="anthropic/claude-sonnet-4"><span class="v mono">anthropic/claude-sonnet-4</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button><button class="field" type="button"><span class="v mono">xhigh</span></button></div>
+                <div class="srow"><span class="an">worker <span class="dot" aria-hidden="true"></span><span class="vh">changed</span></span><button class="field wide" type="button" title="openai/gpt-5-codex"><span class="v mono">openai/gpt-5-codex</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button><button class="field" type="button"><span class="v mono">high</span></button></div>
+
+                <section class="sect" aria-labelledby="ch-2">
+                  <h4 id="ch-2">Fallback chain <span class="key">*</span> default</h4>
+                  <ol class="chainro">
+                    <li><span class="step">1</span><span class="mono">anthropic/claude-haiku-4-5</span><span class="think">low</span></li>
+                    <li><span class="step">2</span><span class="mono">openai/gpt-5-codex</span><span class="think">medium</span></li>
+                    <li><span class="step">3</span><span class="mono">google/gemini-2.5-pro</span><span class="think">high</span></li>
+                  </ol>
+                  <div class="bacts"><button class="btn" type="button">Edit chain</button></div>
+                </section>
+
+                <section class="sect" aria-labelledby="pin-2">
+                  <h4 id="pin-2">Pin</h4>
+                  <dl class="pins">
+                    <div class="pinrow"><dt class="plab">Repo</dt><dd><span class="mono">fast</span></dd></div>
+                    <div class="pinrow"><dt class="plab">Local</dt><dd><span class="mono">team</span></dd></div>
+                  </dl>
+                  <div class="bacts"><button class="btn" type="button">Edit pin</button></div>
+                </section>
+              </div>
+              <div class="sfoot" role="group" aria-label="Unsaved changes">
+                <span class="sstat">2 unsaved</span>
+                <span class="snote">saving stores, it does not apply</span>
+                <span class="sacts"><button class="btn quiet" type="button">Discard</button><button class="btn primary" type="button">Save</button></span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ 4. MODEL PICKER inside the panel ============ -->
+        <section class="state" data-pane="picker">
+          <div class="split">
+            <nav class="miniledger" aria-label="Profiles">
+              <p class="ml-title">Profiles</p>
+              <span class="mrow" aria-current="true">team<span class="cm def">default</span></span>
+              <span class="mrow">fast<span class="cm">pin · repo</span></span>
+              <span class="mrow">solo</span>
+            </nav>
+            <div class="sheet" role="group" aria-label="Profile team">
+              <div class="shead">
+                <button class="iconbtn" type="button" aria-label="Back to profiles"><svg class="i" aria-hidden="true"><use href="#i-back"/></svg></button>
+                <div><p class="sname">team</p><p class="smeta">Choosing a model for explore</p></div>
+              </div>
+              <div class="mline"><span class="mlab">Mode</span><span class="segmini" role="radiogroup" aria-label="Orchestrator mode"><span role="radio" tabindex="-1" aria-checked="true">Organic</span><span role="radio" tabindex="-1" aria-checked="false">Full delegation</span></span></div>
+              <div class="sbody noscroll">
+                <div class="srow"><span class="an">orchestrator</span><button class="field wide" type="button"><span class="v mono">anthropic/claude-sonnet-4</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button><button class="field" type="button"><span class="v mono">high</span></button></div>
+                <div class="srow">
+                  <span class="an">explore</span>
+                  <div class="cellpop">
+                    <button class="field wide" type="button" aria-expanded="true" aria-controls="pop-2"><span class="v mono">anthropic/claude-haiku-4-5</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button>
+                    <div class="pop" id="pop-2" role="group" aria-label="Choose a model">
+                      <input class="filter" type="search" value="claude" aria-label="Filter models" readonly>
+                      <ul>
+                        <li><button class="option" type="button" aria-selected="true"><span class="mono">anthropic/claude-haiku-4-5</span><span class="prov">anthropic</span></button></li>
+                        <li><button class="option" type="button" aria-selected="false"><span class="mono">anthropic/claude-sonnet-4</span><span class="prov">anthropic</span></button></li>
+                        <li><button class="option" type="button" aria-selected="false"><span class="mono">openai/gpt-5-codex</span><span class="prov">openai</span></button></li>
+                        <li><button class="option" type="button" aria-selected="false"><span class="mono">google/gemini-2.5-pro</span><span class="prov">google</span></button></li>
+                      </ul>
+                      <p class="pophint">Effort stays low</p>
+                    </div>
+                  </div>
+                  <button class="field" type="button"><span class="v mono">low</span></button>
+                </div>
+                <div class="srow"><span class="an">verify</span><button class="field wide" type="button"><span class="v mono">anthropic/claude-sonnet-4</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button><button class="field" type="button"><span class="v mono">medium</span></button></div>
+                <div class="srow"><span class="an">worker</span><button class="field wide" type="button"><span class="v mono">openai/gpt-5-codex</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button><button class="field" type="button"><span class="v mono">high</span></button></div>
+                <p class="note">The list reuses the 0.1.11 catalog. The panel is narrow, so the field truncates the id; the popover, and the title attribute, carry the whole name.</p>
+              </div>
+              <div class="sfoot" role="group" aria-label="Unsaved changes">
+                <span class="sstat">No changes yet</span>
+                <span class="snote">Escape closes, nothing written</span>
+                <span class="sacts"><button class="btn quiet" type="button">Discard</button><button class="btn primary" type="button">Save</button></span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ 5. FALLBACK CHAIN: its own view in the panel ============ -->
+        <section class="state" data-pane="chain">
+          <div class="split">
+            <nav class="miniledger" aria-label="Profiles">
+              <p class="ml-title">Profiles</p>
+              <span class="mrow" aria-current="true">team<span class="cm def">default</span></span>
+              <span class="mrow">fast<span class="cm">pin · repo</span></span>
+              <span class="mrow">solo</span>
+            </nav>
+            <div class="sheet" role="group" aria-label="Profile team, fallback chain">
+              <div class="shead">
+                <button class="iconbtn" type="button" aria-label="Back to team"><svg class="i" aria-hidden="true"><use href="#i-back"/></svg></button>
+                <div><p class="sname">team · Fallback chain</p><p class="smeta">Default chain <span class="key">*</span> · 8 of 8</p></div>
+              </div>
+              <div class="sbody">
+                <ol class="steps">
+                  <li><span class="step">1</span><div class="stepmain"><button class="field wide" type="button"><span class="v mono">anthropic/claude-haiku-4-5</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></div><button class="iconbtn" type="button" aria-label="Move step 1 up" aria-disabled="true"><svg class="i s" aria-hidden="true"><use href="#i-up"/></svg></button><button class="iconbtn" type="button" aria-label="Move step 1 down"><svg class="i s" aria-hidden="true"><use href="#i-down"/></svg></button><button class="iconbtn" type="button" aria-label="Remove step 1"><svg class="i s" aria-hidden="true"><use href="#i-x"/></svg></button></li>
+                  <li class="changed"><span class="step">2</span><div class="stepmain"><button class="field wide" type="button"><span class="v mono">openai/gpt-5-codex</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></div><button class="iconbtn" type="button" aria-label="Move step 2 up"><svg class="i s" aria-hidden="true"><use href="#i-up"/></svg></button><button class="iconbtn" type="button" aria-label="Move step 2 down"><svg class="i s" aria-hidden="true"><use href="#i-down"/></svg></button><button class="iconbtn" type="button" aria-label="Remove step 2"><svg class="i s" aria-hidden="true"><use href="#i-x"/></svg></button></li>
+                  <li><span class="step">3</span><div class="stepmain"><button class="field wide" type="button"><span class="v mono">google/gemini-2.5-pro</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></div><button class="iconbtn" type="button" aria-label="Move step 3 up"><svg class="i s" aria-hidden="true"><use href="#i-up"/></svg></button><button class="iconbtn" type="button" aria-label="Move step 3 down"><svg class="i s" aria-hidden="true"><use href="#i-down"/></svg></button><button class="iconbtn" type="button" aria-label="Remove step 3"><svg class="i s" aria-hidden="true"><use href="#i-x"/></svg></button></li>
+                  <li><span class="step">4</span><div class="stepmain"><button class="field wide" type="button" aria-invalid="true" aria-describedby="rep-2"><span class="v mono">google/gemini-2.5-pro</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button><p class="step-err" id="rep-2">Already step 3 · a model appears once</p></div><button class="iconbtn" type="button" aria-label="Move step 4 up"><svg class="i s" aria-hidden="true"><use href="#i-up"/></svg></button><button class="iconbtn" type="button" aria-label="Move step 4 down"><svg class="i s" aria-hidden="true"><use href="#i-down"/></svg></button><button class="iconbtn" type="button" aria-label="Remove step 4"><svg class="i s" aria-hidden="true"><use href="#i-x"/></svg></button></li>
+                  <li><span class="step">5</span><div class="stepmain"><button class="field wide" type="button"><span class="v mono">mistral/codestral-2508</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></div><button class="iconbtn" type="button" aria-label="Move step 5 up"><svg class="i s" aria-hidden="true"><use href="#i-up"/></svg></button><button class="iconbtn" type="button" aria-label="Move step 5 down"><svg class="i s" aria-hidden="true"><use href="#i-down"/></svg></button><button class="iconbtn" type="button" aria-label="Remove step 5"><svg class="i s" aria-hidden="true"><use href="#i-x"/></svg></button></li>
+                  <li><span class="step">6</span><div class="stepmain"><button class="field wide" type="button"><span class="v mono">openai/gpt-5-mini</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></div><button class="iconbtn" type="button" aria-label="Move step 6 up"><svg class="i s" aria-hidden="true"><use href="#i-up"/></svg></button><button class="iconbtn" type="button" aria-label="Move step 6 down"><svg class="i s" aria-hidden="true"><use href="#i-down"/></svg></button><button class="iconbtn" type="button" aria-label="Remove step 6"><svg class="i s" aria-hidden="true"><use href="#i-x"/></svg></button></li>
+                  <li><span class="step">7</span><div class="stepmain"><button class="field wide" type="button"><span class="v mono">anthropic/claude-opus-4-1</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></div><button class="iconbtn" type="button" aria-label="Move step 7 up"><svg class="i s" aria-hidden="true"><use href="#i-up"/></svg></button><button class="iconbtn" type="button" aria-label="Move step 7 down"><svg class="i s" aria-hidden="true"><use href="#i-down"/></svg></button><button class="iconbtn" type="button" aria-label="Remove step 7"><svg class="i s" aria-hidden="true"><use href="#i-x"/></svg></button></li>
+                  <li><span class="step">8</span><div class="stepmain"><button class="field wide" type="button"><span class="v mono">openai/o4-mini</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></div><button class="iconbtn" type="button" aria-label="Move step 8 up"><svg class="i s" aria-hidden="true"><use href="#i-up"/></svg></button><button class="iconbtn" type="button" aria-label="Move step 8 down" aria-disabled="true"><svg class="i s" aria-hidden="true"><use href="#i-down"/></svg></button><button class="iconbtn" type="button" aria-label="Remove step 8"><svg class="i s" aria-hidden="true"><use href="#i-x"/></svg></button></li>
+                </ol>
+                <div class="addstep">
+                  <button class="btn" type="button" aria-disabled="true" aria-describedby="lim-2">Add step</button>
+                  <span class="limit" id="lim-2">Limit reached: 8 of 8</span>
+                </div>
+                <p class="note">This is a view of the panel, not a second dialog: the crumb says where you are and the back arrow returns to the agents. The repeat has to be resolved before the save is accepted.</p>
+              </div>
+              <div class="sfoot" role="group" aria-label="Unsaved changes">
+                <span class="sstat">1 unsaved change</span>
+                <span class="snote">refused before the write</span>
+                <span class="sacts"><button class="btn quiet" type="button">Discard</button><button class="btn primary" type="button" aria-disabled="true" aria-describedby="rep-2">Save</button></span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ 6. PIN: its own view in the panel ============ -->
+        <section class="state" data-pane="pin">
+          <div class="split">
+            <nav class="miniledger" aria-label="Profiles">
+              <p class="ml-title">Profiles</p>
+              <span class="mrow" aria-current="true">team<span class="cm def">default</span></span>
+              <span class="mrow">fast<span class="cm">pin · repo</span></span>
+              <span class="mrow">solo</span>
+            </nav>
+            <div class="sheet" role="group" aria-label="Profile team, pin">
+              <div class="shead">
+                <button class="iconbtn" type="button" aria-label="Back to team"><svg class="i" aria-hidden="true"><use href="#i-back"/></svg></button>
+                <div><p class="sname">team · Pin</p><p class="smeta">Two layers, one profile each</p></div>
+              </div>
+              <div class="sbody">
+                <div class="banner" role="status">
+                  <p><span class="bt">Pins are read when the pane opens.</span></p>
+                  <p class="why">They are not watched, so a terminal edit needs a reopen.</p>
+                </div>
+                <div class="pinrows">
+                  <div class="pinrow">
+                    <span class="plab">Repo</span>
+                    <button class="field wide" type="button"><span class="v mono">none</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button>
+                    <button class="btn quiet" type="button" aria-disabled="true" aria-describedby="clr-2">Clear</button>
+                  </div>
+                  <div class="pinrow">
+                    <span class="plab">Local</span>
+                    <button class="field wide" type="button"><span class="v mono">team</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button>
+                    <button class="btn quiet" type="button">Clear</button>
+                  </div>
+                </div>
+                <p class="note" id="clr-2">Repo cleared in this draft: <span class="code">{"source":"repo","profile":null}</span> leaves this folder unpinned, so the default profile wins here.</p>
+                <p class="note">The repo pin wins inside this folder; the local pin wins everywhere else.</p>
+              </div>
+              <div class="sfoot" role="group" aria-label="Unsaved changes">
+                <span class="sstat">1 unsaved change</span>
+                <span class="snote">writes null</span>
+                <span class="sacts"><button class="btn quiet" type="button">Discard</button><button class="btn primary" type="button">Save</button></span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ 7. REVISION CONFLICT ============ -->
+        <section class="state" data-pane="conflict">
+          <div class="split">
+            <nav class="miniledger" aria-label="Profiles">
+              <p class="ml-title">Profiles</p>
+              <span class="mrow" aria-current="true">team<span class="cm def">default</span></span>
+              <span class="mrow">fast<span class="cm">pin · repo</span></span>
+              <span class="mrow">solo</span>
+            </nav>
+            <div class="sheet" role="group" aria-label="Profile team">
+              <div class="shead">
+                <button class="iconbtn" type="button" aria-label="Back to profiles"><svg class="i" aria-hidden="true"><use href="#i-back"/></svg></button>
+                <div><p class="sname">team</p><p class="smeta">Draft from 14:22</p></div>
+              </div>
+              <div class="mline"><span class="mlab">Mode</span><span class="segmini" role="radiogroup" aria-label="Orchestrator mode"><span role="radio" tabindex="-1" aria-checked="true">Organic</span><span role="radio" tabindex="-1" aria-checked="false">Full delegation</span></span></div>
+              <div class="sbody">
+                <div class="banner warn" role="alert">
+                  <p><span class="bt">This profile changed since you opened it.</span></p>
+                  <p class="why">Nothing was written. Keep your two changes and write over theirs, or take their version.</p>
+                  <div class="bacts">
+                    <button class="btn primary" type="button">Keep my draft</button>
+                    <button class="btn" type="button">Reload theirs</button>
+                  </div>
+                </div>
+                <div class="srow"><span class="an">orchestrator</span><button class="field wide" type="button"><span class="v mono">anthropic/claude-sonnet-4</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button><button class="field" type="button"><span class="v mono">high</span></button></div>
+                <div class="srow"><span class="an">explore</span><button class="field wide" type="button"><span class="v mono">anthropic/claude-haiku…</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button><button class="field" type="button"><span class="v mono">low</span></button></div>
+                <div class="srow"><span class="an">verify <span class="dot" aria-hidden="true"></span><span class="vh">changed</span></span><button class="field wide" type="button"><span class="v mono">anthropic/claude-sonnet-4</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button><button class="field" type="button"><span class="v mono">xhigh</span></button></div>
+                <div class="srow"><span class="an">worker <span class="dot" aria-hidden="true"></span><span class="vh">changed</span></span><button class="field wide" type="button"><span class="v mono">openai/gpt-5-codex</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button><button class="field" type="button"><span class="v mono">high</span></button></div>
+                <p class="note">Reload theirs is the safe way out; it discards the two dots, so it asks once more before it throws the draft away.</p>
+              </div>
+              <div class="sfoot" role="group" aria-label="Unsaved changes">
+                <span class="sstat">2 unsaved, kept</span>
+                <span class="snote">a fresh revision is read on the retry</span>
+                <span class="sacts"><button class="btn quiet" type="button">Discard</button><button class="btn primary" type="button">Save</button></span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ 8. INVALID DATA ============ -->
+        <section class="state" data-pane="rejected">
+          <div class="split">
+            <nav class="miniledger" aria-label="Profiles">
+              <p class="ml-title">Profiles</p>
+              <span class="mrow" aria-current="true">team<span class="cm def">default</span></span>
+              <span class="mrow">fast<span class="cm">pin · repo</span></span>
+              <span class="mrow">solo</span>
+            </nav>
+            <div class="sheet" role="group" aria-label="Profile team">
+              <div class="shead">
+                <button class="iconbtn" type="button" aria-label="Back to profiles"><svg class="i" aria-hidden="true"><use href="#i-back"/></svg></button>
+                <div><p class="sname">team</p><p class="smeta">Draft from 14:22</p></div>
+              </div>
+              <div class="mline"><span class="mlab">Mode</span><span class="segmini" role="radiogroup" aria-label="Orchestrator mode"><span role="radio" tabindex="-1" aria-checked="true">Organic</span><span role="radio" tabindex="-1" aria-checked="false">Full delegation</span></span></div>
+              <div class="sbody">
+                <div class="banner bad" role="alert">
+                  <p><span class="bt">gentle-pi rejected this draft.</span></p>
+                  <p class="why">Nothing was written; the draft is kept.</p>
+                  <p class="why"><span class="code">invalid_data · profiles.team.worker.thinking: unknown level "ultra"</span></p>
+                </div>
+                <div class="srow"><span class="an">orchestrator</span><button class="field wide" type="button"><span class="v mono">anthropic/claude-sonnet-4</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button><button class="field" type="button"><span class="v mono">high</span></button></div>
+                <div class="srow"><span class="an">explore</span><button class="field wide" type="button"><span class="v mono">anthropic/claude-haiku…</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button><button class="field" type="button"><span class="v mono">low</span></button></div>
+                <div class="srow"><span class="an">verify</span><button class="field wide" type="button"><span class="v mono">anthropic/claude-sonnet-4</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button><button class="field" type="button"><span class="v mono">medium</span></button></div>
+                <div class="srow"><span class="an">worker <span class="dot warn" aria-hidden="true"></span><span class="vh">refused</span></span><button class="field wide" type="button"><span class="v mono">openai/gpt-5-codex</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button><button class="field" type="button" aria-invalid="true"><span class="v mono">ultra</span></button></div>
+                <p class="note">There is no Apply here: a refused draft was never applied, so the second action stays out of reach until a write lands.</p>
+              </div>
+              <div class="sfoot" role="group" aria-label="Unsaved changes">
+                <span class="sstat">Draft kept</span>
+                <span class="snote">1 field refused</span>
+                <span class="sacts"><button class="btn quiet" type="button">Discard</button><button class="btn primary" type="button">Save</button></span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ 10. SAVED, NOT APPLIED ============ -->
+        <section class="state" data-pane="saved">
+          <div class="split">
+            <nav class="miniledger" aria-label="Profiles">
+              <p class="ml-title">Profiles</p>
+              <span class="mrow" aria-current="true">team<span class="cm def">saved</span></span>
+              <span class="mrow">fast<span class="cm">pin · repo</span></span>
+              <span class="mrow">solo</span>
+            </nav>
+            <div class="sheet" role="group" aria-label="Profile team">
+              <div class="shead">
+                <button class="iconbtn" type="button" aria-label="Back to profiles"><svg class="i" aria-hidden="true"><use href="#i-back"/></svg></button>
+                <div><p class="sname">team</p><p class="smeta">Saved at 14:24</p></div>
+              </div>
+              <div class="mline"><span class="mlab">Mode</span><span class="mval">organic</span></div>
+              <div class="sbody">
+                <div class="banner" role="status">
+                  <p><span class="bt">Saved. Not applied yet.</span></p>
+                  <p class="why">New chats still start on <span class="mono">fast</span>; chats already open keep the routing they started with.</p>
+                  <div class="bacts">
+                    <button class="btn primary" type="button">Make default for new sessions</button>
+                    <button class="btn quiet" type="button">Done</button>
+                  </div>
+                </div>
+                <div class="srow"><span class="an">orchestrator</span><span class="mono" style="font-size:11px;color:var(--muted)">anthropic/claude-sonnet-4</span><span class="mono" style="font-size:11px;color:var(--accent);text-align:right">high</span></div>
+                <div class="srow"><span class="an">explore</span><span class="mono" style="font-size:11px;color:var(--muted)">anthropic/claude-haiku-4-5</span><span class="mono" style="font-size:11px;color:var(--accent);text-align:right">low</span></div>
+                <div class="srow"><span class="an">verify</span><span class="mono" style="font-size:11px;color:var(--muted)">anthropic/claude-sonnet-4</span><span class="mono" style="font-size:11px;color:var(--accent);text-align:right">xhigh</span></div>
+                <div class="srow"><span class="an">worker</span><span class="mono" style="font-size:11px;color:var(--muted)">openai/gpt-5-codex</span><span class="mono" style="font-size:11px;color:var(--accent);text-align:right">high</span></div>
+                <section class="sect" aria-labelledby="pin-saved2">
+                  <h4 id="pin-saved2">Pin</h4>
+                  <dl class="pins">
+                    <div class="pinrow"><dt class="plab">Repo</dt><dd><span class="mono">fast</span> <span class="tag warn">wins here</span></dd></div>
+                    <div class="pinrow"><dt class="plab">Local</dt><dd><span class="mono">team</span></dd></div>
+                  </dl>
+                  <p class="note">This repo is pinned to fast, so fast stays the default in this folder even after team is made default.</p>
+                </section>
+              </div>
+              <div class="sfoot">
+                <span class="sstat">Stored, not applied</span>
+                <span class="snote">the second action is the apply</span>
+                <span class="sacts"><button class="btn quiet" type="button">Close</button></span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ 11. DEGRADED ============ -->
+        <section class="state" data-pane="degraded">
+          <h3>Profiles</h3>
+          <p class="hint">Read-only view, the one this pane draws today</p>
+          <div class="banner bad" role="alert">
+            <p><span class="bt">The control process did not answer.</span></p>
+            <p class="why">Opening a profile needs it. This list still shows what the shell read from the files.</p>
+            <div class="bacts">
+              <button class="btn" type="button">Try again</button>
+              <button class="btn quiet" type="button"><svg class="i s" aria-hidden="true"><use href="#i-term"/></svg> Edit in terminal</button>
+            </div>
+          </div>
+          <ul class="ledger">
+            <li><span class="lrow" aria-current="true"><span class="ltext"><span class="lname">team</span><span class="lmeta">4 agents · 3 fallbacks · default for new sessions</span></span><span class="lright"><span class="tag quiet">local</span></span></span></li>
+            <li><span class="lrow"><span class="ltext"><span class="lname">fast</span><span class="lmeta">2 agents · 1 fallback · pinned in this repo</span></span><span class="lright"><span class="tag quiet">repo</span></span></span></li>
+            <li><span class="lrow"><span class="ltext"><span class="lname">solo</span><span class="lmeta">1 agent · no fallback chain</span></span></span></li>
+          </ul>
+          <p class="note">The rows keep their content and lose their affordance; nothing looks clickable that cannot open.</p>
+        </section>
+
+      </div><!-- /pane -->
+    </div><!-- /body -->
+
+    <!-- The dialog's own action row stays; a panel saves itself inside the pane. -->
+    <div class="acts"><button class="btn" type="button">Close</button></div>
+
+    <div class="ovl" data-overlay="apply" hidden></div>
+    <div class="confirm" data-overlay="apply" role="alertdialog" aria-modal="true" aria-labelledby="conf-t" hidden>
+      <h4 id="conf-t">Apply profile "team"?</h4>
+      <p><strong>New chats start on team.</strong> Chats already open keep their routing.</p>
+      <p>This repo is pinned to <span class="mono">fast</span>, so fast stays the default in this folder.</p>
+      <p class="note" style="margin:6px 0 0">gentle-pi asks this itself; the editor only offers the action.</p>
+      <div class="cacts">
+        <button class="btn" type="button">Cancel</button>
+        <button class="btn primary" type="button">Apply</button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<p class="legend" style="padding:0 24px 18px;max-width:900px">
+  Copy is English and kept short so Spanish fits: the longest button here is <em>Make default for new sessions</em> (31 characters in Spanish), the longest sentence 74. The honest cost of this direction is width: at the dialog's 680 px the panel is 322 px wide, so the model field truncates, the orchestrator mode fits only as a two-word segmented line under the title, and the chain needs its own view.
+</p>
+
+<script>
+(function(){
+  var LEGEND = {
+    idle:"The ledger is the pane: three profiles, their size, the default and the pin layer named in words. Choosing a row is the only way in, so reading never mutates anything.",
+    connecting:"The temporary control child is starting (5–10 s, ~400 MB). The list is already read, it just cannot open; the rows keep their place and the reason sits above them.",
+    editing:"The panel saves one profile: mode as a two-word segmented line under the title, agents on top, chain and pin as two summaries with their own Edit buttons, and a footer that names the count and says a save only stores.",
+    picker:"The catalog opens inside the panel, over the rows below it. Choosing writes one field; Escape closes with nothing written. The truncation here is the price of the split.",
+    chain:"The chain is its own view inside the panel, reached by Edit chain, with the crumb naming where you are. Step 8 refuses a ninth and the repeated gemini is refused inline.",
+    pin:"Also its own view: two layers, one profile each, Clear writing null. The notice says the pins are read on open and never watched, which is why a reopen is needed.",
+    conflict:"revision_conflict inside the panel: nothing was written, both dots are kept, and the choice is explicit — keep the draft with a fresh revision, or reload theirs.",
+    rejected:"The owner's invalid_data answer with the refused field marked, and the explicit sentence that a refused draft was never applied, so Make default is not offered.",
+    apply:"The channel's confirmation over the saved panel: the profile name, the sentence that open chats keep their routing, and the repo pin that still wins in this folder.",
+    saved:"The panel says saved and stops short: the ledger's meta flips to the new shape, the default has not moved, and the apply is offered right there.",
+    degraded:"No answer from the child, so the ledger falls back to today's read-only list with Try again and the terminal handoff. Rows lose their affordance rather than pretending."
+  };
+  var dlg = document.getElementById('dlg');
+  var legend = document.getElementById('legend');
+  var buttons = [].slice.call(document.querySelectorAll('[data-go]'));
+  var BASE = { apply: 'saved' };
+  function show(id){
+    var base = BASE[id] || id;
+    dlg.setAttribute('data-state', id);
+    document.querySelectorAll('[data-pane]').forEach(function(p){ p.hidden = p.dataset.pane !== base; });
+    document.querySelectorAll('[data-overlay]').forEach(function(o){ o.hidden = o.dataset.overlay !== id; });
+    buttons.forEach(function(b){ b.setAttribute('aria-pressed', b.dataset.go === id ? 'true' : 'false'); });
+    legend.textContent = LEGEND[id] || '';
+  }
+  buttons.forEach(function(b){ b.addEventListener('click', function(){ show(b.dataset.go); }); });
+  show('idle');
+})();
+</script>
+</body>
+</html>

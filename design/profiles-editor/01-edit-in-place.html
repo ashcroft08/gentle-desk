@@ -1,0 +1,746 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=960">
+<title>Profiles editor — A: edit in place</title>
+<style>
+/* Tokens: design/system.md, theme dark (apps/desktop/src/theme.css). */
+:root{--bg:#0e1116;--surface:#151a21;--surface2:#1c222b;--border:#2b333d;--text:#e4e8ee;--muted:#9aa4b2;--faint:#7d8593;--accent:#7aa2f7;--tint:rgba(122,162,247,.14);--success:#7edc9a;--warning:#e7b455;--danger:#ff8585;--shadow:0 8px 24px rgba(0,0,0,.45)}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.mono{font-family:ui-monospace,'Cascadia Code',Consolas,monospace}
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.i{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.i.s{width:12px;height:12px}
+/* ---- the artboard's own chrome: title, state switcher, legend ---- */
+.board{padding:16px 24px 12px;border-bottom:1px solid var(--border);background:var(--surface)}
+.kicker{margin:0 0 3px;font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--faint)}
+h1{margin:0 0 5px;font-size:18px;font-weight:600}
+.lead{margin:0 0 10px;max-width:790px;color:var(--muted);font-size:12.5px;line-height:1.55}
+.states{display:flex;flex-wrap:wrap;gap:6px}
+.states button{border:1px solid var(--border);background:transparent;color:var(--muted);border-radius:8px;padding:4px 10px;font-size:12px;cursor:pointer;transition:background-color 120ms ease,color 120ms ease,border-color 120ms ease}
+.states button:hover{background:var(--surface2);color:var(--text)}
+.states button[aria-pressed="true"]{background:var(--tint);color:var(--accent);border-color:var(--accent);font-weight:600}
+.legend{margin:8px 0 0;font-size:11.5px;color:var(--faint);max-width:830px;line-height:1.5}
+/* ---- the Settings shell the pane grows out of ---- */
+.stage{display:flex;justify-content:center;padding:16px 24px 20px}
+.dlg{position:relative;width:min(680px,100%);background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);padding:18px;display:flex;flex-direction:column;gap:14px;max-height:calc(100vh - 196px);min-height:420px}
+.dt{margin:0;font-size:15px;font-weight:600}
+.body{display:flex;gap:18px;flex:1;min-height:0}
+.rail{flex:none;width:184px;display:flex;flex-direction:column;gap:2px;border-right:1px solid var(--border)}
+.rail .opt{display:flex;align-items:center;gap:9px;height:32px;padding:0 10px;border-radius:8px;font-size:13px;color:var(--muted)}
+.rail .opt.on{background:var(--tint);color:var(--accent)}
+.pane{position:relative;flex:1;min-width:0;overflow:auto;padding-right:2px;display:flex;flex-direction:column}
+.state{display:flex;flex-direction:column;flex:1;min-height:0}
+.pane h3{margin:0;font-size:15px;font-weight:600}
+.hint{margin:2px 0 12px;font-size:12px;color:var(--muted)}
+.note{margin:6px 0 0;font-size:11.5px;color:var(--faint);line-height:1.5}
+/* ---- mode strip (stored with the profile now) ---- */
+.mode{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding-bottom:12px;border-bottom:1px solid var(--border);margin-bottom:14px}
+.mlabel{font-size:12px;font-weight:600;color:var(--muted)}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.seg span{padding:5px 12px;font-size:12.5px;color:var(--muted);cursor:default}
+.seg span[aria-checked="true"]{background:var(--accent);color:var(--bg);font-weight:600}
+/* ---- profile chips: which profile the table below shows ---- */
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.chip{display:inline-flex;align-items:baseline;gap:8px;border:1px solid var(--border);background:var(--surface2);border-radius:8px;padding:4px 10px;font-size:12.5px;color:var(--text);cursor:pointer;transition:border-color 120ms ease}
+.chip:hover{border-color:var(--accent)}
+.chip[aria-current="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.cmark{font-size:11px;color:var(--muted)}
+.cmark.def{color:var(--accent)}
+/* ---- the ledger: the agents table, read or edited ---- */
+table.agents{width:100%;border-collapse:collapse;font-size:13px}
+table.agents th{font-size:11px;font-weight:600;color:var(--faint);text-align:left;text-transform:uppercase;letter-spacing:.05em;padding:4px 8px 8px;border-bottom:1px solid var(--border)}
+table.agents td{padding:4px 8px;vertical-align:middle}
+td.agent{width:118px;color:var(--text)}
+td.model{max-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:12px;color:var(--muted)}
+td.eff{width:84px;text-align:right}
+td.eff .e{font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:12px;color:var(--accent)}
+tr:hover td{background:var(--surface2)}
+tr:focus-within td{background:var(--surface2)}
+.dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--accent);margin-left:5px;vertical-align:middle}
+.dot.warn{background:var(--warning)}
+/* ---- the inline field: a button that reads like a select ---- */
+.field{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);border-radius:6px;padding:2px 7px;font-size:12px;cursor:pointer;transition:border-color 120ms ease}
+.field:hover{border-color:var(--accent)}
+.field svg{color:var(--faint)}
+.field.wide{display:flex;width:100%;justify-content:space-between;min-width:0}
+.field .v{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.field .v.mono{font-family:ui-monospace,'Cascadia Code',Consolas,monospace}
+.field[aria-invalid="true"]{border-color:var(--danger)}
+.cellpop{position:relative;min-width:0}
+/* ---- the model picker: the composer's popover, in the row ---- */
+.pop{position:absolute;z-index:30;left:0;top:calc(100% + 6px);width:302px;background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.4);padding:4px}
+.pop .filter{width:100%;border:1px solid var(--border);background:var(--bg);border-radius:8px;padding:4px 8px;font-size:12px;margin-bottom:4px}
+.pop .filter:focus{border-color:var(--accent);outline:none}
+.pop ul{list-style:none;margin:0;padding:0;max-height:186px;overflow:auto}
+.pop .option{display:flex;align-items:baseline;gap:8px;width:100%;text-align:left;border:0;background:transparent;border-radius:8px;padding:5px 8px;font-size:12px;color:var(--text);cursor:pointer}
+.pop .option:hover,.pop .option.active{background:var(--surface2)}
+.pop .option[aria-selected="true"]{color:var(--accent);font-weight:600}
+.pop .prov{margin-left:auto;font-size:11px;color:var(--faint)}
+.pop .pophint{padding:2px 8px 4px;font-size:11px;color:var(--faint)}
+/* ---- sections under the table: chain, pin ---- */
+.sect{margin-top:16px;padding-top:12px;border-top:1px solid var(--border)}
+.sect h4{margin:0 0 8px;display:flex;align-items:center;gap:8px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--faint)}
+.key{font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:11px;letter-spacing:0;color:var(--accent);background:var(--tint);border-radius:4px;padding:1px 5px}
+.chainro{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:2px}
+.chainro li{display:flex;align-items:baseline;gap:8px;font-size:12.5px;padding:1px 0}
+.chainro .step{width:16px;flex:none;font:600 11px/1.6 ui-monospace,'Cascadia Code',Consolas,monospace;color:var(--faint)}
+.chainro .think{margin-left:auto;font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:12px;color:var(--accent)}
+.steps{margin:0;padding:0;list-style:none;border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.steps li{display:flex;align-items:center;gap:6px;padding:5px 7px;border-bottom:1px solid var(--border)}
+.steps li:last-child{border-bottom:0}
+.steps li.changed{background:var(--tint)}
+.steps .step{width:16px;flex:none;text-align:center;font:600 11px/1 ui-monospace,'Cascadia Code',Consolas,monospace;color:var(--muted)}
+.stepmain{flex:1;min-width:0}
+.step-err{margin:3px 0 0;font-size:11.5px;color:var(--danger);line-height:1.4}
+.iconbtn{width:24px;height:24px;flex:none;display:inline-grid;place-items:center;border:1px solid transparent;border-radius:6px;background:transparent;color:var(--muted);cursor:pointer;transition:background-color 120ms ease,color 120ms ease}
+.iconbtn:hover{background:var(--surface2);color:var(--text)}
+.iconbtn[aria-disabled="true"]{opacity:.4;cursor:not-allowed}
+.addstep{display:flex;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap}
+.limit{font-size:11.5px;color:var(--warning)}
+.pinrows{display:flex;flex-direction:column;gap:6px}
+.pinrow{display:flex;align-items:center;gap:8px}
+.pinrow .plab{width:46px;flex:none;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--faint)}
+.pinrow .field{flex:1;min-width:0}
+.pinrow dd{margin:0}
+.pins{margin:0;display:flex;flex-direction:column;gap:4px}
+.pins .pinrow dd{font-size:12.5px}
+/* ---- notices and the two in-pane answers ---- */
+.banner{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:8px 10px 8px 12px;box-shadow:inset 3px 0 0 var(--accent);margin:0 0 12px;font-size:12.5px}
+.banner p{margin:0}
+.banner .bt{font-weight:600}
+.banner.warn{box-shadow:inset 3px 0 0 var(--warning)}
+.banner.bad{box-shadow:inset 3px 0 0 var(--danger)}
+.banner.bad .bt{color:var(--danger)}
+.banner .why{margin-top:3px;color:var(--muted);font-size:12px}
+.bacts{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}
+.code{font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:11.5px;color:var(--muted);background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:1px 5px}
+/* ---- buttons, tags ---- */
+.btn{border:1px solid var(--border);background:var(--surface2);color:var(--text);border-radius:8px;padding:5px 12px;font-size:12.5px;cursor:pointer;transition:border-color 120ms ease}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{border-color:var(--accent);background:var(--accent);color:var(--bg);font-weight:600}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.quiet{background:transparent;color:var(--muted)}
+.btn[aria-disabled="true"]{opacity:.55;cursor:not-allowed}
+.acts{display:flex;gap:8px;justify-content:flex-end;margin-top:auto;padding-top:12px}
+.tag{font-size:11px;font-weight:600;border-radius:999px;padding:2px 8px;border:1px solid currentColor;white-space:nowrap}
+.tag.ok{color:var(--success)}
+.tag.warn{color:var(--warning)}
+.tag.quiet{color:var(--muted)}
+.tag.bad{color:var(--danger)}
+/* ---- the sticky bar: direction A's one commit point ---- */
+.savebar{position:sticky;bottom:-2px;z-index:6;margin-top:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:8px 10px 8px 12px;box-shadow:var(--shadow)}
+.sstat{font-size:12.5px;font-weight:600}
+.snote{font-size:11.5px;color:var(--muted)}
+.sacts{margin-left:auto;display:flex;gap:8px}
+/* ---- confirm card: the channel's own question ---- */
+.ovl{position:absolute;inset:0;border-radius:14px;background:rgba(0,0,0,.5);z-index:40}
+.confirm{position:absolute;z-index:41;left:50%;top:50%;transform:translate(-50%,-50%);width:min(420px,calc(100% - 36px));background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);padding:18px}
+.confirm h4{margin:0 0 6px;font-size:15px;font-weight:600}
+.confirm p{margin:0 0 8px;font-size:12.5px;color:var(--muted);line-height:1.55}
+.confirm p strong{color:var(--text);font-weight:600}
+.confirm .cacts{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+/* ---- motion, reduced on request ---- */
+.pulse{display:inline-flex;gap:3px;vertical-align:middle}
+.pulse i{width:4px;height:4px;border-radius:50%;background:var(--accent);animation:pp 1.2s ease-in-out infinite}
+.pulse i:nth-child(2){animation-delay:.2s}
+.pulse i:nth-child(3){animation-delay:.4s}
+@keyframes pp{0%,100%{opacity:.25}50%{opacity:1}}
+.dim{opacity:.6}
+@media (prefers-reduced-motion: reduce){
+  *{animation:none!important;transition:none!important}
+  .pulse i{opacity:.8}
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="i-theme" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 18a6 6 0 0 0 0-12v12z"/></symbol>
+<symbol id="i-house" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></symbol>
+<symbol id="i-restart" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></symbol>
+<symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 5.2a3.5 3.5 0 0 1 0 6.6"/><path d="M18 20a6.4 6.4 0 0 0-2-4.6"/></symbol>
+<symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="m11 12 8-8"/><path d="m17 4 3 3"/><path d="m14 7 3 3"/></symbol>
+<symbol id="i-gauge" viewBox="0 0 24 24"><path d="M3.5 18a9 9 0 1 1 17 0"/><path d="m12 14 4-4"/></symbol>
+<symbol id="i-msg" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H8l-4 3V6a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2z"/></symbol>
+<symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></symbol>
+<symbol id="i-chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+<symbol id="i-up" viewBox="0 0 24 24"><path d="m18 15-6-6-6 6"/></symbol>
+<symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+<symbol id="i-warn" viewBox="0 0 24 24"><path d="m21.7 18-8-14a2 2 0 0 0-3.4 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
+<symbol id="i-term" viewBox="0 0 24 24"><path d="M12 19h8"/><path d="m4 17 6-6-6-6"/></symbol>
+</defs></svg>
+
+<header class="board">
+  <p class="kicker">Direction A · edit in place</p>
+  <h1>The ledger rows become the fields</h1>
+  <p class="lead">The table the pane already draws stops being read-only: a model or an effort is a control in its own cell, and one sticky bar at the bottom of the pane holds the two writes. The chain and the pin sit under the table as two short blocks. No second screen, no mode to enter.</p>
+  <div class="states" role="group" aria-label="Artboard states">
+    <button type="button" data-go="idle" aria-pressed="true">Idle</button>
+    <button type="button" data-go="connecting" aria-pressed="false">Connecting</button>
+    <button type="button" data-go="editing" aria-pressed="false">Editing · dirty</button>
+    <button type="button" data-go="picker" aria-pressed="false">Model picker</button>
+    <button type="button" data-go="chain" aria-pressed="false">Fallback chain</button>
+    <button type="button" data-go="pin" aria-pressed="false">Pin</button>
+    <button type="button" data-go="conflict" aria-pressed="false">Revision conflict</button>
+    <button type="button" data-go="rejected" aria-pressed="false">Rejected draft</button>
+    <button type="button" data-go="apply" aria-pressed="false">Apply confirm</button>
+    <button type="button" data-go="saved" aria-pressed="false">Saved, not applied</button>
+    <button type="button" data-go="degraded" aria-pressed="false">Degraded</button>
+  </div>
+  <p class="legend" id="legend" aria-live="polite"></p>
+</header>
+
+<main class="stage">
+  <div class="dlg" id="dlg" data-state="idle" role="dialog" aria-modal="true" aria-labelledby="dt-title">
+    <h2 class="dt" id="dt-title">Settings</h2>
+    <div class="body">
+      <nav class="rail" aria-label="Settings sections">
+        <span class="opt"><svg class="i" aria-hidden="true"><use href="#i-theme"/></svg>Appearance</span>
+        <span class="opt"><svg class="i" aria-hidden="true"><use href="#i-house"/></svg>Shell home</span>
+        <span class="opt"><svg class="i" aria-hidden="true"><use href="#i-restart"/></svg>Updates</span>
+        <span class="opt on" aria-current="true"><svg class="i" aria-hidden="true"><use href="#i-users"/></svg>Profiles</span>
+        <span class="opt"><svg class="i" aria-hidden="true"><use href="#i-key"/></svg>Account</span>
+        <span class="opt"><svg class="i" aria-hidden="true"><use href="#i-gauge"/></svg>Usage</span>
+        <span class="opt"><svg class="i" aria-hidden="true"><use href="#i-msg"/></svg>Language</span>
+        <span class="opt"><svg class="i" aria-hidden="true"><use href="#i-info"/></svg>About</span>
+      </nav>
+
+      <div class="pane">
+
+        <!-- ============ 1. IDLE: what the shell read, nothing to write ============ -->
+        <section class="state" data-pane="idle">
+          <h3>Profiles</h3>
+          <p class="hint">Stored by gentle-pi · read at 14:18</p>
+
+          <div class="mode">
+            <span class="mlabel">Orchestrator mode</span>
+            <div class="seg" role="radiogroup" aria-label="Orchestrator mode">
+              <span role="radio" tabindex="-1" aria-checked="true">Organic</span>
+              <span role="radio" tabindex="-1" aria-checked="false">Full delegation</span>
+            </div>
+            <span class="snote">Saved with the profile · new chats only</span>
+          </div>
+
+          <div class="chips" role="group" aria-label="Profiles">
+            <span class="chip" aria-current="true">team <span class="cmark def">default</span></span>
+            <span class="chip">fast <span class="cmark">pin · repo</span></span>
+            <span class="chip">solo <span class="cmark">2 agents</span></span>
+          </div>
+
+          <table class="agents">
+            <thead><tr><th scope="col">Agent</th><th scope="col">Model</th><th scope="col" style="text-align:right">Effort</th></tr></thead>
+            <tbody>
+              <tr><td class="agent">orchestrator</td><td class="model">anthropic/claude-sonnet-4</td><td class="eff"><span class="e">high</span></td></tr>
+              <tr><td class="agent">explore</td><td class="model">anthropic/claude-haiku-4-5</td><td class="eff"><span class="e">low</span></td></tr>
+              <tr><td class="agent">verify</td><td class="model">anthropic/claude-sonnet-4</td><td class="eff"><span class="e">medium</span></td></tr>
+              <tr><td class="agent">worker</td><td class="model">openai/gpt-5-codex</td><td class="eff"><span class="e">high</span></td></tr>
+            </tbody>
+          </table>
+          <p class="note">Click a model or an effort to change it here. A save stores the profile; new chats pick it up only after Make default.</p>
+
+          <section class="sect" aria-labelledby="ch-idle">
+            <h4 id="ch-idle">Fallback chain <span class="key">*</span> default</h4>
+            <ol class="chainro">
+              <li><span class="step">1</span><span class="mono">anthropic/claude-haiku-4-5</span><span class="think">low</span></li>
+              <li><span class="step">2</span><span class="mono">openai/gpt-5-codex</span><span class="think">medium</span></li>
+              <li><span class="step">3</span><span class="mono">google/gemini-2.5-pro</span><span class="think">high</span></li>
+            </ol>
+            <p class="note">Up to 8 steps · a model appears once per chain</p>
+          </section>
+
+          <section class="sect" aria-labelledby="pin-idle">
+            <h4 id="pin-idle">Pin</h4>
+            <dl class="pins">
+              <div class="pinrow"><dt class="plab">Repo</dt><dd><span class="mono">fast</span> <span class="tag quiet">this repo</span></dd></div>
+              <div class="pinrow"><dt class="plab">Local</dt><dd><span class="mono">team</span></dd></div>
+            </dl>
+            <p class="note">Read when this pane opens · pins are not watched, so a terminal edit needs a reopen</p>
+          </section>
+        </section>
+
+        <!-- ============ 2. CONNECTING: the temporary control child starts ============ -->
+        <section class="state" data-pane="connecting">
+          <h3>Profiles</h3>
+          <p class="hint">The pane read the files; the editor still needs its own process.</p>
+          <div class="banner" role="status">
+            <p><span class="bt">Starting the control process</span> <span class="pulse" aria-hidden="true"><i></i><i></i><i></i></span></p>
+            <p class="why">5 to 10 seconds. Keep this pane open; closing it stops the process again.</p>
+            <p class="why">Pins are read again on open, so a terminal edit made meanwhile shows up here.</p>
+          </div>
+          <div class="dim" aria-hidden="true">
+            <div class="chips">
+              <span class="chip" aria-current="true">team <span class="cmark def">default</span></span>
+              <span class="chip">fast <span class="cmark">pin · repo</span></span>
+            </div>
+            <table class="agents">
+              <thead><tr><th scope="col">Agent</th><th scope="col">Model</th><th scope="col" style="text-align:right">Effort</th></tr></thead>
+              <tbody>
+                <tr><td class="agent">orchestrator</td><td class="model">anthropic/claude-sonnet-4</td><td class="eff"><span class="e">high</span></td></tr>
+                <tr><td class="agent">explore</td><td class="model">anthropic/claude-haiku-4-5</td><td class="eff"><span class="e">low</span></td></tr>
+                <tr><td class="agent">verify</td><td class="model">anthropic/claude-sonnet-4</td><td class="eff"><span class="e">medium</span></td></tr>
+                <tr><td class="agent">worker</td><td class="model">openai/gpt-5-codex</td><td class="eff"><span class="e">high</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="note">The bar below is the pane's, not the editor's: nothing is editable until the process answers.</p>
+          <div class="savebar">
+            <span class="sstat">Read-only for 5 to 10 seconds</span>
+            <span class="snote">Model and effort fields appear when it is up</span>
+            <span class="sacts">
+              <button class="btn quiet" type="button" aria-disabled="true" aria-describedby="wait-why">Edit</button>
+            </span>
+          </div>
+          <p class="note" id="wait-why">Edit answers no click until the control process is up.</p>
+        </section>
+
+        <!-- ============ 3. EDITING: a dirty draft, one sticky bar ============ -->
+        <section class="state" data-pane="editing">
+          <h3>Profiles</h3>
+          <p class="hint">Stored by gentle-pi · draft from 14:22</p>
+          <div class="mode">
+            <span class="mlabel">Orchestrator mode</span>
+            <div class="seg" role="radiogroup" aria-label="Orchestrator mode">
+              <span role="radio" tabindex="-1" aria-checked="true">Organic</span>
+              <span role="radio" tabindex="-1" aria-checked="false">Full delegation</span>
+            </div>
+          </div>
+          <div class="chips" role="group" aria-label="Profiles">
+            <span class="chip" aria-current="true">team <span class="cmark def">default</span></span>
+            <span class="chip">fast <span class="cmark">pin · repo</span></span>
+            <span class="chip">solo</span>
+          </div>
+          <table class="agents">
+            <thead><tr><th scope="col">Agent</th><th scope="col">Model</th><th scope="col" style="text-align:right">Effort</th></tr></thead>
+            <tbody>
+              <tr>
+                <td class="agent">orchestrator</td>
+                <td class="model"><button class="field wide" type="button"><span class="v mono">anthropic/claude-sonnet-4</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></td>
+                <td class="eff"><button class="field" type="button"><span class="v mono">high</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></td>
+              </tr>
+              <tr>
+                <td class="agent">explore</td>
+                <td class="model"><button class="field wide" type="button"><span class="v mono">anthropic/claude-haiku-4-5</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></td>
+                <td class="eff"><button class="field" type="button"><span class="v mono">low</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></td>
+              </tr>
+              <tr>
+                <td class="agent">verify <span class="dot" aria-hidden="true"></span><span class="vh">changed</span></td>
+                <td class="model"><button class="field wide" type="button"><span class="v mono">anthropic/claude-sonnet-4</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></td>
+                <td class="eff"><button class="field" type="button"><span class="v mono">xhigh</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></td>
+              </tr>
+              <tr>
+                <td class="agent">worker <span class="dot" aria-hidden="true"></span><span class="vh">changed</span></td>
+                <td class="model"><button class="field wide" type="button"><span class="v mono">openai/gpt-5-codex</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></td>
+                <td class="eff"><button class="field" type="button"><span class="v mono">high</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></td>
+              </tr>
+            </tbody>
+          </table>
+
+          <section class="sect" aria-labelledby="ch-edit">
+            <h4 id="ch-edit">Fallback chain <span class="key">*</span> default</h4>
+            <ol class="chainro">
+              <li><span class="step">1</span><span class="mono">anthropic/claude-haiku-4-5</span><span class="think">low</span></li>
+              <li><span class="step">2</span><span class="mono">openai/gpt-5-codex</span><span class="think">medium</span></li>
+              <li><span class="step">3</span><span class="mono">google/gemini-2.5-pro</span><span class="think">high</span></li>
+            </ol>
+          </section>
+
+          <section class="sect" aria-labelledby="pin-edit">
+            <h4 id="pin-edit">Pin</h4>
+            <dl class="pins">
+              <div class="pinrow"><dt class="plab">Repo</dt><dd><span class="mono">fast</span></dd></div>
+              <div class="pinrow"><dt class="plab">Local</dt><dd><span class="mono">team</span></dd></div>
+            </dl>
+          </section>
+
+          <div class="savebar" role="group" aria-label="Unsaved changes">
+            <span class="sstat">2 unsaved changes</span>
+            <span class="snote">Saving stores the profile, it does not apply it</span>
+            <span class="sacts">
+              <button class="btn quiet" type="button">Discard</button>
+              <button class="btn primary" type="button">Save changes</button>
+            </span>
+          </div>
+          <p class="note">The bar stays at the bottom of the pane while the table scrolls under it.</p>
+        </section>
+
+        <!-- ============ 4. MODEL PICKER: the 0.1.11 catalog, in the row ============ -->
+        <section class="state" data-pane="picker">
+          <h3>Profiles</h3>
+          <p class="hint">team · picker open on explore</p>
+          <div class="chips" role="group" aria-label="Profiles">
+            <span class="chip" aria-current="true">team <span class="cmark def">default</span></span>
+            <span class="chip">fast <span class="cmark">pin · repo</span></span>
+          </div>
+          <table class="agents">
+            <thead><tr><th scope="col">Agent</th><th scope="col">Model</th><th scope="col" style="text-align:right">Effort</th></tr></thead>
+            <tbody>
+              <tr>
+                <td class="agent">orchestrator</td>
+                <td class="model"><button class="field wide" type="button"><span class="v mono">anthropic/claude-sonnet-4</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></td>
+                <td class="eff"><button class="field" type="button"><span class="v mono">high</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></td>
+              </tr>
+              <tr>
+                <td class="agent">explore</td>
+                <td class="model">
+                  <div class="cellpop">
+                    <button class="field wide" type="button" aria-expanded="true" aria-controls="pop-1"><span class="v mono">anthropic/claude-haiku-4-5</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button>
+                    <div class="pop" id="pop-1" role="group" aria-label="Choose a model">
+                      <input class="filter" type="search" value="claude" aria-label="Filter models" readonly>
+                      <ul>
+                        <li><button class="option" type="button" aria-selected="true"><span class="mono">anthropic/claude-haiku-4-5</span><span class="prov">anthropic</span></button></li>
+                        <li><button class="option" type="button" aria-selected="false"><span class="mono">anthropic/claude-sonnet-4</span><span class="prov">anthropic</span></button></li>
+                        <li><button class="option" type="button" aria-selected="false"><span class="mono">anthropic/claude-opus-4-1</span><span class="prov">anthropic</span></button></li>
+                        <li><button class="option" type="button" aria-selected="false"><span class="mono">openai/gpt-5-codex</span><span class="prov">openai</span></button></li>
+                      </ul>
+                      <p class="pophint">Effort stays low · saving stores the profile</p>
+                    </div>
+                  </div>
+                </td>
+                <td class="eff"><button class="field" type="button"><span class="v mono">low</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></td>
+              </tr>
+              <tr>
+                <td class="agent">verify</td>
+                <td class="model"><button class="field wide" type="button"><span class="v mono">anthropic/claude-sonnet-4</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></td>
+                <td class="eff"><button class="field" type="button"><span class="v mono">medium</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></td>
+              </tr>
+              <tr>
+                <td class="agent">worker</td>
+                <td class="model"><button class="field wide" type="button"><span class="v mono">openai/gpt-5-codex</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></td>
+                <td class="eff"><button class="field" type="button"><span class="v mono">high</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="savebar" role="group" aria-label="Unsaved changes">
+            <span class="sstat">No unsaved changes yet</span>
+            <span class="snote">Choosing an option writes only the model field</span>
+            <span class="sacts"><button class="btn quiet" type="button">Discard</button><button class="btn primary" type="button">Save changes</button></span>
+          </div>
+        </section>
+
+        <!-- ============ 5. FALLBACK CHAIN: reorder, remove, add, limit, repeat ============ -->
+        <section class="state" data-pane="chain">
+          <h3>Profiles</h3>
+          <p class="hint">team · chain edited in place</p>
+          <div class="sect" style="margin-top:0;padding-top:0;border-top:0">
+            <h4>Fallback chain <span class="key">*</span> default <span class="tag warn">8 of 8</span></h4>
+            <ol class="steps">
+              <li>
+                <span class="step">1</span>
+                <div class="stepmain"><button class="field wide" type="button"><span class="v mono">anthropic/claude-haiku-4-5</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></div>
+                <button class="iconbtn" type="button" aria-label="Move step 1 up" aria-disabled="true"><svg class="i" aria-hidden="true"><use href="#i-up"/></svg></button>
+                <button class="iconbtn" type="button" aria-label="Move step 1 down"><svg class="i" aria-hidden="true"><use href="#i-down"/></svg></button>
+                <button class="iconbtn" type="button" aria-label="Remove step 1"><svg class="i" aria-hidden="true"><use href="#i-x"/></svg></button>
+              </li>
+              <li class="changed">
+                <span class="step">2</span>
+                <div class="stepmain"><button class="field wide" type="button"><span class="v mono">openai/gpt-5-codex</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></div>
+                <button class="iconbtn" type="button" aria-label="Move step 2 up"><svg class="i" aria-hidden="true"><use href="#i-up"/></svg></button>
+                <button class="iconbtn" type="button" aria-label="Move step 2 down"><svg class="i" aria-hidden="true"><use href="#i-down"/></svg></button>
+                <button class="iconbtn" type="button" aria-label="Remove step 2"><svg class="i" aria-hidden="true"><use href="#i-x"/></svg></button>
+              </li>
+              <li>
+                <span class="step">3</span>
+                <div class="stepmain"><button class="field wide" type="button"><span class="v mono">google/gemini-2.5-pro</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></div>
+                <button class="iconbtn" type="button" aria-label="Move step 3 up"><svg class="i" aria-hidden="true"><use href="#i-up"/></svg></button>
+                <button class="iconbtn" type="button" aria-label="Move step 3 down"><svg class="i" aria-hidden="true"><use href="#i-down"/></svg></button>
+                <button class="iconbtn" type="button" aria-label="Remove step 3"><svg class="i" aria-hidden="true"><use href="#i-x"/></svg></button>
+              </li>
+              <li>
+                <span class="step">4</span>
+                <div class="stepmain">
+                  <button class="field wide" type="button" aria-invalid="true" aria-describedby="rep-err"><span class="v mono">google/gemini-2.5-pro</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button>
+                  <p class="step-err" id="rep-err">Already step 3 · a model appears once</p>
+                </div>
+                <button class="iconbtn" type="button" aria-label="Move step 4 up"><svg class="i" aria-hidden="true"><use href="#i-up"/></svg></button>
+                <button class="iconbtn" type="button" aria-label="Move step 4 down"><svg class="i" aria-hidden="true"><use href="#i-down"/></svg></button>
+                <button class="iconbtn" type="button" aria-label="Remove step 4"><svg class="i" aria-hidden="true"><use href="#i-x"/></svg></button>
+              </li>
+              <li>
+                <span class="step">5</span>
+                <div class="stepmain"><button class="field wide" type="button"><span class="v mono">mistral/codestral-2508</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></div>
+                <button class="iconbtn" type="button" aria-label="Move step 5 up"><svg class="i" aria-hidden="true"><use href="#i-up"/></svg></button>
+                <button class="iconbtn" type="button" aria-label="Move step 5 down"><svg class="i" aria-hidden="true"><use href="#i-down"/></svg></button>
+                <button class="iconbtn" type="button" aria-label="Remove step 5"><svg class="i" aria-hidden="true"><use href="#i-x"/></svg></button>
+              </li>
+              <li>
+                <span class="step">6</span>
+                <div class="stepmain"><button class="field wide" type="button"><span class="v mono">openai/gpt-5-mini</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></div>
+                <button class="iconbtn" type="button" aria-label="Move step 6 up"><svg class="i" aria-hidden="true"><use href="#i-up"/></svg></button>
+                <button class="iconbtn" type="button" aria-label="Move step 6 down"><svg class="i" aria-hidden="true"><use href="#i-down"/></svg></button>
+                <button class="iconbtn" type="button" aria-label="Remove step 6"><svg class="i" aria-hidden="true"><use href="#i-x"/></svg></button>
+              </li>
+              <li>
+                <span class="step">7</span>
+                <div class="stepmain"><button class="field wide" type="button"><span class="v mono">anthropic/claude-opus-4-1</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></div>
+                <button class="iconbtn" type="button" aria-label="Move step 7 up"><svg class="i" aria-hidden="true"><use href="#i-up"/></svg></button>
+                <button class="iconbtn" type="button" aria-label="Move step 7 down"><svg class="i" aria-hidden="true"><use href="#i-down"/></svg></button>
+                <button class="iconbtn" type="button" aria-label="Remove step 7"><svg class="i" aria-hidden="true"><use href="#i-x"/></svg></button>
+              </li>
+              <li>
+                <span class="step">8</span>
+                <div class="stepmain"><button class="field wide" type="button"><span class="v mono">openai/o4-mini</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></div>
+                <button class="iconbtn" type="button" aria-label="Move step 8 up"><svg class="i" aria-hidden="true"><use href="#i-up"/></svg></button>
+                <button class="iconbtn" type="button" aria-label="Move step 8 down" aria-disabled="true"><svg class="i" aria-hidden="true"><use href="#i-down"/></svg></button>
+                <button class="iconbtn" type="button" aria-label="Remove step 8"><svg class="i" aria-hidden="true"><use href="#i-x"/></svg></button>
+              </li>
+            </ol>
+            <div class="addstep">
+              <button class="btn" type="button" aria-disabled="true" aria-describedby="lim-8">Add step</button>
+              <span class="limit" id="lim-8">Limit reached: 8 of 8 steps. Remove one to add another.</span>
+            </div>
+            <p class="note">1 unsaved change · the repeat must be resolved before the save is accepted</p>
+          </div>
+          <div class="savebar" role="group" aria-label="Unsaved changes">
+            <span class="sstat">1 unsaved change</span>
+            <span class="snote">A repeated model is refused here, before the write</span>
+            <span class="sacts"><button class="btn quiet" type="button">Discard</button><button class="btn primary" type="button" aria-disabled="true" aria-describedby="rep-err">Save changes</button></span>
+          </div>
+        </section>
+
+        <!-- ============ 6. PIN: two layers, one clear ============ -->
+        <section class="state" data-pane="pin">
+          <h3>Profiles</h3>
+          <p class="hint">team · the pin is a separate file per layer</p>
+          <div class="banner" role="status">
+            <p><span class="bt">Pins are read when this pane opens.</span></p>
+            <p class="why">They are not watched: a pin changed in the terminal stays invisible until you reopen this pane.</p>
+          </div>
+          <div class="pinrows">
+            <div class="pinrow">
+              <span class="plab">Repo</span>
+              <button class="field wide" type="button"><span class="v mono">none</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button>
+              <button class="btn quiet" type="button" aria-disabled="true" aria-describedby="clr-1">Clear</button>
+            </div>
+            <div class="pinrow">
+              <span class="plab">Local</span>
+              <button class="field wide" type="button"><span class="v mono">team</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button>
+              <button class="btn quiet" type="button">Clear</button>
+            </div>
+          </div>
+          <p class="note" id="clr-1">Repo cleared in this draft: it writes <span class="code">null</span>, so this folder has no pin and the default profile wins.</p>
+          <p class="note">One profile per layer · the repo pin wins inside this folder · the local pin wins everywhere else</p>
+          <div class="savebar" role="group" aria-label="Unsaved changes">
+            <span class="sstat">1 unsaved change</span>
+            <span class="snote">Writes <span class="code">{"source":"repo","profile":null}</span></span>
+            <span class="sacts"><button class="btn quiet" type="button">Discard</button><button class="btn primary" type="button">Save changes</button></span>
+          </div>
+        </section>
+
+        <!-- ============ 7. REVISION CONFLICT: keep the draft or reload ============ -->
+        <section class="state" data-pane="conflict">
+          <h3>Profiles</h3>
+          <p class="hint">team · draft from 14:22</p>
+          <div class="banner warn" role="alert">
+            <p><span class="bt">This file changed since you opened it.</span></p>
+            <p class="why">Nothing was written. The revision the editor held is stale, so the save was refused.</p>
+            <div class="bacts">
+              <button class="btn primary" type="button">Keep my draft</button>
+              <button class="btn" type="button">Reload theirs</button>
+            </div>
+          </div>
+          <div class="chips" role="group" aria-label="Profiles">
+            <span class="chip" aria-current="true">team <span class="cmark def">default</span></span>
+            <span class="chip">fast <span class="cmark">pin · repo</span></span>
+          </div>
+          <table class="agents">
+            <thead><tr><th scope="col">Agent</th><th scope="col">Model</th><th scope="col" style="text-align:right">Effort</th></tr></thead>
+            <tbody>
+              <tr>
+                <td class="agent">orchestrator</td>
+                <td class="model"><button class="field wide" type="button"><span class="v mono">anthropic/claude-sonnet-4</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></td>
+                <td class="eff"><button class="field" type="button"><span class="v mono">high</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></td>
+              </tr>
+              <tr>
+                <td class="agent">explore</td>
+                <td class="model"><button class="field wide" type="button"><span class="v mono">anthropic/claude-haiku-4-5</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></td>
+                <td class="eff"><button class="field" type="button"><span class="v mono">low</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></td>
+              </tr>
+              <tr>
+                <td class="agent">verify <span class="dot" aria-hidden="true"></span><span class="vh">changed</span></td>
+                <td class="model"><button class="field wide" type="button"><span class="v mono">anthropic/claude-sonnet-4</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></td>
+                <td class="eff"><button class="field" type="button"><span class="v mono">xhigh</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></td>
+              </tr>
+              <tr>
+                <td class="agent">worker <span class="dot" aria-hidden="true"></span><span class="vh">changed</span></td>
+                <td class="model"><button class="field wide" type="button"><span class="v mono">openai/gpt-5-codex</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></td>
+                <td class="eff"><button class="field" type="button"><span class="v mono">high</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="savebar" role="group" aria-label="Unsaved changes">
+            <span class="sstat">2 unsaved changes, kept</span>
+            <span class="snote">Keep my draft writes over theirs with a fresh revision</span>
+            <span class="sacts"><button class="btn quiet" type="button">Discard</button><button class="btn primary" type="button">Save changes</button></span>
+          </div>
+        </section>
+
+        <!-- ============ 8. INVALID DATA: the owner refused it ============ -->
+        <section class="state" data-pane="rejected">
+          <h3>Profiles</h3>
+          <p class="hint">team · draft from 14:22</p>
+          <div class="banner bad" role="alert">
+            <p><span class="bt">gentle-pi rejected this draft.</span></p>
+            <p class="why">Nothing was written. The draft is kept exactly as you left it.</p>
+            <p class="why"><span class="code">invalid_data · profiles.team.worker.thinking: unknown level "ultra"</span></p>
+            <div class="bacts">
+              <button class="btn primary" type="button">Back to the draft</button>
+              <button class="btn quiet" type="button">Discard draft</button>
+            </div>
+          </div>
+          <table class="agents">
+            <thead><tr><th scope="col">Agent</th><th scope="col">Model</th><th scope="col" style="text-align:right">Effort</th></tr></thead>
+            <tbody>
+              <tr>
+                <td class="agent">orchestrator</td>
+                <td class="model"><button class="field wide" type="button"><span class="v mono">anthropic/claude-sonnet-4</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></td>
+                <td class="eff"><button class="field" type="button"><span class="v mono">high</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></td>
+              </tr>
+              <tr>
+                <td class="agent">explore</td>
+                <td class="model"><button class="field wide" type="button"><span class="v mono">anthropic/claude-haiku-4-5</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></td>
+                <td class="eff"><button class="field" type="button"><span class="v mono">low</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></td>
+              </tr>
+              <tr>
+                <td class="agent">verify</td>
+                <td class="model"><button class="field wide" type="button"><span class="v mono">anthropic/claude-sonnet-4</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></td>
+                <td class="eff"><button class="field" type="button"><span class="v mono">medium</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></td>
+              </tr>
+              <tr>
+                <td class="agent">worker <span class="dot warn" aria-hidden="true"></span><span class="vh">refused</span></td>
+                <td class="model"><button class="field wide" type="button"><span class="v mono">openai/gpt-5-codex</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></td>
+                <td class="eff"><button class="field" type="button" aria-invalid="true"><span class="v mono">ultra</span><svg class="i s" aria-hidden="true"><use href="#i-chev"/></svg></button></td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="savebar" role="group" aria-label="Unsaved changes">
+            <span class="sstat">Draft kept · 1 field refused</span>
+            <span class="snote">Fix the effort, then save again</span>
+            <span class="sacts"><button class="btn quiet" type="button">Discard</button><button class="btn primary" type="button">Save changes</button></span>
+          </div>
+        </section>
+
+        <!-- ============ 10. SAVED, NOT APPLIED ============ -->
+        <section class="state" data-pane="saved">
+          <h3>Profiles</h3>
+          <p class="hint">team · saved at 14:24</p>
+          <div class="banner" role="status">
+            <p><span class="bt">Saved. Not applied yet.</span></p>
+            <p class="why">New chats still start on <span class="mono">fast</span> until you make team the default. Chats already open keep the routing they started with.</p>
+            <div class="bacts">
+              <button class="btn primary" type="button">Make default for new sessions</button>
+              <button class="btn quiet" type="button">Done</button>
+            </div>
+          </div>
+          <table class="agents">
+            <thead><tr><th scope="col">Agent</th><th scope="col">Model</th><th scope="col" style="text-align:right">Effort</th></tr></thead>
+            <tbody>
+              <tr><td class="agent">orchestrator</td><td class="model">anthropic/claude-sonnet-4</td><td class="eff"><span class="e">high</span></td></tr>
+              <tr><td class="agent">explore</td><td class="model">anthropic/claude-haiku-4-5</td><td class="eff"><span class="e">low</span></td></tr>
+              <tr><td class="agent">verify</td><td class="model">anthropic/claude-sonnet-4</td><td class="eff"><span class="e">xhigh</span></td></tr>
+              <tr><td class="agent">worker</td><td class="model">openai/gpt-5-codex</td><td class="eff"><span class="e">high</span></td></tr>
+            </tbody>
+          </table>
+          <section class="sect" aria-labelledby="pin-saved">
+            <h4 id="pin-saved">Pin</h4>
+            <dl class="pins">
+              <div class="pinrow"><dt class="plab">Repo</dt><dd><span class="mono">fast</span> <span class="tag warn">wins here</span></dd></div>
+              <div class="pinrow"><dt class="plab">Local</dt><dd><span class="mono">team</span></dd></div>
+            </dl>
+            <p class="note">This repo is pinned to fast, so fast stays the default in this folder even after team is made default.</p>
+          </section>
+        </section>
+
+        <!-- ============ 11. DEGRADED: the child never answered ============ -->
+        <section class="state" data-pane="degraded">
+          <h3>Profiles</h3>
+          <p class="hint">Read-only view, the one this pane draws today</p>
+          <div class="banner bad" role="alert">
+            <p><span class="bt">The control process did not answer.</span></p>
+            <p class="why">Editing needs it. This view still shows what the shell read from the files.</p>
+            <div class="bacts">
+              <button class="btn" type="button">Try again</button>
+              <button class="btn quiet" type="button"><svg class="i s" aria-hidden="true"><use href="#i-term"/></svg> Edit in terminal</button>
+            </div>
+          </div>
+          <div class="chips" role="group" aria-label="Profiles">
+            <span class="chip" aria-current="true">team <span class="cmark def">default</span></span>
+            <span class="chip">fast <span class="cmark">pin · repo</span></span>
+          </div>
+          <table class="agents">
+            <thead><tr><th scope="col">Agent</th><th scope="col">Model</th><th scope="col" style="text-align:right">Effort</th></tr></thead>
+            <tbody>
+              <tr><td class="agent">orchestrator</td><td class="model">anthropic/claude-sonnet-4</td><td class="eff"><span class="e">high</span></td></tr>
+              <tr><td class="agent">explore</td><td class="model">anthropic/claude-haiku-4-5</td><td class="eff"><span class="e">low</span></td></tr>
+              <tr><td class="agent">verify</td><td class="model">anthropic/claude-sonnet-4</td><td class="eff"><span class="e">medium</span></td></tr>
+              <tr><td class="agent">worker</td><td class="model">openai/gpt-5-codex</td><td class="eff"><span class="e">high</span></td></tr>
+            </tbody>
+          </table>
+          <p class="note">The files were read twice: the shell's own push, then this pane's retry. Nothing here writes.</p>
+        </section>
+
+      </div><!-- /pane -->
+    </div><!-- /body -->
+
+    <!-- The dialog's own action row stays: the sticky bar lives inside the pane,
+         so closing the dialog and abandoning a draft are two different exits. -->
+    <div class="acts"><button class="btn" type="button">Close</button></div>
+
+    <!-- the channel's confirmation, over the saved pane -->
+    <div class="ovl" data-overlay="apply" hidden></div>
+    <div class="confirm" data-overlay="apply" role="alertdialog" aria-modal="true" aria-labelledby="conf-t" hidden>
+      <h4 id="conf-t">Apply profile "team"?</h4>
+      <p><strong>New chats start on team.</strong> Chats already open keep their routing.</p>
+      <p>This repo is pinned to <span class="mono">fast</span>, so fast stays the default in this folder.</p>
+      <p class="note" style="margin:6px 0 0">gentle-pi asks this itself; the editor only offers the action.</p>
+      <div class="cacts">
+        <button class="btn" type="button">Cancel</button>
+        <button class="btn primary" type="button">Apply</button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<p class="legend" style="padding:0 24px 18px;max-width:900px">
+  Copy is English and kept short so Spanish fits: the longest button here is <em>Save and make default</em> (26 characters in Spanish), the longest sentence 78. One assumption to settle before code: with the whole document writable, <em>Orchestrator mode</em> becomes a stored field, while today's strip is session-only.
+</p>
+
+<script>
+(function(){
+  var LEGEND = {
+    idle:"Read-only: what the shell read, the default marked, both pin layers and the default chain. Nothing writable until a value is touched, so a glance never starts a draft.",
+    connecting:"The temporary control child is starting (5–10 s, ~400 MB). The pane says what it waits for, keeps the read view, and its Edit control stays focusable with the reason attached.",
+    editing:"Touched rows carry a dot; one sticky bar at the bottom of the pane names the count, says a save only stores, and holds Discard and Save changes.",
+    picker:"The model list is the 0.1.11 catalog in a popover; choosing writes one field and the effort stays as the row had it. Escape closes without a change.",
+    chain:"Reorder with the arrows, remove with ×, add at the end. Step 8 refuses a ninth (warning tag plus the limit line) and a model repeated from step 3 is refused inline, before any write.",
+    pin:"Two layers, one row each: repo and local. Clear writes null and leaves that layer unpinned. The notice says pins are read on open and never watched.",
+    conflict:"revision_conflict: the file changed under the draft. Nothing was written, the draft is still in the fields, and the bar still offers the write with a fresh revision.",
+    rejected:"The owner's invalid_data answer, verbatim, with the refused field marked. Nothing was written and the draft is kept; the footer says which agent and level it refused.",
+    apply:"The channel's own confirmation over the saved pane: it names the profile, says which chats keep their routing, and reports that the repo pin wins in this folder.",
+    saved:"The save landed and the pane says so without claiming more: new chats still read the old default until the second action, which is offered here.",
+    degraded:"The child never answered. The pane falls back to today's read-only view with Try again and the terminal handoff; an editor never breaks, it degrades."
+  };
+  var dlg = document.getElementById('dlg');
+  var legend = document.getElementById('legend');
+  var buttons = [].slice.call(document.querySelectorAll('[data-go]'));
+  var BASE = { apply: 'saved' };
+  function show(id){
+    var base = BASE[id] || id;
+    dlg.setAttribute('data-state', id);
+    document.querySelectorAll('[data-pane]').forEach(function(p){ p.hidden = p.dataset.pane !== base; });
+    document.querySelectorAll('[data-overlay]').forEach(function(o){ o.hidden = o.dataset.overlay !== id; });
+    buttons.forEach(function(b){ b.setAttribute('aria-pressed', b.dataset.go === id ? 'true' : 'false'); });
+    legend.textContent = LEGEND[id] || '';
+  }
+  buttons.forEach(function(b){ b.addEventListener('click', function(){ show(b.dataset.go); }); });
+  show('idle');
+})();
+</script>
+</body>
+</html>
