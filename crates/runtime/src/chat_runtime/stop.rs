@@ -63,7 +63,10 @@ impl ChatRuntime {
 
     /// The chat's stop client, created on its first stop. `None` for a chat the
     /// host has no key for (never opened, or already closed).
-    fn stopper(&self, chat: &ChatId) -> Option<Arc<Stopper>> {
+    ///
+    /// `pub(super)` so the runtime's own tests can pin S8's one client per chat
+    /// without a child: the client is what carries the counter.
+    pub(super) fn stopper(&self, chat: &ChatId) -> Option<Arc<Stopper>> {
         // The registry lock ends before any exchange: it is taken only to read
         // the key, never across a call that blocks on a child.
         let key = self.keys().key_of(chat)?;

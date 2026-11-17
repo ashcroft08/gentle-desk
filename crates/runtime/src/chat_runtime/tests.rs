@@ -15,6 +15,7 @@ mod fake;
 mod folder;
 mod open_chat;
 mod rekey;
+mod stop;
 use fake::FakeSpawner;
 
 fn runtime_with(limits: Limits) -> (ChatRuntime, Arc<FakeSpawner>) {
