@@ -92,3 +92,24 @@ The roadmap's "0.4.x: stopping a helper" (agreed 2026-11-16, maintainer:
   left; S7 forbids real children without the maintainer's per-run approval, so
   it waits for an approved session (stop a real helper, the chat keeps running,
   the counters and the card correct on the child's next frame).
+- L5 (parent, 2026-11-17): T2-T4 REVIEWED AND APPROVED — lineage
+  review-471c99ffe74e14b9 (risk + resilience + reliability), 32 paths, 1773
+  lines, tier high, correction budget 200 (unused). Three model runs, ~$0.068
+  total, APPROVED, authority burned. Delivered as PR #179. FOUR ADVISORY
+  (non-blocking) findings, recorded here as BACKLOG — the review closed on this
+  candidate and none of them reopens it:
+  (1) R3-requestid-reset-on-existing-open — the OpenProcess arm drops the stop
+  client BEFORE `open` reveals whether it started a new child, so re-clicking an
+  already-open chat (Opened::Existing) discards a live client's counter and
+  capabilities; the next stop restarts at `desktop-1`, which is S8's "one counter
+  per chat" broken for that path. Small fix (forget only when a fresh child
+  started), needs its own candidate. HIGHEST of the four.
+  (2) R3-stop-client-cache-not-pruned-on-close — closing a chat keeps its client
+  in the map for the process lifetime.
+  (3) R4-1 — a chat's first stop is two sequential blocking exchanges
+  (capabilities, then cancel) under that chat's Stopper mutex, so a stalling
+  child holds the stop for up to two deadlines and a second stop of the same chat
+  queues behind it; silent by S7.
+  (4) R4-2 — `helper_stopped` overwrites the mark unconditionally, so a terminal
+  status the child reported between the click and the accepted cancel is
+  replaced by Cancelled (display-only; the child did accept the cancel).
