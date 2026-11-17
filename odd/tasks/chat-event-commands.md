@@ -33,7 +33,7 @@ latent one:
 
 - [x] T1 (S1-S4) shell: the pump hands the fold's chat commands to the same runner the intent path already uses, off the fold thread. Route: gentle-ai-worker; commit: 0a0da36
 - [x] T2 (S5) shell: a test through the pump seam with a recording executor proving a settled turn's `get_session_stats` is run, plus the full suite, `fmt` and `clippy`. Route: gentle-ai-worker; commit: cd6417b
-- [ ] T3 (S1) parent verifies with `tools/fake-gentle-shell` through `GENTLE_SHELL_BIN`: the chip moves after a turn without reopening. Route: parent; commit:
+- [x] T3 (S1) parent verifies with `tools/fake-gentle-shell` through `GENTLE_SHELL_BIN`: the chip moves after a turn without reopening. Route: parent; commit: none - verified by the user in the real app (see L12)
 
 ## Log
 
@@ -50,3 +50,5 @@ latent one:
 
 - L10 (checks, verified by the parent): `cargo fmt --all --check` clean, `cargo clippy --workspace --all-targets` exit 0, `cargo test --workspace` exit 0 with 111 test binaries ok, run with the worktree's own `target/`. The first suite run failed with `LNK1318` PDB errors because it shared the sibling session's `target/`; that was a method error, not a code failure, and the shared `CARGO_TARGET_DIR` is no longer used. The first `fmt` run also caught `chat_no_abort.rs`, created after the earlier `cargo fmt --all`; fixed in c088407.
 - L11 (pending): T3 is the user's real-window check, not done: the chip must move after a turn with no close and reopen, and a queued prompt must go out when a slot frees, both against `tools/fake-gentle-shell` through `GENTLE_SHELL_BIN`.
+
+- L12 (window check, reported by the user): the app was run from this branch with `npm run tauri dev` and the real `gentle-shell` (the fake shell does not answer `get_session_stats`, so it cannot exercise the chip). The user's words: «Ahora si funciono sin ningun problema». Evidence from the run log: a 5 minute session, three chats opened, three children `stopped by the host` at close, no panic, no `Operation aborted`, no leftover `gentle-desk-app` process. The only error line is WebView2's harmless `Failed to unregister class Chrome_WidgetWin_0` at exit. Not exercised in that session and so not verified: the 15 minute idle reap, and a fourth prompt queuing behind three working chats.
