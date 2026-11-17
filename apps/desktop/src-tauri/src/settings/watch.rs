@@ -185,14 +185,16 @@ impl Debouncer {
     /// is not part of the old batch - merging it would delay the notice the old
     /// batch already owed until the new event's own quiet window.
     pub fn push(&mut self, now: Duration, group: Option<Group>) -> Option<Changed> {
-        let group = group?;
-        // The due check comes FIRST, from the instant this event arrived: the
-        // notice the open batch already owes goes out with this push, and the
-        // event opens the next batch.
+        // The due check comes FIRST, from the instant this event arrived, and it
+        // does not depend on the event naming a group: the notice the open batch
+        // already owes goes out with this push even when the event is noise.
         let flushed = self.take_if_due(now);
-        // A `now` earlier than the previous push only widens the window.
-        self.last = Some(self.last.map_or(now, |last| last.max(now)));
-        self.changed.note(group);
+        // Only an event that names a group opens (or extends) a batch. A `now`
+        // earlier than the previous push only widens the window.
+        if let Some(group) = group {
+            self.last = Some(self.last.map_or(now, |last| last.max(now)));
+            self.changed.note(group);
+        }
         flushed
     }
 
@@ -453,6 +455,60 @@ mod tests {
         );
         assert_eq!(debouncer.deadline(), None, "the batch stays open");
         assert_eq!(debouncer.take_if_due(at(5_000)), None);
+    }
+
+    /// An event that names no group (a temp file, any other name in a watched
+    /// folder) still reads the clock: when the open batch is already due, the
+    /// notice it owes goes out with that push instead of waiting for the loop's
+    /// next turn.
+    #[test]
+    fn an_ignored_event_after_the_deadline_still_flushes_the_due_batch() {
+        let mut debouncer = Debouncer::default();
+        assert_eq!(debouncer.push(at(0), Some(Group::Profiles)), None);
+        let deadline = debouncer.deadline().expect("the batch is open");
+
+        let late = deadline + at(500);
+        assert_eq!(
+            debouncer.push(late, None),
+            Some(Changed {
+                profiles: true,
+                account: false,
+            }),
+            "an ignored event past the deadline left the due batch waiting"
+        );
+        assert_eq!(debouncer.deadline(), None, "no batch is left open");
+    }
+
+    /// An ignored event before the deadline changes nothing: it neither flushes
+    /// the batch nor moves its quiet window, so noise in the folder can never
+    /// delay a real change's notice.
+    #[test]
+    fn an_ignored_event_before_the_deadline_leaves_the_batch_alone() {
+        let mut debouncer = Debouncer::default();
+        assert_eq!(debouncer.push(at(0), Some(Group::Profiles)), None);
+        let deadline = debouncer.deadline().expect("the batch is open");
+
+        assert_eq!(debouncer.push(at(100), None), None);
+        assert_eq!(
+            debouncer.deadline(),
+            Some(deadline),
+            "an ignored event moved the quiet window"
+        );
+        assert_eq!(
+            debouncer.take_if_due(deadline),
+            Some(Changed {
+                profiles: true,
+                account: false,
+            })
+        );
+    }
+
+    /// An ignored event with no batch open has nothing to flush and opens none.
+    #[test]
+    fn an_ignored_event_with_no_batch_open_does_nothing() {
+        let mut debouncer = Debouncer::default();
+        assert_eq!(debouncer.push(at(1_000), None), None);
+        assert_eq!(debouncer.deadline(), None);
     }
 
     /// Two bursts with the quiet window between them are two notices, not one.
