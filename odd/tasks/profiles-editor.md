@@ -309,3 +309,42 @@ es valor de producto".
   T2b-2 shell view and plumbing (`ChatProfileView` in `ViewState`, the
   `RefreshChatProfile` intent, windowless tests, bindings regenerated);
   T2b-3 staleness and copy (refresh triggers, i18n words).
+- L12 (parent, 2026-11-17): T2b-2 DELIVERED on `feat/chat-profile-view`, commit 97277d1
+  (writer, then the parent: the one-line `chat_profile: null` in
+  `apps/desktop/src/test-support/view-state.ts` that the new required field needs,
+  outside the writer's surfaces). The shell holds a shell-owned `ChatProfileView`
+  (not reducer state, L11): the session-file binding flagged as an approximation, the
+  default, every profile's agents and fallback chains, the pin layers of the chat's
+  worktree, and a per-store availability (read / unavailable / skipped) so a child
+  that never answered is a state. `RefreshChatProfile` runs T2b-1's read for exactly
+  that chat; the view is projected only while that chat is foreground; a read that
+  reached no store keeps the previous view and says nothing; `Input::ChatClosed`
+  drops it. No copy, no UI, no revisions or write tokens (T2b-3, T2c, T3). VERIFIED
+  by the parent: cargo workspace 1504/0 (with `-j 2`: a first full run died on
+  Windows error 1455, paging file too small, while linking many test binaries at once;
+  an environment limit, not a defect), clippy -D warnings, fmt, bindings drift guard,
+  vitest 745/745, svelte-check 0/0, eslint. REVIEW: lineage review-41a4dc9df89df8cc
+  (risk + resilience + reliability, 12 paths, 1623 lines, tier high), 3 lens runs plus
+  one refuter, ~$0.051 in total, every run asked first. A CRITICAL candidate (R3-001,
+  `note_chat_profile` overwrites the single slot with any completed read) was REFUTED;
+  APPROVED, authority burned. FIVE ADVISORY findings, recorded as BACKLOG, none
+  reopens the review:
+  (1) R4-late-read-reinstalls-view (with R1-closed-chat-view-restored): a read that
+  answers after its chat closed re-installs the view the close dropped, because
+  `note_chat_profile` does not check the chat is still open; a reopened session-path
+  chat reuses its id, so the stale view can reappear until the next refresh, and the
+  keep-previous rule (L11-4) can preserve it. T2b-3's refresh triggers are the natural
+  place to fix it (drop a read whose chat is gone) and it needs a RED test.
+  (2) R1-chat-for-path-fallback (WARNING): `RefreshChatProfile` passes the web's
+  `chat_id` through `chat_for`, whose fallback turns ANY string into a session path
+  that the `FileRead` seam reads; only the parsed bind name and origin are echoed
+  back, never file content, and the webview is the app's own, but the read is not
+  confined to the sessions store. Worth confining before T3 widens what this view
+  carries.
+  (3) R4-ran-single-slot-drops-read: `Ran` carries one profile read, so two
+  `ReadChatProfile` commands in one run lose all but the last answer.
+  (4) R4-unreadable-session-silent: an unreadable session file reads as "uses the
+  default" with no log; by design (L9) but invisible to an operator.
+  KNOWN LIMIT: per-layer pin marks carry only what the `pins` value names (winner /
+  stale / invalid); `layers[]` lives in the projection that T2b-1 drops, so T6 may
+  need it.

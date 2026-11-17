@@ -254,6 +254,16 @@ pub enum UiIntent {
     /// terminal may have changed the file. Nothing is written: the shell owns
     /// the file. The answer travels back on [`ViewState::profiles`].
     RefreshProfiles,
+    /// Re-read THIS chat's own profile configuration (profiles-editor T2b-2,
+    /// L11): the profiles, their fallback chains and the pin of that chat's
+    /// worktree, asked of that chat's OWN child, which is the only one that knows
+    /// them. The Profile tab sends it when it opens and when it asks again.
+    /// Nothing is written, and a read that reached no store leaves the view as it
+    /// was. The answer travels back on [`ViewState::chat_profile`], for that chat
+    /// alone.
+    RefreshChatProfile {
+        chat_id: String,
+    },
     /// Re-read the provider names and re-run one `auth check` per provider
     /// (0.1.12, T3). The answer travels back on [`ViewState::auth`].
     RefreshAuth,
@@ -384,6 +394,160 @@ pub struct ProfilesView {
     /// The mode the desk passes to the chats it opens from now on. It is the
     /// SESSION's switch, never a stored preference (S1).
     pub mode: OrchestratorModeView,
+}
+
+/// One agent of one profile, as the chat's Profile tab draws it (profiles-editor
+/// T2b-2, S1): the key the store names the agent by and the route it stores.
+/// Every route member is optional because the file allows a partial row, and a
+/// missing one is drawn as nothing rather than as a guess.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub struct ChatProfileAgentView {
+    /// The agent's name, the store's own key (`orchestrator`, `worker`, ...).
+    pub agent: String,
+    pub model: Option<String>,
+    pub thinking: Option<String>,
+    pub tier: Option<String>,
+}
+
+/// One step of a fallback chain: the model, and the effort gentle-pi switches to
+/// with it when the step names one.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub struct ChatProfileStepView {
+    pub model: String,
+    pub thinking: Option<String>,
+}
+
+/// One fallback chain of one profile: the agent it is for, and the models in the
+/// order gentle-pi would move through them.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub struct ChatProfileChainView {
+    /// The store's own key: an agent's name, or `*` for the profile-wide chain.
+    pub agent: String,
+    pub steps: Vec<ChatProfileStepView>,
+}
+
+/// One profile definition, so the tab can draw a profile this chat is not bound
+/// to. The chains are the ones the sibling `profile_fallbacks` store records for
+/// it, and an empty list means the store names none.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub struct ChatProfileDefinitionView {
+    pub name: String,
+    /// Every agent of the profile, in the order the store reports them.
+    pub agents: Vec<ChatProfileAgentView>,
+    /// Every chain this profile has, `*` included, in the store's own order.
+    pub chains: Vec<ChatProfileChainView>,
+}
+
+/// Where one pin layer stands, in the three states the `pins` value itself
+/// names (`desktop-rpc.md:211-234`).
+///
+/// A layer that holds a VALID profile another layer outranks is not reported by
+/// that value at all, so it is not drawn here either: the tab shows the winner
+/// and the two broken lists, and invents no third mark.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum ChatProfilePinMarkView {
+    /// The layer that decides which profile this chat's worktree uses.
+    Winner,
+    /// The layer names a profile the profiles store no longer defines.
+    Stale,
+    /// The layer is not a pin at all.
+    Invalid,
+}
+
+/// One pin layer: the file it lives in, the profile it names, and what became of
+/// it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub struct ChatProfilePinLayerView {
+    /// `local` or `repo`: the file the pin is kept in.
+    pub source: String,
+    /// The profile the layer names, `None` when it names none.
+    pub profile: Option<String>,
+    pub mark: ChatProfilePinMarkView,
+}
+
+/// What the `pins` store answered for THIS chat's own worktree: the pins belong
+/// to a folder, so they are read from the chat's child and never globally.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub struct ChatProfilePinsView {
+    /// Whether a layer named a profile the profiles store still defines.
+    pub resolved: bool,
+    /// The layer that decides here, when one does.
+    pub winner: Option<ChatProfilePinLayerView>,
+    /// Every layer the answer names, each with its own mark: the winner first,
+    /// then the stale ones, then the ones that are not a pin at all.
+    pub layers: Vec<ChatProfilePinLayerView>,
+    /// The owner's own code for why nothing resolved; `worktree_unresolved`
+    /// today.
+    pub reason: Option<String>,
+    /// Whether `reason` is the no-worktree case: no working directory inside a
+    /// resolvable Git worktree, so there is no pin file to read or write (state 5
+    /// of the artboard).
+    pub worktree_unresolved: bool,
+}
+
+/// How one of the three stores a chat's profile is read from answered.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum ChatProfileAvailabilityView {
+    /// The store answered with its content.
+    Read,
+    /// The store answered, and the answer carried no content this contract
+    /// reads: a refusal the owner words itself, or an unusable payload.
+    Unavailable,
+    /// The store was NEVER ASKED, because an earlier one got no answer at all
+    /// and asking could only wait out another deadline. It is state 10 of the
+    /// artboard - this chat's child is not answering - and it reaches the page
+    /// without a channel error.
+    Skipped,
+}
+
+/// How each of the three stores answered, so the page can draw "unavailable"
+/// without knowing one channel error.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub struct ChatProfileStoresView {
+    /// `profiles`: the definitions and the global `active` marker.
+    pub profiles: ChatProfileAvailabilityView,
+    /// `profile_fallbacks`: the chains per profile and agent.
+    pub fallbacks: ChatProfileAvailabilityView,
+    /// `pins`: the layers of this chat's own worktree.
+    pub pins: ChatProfileAvailabilityView,
+}
+
+/// The Profile tab's view of ONE chat (profiles-editor T2b-2, L8, L9, L11): which
+/// profile this chat uses, the definitions it could switch to, their fallback
+/// chains, and the pin of its own worktree.
+///
+/// It carries codes and names only - the words the tab says are its own, in the
+/// page (T2b-3) - and no revision and no write token: nothing here writes (T3).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub struct ChatProfileView {
+    /// The chat this view belongs to. [`ViewState::chat_profile`] carries it only
+    /// while that chat is the foreground one.
+    pub chat_id: String,
+    /// The profile this chat BOUND, `None` for a chat that uses the default: a
+    /// chat with no session file, a session file with no bind entry, a cleared
+    /// one, and an unreadable one are all the default.
+    pub bound: Option<String>,
+    /// Whether `bound` came from the chat's session file - which is the only way
+    /// it can be read (L8: no channel read exposes the binding), so the tab
+    /// labels the answer as the approximation the maintainer accepted in L9.
+    /// `false` for a chat that bound nothing.
+    pub bound_from_session_file: bool,
+    /// The layer the session file recorded the binding for: `user`, `local`,
+    /// `repo` or `global`, as the record itself names them.
+    pub bound_origin: Option<String>,
+    /// The profiles store's `active`: the GLOBAL default, which a valid pin
+    /// outranks (L8). `None` when that store was not read, and when it names no
+    /// active profile.
+    pub default_profile: Option<String>,
+    /// Every profile the store defines, in the order it reports them.
+    pub profiles: Vec<ChatProfileDefinitionView>,
+    /// The pins as this chat's own worktree resolves them, `None` when that store
+    /// was not read ([`ChatProfileStoresView::pins`] then says why).
+    pub pins: Option<ChatProfilePinsView>,
+    /// How each of the three stores answered.
+    pub stores: ChatProfileStoresView,
 }
 
 /// What one "Open in terminal" button asks the shell to do (0.1.12, S1, S2,
@@ -1086,6 +1250,18 @@ pub struct ViewState {
     /// The agent profiles the shell keeps (0.1.12, T2), read on the pane's
     /// behalf and never written.
     pub profiles: ProfilesView,
+    /// The Profile tab's view of the FOREGROUND chat (profiles-editor T2b-2,
+    /// L11): which profile this chat uses, the definitions, their chains and the
+    /// pin of its own worktree, as that chat's own child answered it.
+    ///
+    /// Shell-owned, like [`profiles`](Self::profiles): the reducer knows nothing
+    /// about a session file or a child's config store. A read belongs to the one
+    /// chat [`ChatProfileView::chat_id`] names and is carried only while that
+    /// chat is the foreground one, so a read that lands after the user moved on
+    /// never draws on the wrong chat. `None` until a read answered, for a chat
+    /// that is not the foreground one, and for every chat without a view of its
+    /// own.
+    pub chat_profile: Option<ChatProfileView>,
     /// Where the shell's authentication stands (0.1.12, T3): provider names and
     /// their own check, never a key.
     pub auth: AuthView,

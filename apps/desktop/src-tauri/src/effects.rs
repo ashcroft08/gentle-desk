@@ -20,7 +20,7 @@ use std::time::Duration;
 
 use gentle_app::{ChatCommand, ChatId, Input};
 use gentle_backend::chat_host::Opened;
-use gentle_runtime::chat_runtime::{request_after_open, Outcome};
+use gentle_runtime::chat_runtime::{request_after_open, ChatConfigRead, Outcome};
 
 mod runtime;
 
@@ -39,6 +39,11 @@ pub trait ChatExecutor: Send + Sync {
 pub struct Ran {
     /// The reducer inputs the outcome implies, to fold one after another.
     pub inputs: Vec<Input>,
+    /// One chat's profile configuration that arrived, with that chat
+    /// (profiles-editor T2b-2). It is NOT a reducer input: the view is the
+    /// shell's own (`bridge::chat_profile`), so it travels beside the inputs for
+    /// the caller to note next to `ProfilesView`.
+    pub chat_profile: Option<(ChatId, ChatConfigRead)>,
     /// A fresh child's start only proved its process was created, which takes
     /// milliseconds while the child takes seconds to speak. Its opening phase
     /// therefore ends with the chat's own first event, and the caller arms
@@ -98,10 +103,11 @@ fn run_into(command: ChatCommand, executor: &dyn ChatExecutor, ran: &mut Ran) {
         // child or a refusal - and today's behaviour is exactly that: the helper
         // keeps the mark it had and nothing is said (S7).
         Outcome::NotStopped { .. } => {}
-        // A chat's profile configuration arrived (profiles-editor T2b): the
-        // shell's own view takes it, not the reducer, so nothing is folded here.
-        // A read that failed leaves the pane exactly as it was drawn (S6).
-        Outcome::ChatProfile { .. } => {}
+        // A chat's profile configuration arrived (profiles-editor T2b-2): the
+        // shell's own view takes it, not the reducer, so nothing is folded here
+        // and the read travels beside the inputs. A read that reached no store
+        // leaves the tab exactly as it was drawn (S6, L11-4).
+        Outcome::ChatProfile { chat, read } => ran.chat_profile = Some((chat, *read)),
     }
 }
 

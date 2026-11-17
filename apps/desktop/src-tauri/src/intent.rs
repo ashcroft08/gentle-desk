@@ -70,7 +70,11 @@ pub fn to_intent(state: &gentle_app::AppState, intent: UiIntent) -> Option<gentl
         // The Settings pane's intents (0.1.12) are the shell's: they read a
         // file, run the shell's own check, or pass a mode to the children, so
         // the bridge answers them before it asks this (`Bridge::dispatch`).
+        // `RefreshChatProfile` (profiles-editor T2b-2, L11) is the same: it asks
+        // ONE chat's own child for its configuration, so the shell answers it
+        // with a command of its own (`AppStateHolder::dispatch_commands`).
         UiIntent::RefreshProfiles
+        | UiIntent::RefreshChatProfile { .. }
         | UiIntent::RefreshAuth
         | UiIntent::CheckUpdates
         | UiIntent::RefreshUsage
@@ -90,6 +94,10 @@ fn ui_answer(answer: crate::contract::DialogAnswer) -> gentle_core::rpc::UiAnswe
 
 /// The app's chat for an id the web side sent back.
 ///
+/// `pub(crate)` because the Profile tab's read (profiles-editor T2b-2) names one
+/// chat the same way: it is the ONE rule that reads an id back, so a chat the
+/// view named travels back to the chat it belongs to.
+///
 /// The web only ever holds ids the state named - [`gentle_app::AppState`] names
 /// every chat by `ChatId::as_str` and every session row by its path - so the
 /// lookup is the round trip of an id the view was given, and a chat of no
@@ -97,7 +105,7 @@ fn ui_answer(answer: crate::contract::DialogAnswer) -> gentle_core::rpc::UiAnswe
 /// id the state has not heard of is read as the session path of a stored chat,
 /// which is how the app builds that chat's id: the sidebar names a row by its
 /// path long before any chat exists.
-fn chat_for(state: &gentle_app::AppState, chat_id: &str) -> ChatId {
+pub(crate) fn chat_for(state: &gentle_app::AppState, chat_id: &str) -> ChatId {
     state
         .chats
         .ids()
