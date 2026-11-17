@@ -33,7 +33,9 @@ use std::path::{Component, Path, PathBuf};
 
 use gentle_app::ChatId;
 use gentle_core::i18n::Language;
-use gentle_core::rpc::config_store::{FallbacksDocument, PinLayer, PinsValue, ProfilesDocument};
+use gentle_core::rpc::config_store::{
+    FallbacksDocument, OrchestratorMode, PinLayer, PinsValue, ProfilesDocument,
+};
 use gentle_runtime::chat_runtime::{ChatConfigRead, StoreRead};
 use gentle_runtime::session_profile::last_session_profile;
 
@@ -41,7 +43,8 @@ use super::{lock, AppStateHolder};
 use crate::contract::{
     ChatProfileAgentView, ChatProfileAvailabilityView, ChatProfileChainView,
     ChatProfileDefinitionView, ChatProfilePinLayerView, ChatProfilePinMarkView,
-    ChatProfilePinsView, ChatProfileStepView, ChatProfileStoresView, ChatProfileView, ViewState,
+    ChatProfilePinsView, ChatProfileStepView, ChatProfileStoresView, ChatProfileView,
+    OrchestratorModeView, ViewState,
 };
 use crate::settings::FileRead;
 
@@ -203,8 +206,22 @@ fn definitions(
                 })
                 .collect(),
             chains: chains(fallbacks, name),
+            mode: mode(profiles.workflow.get(name)),
         })
         .collect()
+}
+
+/// One profile's orchestration mode: the `workflow` entry the profiles store holds
+/// for it, or gentle-pi's own default when it names none (L22: absent = organic).
+///
+/// The entry is stored PER PROFILE, which is why a change in the terminal reaches
+/// every chat that uses the profile (L20): the mode is the profile's, never one
+/// chat's.
+fn mode(recorded: Option<&OrchestratorMode>) -> OrchestratorModeView {
+    match recorded {
+        Some(OrchestratorMode::FullDelegation) => OrchestratorModeView::FullDelegation,
+        Some(OrchestratorMode::Organic) | None => OrchestratorModeView::Organic,
+    }
 }
 
 /// The chains one profile has, `*` included, in the store's own order. A chain
@@ -342,7 +359,7 @@ mod tests {
     use super::{compose, lock, view};
     use crate::contract::{
         ChatProfileAvailabilityView, ChatProfilePinLayerView, ChatProfilePinMarkView,
-        ChatProfileView,
+        ChatProfileView, OrchestratorModeView,
     };
     use crate::settings::FileRead;
 
@@ -515,6 +532,84 @@ mod tests {
         assert_eq!(worker.agent, "worker");
         assert_eq!(worker.thinking.as_deref(), Some("high"));
         assert_eq!(worker.tier.as_deref(), Some("cheap"));
+    }
+
+    /// The documented read, with one `workflow` map instead of the frame's own.
+    fn with_workflow(workflow: serde_json::Value) -> ChatConfigRead {
+        let document = serde_json::json!({
+            "kind": "gentle-pi.agent_model_profiles",
+            "version": 1,
+            "profiles": {
+                "quiet": {"orchestrator": {"model": "p/m"}},
+                "busy": {"orchestrator": {"model": "p/n"}}
+            },
+            "workflow": workflow,
+        });
+        ChatConfigRead {
+            profiles: typed(&document, StoreId::Profiles, |value| match value {
+                StoreValue::Profiles(document) => Some(document),
+                _ => None,
+            }),
+            ..ChatConfigRead::unasked()
+        }
+    }
+
+    /// The mode the view carries for one profile of `read`.
+    fn mode_of(read: &ChatConfigRead, name: &str) -> OrchestratorModeView {
+        view_of(read, None)
+            .profiles
+            .iter()
+            .find(|profile| profile.name == name)
+            .expect("the store defines the profile")
+            .mode
+    }
+
+    #[test]
+    fn a_profile_whose_workflow_names_full_delegation_carries_that_mode() {
+        let view = view_of(&documented(), None);
+
+        assert_eq!(
+            view.profiles[0].mode,
+            OrchestratorModeView::FullDelegation,
+            "the documented frames name full-delegation for this profile (L22)"
+        );
+    }
+
+    #[test]
+    fn a_profile_the_workflow_does_not_name_is_organic() {
+        let read =
+            with_workflow(serde_json::json!({"busy": {"orchestratorMode": "full-delegation"}}));
+
+        assert_eq!(
+            mode_of(&read, "quiet"),
+            OrchestratorModeView::Organic,
+            "an absent entry is gentle-pi's own default, never a guess (L22)"
+        );
+        assert_eq!(
+            mode_of(&read, "busy"),
+            OrchestratorModeView::FullDelegation,
+            "and the profile that names one keeps its own"
+        );
+    }
+
+    #[test]
+    fn a_workflow_entry_that_names_organic_is_organic() {
+        let read = with_workflow(serde_json::json!({"quiet": {"orchestratorMode": "organic"}}));
+
+        assert_eq!(mode_of(&read, "quiet"), OrchestratorModeView::Organic);
+    }
+
+    #[test]
+    fn a_workflow_entry_of_another_profile_is_not_this_profiles() {
+        let read =
+            with_workflow(serde_json::json!({"gone": {"orchestratorMode": "full-delegation"}}));
+
+        assert_eq!(
+            mode_of(&read, "quiet"),
+            OrchestratorModeView::Organic,
+            "the mode is stored PER PROFILE: another name's entry says nothing about this one"
+        );
+        assert_eq!(mode_of(&read, "busy"), OrchestratorModeView::Organic);
     }
 
     #[test]

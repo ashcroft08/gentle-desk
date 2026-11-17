@@ -19,8 +19,9 @@
   import ProfileBody from './ProfileBody.svelte'
   import ProfileHead from './ProfileHead.svelte'
   import ProfileNotice from './ProfileNotice.svelte'
+  import ProfileRoutes from './ProfileRoutes.svelte'
   import { profileCopy } from './copy'
-  import { panelState } from './rules'
+  import { panelState, usedProfile } from './rules'
 
   let {
     chatId = null,
@@ -43,6 +44,9 @@
   // Not named `state`: inside a component `$state` would then read as a store
   // subscription of a local, and the rune itself is what this file needs.
   const shape = $derived(panelState(view, asked))
+
+  /** The profile this chat runs, when the store still defines it (L19). */
+  const used = $derived(usedProfile(view))
 
   /** This open tab's read, so Try again and a window focus share one path. */
   let read: CoalescedRead | null = null
@@ -113,6 +117,11 @@
            never from the one the reader left open. -->
       {#key view.chat_id}
         <ProfileHead {view} {copy} />
+        {#if used !== null}
+          <!-- The profile's own pairs and its mode, as Settings > Profiles draws
+               them (L19): read-only, and the mode is the PROFILE's (L20). -->
+          <ProfileRoutes profile={used} {copy} />
+        {/if}
         <ProfileBody {view} {copy} />
       {/key}
       <!-- The footer says what this slice is: read-only. The three outcomes of the
