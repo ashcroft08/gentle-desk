@@ -28,6 +28,12 @@ export interface ComposerCopy {
   messagePlaceholder: string
   /** The line under the box that lists the three keys it answers to. */
   keysHint: string
+  /**
+   * The same line while the chat works or waits for a slot: Enter sends
+   * nothing there (one turn at a time), so the hint says it is off instead of
+   * promising a send the composer will not do.
+   */
+  keysHintWorking: string
   /** The two buttons, each its own accessible name. */
   send: string
   stop: string
@@ -64,6 +70,8 @@ const ENGLISH: ComposerCopy = {
   messageLabel: 'Message',
   messagePlaceholder: 'Tell Gentle what you need...',
   keysHint: 'Enter to send \u00b7 Shift+Enter for a new line \u00b7 Esc to stop',
+  keysHintWorking:
+    'Enter is off while Gentle works \u00b7 Shift+Enter for a new line \u00b7 Esc to stop',
   send: 'Send',
   stop: 'Stop',
   openingReason: 'Send is available once the chat is ready.',
@@ -88,6 +96,8 @@ const SPANISH: typeof ENGLISH = {
   messagePlaceholder: 'Cuéntale a Gentle lo que necesitas...',
   // The three key names are the keyboard's own, so they are not translated.
   keysHint: 'Enter para enviar \u00b7 Shift+Enter para una línea nueva \u00b7 Esc para detener',
+  keysHintWorking:
+    'Enter no envía mientras Gentle trabaja \u00b7 Shift+Enter para una línea nueva \u00b7 Esc para detener',
   send: 'Enviar',
   stop: 'Detener',
   openingReason: 'Enviar estará disponible cuando el chat esté listo.',

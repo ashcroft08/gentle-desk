@@ -148,6 +148,45 @@ describe('Composer', () => {
     expect(intents()).toEqual([{ type: 'Abort' }])
   })
 
+  // One turn at a time: while the chat works, Enter has nothing to send, so it
+  // must not take the draft away either (the reducer would drop the prompt).
+  it('sends nothing on Enter while the chat works, and keeps the draft', async () => {
+    const { box } = draw({ chat: 'chat-1', mark: 'Working' })
+    await type(box, 'a draft')
+
+    const event = enter()
+    box.dispatchEvent(event)
+    await tick()
+
+    expect(event.defaultPrevented).toBe(false)
+    expect(intents()).toEqual([])
+    expect(box.value).toBe('a draft')
+  })
+
+  it('sends nothing on Enter while the chat waits for a slot, and keeps the draft', async () => {
+    const { box } = draw({ chat: 'chat-1', mark: 'Queued' })
+    await type(box, 'a draft')
+
+    const event = enter()
+    box.dispatchEvent(event)
+    await tick()
+
+    expect(event.defaultPrevented).toBe(false)
+    expect(intents()).toEqual([])
+    expect(box.value).toBe('a draft')
+  })
+
+  it('sends nothing on a submit while the chat works, and keeps the draft', async () => {
+    const { box } = draw({ chat: 'chat-1', mark: 'Working' })
+    await type(box, 'a draft')
+
+    const form = box.closest('form') as HTMLFormElement
+    await fireEvent.submit(form)
+
+    expect(intents()).toEqual([])
+    expect(box.value).toBe('a draft')
+  })
+
   it('shows Send and never Stop on an idle chat', () => {
     draw({ chat: 'chat-1' })
 

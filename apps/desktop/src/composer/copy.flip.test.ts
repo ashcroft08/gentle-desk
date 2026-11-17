@@ -23,6 +23,12 @@ vi.mock('@tauri-apps/api/webview', () => import('../test-support/webview').then(
 const KEYS_EN = 'Enter to send \u00b7 Shift+Enter for a new line \u00b7 Esc to stop'
 const KEYS_ES = 'Enter para enviar \u00b7 Shift+Enter para una línea nueva \u00b7 Esc para detener'
 
+/** The same line while the chat works, where the Enter it names is off. */
+const KEYS_WORKING_EN =
+  'Enter is off while Gentle works \u00b7 Shift+Enter for a new line \u00b7 Esc to stop'
+const KEYS_WORKING_ES =
+  'Enter no envía mientras Gentle trabaja \u00b7 Shift+Enter para una línea nueva \u00b7 Esc para detener'
+
 /** A model list the child failed to send, in the child's own words (D7). */
 const FAILED: ModelChipView = {
   status: { type: 'Failed', data: 'socket closed' },
@@ -65,6 +71,21 @@ describe('a drawn composer', () => {
     expect(screen.getByRole('button', { name: 'Enviar' })).toBeTruthy()
     // D7: the draft is the person's own text, so no language rewrites it.
     expect(box('Mensaje').value).toBe('keep me')
+
+    setLanguage('en')
+  })
+
+  it('flips the hint that says Enter is off while the chat works', async () => {
+    setLanguage('en')
+    render(Composer, { props: { chat: 'c:1', mark: 'Working' } })
+    expect(screen.getByText(KEYS_WORKING_EN)).toBeTruthy()
+    expect(screen.queryByText(KEYS_EN)).toBeNull()
+
+    setLanguage('es')
+    await tick()
+
+    expect(screen.getByText(KEYS_WORKING_ES)).toBeTruthy()
+    expect(screen.queryByText(KEYS_ES)).toBeNull()
 
     setLanguage('en')
   })
