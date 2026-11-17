@@ -409,3 +409,27 @@ es valor de producto".
   built: Settings > Profiles still reads as global (S9's original complaint). It needs
   its scope labelled ("Default for new chats") and a pointer to the chat's tab; small
   and web-only, so its own slice.
+- L16 (maintainer + parent, 2026-11-17): FIRST REAL-WINDOW LOOK AT THE PROFILE TAB, and
+  it FAILED: "pongo en perfil y la app se traba, se pone lento todo, no puedo navegar en
+  esa seccion". T2c passed 788 jsdom tests and was never seen rendered (L15 said so);
+  this is the cost of that gap. DIAGNOSIS (an explorer read the code; nothing observed
+  in a window): no read re-triggers another (RefreshChatProfile comes only from the
+  web) and the blocking read runs on a worker thread, so navigating does not wait
+  behind it. What the PR added was a per-push cost: (1) the panel was mounted
+  permanently, hidden, so its subtree was re-patched on every state push even on the
+  Chat tab; (2) `ProfileGroup` rendered every collapsed profile's agents, chains and
+  pins, O(profiles x agents x chains) per render; (3) Rust clones `chat_profile` into
+  EVERY push (one push per child event, a streaming reply is about one per event) and
+  the store does not preserve identity, so the prop was new every time. FIXED, each RED
+  first, vitest 793/793: the profile object keeps its identity when a push carries an
+  equal value; the panel is mounted only while its tab is open; a group builds its body
+  only when open. NOT FIXED, recorded: Rust still sends `chat_profile` in every push
+  (only the first-read case needs it); and `chat/view.ts`'s identity guard is false for
+  most slices (`notices`, `images`, `helpers`... are rebuilt per push), a PRE-EXISTING
+  waste that the Profile tab merely made visible. NOT EXPLAINED: this accounts for
+  slowness while a chat streams, but not obviously for a freeze with the chat idle. The
+  maintainer's answer to "does it freeze with the chat idle, or only while it is
+  working?" decides whether this fix was the cause or only a contributor; if it
+  freezes idle, the next suspects are the focus-driven re-read and the whole-session-
+  file read per refresh. LESSON: a UI slice is not closed by jsdom; the next UI slice
+  (T2d, T3) is looked at in a real window BEFORE its PR is opened.

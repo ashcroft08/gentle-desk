@@ -175,6 +175,16 @@ function sameShell(a: ShellView, b: ShellView): boolean {
 }
 
 /**
+ * Whether two pushes say the same about this chat's profile. Rust serializes a
+ * FRESH object into every push, so identity never answers this; the value does,
+ * and it changes only when a read lands (the store is read on request, never
+ * once per push).
+ */
+function sameProfile(a: ChatProfileView, b: ChatProfileView): boolean {
+  return JSON.stringify(a) === JSON.stringify(b)
+}
+
+/**
  * The mark of one chat: only the chats that are not idle are listed, so a chat
  * the list does not name is idle. An activity name the contract does not carry
  * draws nothing rather than a wrong mark.
@@ -215,7 +225,17 @@ export function createChatView(deps: ChatViewDeps = {}): ChatView {
   }
 
   const stop = store.subscribe((view) => {
-    const next = chatOf(view)
+    const pushed = chatOf(view)
+    // A profile view of the SAME value is the one already drawn, so the object
+    // already drawn is what keeps its identity: the Profile tab is redrawn per
+    // push (one per child event while a reply streams), and a new object of the
+    // same value is what would make it repatch its whole subtree.
+    const next =
+      pushed.chatProfile !== null &&
+      state.chatProfile !== null &&
+      sameProfile(pushed.chatProfile, state.chatProfile)
+        ? { ...pushed, chatProfile: state.chatProfile }
+        : pushed
     // A push that moves none of these slices changes nothing here, and the
     // arrays are the ones Rust sent, so identity is the cheapest answer.
     if (

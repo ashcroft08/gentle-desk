@@ -3,7 +3,8 @@
   // button that opens it, its summary at the right edge, and the body it controls.
   // The chevron is the house's own `chevronDown` glyph, turned by CSS rather than
   // swapped for a picture, and the whole head is one button, so a group is one tab
-  // stop and Enter or Space opens it.
+  // stop and Enter or Space opens it. The body is drawn only while the group is
+  // open, which is what keeps a collapsed profile from costing anything.
   import type { Snippet } from 'svelte'
   import Icon from '../icons/Icon.svelte'
 
@@ -49,7 +50,13 @@
     </button>
   </h3>
   <div class="gb" id={panelId} hidden={!expanded}>
-    {@render children()}
+    <!-- The body is BUILT only while the group is open. Every profile's agents and
+         chains, collapsed or not, is what a state push would otherwise repaint on
+         each redraw; the panel element stays, so the head's `aria-controls` always
+         points at it. -->
+    {#if expanded}
+      {@render children()}
+    {/if}
   </div>
 </div>
 

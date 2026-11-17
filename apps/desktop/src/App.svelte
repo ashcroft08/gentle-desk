@@ -214,10 +214,15 @@
             />
           {/if}
         </div>
-        <!-- The chat's own profile (profiles-editor T2c): a view OF this chat, so
-             it is mounted with the others and reads only while it is the open one. -->
+        <!-- The chat's own profile (profiles-editor T2c): a view OF this chat. It
+             is MOUNTED only while its tab is the open one - its whole subtree is
+             redrawn per state push, and one push per child event is what a
+             streaming reply costs, so nothing of it is kept for a tab nobody
+             opened. The tabpanel stays, empty, so the tab's wiring holds. -->
         <div class="view" id="p-profile" role="tabpanel" aria-labelledby="t-profile" hidden={tab !== 'profile'}>
-          <ProfilePanel chatId={chat.chat} view={chat.chatProfile} active={tab === 'profile'} />
+          {#if tab === 'profile'}
+            <ProfilePanel chatId={chat.chat} view={chat.chatProfile} active />
+          {/if}
         </div>
       </div>
     {/if}

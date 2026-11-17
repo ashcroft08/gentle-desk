@@ -17,6 +17,13 @@ import { helperRow, helpersPanel } from '../test-support/helpers'
 import { helperThread as openThread } from '../test-support/helper-thread'
 import { chatOf, createChatView } from './view'
 
+/** A reply in flight: the one slice that moves on every push of a streaming turn. */
+const replying = (text: string): ReturnType<typeof viewState> =>
+  viewState({
+    foreground_chat: 'chat-1',
+    messages: [{ id: 'm1', role: 'Assistant', text, streaming: true, error: null, images: [] }],
+  })
+
 vi.mock('@tauri-apps/api/core', () => import('../test-support/tauri-mock').then((m) => m.coreModule()))
 vi.mock('@tauri-apps/api/event', () => import('../test-support/tauri-mock').then((m) => m.eventModule()))
 
@@ -177,6 +184,41 @@ describe('createChatView', () => {
     )
     await vi.waitFor(() => expect(view.get().shell.launcher_found).toBe(true))
     expect(view.get().shell.install).toEqual({ type: 'Done' })
+    view.dispose()
+  })
+
+  it('keeps the profile view it holds when a push carries a deep-equal one', async () => {
+    // Rust sends a NEW `chat_profile` object in every push, a streaming reply's
+    // deltas included, and the Profile tab repaints its whole subtree when the
+    // prop changes identity: the value, not the object, is what decides.
+    const first = chatProfile({ chat_id: 'chat-1' })
+    setHandler('get_view_state', () => viewState({ foreground_chat: 'chat-1', chat_profile: first }))
+    const view = createChatView()
+    await view.ready
+    expect(view.get().chatProfile).toBe(first)
+
+    // The push is a new object of the same value, as Rust's serialization is.
+    const pushed = { ...replying('a longer answer'), chat_profile: chatProfile({ chat_id: 'chat-1' }) }
+    expect(pushed.chat_profile).not.toBe(first)
+    expect(pushed.chat_profile).toEqual(first)
+    pushEvent('state-changed', pushed)
+
+    // Nothing moved: the tab keeps the object it already draws.
+    await Promise.resolve()
+    expect(view.get().chatProfile).toBe(first)
+    view.dispose()
+  })
+
+  it('takes the profile view a push carries when its value changed', async () => {
+    const first = chatProfile({ chat_id: 'chat-1' })
+    setHandler('get_view_state', () => viewState({ foreground_chat: 'chat-1', chat_profile: first }))
+    const view = createChatView()
+    await view.ready
+
+    const changed = chatProfile({ chat_id: 'chat-1', bound: 'fast', bound_from_session_file: true })
+    pushEvent('state-changed', { ...replying('an answer'), chat_profile: changed })
+
+    await vi.waitFor(() => expect(view.get().chatProfile).toBe(changed))
     view.dispose()
   })
 

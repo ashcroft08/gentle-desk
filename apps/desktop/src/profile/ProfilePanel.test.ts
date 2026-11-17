@@ -9,7 +9,7 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/sve
 import { tick } from 'svelte'
 import type { ChatProfileView_Serialize as ChatProfile } from '../contract/bindings'
 import { setLanguage } from '../i18n/language.svelte'
-import { chatProfile, definition } from '../test-support/chat-profile'
+import { chatProfile, definition, agent, FAST, TEAM } from '../test-support/chat-profile'
 import { resetTauriMock, setHandler } from '../test-support/tauri-mock'
 import ProfilePanel from './ProfilePanel.svelte'
 import { profileCopy } from './copy'
@@ -131,6 +131,24 @@ describe('the profiles listed read-only', () => {
     expect(group(/^fast/).getAttribute('aria-expanded')).toBe('true')
     expect(group(/^team/).getAttribute('aria-expanded')).toBe('false')
     expect(bodyOf(group(/^fast/)).hidden).toBe(false)
+  })
+
+  it('builds the body of the open group only, never every profile in the store', () => {
+    const solo = definition('solo', {
+      agents: [agent('orchestrator', 'google/gemini-3-pro', 'high')],
+      chains: [],
+    })
+    draw({ view: chatProfile({ profiles: [TEAM, FAST, solo], default_profile: 'team' }) })
+
+    // `team` is the group this chat runs, so it is the open one: its agents are here.
+    expect(within(bodyOf(group(/^team/))).getByText('anthropic/claude-sonnet-4')).toBeTruthy()
+    // `fast` and `solo` are collapsed: their bodies are not built at all, which is
+    // what keeps a state push from repainting every profile's agents and chains.
+    expect(screen.queryAllByText('openai/gpt-5-mini')).toHaveLength(0)
+    expect(screen.queryAllByText('google/gemini-3-pro')).toHaveLength(0)
+    // The bodies are still there for the accordion to reveal: only their content waits.
+    expect(bodyOf(group(/^fast/)).hidden).toBe(true)
+    expect(bodyOf(group(/^fast/)).textContent).toBe('')
   })
 
   it('draws no edit control at all: this tab only reads', () => {

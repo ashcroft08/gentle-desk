@@ -213,4 +213,34 @@ describe('the Chat | Helpers views', () => {
     // The Profile view has no composer either: it is a view of the chat, not it.
     expect(screen.queryByRole('textbox')).toBeNull()
   })
+
+  it('mounts the Profile panel only while its tab is open', async () => {
+    const fixture = serveSidebar({
+      view: open({
+        foreground_chat: 'foreground_chat',
+        chat_profile: chatProfile({ chat_id: 'foreground_chat' }),
+      }),
+    })
+    render(App)
+    await screen.findByRole('tablist', { name: 'View' })
+
+    // Chat is the open tab, and the pushed view is already here: the Profile panel
+    // is not in the tree at all, so nothing of it is built or patched per push.
+    const panel = document.getElementById('p-profile')
+    if (panel === null) throw new Error('the Profile tab points at no panel')
+    expect(panel.textContent).toBe('')
+    expect(screen.queryByText('This chat uses the default profile, team.')).toBeNull()
+    // And a tab nobody opened has not asked for a read either.
+    expect(intentTypes(fixture.intents())).not.toContain('RefreshChatProfile')
+
+    await tab(/^Profile$/)
+
+    // Opening it draws it and reads it, once.
+    expect(within(panel).getByText('This chat uses the default profile, team.')).toBeTruthy()
+    await waitFor(() =>
+      expect(
+        intentTypes(fixture.intents()).filter((type) => type === 'RefreshChatProfile'),
+      ).toHaveLength(1),
+    )
+  })
 })
