@@ -15,6 +15,7 @@ mod fake;
 mod folder;
 mod mark;
 mod open_chat;
+mod profile;
 mod rekey;
 mod stop;
 use fake::FakeSpawner;

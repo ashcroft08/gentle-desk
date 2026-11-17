@@ -285,3 +285,27 @@ es valor de producto".
   system sync, the six artboards); then one PR per code slice of about 400 authored
   lines or less (T2a core now; T2b plumbing; T2c read-only tab; T3 writes; ...), each
   with its own native review when its tier is high.
+- L11 (parent, 2026-11-17): T2b mapped by an explorer (hop-by-hop, helper-stop as the
+  template; path:line in its report). DECISIONS. (1) The chat-profile VIEW is
+  SHELL-OWNED, like `ProfilesView` (bridge.rs, bridge/settings.rs), not reducer state:
+  `crates/app` depends only on gentle-core while `gentle-runtime` depends on
+  `gentle-app`, so the reducer cannot name `gentle_runtime::session_profile`; keeping
+  the view out of the reducer avoids pushing typed profile data through `Input`.
+  (2) The chat's request REUSES the per-chat `DesktopClient` that helper-stop already
+  caches (`Stoppers`, one client per chat). A SECOND client map would give one chat two
+  independent requestId counters talking to the same child, and `desktop-1` would
+  collide (S8, the L3 advisory of rpc-settings-sync): a stop and a profile read of the
+  same chat must number from ONE counter. (3) The bound profile comes from the
+  session file through the `FileRead` seam (L9), not from the channel; the channel adds
+  what a session file cannot: the pins of THIS chat's worktree and the
+  `writeRevision` tokens T3 needs. (4) A degraded read keeps the previous view and
+  says nothing (helper-stop's rule, and the `get_session_stats` rule), and the view is
+  reset when the chat closes so a stalled read cannot stick the way `ModelsStatus::
+  Loading` can. (5) Refresh on chat open and on `AgentSettled`; the settings watcher
+  does not see session files, so it only marks the DEFINITIONS half stale.
+  SLICES (each its own PR from main, about 400 authored lines or less):
+  T2b-1 runtime request (`ChatCommand::ReadChatProfile`, `Outcome::ChatProfile`, the
+  runtime method over the shared client, minimal compile arms in the desktop effects);
+  T2b-2 shell view and plumbing (`ChatProfileView` in `ViewState`, the
+  `RefreshChatProfile` intent, windowless tests, bindings regenerated);
+  T2b-3 staleness and copy (refresh triggers, i18n words).

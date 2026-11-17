@@ -200,6 +200,13 @@ pub enum ChatCommand {
     /// keeps running. A stop that cannot be made is silent: the helper keeps the
     /// mark it had and nothing is said (S7).
     StopHelper { chat: ChatId, helper_id: String },
+    /// Read that chat's OWN profile configuration (profiles-editor T2b, S9):
+    /// the profiles, their fallback chains and the pin, over the desktop channel
+    /// into this chat's child and no other. The editor lives inside the chat and
+    /// the pin belongs to the chat's worktree, so the child that answers is the
+    /// chat's own; nothing here is global. A read that cannot be made changes
+    /// nothing: the pane keeps what it drew (S6).
+    ReadChatProfile { chat: ChatId },
     /// Tell the host whether that chat is running a turn. The reducer owns the
     /// mark (it is the one that reads `agent_start` / `agent_end`), so this is
     /// how the host's protection rules learn it: a working chat is never the
@@ -215,6 +222,7 @@ impl ChatCommand {
                 chat
             }
             Self::StopHelper { chat, .. } => chat,
+            Self::ReadChatProfile { chat } => chat,
             Self::SetWorking { chat, .. } => chat,
         }
     }

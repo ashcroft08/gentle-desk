@@ -5,10 +5,12 @@
 //! resolves the chat's own [`ChatKey`](gentle_backend::chat_host::ChatKey) each
 //! time it writes, so a reopened chat reaches its new child.
 //!
-//! One client per chat, and that is the point of the cache: a
+//! This module also owns the per-chat desktop client registry, because the stop
+//! is what needed it first and the chat's profile read (profiles-editor T2b)
+//! shares it. One client per chat is the point of the cache: a
 //! [`DesktopClient`] numbers its requests and caches the child's capabilities, so
 //! keeping one per chat is what gives each chat ONE growing `requestId` counter
-//! (S8) instead of every stop starting again at `desktop-1`, which two answers
+//! (S8) instead of every request starting again at `desktop-1`, which two answers
 //! arriving together could no longer be told apart by. A chat's client is dropped
 //! when the chat is (re)opened, because a fresh child must be asked for its own
 //! capabilities before anything is written to it.
@@ -19,18 +21,18 @@
 //! shown.
 
 use std::collections::BTreeMap;
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, Mutex};
 
 use gentle_app::ChatId;
 use gentle_backend::chat_host::HostDesktopChannel;
 use gentle_core::rpc::helper_stop::{stop_helper, StopOutcome};
 use gentle_core::rpc::DesktopClient;
 
-use super::ChatRuntime;
+use super::{lock, ChatRuntime};
 
-/// One chat's stop client: its own requestId counter and the capabilities of the
-/// child it asked.
-pub(super) type Stopper = Mutex<DesktopClient<HostDesktopChannel>>;
+/// One chat's desktop client: its own requestId counter and the capabilities of
+/// the child it asked. Every desktop request of that chat goes through it.
+pub(super) type ChatDesktopClient = Mutex<DesktopClient<HostDesktopChannel>>;
 
 impl ChatRuntime {
     /// Asks `chat`'s own child to cancel one delegated helper, and answers whether
@@ -41,12 +43,12 @@ impl ChatRuntime {
     /// host does not know has no child and answers `false` without writing
     /// anything.
     pub fn stop_helper(&self, chat: &ChatId, helper_id: &str) -> bool {
-        let Some(stopper) = self.stopper(chat) else {
+        let Some(client) = self.desktop_client(chat) else {
             return false;
         };
         // One exchange per chat at a time, which is what makes its request ids
         // meaningful; another chat's stop runs in parallel.
-        let mut client = lock(&stopper);
+        let mut client = lock(&client);
         match stop_helper(&mut client, helper_id) {
             StopOutcome::Stopped => true,
             other => {
@@ -61,36 +63,32 @@ impl ChatRuntime {
         }
     }
 
-    /// The chat's stop client, created on its first stop. `None` for a chat the
-    /// host has no key for (never opened, or already closed).
+    /// The chat's desktop client, created on its first desktop request. `None`
+    /// for a chat the host has no key for (a fresh chat that was never opened).
     ///
     /// `pub(super)` so the runtime's own tests can pin S8's one client per chat
     /// without a child: the client is what carries the counter.
-    pub(super) fn stopper(&self, chat: &ChatId) -> Option<Arc<Stopper>> {
+    pub(super) fn desktop_client(&self, chat: &ChatId) -> Option<Arc<ChatDesktopClient>> {
         // The registry lock ends before any exchange: it is taken only to read
         // the key, never across a call that blocks on a child.
         let key = self.keys().key_of(chat)?;
-        let mut stops = lock(&self.stops);
-        Some(Arc::clone(stops.entry(chat.clone()).or_insert_with(|| {
-            Arc::new(Mutex::new(DesktopClient::new(
-                self.host.desktop_channel(key),
-            )))
-        })))
+        let mut clients = lock(&self.clients);
+        Some(Arc::clone(clients.entry(chat.clone()).or_insert_with(
+            || {
+                Arc::new(Mutex::new(DesktopClient::new(
+                    self.host.desktop_channel(key),
+                )))
+            },
+        )))
     }
 
-    /// Forgets the chat's stop client, so the next stop asks the child that is up
-    /// then for its capabilities. Called when the chat is (re)opened: capabilities
-    /// belong to the child that reported them.
-    pub(super) fn forget_stopper(&self, chat: &ChatId) {
-        lock(&self.stops).remove(chat);
+    /// Forgets the chat's desktop client, so the next request asks the child that
+    /// is up then for its capabilities. Called when the chat is (re)opened:
+    /// capabilities belong to the child that reported them.
+    pub(super) fn forget_desktop_client(&self, chat: &ChatId) {
+        lock(&self.clients).remove(chat);
     }
 }
 
-/// A lock that survives a poisoned mutex: a thread that died holding one must not
-/// make every later stop fail.
-fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
-    mutex.lock().unwrap_or_else(|poison| poison.into_inner())
-}
-
-/// The type of the registry the runtime holds: one stop client per chat.
-pub(super) type Stoppers = Mutex<BTreeMap<ChatId, Arc<Stopper>>>;
+/// The type of the registry the runtime holds: one desktop client per chat.
+pub(super) type ChatDesktopClients = Mutex<BTreeMap<ChatId, Arc<ChatDesktopClient>>>;

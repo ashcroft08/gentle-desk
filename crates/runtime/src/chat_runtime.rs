@@ -17,28 +17,31 @@ use gentle_backend::chat_host::{ChatHost, TaggedEvent};
 
 use crate::chat_keys::ChatKeys;
 
-use self::stop::Stoppers;
+use self::stop::ChatDesktopClients;
 
 mod events;
 mod execute;
 mod host;
 mod open;
+mod profile;
 mod rekey;
 mod stop;
 
 pub use events::Converted;
 pub use execute::Outcome;
 pub use open::request_after_open;
+pub use profile::{ChatConfigRead, StoreRead};
 pub use rekey::session_file_of;
 
 /// The chat host plus the id/key registry that goes with it.
 pub struct ChatRuntime {
     host: Arc<ChatHost>,
     keys: Mutex<ChatKeys>,
-    /// The desktop stop clients, one per chat: each holds that chat's own
-    /// `requestId` counter and the capabilities its child reported (helper-stop
-    /// S8). Empty until the first helper is stopped.
-    pub(super) stops: Stoppers,
+    /// One desktop client per chat: each holds that chat's own `requestId`
+    /// counter and the capabilities its child reported, so ONE chat numbers its
+    /// helper stops and its profile read from ONE sequence (helper-stop S8,
+    /// profiles-editor S8). Empty until the first request is asked.
+    pub(super) clients: ChatDesktopClients,
 }
 
 impl ChatRuntime {
@@ -49,7 +52,7 @@ impl ChatRuntime {
         let runtime = Self {
             host: Arc::new(host),
             keys: Mutex::new(ChatKeys::default()),
-            stops: Mutex::new(Default::default()),
+            clients: Mutex::new(Default::default()),
         };
         (runtime, events)
     }
@@ -61,6 +64,12 @@ impl ChatRuntime {
             .lock()
             .unwrap_or_else(|poison| poison.into_inner())
     }
+}
+
+/// A lock that survives a poisoned mutex: a thread that died holding one must not
+/// make every later request to a child fail.
+pub(super) fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
+    mutex.lock().unwrap_or_else(|poison| poison.into_inner())
 }
 
 #[cfg(test)]

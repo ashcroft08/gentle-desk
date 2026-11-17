@@ -22,7 +22,7 @@ use gentle_backend::chat_host::{
 use gentle_backend::home::{with_home_flag, HomeChoice, HomeEnv};
 use gentle_backend::launcher::{self, LauncherEnv};
 use gentle_core::i18n::{messages, Language};
-use gentle_runtime::chat_runtime::{ChatRuntime, Outcome};
+use gentle_runtime::chat_runtime::{ChatConfigRead, ChatRuntime, Outcome};
 
 use super::ChatExecutor;
 use crate::bridge::AppStateHolder;
@@ -197,6 +197,7 @@ impl ChatExecutor for RuntimeExecutor {
             ChatCommand::Send { .. }
             | ChatCommand::CloseProcess { .. }
             | ChatCommand::StopHelper { .. }
+            | ChatCommand::ReadChatProfile { .. }
             | ChatCommand::SetWorking { .. } => None,
         };
         // The chat's attached images are merged in HERE, beside the folder and
@@ -215,6 +216,12 @@ impl ChatExecutor for RuntimeExecutor {
                 ChatCommand::StopHelper { chat, helper_id } => {
                     Outcome::NotStopped { chat, helper_id }
                 }
+                // There is no host, so there is no child to ask for the chat's
+                // profile configuration: nothing was read and nothing is said.
+                ChatCommand::ReadChatProfile { chat } => Outcome::ChatProfile {
+                    chat,
+                    read: Box::new(ChatConfigRead::unasked()),
+                },
                 // There is no host, so there is nothing to protect from and
                 // nothing to reap: the mark has no reader in this run.
                 ChatCommand::SetWorking { chat, working } => Outcome::Working { chat, working },
@@ -265,6 +272,12 @@ fn refuse(language: Language, command: ChatCommand) -> Outcome {
         // A stop that arrives while the window closes changes nothing: the
         // helpers go with their children, and nothing is said (S7).
         ChatCommand::StopHelper { chat, helper_id } => Outcome::NotStopped { chat, helper_id },
+        // Nor is there a child left to answer for a chat's profile: the pane
+        // keeps what it drew. This arm is the mirror of an unopened chat (T2b-1).
+        ChatCommand::ReadChatProfile { chat } => Outcome::ChatProfile {
+            chat,
+            read: Box::new(ChatConfigRead::unasked()),
+        },
         // No host is left to mark, and the run that would have read the mark is
         // the one being torn down.
         ChatCommand::SetWorking { chat, working } => Outcome::Working { chat, working },
