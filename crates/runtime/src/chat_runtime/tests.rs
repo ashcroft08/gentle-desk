@@ -13,6 +13,7 @@ use super::{ChatRuntime, Converted, Outcome};
 mod calls;
 mod fake;
 mod folder;
+mod mark;
 mod open_chat;
 mod rekey;
 mod stop;

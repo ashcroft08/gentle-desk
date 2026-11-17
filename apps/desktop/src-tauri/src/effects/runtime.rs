@@ -184,7 +184,8 @@ impl ChatExecutor for RuntimeExecutor {
             ChatCommand::OpenProcess { chat } => self.folders.take(chat),
             ChatCommand::Send { .. }
             | ChatCommand::CloseProcess { .. }
-            | ChatCommand::StopHelper { .. } => None,
+            | ChatCommand::StopHelper { .. }
+            | ChatCommand::SetWorking { .. } => None,
         };
         // The chat's attached images are merged in HERE, beside the folder and
         // never through `crates/app`: `ChatCommand` carries no image, and the
@@ -202,6 +203,9 @@ impl ChatExecutor for RuntimeExecutor {
                 ChatCommand::StopHelper { chat, helper_id } => {
                     Outcome::NotStopped { chat, helper_id }
                 }
+                // There is no host, so there is nothing to protect from and
+                // nothing to reap: the mark has no reader in this run.
+                ChatCommand::SetWorking { chat, working } => Outcome::Working { chat, working },
             },
         }
     }
@@ -249,6 +253,9 @@ fn refuse(language: Language, command: ChatCommand) -> Outcome {
         // A stop that arrives while the window closes changes nothing: the
         // helpers go with their children, and nothing is said (S7).
         ChatCommand::StopHelper { chat, helper_id } => Outcome::NotStopped { chat, helper_id },
+        // No host is left to mark, and the run that would have read the mark is
+        // the one being torn down.
+        ChatCommand::SetWorking { chat, working } => Outcome::Working { chat, working },
     }
 }
 

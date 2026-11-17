@@ -77,6 +77,9 @@ fn run_into(command: ChatCommand, executor: &dyn ChatExecutor, ran: &mut Ran) {
             ran.inputs.push(Input::ChatFailed { chat, message });
         }
         Outcome::Sent => {}
+        // The host's working mark is not the app's: the reducer already holds it
+        // and folds nothing back, so the answer is only that the mark landed.
+        Outcome::Working { .. } => {}
         // The user's Close chat stopped that child: folded as the EXPECTED close
         // the host reports, so no death notice is left for a chat the user put
         // away (0.1.14). The child's own `Closed` event folds the same input

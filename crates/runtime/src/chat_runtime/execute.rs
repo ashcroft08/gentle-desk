@@ -37,6 +37,9 @@ pub enum Outcome {
     /// list the method. Today's behaviour: the helper keeps the mark it had, and
     /// the shell folds nothing.
     NotStopped { chat: ChatId, helper_id: String },
+    /// The host's working mark was set for that chat, or a chat the host does
+    /// not know was named (nothing to mark, nothing to answer).
+    Working { chat: ChatId, working: bool },
 }
 
 impl ChatRuntime {
@@ -86,6 +89,12 @@ impl ChatRuntime {
                 } else {
                     Outcome::NotStopped { chat, helper_id }
                 }
+            }
+            // The host owns the mark's effect (protection, reaping); the app
+            // owns the mark itself, so this carries no answer to fold back.
+            ChatCommand::SetWorking { chat, working } => {
+                self.set_working(&chat, working);
+                Outcome::Working { chat, working }
             }
         }
     }
