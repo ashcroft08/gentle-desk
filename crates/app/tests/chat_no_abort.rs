@@ -7,7 +7,9 @@
 //! these tests pin is that no path the user takes to another chat — or back —
 //! ever asks for the working chat's child to be stopped.
 
-use gentle_app::{update_chats, AppState, ChatActivity, ChatCommand, ChatId, Effects, Input, Intent};
+use gentle_app::{
+    update_chats, AppState, ChatActivity, ChatCommand, ChatId, Effects, Input, Intent,
+};
 use gentle_core::rpc::RpcEvent;
 
 fn chat(name: &str) -> ChatId {
@@ -101,7 +103,11 @@ fn a_turn_that_ends_while_the_user_is_elsewhere_keeps_its_reply() {
     let state = working_chat();
     let (state, _) = open(state, &chat("old"));
 
-    let (state, _) = event(state, &chat("work"), RpcEvent::AgentEnd { will_retry: None });
+    let (state, _) = event(
+        state,
+        &chat("work"),
+        RpcEvent::AgentEnd { will_retry: None },
+    );
 
     assert_eq!(
         state.chats.activity(&chat("work")),
