@@ -1,0 +1,28 @@
+{
+  "title": "Profiles, fallbacks and pin editor",
+  "brief": "An editor for gentle-pi profiles inside the existing Settings dialog: model and effort per agent, the fallback chain (at most 8 steps, no repeated model, the * default chain), the local and repo pin, the whole-document write with expectedRevision, the owner's rejection, and the separate 'Make default for new sessions' step. Three directions, each drawn through eleven states: idle, connecting (a temporary control child, 5-10 s), dirty draft, model picker, fallback chain at its limit with a repeated model, pin editor, revision conflict, rejected draft, apply confirmation, saved-but-not-applied, and the degraded read-only fallback.",
+  "feature": "odd/tasks/profiles-editor.md",
+  "artboards": [
+    {
+      "file": "01-edit-in-place.html",
+      "title": "A: the ledger rows become the fields",
+      "tradeoff": "Makes easy: one screen, no mode to learn, every agent's model and effort changed where it already stands, and one sticky bar with a single count for the whole draft. Costs: a dense table where the model popover covers the rows below and the effort cells are small targets; the chain and the pin have no column, so they become stacked blocks under the table; a stray click on a value has already started a draft; and a conflicting or rejected write has to be reported in a banner that must not push the bar out of reach.",
+      "width": 960,
+      "height": 800
+    },
+    {
+      "file": "02-detail-panel.html",
+      "title": "B: the ledger stays read-only, a profile opens in a panel",
+      "tradeoff": "Makes easy: reading is always one untouched screen, writing is always one profile, the panel has room for the owner's rejection and for what a save does and does not do, and the ledger can never mutate under the pointer. Costs: two steps for one field and one save per profile; at the dialog's 680 px the panel is only 322 px wide, so it is a slide-over that hides most of the ledger and truncates model ids; the chain and the pin need their own views inside the panel, which adds a second navigation level; and comparing two profiles means closing one to open the other.",
+      "width": 960,
+      "height": 800
+    },
+    {
+      "file": "03-focused-mode.html",
+      "title": "C: an explicit Edit mode with a Cancel / Save / Save and make default footer",
+      "tradeoff": "Makes easy: unambiguous commit semantics — a draft exists only inside the mode, and leaving it is always Cancel, Save or Save and make default; the form has the whole pane for agents, chain and pin; and the apply step sits where the save happened. Costs: an extra mode to learn and an extra click to start; nothing is comparable while editing, so checking another profile means cancelling; a dirty draft forces a keep-or-discard decision to leave; and the read-only view has to keep a second, permanent way out (the terminal) for what the editor does not cover.",
+      "width": 960,
+      "height": 800
+    }
+  ]
+}
