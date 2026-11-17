@@ -969,23 +969,58 @@ pub fn run_chat_commands(
     commands: Vec<gentle_app::ChatCommand>,
 ) {
     for command in commands {
-        let holder = Arc::clone(holder);
+        let run_holder = Arc::clone(holder);
         let executor = Arc::clone(&executor);
         // The seam is `Send + Sync`, so a worker thread pushes with it and
         // no window handle is cloned anywhere.
-        let emit = Arc::clone(emit);
+        let run_emit = Arc::clone(emit);
+        // Kept for the branch below: a command that could not be started was
+        // moved into the closure that never ran.
+        let unstarted = command.clone();
         let spawned = std::thread::Builder::new()
             .name("chat-command".to_owned())
             .spawn(move || {
                 let ran = effects::run_one(command, executor.as_ref());
-                fold_and_push(&holder, &emit, ran);
+                fold_and_push(&run_holder, &run_emit, ran);
             });
         if let Err(error) = spawned {
-            // A command that never runs leaves its chat opening until its own
-            // first event or a later open ends the phase: a log line, never a
-            // silent click that nobody can explain.
+            // A failed OS call is worth a log line, and the web side must not be
+            // left waiting for the answer the command can no longer give: the
+            // two commands the page asks of a chat fail in a way it can draw
+            // ([`fold_spawn_failure`], L17(a), L18).
             eprintln!("chat command thread unavailable: {error}");
+            fold_spawn_failure(holder, emit, &unstarted);
         }
+    }
+}
+
+/// Folds what a chat command that could NOT be started leaves, and pushes it
+/// (profiles-editor L17(a), L18).
+///
+/// A thread that cannot be created drops the command it was for, so the answer
+/// can only be the fold's. The two commands the page is WAITING on answer it: a
+/// read that never ran becomes the chat's unavailable view, which the tab draws
+/// with its Try again, and a mode save that never ran becomes the end state of a
+/// write that got no answer, which re-enables the switch and says the mode could
+/// not be saved. Nothing else is drawn, no retry is made, and nothing is
+/// started: the command's own chat may already be closed, where it folds
+/// nothing at all.
+pub fn fold_spawn_failure(
+    holder: &Arc<AppStateHolder>,
+    emit: &Emit,
+    command: &gentle_app::ChatCommand,
+) {
+    let view = match command {
+        gentle_app::ChatCommand::ReadChatProfile { chat } => holder.note_chat_profile_unread(chat),
+        gentle_app::ChatCommand::SetChatProfileMode { chat, .. } => {
+            holder.note_chat_mode_unstarted(chat)
+        }
+        // Every other command has already answered the web side with the slice
+        // its intent folded, and none of them is a slice the failure changes.
+        _ => None,
+    };
+    if let Some(view) = view {
+        push(emit, view);
     }
 }
 

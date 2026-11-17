@@ -34,8 +34,9 @@ use std::path::{Component, Path, PathBuf};
 use gentle_app::ChatId;
 use gentle_core::i18n::Language;
 use gentle_core::rpc::config_store::{
-    FallbacksDocument, OrchestratorMode, PinLayer, PinsValue, ProfilesDocument,
+    FallbacksDocument, OrchestratorMode, PinLayer, PinsValue, ProfilesDocument, SetConfigOutcome,
 };
+use gentle_core::rpc::NoAnswer;
 use gentle_runtime::chat_runtime::{ChatConfigRead, ModeWriteResult, StoreRead};
 use gentle_runtime::session_profile::last_session_profile;
 
@@ -330,6 +331,45 @@ impl AppStateHolder {
         let view = self.compose_view(chat, read);
         self.install_chat_profile(view);
         Some(self.view())
+    }
+
+    /// Records that a read of `chat`'s profile could not even START, and answers
+    /// the slice to push (profiles-editor L17(a), the liveness hole of L18).
+    ///
+    /// The read never reached that chat's child - the worker thread its command
+    /// runs on could not be created - so no store will ever answer: without this
+    /// the tab waits in its reading state for ever and every click of the user's
+    /// is another read that never runs. The view installed is the one a chat whose
+    /// child is not answering already draws (every store `Unread`, which the page
+    /// turns into its unavailable state and its Try again); the next read that
+    /// answers replaces it, so the retry the page then offers works. A chat that
+    /// closed in the meantime is dropped with its state, as its view is
+    /// (L11-4 - which is about a read that ANSWERED nothing, while this one did
+    /// not answer at all).
+    pub fn note_chat_profile_unread(&self, chat: &ChatId) -> Option<ViewState> {
+        if !self.is_open(chat) {
+            lock(&self.mode_saves).remove(chat.as_str());
+            return None;
+        }
+        let view = self.compose_view(chat, &ChatConfigRead::unasked());
+        self.install_chat_profile(view);
+        Some(self.view())
+    }
+
+    /// Records that an attempt to save `chat`'s profile mode could not even
+    /// START: the worker thread its command runs on could not be created, so the
+    /// write never ran and will never answer (profiles-editor L17(a)).
+    ///
+    /// It is [`Self::note_chat_mode`] with the failure a child that did not answer
+    /// leaves, which is the honest answer here too: nothing was written. The
+    /// switch is usable again and one short line says the mode could not be
+    /// saved, and a chat that closed meanwhile is dropped with its state.
+    pub fn note_chat_mode_unstarted(&self, chat: &ChatId) -> Option<ViewState> {
+        self.note_chat_mode(
+            chat,
+            &ModeWriteResult::failed(SetConfigOutcome::NoAnswer(NoAnswer::NotConnected)),
+            &ChatConfigRead::unasked(),
+        )
     }
 
     /// Records what one attempt to save a profile's orchestration mode came to,
