@@ -91,6 +91,10 @@ fn fold_once(state: AppState, input: Input) -> (AppState, Effects) {
             (chats::stderr(state, &chat, &line), Effects::default())
         }
         Input::ChatOpened { chat } => (chats::opened(state, &chat), Effects::default()),
+        Input::HelperStopped { chat, helper_id } => (
+            chats::helper_stopped(state, &chat, &helper_id),
+            Effects::default(),
+        ),
         Input::SessionsPrepared(prepared) => {
             let mut state = state;
             state.set_prepared(prepared);

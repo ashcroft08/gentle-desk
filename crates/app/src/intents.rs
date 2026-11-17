@@ -92,6 +92,11 @@ fn single_chat(mut state: AppState, intent: Intent) -> (AppState, Vec<Command>) 
             }
             (state, Vec::new())
         }
+        // The desktop segment's stop of one helper: its command is a per-chat
+        // one (that chat's own child), and the one-child shell has no desktop
+        // channel to ask, so a stop here changes nothing. A shell that runs one
+        // child per chat never reaches this arm (`Chats::apply` answers first).
+        Intent::StopHelper(_) => (state, Vec::new()),
         Intent::CloseHelper => {
             state.selected_helper = None;
             (state, Vec::new())

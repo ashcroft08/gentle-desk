@@ -25,6 +25,18 @@ pub enum Outcome {
     /// had none). The chat itself is unchanged: its next open starts a fresh
     /// child through `--session` (0.1.14).
     Closed { chat: ChatId },
+    /// The chat's child accepted the stop of one helper (helper-stop S2): that
+    /// helper is cancelled from now on, and the chat keeps running. The child's
+    /// own state may still say `running` for an instant - an accepted cancel of a
+    /// running helper transitions asynchronously - so the acceptance, not the
+    /// reported state, is what this says.
+    Stopped { chat: ChatId, helper_id: String },
+    /// No stop happened, and nothing is wrong (helper-stop S7): the chat has no
+    /// child, its host is not interactive, the child never answered before the
+    /// deadline, it closed, it refused (`not_found`), or its capabilities do not
+    /// list the method. Today's behaviour: the helper keeps the mark it had, and
+    /// the shell folds nothing.
+    NotStopped { chat: ChatId, helper_id: String },
 }
 
 impl ChatRuntime {
@@ -51,13 +63,29 @@ impl ChatRuntime {
         folder: Option<PathBuf>,
     ) -> Outcome {
         match command {
-            ChatCommand::OpenProcess { chat } => self.open(language, chat, folder),
+            ChatCommand::OpenProcess { chat } => {
+                // A chat being (re)opened gets a fresh stop client: the
+                // capabilities a stop caches belong to the child that reported
+                // them, and an open reaches a child that may be a new one.
+                self.forget_stopper(&chat);
+                self.open(language, chat, folder)
+            }
             ChatCommand::Send { chat, rpc } => self.send(language, chat, &rpc),
             // The child is stopped here, on the caller's thread: the host's grace
             // is up to 2 s and nothing of the window may wait on it (0.1.14).
             ChatCommand::CloseProcess { chat } => {
                 self.close(&chat);
                 Outcome::Closed { chat }
+            }
+            // One helper, over the desktop channel into that chat's own child
+            // (helper-stop S2, S3, S6). Blocking on the channel's deadline, so
+            // the caller runs it off the window's thread.
+            ChatCommand::StopHelper { chat, helper_id } => {
+                if self.stop_helper(&chat, &helper_id) {
+                    Outcome::Stopped { chat, helper_id }
+                } else {
+                    Outcome::NotStopped { chat, helper_id }
+                }
             }
         }
     }

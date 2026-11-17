@@ -2,6 +2,7 @@
 //! not reach it, the stderr its child printed, the session file a new chat
 //! learned, and its child going away.
 
+use gentle_core::helpers::HelperStatus;
 use gentle_core::i18n::messages;
 
 use crate::chats::{queue, ChatId};
@@ -27,6 +28,37 @@ pub(crate) fn failed(mut state: AppState, chat: &ChatId, message: &str) -> AppSt
 /// foreground mark and a finished turn nobody has read all move with it.
 pub(crate) fn rekeyed(mut state: AppState, from: &ChatId, to: ChatId) -> AppState {
     state.chats.rekey(from, to);
+    state
+}
+
+/// One helper of `chat` was stopped at the user's ask (helper-stop S2): its card
+/// and its thread read `Cancelled` from now on, which both windows draw as the
+/// `Ended` mark. Nothing else moves: the chat keeps running (this is not a turn
+/// ending, so no slot is freed and no queued prompt goes out), its other helpers
+/// keep their marks, and the open thread stays open.
+///
+/// The end time is left alone on purpose: the child's own frame carries the real
+/// one (`gentle_core::helpers::merge_tasks` never re-derives a terminal status),
+/// and a mark without one simply sorts last among the finished helpers until it
+/// arrives. A chat or a task the state does not know changes nothing - the stop
+/// already happened in the child, and a task it stopped reporting has no card to
+/// re-mark - and no chat is created for an id the app never opened.
+pub(crate) fn helper_stopped(mut state: AppState, chat: &ChatId, helper_id: &str) -> AppState {
+    let marked = state
+        .chats
+        .state(chat)
+        .is_some_and(|chat| chat.helpers.tasks.iter().any(|task| task.id == helper_id));
+    if marked {
+        let chat = state.chats.chat_mut(chat);
+        if let Some(task) = chat
+            .helpers
+            .tasks
+            .iter_mut()
+            .find(|task| task.id == helper_id)
+        {
+            task.status = HelperStatus::Cancelled;
+        }
+    }
     state
 }
 

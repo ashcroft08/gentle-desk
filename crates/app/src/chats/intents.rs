@@ -4,6 +4,7 @@
 //! when the intent names a chat (or when there is a foreground chat to act on).
 //! The one-child shell never produces them, so nothing it does changes.
 
+use gentle_core::helpers::HelperStatus;
 use gentle_core::rpc::{RpcCommand, UiAnswer};
 
 use super::queue;
@@ -41,6 +42,7 @@ pub(crate) fn apply(state: &mut AppState, intent: &Intent) -> Option<Effects> {
         Intent::CopyMessage(id) => copy_message(state, id).map(for_shell),
         Intent::AnswerDialog { id, answer } => answer_dialog(state, id, answer).map(for_chat),
         Intent::SelectHelper(id) => select_helper(state, id),
+        Intent::StopHelper(id) => stop_helper(state, id),
         // The chip's three asks go to the foreground chat's child, like any
         // other prompt (0.1.11): the one-child send the fallthrough would
         // produce is dropped by the chats shell.
@@ -93,6 +95,36 @@ fn close_helper(state: &mut AppState) -> Option<Effects> {
     state.chats.foreground()?;
     state.selected_helper = None;
     Some(for_chat(Vec::new()))
+}
+
+/// Stops one helper of the FOREGROUND chat (helper-stop S2), named by the id the
+/// panel drew.
+///
+/// Only a helper that is RUNNING can be stopped: that is exactly when the thread
+/// bar's square is enabled, and a stop of a queued, waiting or finished helper
+/// would ask the child to cancel something that is not working. Every other id -
+/// one this chat never listed, or a task of another chat - changes nothing, the
+/// same rule [`select_helper`] follows for an unknown id: no command, no notice.
+///
+/// The answer is one command for THIS chat's own child (S6): the chat keeps
+/// running and its other helpers are untouched (S1). Whether the child accepted
+/// comes back as [`Input::HelperStopped`](crate::Input::HelperStopped), which
+/// marks that helper; a stop that did not happen sends nothing (S7).
+fn stop_helper(state: &mut AppState, id: &str) -> Option<Effects> {
+    let chat = state.chats.foreground()?.clone();
+    let running = state.chats.state(&chat).is_some_and(|chat| {
+        chat.helpers
+            .tasks
+            .iter()
+            .any(|task| task.id == id && task.status == HelperStatus::Running)
+    });
+    if !running {
+        return Some(for_chat(Vec::new()));
+    }
+    Some(for_chat(vec![ChatCommand::StopHelper {
+        chat,
+        helper_id: id.to_owned(),
+    }]))
 }
 
 /// Effects on one chat's child and nothing of the single child.
