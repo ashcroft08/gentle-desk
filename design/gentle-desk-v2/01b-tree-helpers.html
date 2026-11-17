@@ -82,6 +82,10 @@ h1,h2,p{margin:0}
 .ht{display:flex;flex-direction:column;min-height:0}
 .ht-bar{display:flex;align-items:center;gap:6px;height:48px;padding:0 12px;border-bottom:1px solid var(--border)}
 .ht-bar h2{font-size:14px;font-weight:600;flex:1;display:flex;align-items:center;gap:8px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ht-bar .stop{width:32px;height:32px;border-radius:8px;color:var(--danger);position:relative}
+.ht-bar .stop:hover:not([disabled]),.ht-bar .stop:focus-visible:not([disabled]){background:var(--danger);color:var(--bg)}
+.ht-bar .stop[disabled]{color:var(--faint);cursor:default}
+.ht-bar .stop svg{width:14px;height:14px;fill:currentColor}
 .ht-body{overflow:auto;padding:20px 24px;display:flex;flex-direction:column;gap:12px}
 .ht-body .tool{display:none;color:var(--muted);font-size:12px;border-left:2px solid var(--border);padding-left:10px}
 .ht-body.show-tools .tool{display:block}
@@ -156,7 +160,7 @@ code{font-variant-ligatures:none}
  <div class="hv">
   <div class="hl"><div role="listbox" data-nav aria-label="Helpers"><div role="option" data-item data-helper="h1" tabindex="-1" class="row" aria-selected="true"><svg class="mark m-working" viewBox="0 0 24 24" role="img" aria-label="Running"><title>Running</title><use href="#m-working"/></svg><span class="t"><span>explore</span><span class="sub">Inventory of sidebar modules</span></span></div><div role="option" data-item data-helper="h2" tabindex="-1" class="row" aria-selected="false"><svg class="mark m-done" viewBox="0 0 24 24" role="img" aria-label="Done"><title>Done</title><use href="#m-done"/></svg><span class="t"><span>verify</span><span class="sub">Contract tests for the bridge</span></span></div><div role="option" data-item data-helper="h3" tabindex="-1" class="row" aria-selected="false"><svg class="mark m-queued" viewBox="0 0 24 24" role="img" aria-label="Waiting"><title>Waiting</title><use href="#m-queued"/></svg><span class="t"><span>worker</span><span class="sub">Bridge event types</span></span></div></div></div>
   <div class="ht">
-   <div class="ht-bar"><button class="ic tip-l" type="button" id="back" data-tip="Back to chat" aria-label="Back to chat"><svg class="" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-back"/></svg></button><h2 id="h-name"></h2></div>
+   <div class="ht-bar"><button class="ic tip-l" type="button" id="back" data-tip="Back to chat" aria-label="Back to chat"><svg class="" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-back"/></svg></button><h2 id="h-name"></h2><button class="ic stop tip-r" type="button" id="h-stop" data-tip="Stop" aria-label="Stop this helper"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-stop"/></svg></button></div>
    <div class="ht-body" id="h-body" aria-live="polite"></div>
   </div>
  </div>
@@ -173,13 +177,25 @@ try{var s=localStorage.getItem('gd-theme');if(s&&sel){root.setAttribute('data-th
 if(sel){sel.addEventListener('change',function(){root.setAttribute('data-theme',sel.value);try{localStorage.setItem('gd-theme',sel.value)}catch(e){}});}
 var H=JSON.parse(document.getElementById('hdata').textContent);
 var body=document.getElementById('h-body');
+var cur=null;
 function renderHelper(id){
  var h=H[id];if(!h||!body)return;
+ cur=id;
  document.getElementById('h-name').textContent=h.name+' - '+h.task;
+ var st=document.getElementById('h-stop');
+ if(st){st.disabled=!h.stop;st.setAttribute('data-tip',h.stop?'Stop':'Stopped');st.setAttribute('aria-label',h.stop?'Stop '+h.name:h.name+' already stopped');}
  body.innerHTML='';
  h.lines.forEach(function(l){var p=document.createElement('p');if(l[0]==='t'){p.className='tool';var c=document.createElement('code');c.textContent=l[1];p.appendChild(c);}else{p.className='a';p.textContent=l[1];}body.appendChild(p);});
  body.scrollTop=body.scrollHeight;
 }
+var stop=document.getElementById('h-stop');
+if(stop)stop.addEventListener('click',function(){
+ var h=cur&&H[cur];if(!h||!h.stop)return;
+ h.mark='ended';h.stop=false;
+ var row=document.querySelector('[data-helper="'+cur+'"] .mark');
+ if(row){row.setAttribute('class','mark m-ended');var t=row.querySelector('title');if(t)t.textContent='Stopped';var lb=row.getAttribute('aria-label');if(lb)row.setAttribute('aria-label','Stopped');}
+ renderHelper(cur);
+});
 document.querySelectorAll('[role=tablist]').forEach(function(list){
  var tabs=[].slice.call(list.querySelectorAll('[role=tab]'));
  function activate(t,focus){tabs.forEach(function(x){var on=x===t;x.setAttribute('aria-selected',on?'true':'false');x.tabIndex=on?0:-1;var p=document.getElementById(x.getAttribute('aria-controls'));if(p)p.hidden=!on;});if(focus)t.focus();}
