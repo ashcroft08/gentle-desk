@@ -177,8 +177,13 @@ fn a_child_that_ignores_the_prompt_times_out_on_a_bounded_wait() {
         ChannelReply::Timeout
     );
     // The prompt was written, and the child simply never answered: today's
-    // behaviour, with nothing broken and nothing visible.
-    assert_eq!(spawner.child(&chat()).commands(), vec![request.command()]);
+    // behaviour, with nothing broken and nothing visible. The write runs on a
+    // short-lived thread of its own inside the exchange's deadline, so on a busy
+    // machine the 50 ms can be over before that thread was scheduled: wait for
+    // the write (bounded) instead of reading the child at that very instant.
+    let child = spawner.child(&chat());
+    wait_for_commands(&child, 1);
+    assert_eq!(child.commands(), vec![request.command()]);
 }
 
 #[test]
