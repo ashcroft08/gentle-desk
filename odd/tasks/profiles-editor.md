@@ -113,6 +113,14 @@ es valor de producto".
       `get_config` read + typed answers; silent degradation to read-only. TDD on
       the fake channel; the real-child proof waits for the maintainer's approved
       script (home temporal, `GENTLE_SHELL_NO_AUTO_SETUP=1`, cleanup).
+- [ ] T2c-2 (S9, L19-L22) in the read-only Profile tab (#192): the used profile's
+      Orchestrator and Fallback pair (as Settings > Profiles draws them: orchestrator =
+      the `orchestrator` agent, fallback = the profile's `*` chain) and the used
+      profile's orchestrator mode as `profiles.json` `workflow` stores it (absent =
+      organic), labelled as the PROFILE's (every chat using it). No switch here: the
+      writing switch is T3 (`set_config` of `workflow`). Route: worker, real-window look.
+- [ ] T2d (L21, L22) remove Settings > Profiles (pane, its tests and copy, the
+      session-only env switch); "Edit in terminal" moves to the tab. Separate slice.
 - [ ] T3 (S2, S3, S4) write path: `set_config` with `expectedRevision` from
       `get_config`, `revision_conflict` -> re-read and ask, `invalid_data` ->
       show and keep the draft, `profile_apply_busy` -> wait/retry copy, whole
@@ -479,3 +487,12 @@ es valor de producto".
   "otra cosa, creo que tener en configuracion es algo que no tiene sentido, creo que
   eliminamos en configuracion y dejamos en cada chat, porque lo que afecta de forma
   global se mantedria ahi tambien. que te parece?"
+- L22 (maintainer + parent, 2026-11-17): spec read (gentle-pi docs/desktop-rpc.md:319,
+  :329): `orchestratorMode` is stored PER PROFILE in `profiles.json` `workflow`
+  (profile -> `{orchestratorMode}`, non-default only), which is why the terminal's change
+  reaches every chat using that profile; the app's switch is a different mechanism
+  (`GENTLE_PI_ORCHESTRATOR_MODE` at spawn, never stored). Whether a live chat picks up a
+  changed `workflow` is not in the spec (probe). Maintainer chose the 3-step plan: T2c-2
+  (read-only mode + Orchestrator/Fallback in the tab), T3 (the writing switch), T2d
+  (remove Settings > Profiles and the env switch). Native review of eb82482..564cec6
+  (lineage review-1e2691ed49a0029c, lens reliability): approved, acknowledged.
