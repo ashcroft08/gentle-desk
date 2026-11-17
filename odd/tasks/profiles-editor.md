@@ -98,7 +98,16 @@ es valor de producto".
       inside the chat. CHOSEN: 06-profile-tab.html (maintainer, L7).: the editor's directions on the canvas (profile list,
       per-agent model + thinking, fallback chain, pin, the conflict and rejection
       states). Maintainer picks one before any code.
-- [ ] T2 (S2, S3, S9, S6) channel through the CHAT's own child (reuse helper-stop's
+- [ ] T2 (S2, S3, S9, S6) channel through the CHAT's own child, sliced:
+      T2a PURE CORE (this slice first): typed builders and answer parsers for
+      `get_config` (profiles, profile_fallbacks, pins), `set_config`
+      (`expectedRevision` from `writeTargets[].writeRevision`) and `apply_profile`
+      (`session` / `default`, `confirmation_required` with its token), pinned with
+      the doc's own example frames; plus a reader of the chat's session file for the
+      LAST `gentle-pi.session-profile/v1` bind entry (L9). T2b plumbing: a generic
+      per-chat desktop request in the runtime (generalising helper-stop's
+      `Stopper`), the app state and the contract. T2c the read-only Profile tab.
+      (reuse helper-stop's
       per-chat `DesktopClient`; no control child unless the probe shows a need),
       behind the swappable channel seam;
       `get_config` read + typed answers; silent degradation to read-only. TDD on
@@ -239,3 +248,11 @@ es valor de producto".
   read from the channel; copy for "Use in this chat" must say it applies to
   subagents launched FROM NOW ON; "default" copy must say it can be outranked by a
   repo pin; the artboard's 8th state needs no token for `session`.
+- L9 (maintainer, 2026-11-17): ruling on how the Profile tab knows which profile a
+  chat uses, given L8's finding that the channel exposes no read: "Leer el archivo de
+  sesión (Recomendado)". The app reads the LAST `gentle-pi.session-profile/v1` bind
+  entry of the chat's own session file, labelled in the UI as an approximation (the
+  branch / corroboration replay of gentle-pi is NOT reimplemented), and the request
+  for a real read goes into the upstream issue draft (queue item 5) alongside the
+  external-config-events one. A chat with no such entry shows the default. T2 is
+  sliced T2a core (pure, TDD) -> T2b plumbing -> T2c read-only tab; writes are T3.
