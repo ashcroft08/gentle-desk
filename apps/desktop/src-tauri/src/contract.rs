@@ -436,6 +436,12 @@ pub struct ChatProfileDefinitionView {
     pub agents: Vec<ChatProfileAgentView>,
     /// Every chain this profile has, `*` included, in the store's own order.
     pub chains: Vec<ChatProfileChainView>,
+    /// The mode this profile's `workflow` entry stores in `profiles.json`, which
+    /// applies to EVERY chat that uses the profile, not to this one alone (L20,
+    /// L22). An absent entry is `Organic`, gentle-pi's own default, so the field
+    /// is defaulted rather than optional: the page always has a word to draw.
+    #[serde(default)]
+    pub mode: OrchestratorModeView,
 }
 
 /// Where one pin layer stands, in the three states the `pins` value itself

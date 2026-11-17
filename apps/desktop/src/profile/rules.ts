@@ -8,10 +8,21 @@
 // whose child did not answer - `stores` says so without one channel error, and
 // "some of it was read" is a state of its own, never a failure of the whole tab.
 import type {
+  ChatProfileAgentView_Serialize as ProfileAgent,
   ChatProfileAvailabilityView,
+  ChatProfileChainView_Serialize as ProfileChain,
   ChatProfileDefinitionView_Serialize as ProfileDefinition,
   ChatProfileView_Serialize as ChatProfile,
+  OrchestratorModeView,
 } from '../contract/bindings'
+
+/**
+ * The reserved agent key gentle-pi routes the orchestrator with, and the `*` key of
+ * the profile-wide chain: the two names this view INTERPRETS
+ * (`crates/runtime/src/profiles.rs`).
+ */
+export const ORCHESTRATOR_ROLE = 'orchestrator'
+export const DEFAULT_CHAIN = '*'
 
 /** The three stores a chat's profile is read from, in the order Rust asks. */
 export type StoreName = 'profiles' | 'fallbacks' | 'pins'
@@ -69,4 +80,59 @@ export function usedProfile(view: ChatProfile | null): ProfileDefinition | null 
   const name = usedName(view)
   if (name === null) return null
   return view?.profiles.find((profile) => profile.name === name) ?? null
+}
+
+/**
+ * The used profile's Orchestrator pair: the row stored under the reserved
+ * `orchestrator` agent, or `null` for a profile that names none - the same row
+ * Settings > Profiles draws as its summary line (`ProfilesPane.svelte`).
+ */
+export function orchestratorOf(profile: ProfileDefinition): ProfileAgent | null {
+  return profile.agents.find((agent) => agent.agent === ORCHESTRATOR_ROLE) ?? null
+}
+
+/**
+ * The chain the used profile's Fallback pair draws: the orchestrator's own, else
+ * the profile-wide `*` - `Profile::chain_for(ORCHESTRATOR_ROLE)` in
+ * `crates/runtime/src/profiles.rs`, which is the rule Settings > Profiles draws
+ * (`Profile::fallback()`, `settings/profiles.rs::profile_view`). `null` for a
+ * profile that records no chain at all: no fallback is ever invented to fill the
+ * row.
+ */
+export function fallbackChainOf(profile: ProfileDefinition): ProfileChain | null {
+  return (
+    profile.chains.find((chain) => chain.agent === ORCHESTRATOR_ROLE) ??
+    profile.chains.find((chain) => chain.agent === DEFAULT_CHAIN) ??
+    null
+  )
+}
+
+/**
+ * The Fallback pair of one chain, in the shape the pair has: the models in the
+ * order gentle-pi would move through them, joined with an arrow, and the effort
+ * only when EVERY step asks for the same one - one effort cell cannot speak for a
+ * chain that changes effort per step. The rule is the Settings pane's own
+ * (`settings/profiles.rs::fallback_view`), reused so the two views cannot drift
+ * apart (L19).
+ */
+export function fallbackPair(chain: ProfileChain): { model: string; thinking: string | null } | null {
+  if (chain.steps.length === 0) return null
+  const model = chain.steps.map((step) => step.model).join(' \u2192 ')
+  const first = chain.steps[0].thinking ?? null
+  const thinking = chain.steps.every((step) => (step.thinking ?? null) === first) ? first : null
+  return { model, thinking }
+}
+
+/**
+ * The words for one stored mode: the value `profiles.json` writes, said the way
+ * the Settings pane says them, so neither view translates a value differently.
+ */
+export function modeName(mode: OrchestratorModeView, copy: ModeWords): string {
+  return mode === 'full-delegation' ? copy.modeFullDelegation : copy.modeOrganic
+}
+
+/** The two words a stored mode needs, so the rule never depends on a dictionary. */
+interface ModeWords {
+  modeOrganic: string
+  modeFullDelegation: string
 }

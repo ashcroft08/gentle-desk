@@ -3,8 +3,16 @@
 // global default, else nothing at all. They are plain data so the components only
 // draw a decision (the `chat/tabs.ts` pattern).
 import { describe, expect, it } from 'vitest'
-import { chatProfile } from '../test-support/chat-profile'
-import { missingStores, panelState, usedName, usedProfile } from './rules'
+import { agent, chain, chatProfile, definition, FAST, TEAM } from '../test-support/chat-profile'
+import {
+  fallbackChainOf,
+  fallbackPair,
+  missingStores,
+  orchestratorOf,
+  panelState,
+  usedName,
+  usedProfile,
+} from './rules'
 
 describe('panelState', () => {
   it('is reading until the first answer lands, and nothing before that is a failure', () => {
@@ -58,5 +66,61 @@ describe('the profile this chat uses', () => {
 
     expect(usedName(view)).toBe('gone')
     expect(usedProfile(view)).toBeNull()
+  })
+})
+
+describe("the used profile's Orchestrator and Fallback pairs", () => {
+  it('takes the orchestrator from the reserved `orchestrator` agent, and nothing when absent', () => {
+    expect(orchestratorOf(TEAM)).toEqual(agent('orchestrator', 'anthropic/claude-sonnet-4', 'high'))
+    // `fast` names a worker only: no orchestrator row is invented for it.
+    expect(orchestratorOf(FAST)).toBeNull()
+    expect(orchestratorOf(definition('bare', { agents: [] }))).toBeNull()
+  })
+
+  it("takes the fallback from the profile's `*` chain when the orchestrator has none", () => {
+    expect(fallbackChainOf(TEAM)).toEqual(TEAM.chains[0])
+    expect(fallbackChainOf(TEAM)?.agent).toBe('*')
+  })
+
+  it("prefers the orchestrator's own chain, the rule `Profile::chain_for` applies", () => {
+    const profile = definition('both', {
+      chains: [
+        chain('*', [{ model: 'wide/one' }]),
+        chain('orchestrator', [{ model: 'orx/backup' }]),
+      ],
+    })
+
+    expect(fallbackChainOf(profile)?.agent).toBe('orchestrator')
+  })
+
+  it('is nothing at all for a profile that records no chain', () => {
+    expect(fallbackChainOf(FAST)).toBeNull()
+    expect(fallbackChainOf(definition('bare', { chains: [] }))).toBeNull()
+  })
+
+  it('joins the chain models with an arrow and keeps the effort only when it is uniform', () => {
+    expect(
+      fallbackPair(
+        chain('*', [
+          { model: 'prov/fb-one', thinking: 'low' },
+          { model: 'prov/fb-two', thinking: 'low' },
+        ]),
+      ),
+    ).toEqual({ model: 'prov/fb-one \u2192 prov/fb-two', thinking: 'low' })
+
+    expect(
+      fallbackPair(
+        chain('*', [
+          { model: 'prov/fb-one', thinking: 'low' },
+          { model: 'prov/fb-two', thinking: 'high' },
+        ]),
+      ),
+    ).toEqual({ model: 'prov/fb-one \u2192 prov/fb-two', thinking: null })
+
+    // A step that names no effort keeps the pair from speaking for the chain.
+    expect(fallbackPair(chain('*', [{ model: 'prov/only' }]))).toEqual({
+      model: 'prov/only',
+      thinking: null,
+    })
   })
 })

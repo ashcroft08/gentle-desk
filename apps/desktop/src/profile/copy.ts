@@ -50,6 +50,21 @@ export interface ProfileCopy {
    * named in, which is ours because the store has no word for it. */
   profileWide: string
   chainTitle: string
+  /** The block that says which pairs the used profile runs (L19), and its own
+   * accessible name, because both a pair and the agents table name a model. */
+  routesLabel: string
+  /** The two pairs Settings > Profiles draws for a profile, worded as it words
+   * them so the two views cannot drift apart. */
+  orchestratorLabel: string
+  fallbackLabel: string
+  /** The profile's own orchestration mode: what `workflow.<profile>` stores, and
+   * the words the Settings pane uses for its two values. */
+  modeLabel: string
+  modeOrganic: string
+  modeFullDelegation: string
+  /** The scope line: the mode belongs to the PROFILE, so it reaches every chat
+   * that uses it - never this chat alone (L20, L22). */
+  modeScope: string
   /** The pin group's own name (state 5). */
   pinTitle: string
   /** No profile is defined at all. */
@@ -103,6 +118,13 @@ const ENGLISH: ProfileCopy = {
   tierColumn: 'Tier',
   profileWide: '* profile-wide',
   chainTitle: 'Fallback chain',
+  routesLabel: 'Routes',
+  orchestratorLabel: 'Orchestrator',
+  fallbackLabel: 'Fallback',
+  modeLabel: 'Orchestrator mode',
+  modeOrganic: 'Organic',
+  modeFullDelegation: 'Full delegation',
+  modeScope: "This profile's mode, so every chat that uses it runs this way.",
   pinTitle: 'Pin',
   noProfiles: 'No profiles are defined.',
   noAgents: 'No agents.',
@@ -146,6 +168,14 @@ const SPANISH: ProfileCopy = {
   tierColumn: 'Nivel',
   profileWide: '* de todo el perfil',
   chainTitle: 'Cadena de respaldo',
+  routesLabel: 'Rutas',
+  orchestratorLabel: 'Orquestador',
+  // "Fallback" stays in English, as the Settings pane draws it in both languages.
+  fallbackLabel: 'Fallback',
+  modeLabel: 'Modo de orquestación',
+  modeOrganic: 'Orgánico',
+  modeFullDelegation: 'Delegación total',
+  modeScope: 'Es el modo de este perfil, así que todos los chats que lo usan funcionan así.',
   pinTitle: 'Perfil fijado',
   noProfiles: 'No hay perfiles definidos.',
   noAgents: 'No hay agentes.',

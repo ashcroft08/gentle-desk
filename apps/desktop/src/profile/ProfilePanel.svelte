@@ -19,8 +19,9 @@
   import ProfileBody from './ProfileBody.svelte'
   import ProfileHead from './ProfileHead.svelte'
   import ProfileNotice from './ProfileNotice.svelte'
+  import ProfileRoutes from './ProfileRoutes.svelte'
   import { profileCopy } from './copy'
-  import { panelState } from './rules'
+  import { panelState, usedProfile } from './rules'
 
   let {
     chatId = null,
@@ -44,13 +45,26 @@
   // subscription of a local, and the rune itself is what this file needs.
   const shape = $derived(panelState(view, asked))
 
+  /** The profile this chat runs, when the store still defines it (L19). */
+  const used = $derived(usedProfile(view))
+
   /** This open tab's read, so Try again and a window focus share one path. */
   let read: CoalescedRead | null = null
 
+  /**
+   * The chat this tab reads, as a VALUE. The parent hands `chatId` down off an
+   * object that every state push replaces, so reading the prop subscribes to that
+   * object: without this derived, each push - one per child event of a streaming
+   * chat, and one per answered read - re-ran the read effect below and asked
+   * again, a read loop that froze the window. A derived of a string changes only
+   * when the string does, so the effect depends on the chat, not on the push.
+   */
+  const chat = $derived(chatId)
+
   /** One ask for this chat's view, or nothing when there is no chat to ask about. */
   function ask(): Promise<void> {
-    if (chatId === null) return Promise.resolve()
-    return dispatchIntent({ type: 'RefreshChatProfile', data: { chat_id: chatId } })
+    if (chat === null) return Promise.resolve()
+    return dispatchIntent({ type: 'RefreshChatProfile', data: { chat_id: chat } })
   }
 
   // One read per open, one per focus, and none after the tab closes. The read is
@@ -61,7 +75,7 @@
     if (!active) return
     asked = false
     const current = coalesced(async () => {
-      if (chatId === null) return
+      if (chat === null) return
       await ask()
       asked = true
     })
@@ -103,6 +117,11 @@
            never from the one the reader left open. -->
       {#key view.chat_id}
         <ProfileHead {view} {copy} />
+        {#if used !== null}
+          <!-- The profile's own pairs and its mode, as Settings > Profiles draws
+               them (L19): read-only, and the mode is the PROFILE's (L20). -->
+          <ProfileRoutes profile={used} {copy} />
+        {/if}
         <ProfileBody {view} {copy} />
       {/key}
       <!-- The footer says what this slice is: read-only. The three outcomes of the

@@ -36,6 +36,8 @@ export function definition(name: string, over: Partial<Definition> = {}): Defini
     name,
     agents: [agent('orchestrator', 'anthropic/claude-sonnet-4', 'high')],
     chains: [chain('*', [{ model: 'anthropic/claude-haiku-4-5', thinking: 'low' }])],
+    // The store's absent `workflow` entry reads as gentle-pi's own default.
+    mode: 'organic',
     ...over,
   }
 }

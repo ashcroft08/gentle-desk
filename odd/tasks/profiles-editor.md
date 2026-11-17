@@ -113,6 +113,24 @@ es valor de producto".
       `get_config` read + typed answers; silent degradation to read-only. TDD on
       the fake channel; the real-child proof waits for the maintainer's approved
       script (home temporal, `GENTLE_SHELL_NO_AUTO_SETUP=1`, cleanup).
+- [x] T2c-2 (S9, L19-L22) (2578e6a; real window L23) in the read-only Profile tab (#192): the used profile's
+      Orchestrator and Fallback pair (as Settings > Profiles draws them: orchestrator =
+      the `orchestrator` agent, fallback = the profile's `*` chain) and the used
+      profile's orchestrator mode as `profiles.json` `workflow` stores it (absent =
+      organic), labelled as the PROFILE's (every chat using it). No switch here: the
+      writing switch is T3 (`set_config` of `workflow`). Route: worker, real-window look.
+- [ ] T2d (L21, L22) remove Settings > Profiles (pane, its tests and copy, the
+      session-only env switch); "Edit in terminal" moves to the tab. Separate slice.
+- [ ] T3-mode (L23, L24) the Profile tab's orchestrator-mode switch: Organic / Full
+      delegation for the USED profile, written as `set_config` of the whole `profiles`
+      document read by `get_config` (its `value`, canonical form) with only
+      `workflow.<profile>` changed (full-delegation sets it, organic REMOVES the entry,
+      and an emptied `workflow` is removed), `expectedRevision` =
+      `writeTargets[global].writeRevision`; then the tab re-reads. `revision_conflict`,
+      `invalid_data`, `profile_apply_busy`, no answer -> nothing changes, the tab says
+      the mode could not be saved and shows the re-read truth. Copy says it is saved in
+      the profile, never that a live chat changes. Risk item 1 (rewrites the user's
+      profiles.json): independent verify. Route: worker.
 - [ ] T3 (S2, S3, S4) write path: `set_config` with `expectedRevision` from
       `get_config`, `revision_conflict` -> re-read and ask, `invalid_data` ->
       show and keep the draft, `profile_apply_busy` -> wait/retry copy, whole
@@ -409,3 +427,104 @@ es valor de producto".
   built: Settings > Profiles still reads as global (S9's original complaint). It needs
   its scope labelled ("Default for new chats") and a pointer to the chat's tab; small
   and web-only, so its own slice.
+- L16 (maintainer + parent, 2026-11-17): FIRST REAL-WINDOW LOOK AT THE PROFILE TAB, and
+  it FAILED: "pongo en perfil y la app se traba, se pone lento todo, no puedo navegar en
+  esa seccion". T2c passed 788 jsdom tests and was never seen rendered (L15 said so);
+  this is the cost of that gap. DIAGNOSIS (an explorer read the code; nothing observed
+  in a window): no read re-triggers another (RefreshChatProfile comes only from the
+  web) and the blocking read runs on a worker thread, so navigating does not wait
+  behind it. What the PR added was a per-push cost: (1) the panel was mounted
+  permanently, hidden, so its subtree was re-patched on every state push even on the
+  Chat tab; (2) `ProfileGroup` rendered every collapsed profile's agents, chains and
+  pins, O(profiles x agents x chains) per render; (3) Rust clones `chat_profile` into
+  EVERY push (one push per child event, a streaming reply is about one per event) and
+  the store does not preserve identity, so the prop was new every time. FIXED, each RED
+  first, vitest 793/793: the profile object keeps its identity when a push carries an
+  equal value; the panel is mounted only while its tab is open; a group builds its body
+  only when open. NOT FIXED, recorded: Rust still sends `chat_profile` in every push
+  (only the first-read case needs it); and `chat/view.ts`'s identity guard is false for
+  most slices (`notices`, `images`, `helpers`... are rebuilt per push), a PRE-EXISTING
+  waste that the Profile tab merely made visible. NOT EXPLAINED: this accounts for
+  slowness while a chat streams, but not obviously for a freeze with the chat idle. The
+  maintainer's answer to "does it freeze with the chat idle, or only while it is
+  working?" decides whether this fix was the cause or only a contributor; if it
+  freezes idle, the next suspects are the focus-driven re-read and the whole-session-
+  file read per refresh. LESSON: a UI slice is not closed by jsdom; the next UI slice
+  (T2d, T3) is looked at in a real window BEFORE its PR is opened.
+- L17 (maintainer, 2026-11-17): SECOND real-window look WITH the perf fix (43280ef):
+  "igual, se congelo esta vez hasta dejo de responder la app y se congelo por completo".
+  NOT slowness, a hard hang: my perf fix was not the cause (or not the whole cause). The
+  dev window's log for that run ends with EIGHT repeats of `chat command thread
+  unavailable: Acceso denegado. (os error 5)` (commands.rs:1036, the thread a
+  `ChatCommand` runs on could not be spawned), which means the tab asked for the chat's
+  profile about eight times and NO read ever ran. Two facts follow and are recorded
+  before any further attempt: (a) an ask whose thread cannot be spawned leaves the tab
+  in `reading` for ever (nothing tells it the read failed), so a user retries, each
+  retry is another thread, and the app never answers; (b) why CreateThread answers
+  "access denied" here is NOT established (insufficient handles, teardown, or a retry
+  storm) and must be measured, not guessed. Decision taken: PR #192 is not to be merged
+  while its tab can freeze the app; the read plumbing under it (T2b-1..3) is already in
+  main and is unaffected. Next steps belong to a fresh session with a real window each
+  round: instrument the asks and the pushes (count + timestamps), fix the liveness hole
+  first (a failed spawn must answer the web, not vanish), THEN reopen the tab.
+- L18 (parent, 2026-11-17): THE FREEZE MEASURED AND FIXED (eb82482). Local, uncommitted
+  instrumentation (a 500 ms sampler of RSS / OS threads / counters, a line per
+  `RefreshChatProfile` in, per chat-command spawn/run/end and per push with its bytes, and
+  the web's own lines forwarded on the same clock). Run 1 (chat Curriculum): the web sent
+  `RefreshChatProfile` every ~7 ms from the moment the tab opened; 4,570 asks in 25 s, each
+  a `chat-command` thread serialised on the child's client (~100 ms per read), so 4,282
+  were alive at +62 s, ~4,300 OS threads, 264 MiB, 22 s per read, 6,350 pushes of ~28 KB
+  (180 MB) into the WebView. The `os error 5` of L17 is the END of that storm, not its
+  cause. Run 2: ONE `ProfilePanel` instance; its read `$effect` was cleaned up and re-run
+  on every push. Cause: the effect read the `chatId` prop, which App.svelte passes as
+  `chat.chat` off `$derived($chrome)` - a new object per push - so the effect subscribed
+  to the object, not to the id. Fix: `const chat = $derived(chatId)`. RED
+  `ProfilePanel.push.test.ts` (mounted as App mounts it): 20 pushes naming the same chat
+  -> 21 reads; GREEN 1. Run 3 (real window, maintainer: "ahora si funciona"): 3 reads in
+  160 s (open + focus), RSS 51 MiB flat, no failed spawn. Still open: the liveness hole of
+  L17(a) (a failed spawn must answer the web) and an optional Rust-side bound of one
+  profile read in flight per chat - a separate change against main.
+- L19 (maintainer, 2026-11-17, verbatim): "ahora si funciona, una cosa falta Fallback y
+  Modo de orquestación, tiene que tenes lo mismo que lo de perfil en configuracion."
+- L20 (maintainer, 2026-11-17, verbatim, answering whether the mode is this chat's):
+  "Se supone que en la terminal al cambiar eso, cambia la forma en que se trabaja en ese
+  chat pero en la app lo que vamos a tener es que solo en cada nuevo chat se aplicaria"
+  then "una cosa en si eso cambia para todos los chats igual en la terminal no es algo que
+  afecte solo al chat en que se trabaja". Reading: the orchestrator mode is GLOBAL (not
+  per chat); the Profile tab carries the same switch and the same Fallback pair as
+  Settings > Profiles.
+- L21 (maintainer, 2026-11-17, verbatim, a proposal under discussion - not yet a ruling):
+  "otra cosa, creo que tener en configuracion es algo que no tiene sentido, creo que
+  eliminamos en configuracion y dejamos en cada chat, porque lo que afecta de forma
+  global se mantedria ahi tambien. que te parece?"
+- L22 (maintainer + parent, 2026-11-17): spec read (gentle-pi docs/desktop-rpc.md:319,
+  :329): `orchestratorMode` is stored PER PROFILE in `profiles.json` `workflow`
+  (profile -> `{orchestratorMode}`, non-default only), which is why the terminal's change
+  reaches every chat using that profile; the app's switch is a different mechanism
+  (`GENTLE_PI_ORCHESTRATOR_MODE` at spawn, never stored). Whether a live chat picks up a
+  changed `workflow` is not in the spec (probe). Maintainer chose the 3-step plan: T2c-2
+  (read-only mode + Orchestrator/Fallback in the tab), T3 (the writing switch), T2d
+  (remove Settings > Profiles and the env switch). Native review of eb82482..564cec6
+  (lineage review-1e2691ed49a0029c, lens reliability): approved, acknowledged.
+- L23 (maintainer, 2026-11-17, verbatim, after the real-window look at 2578e6a): "Se ven
+  bien, lo del modo de orquestacion deberia ser con un switch como en configuracion"
+- L23b (maintainer, 2026-11-17): chose "Switch que guarda en el perfil (como la
+  terminal)" over the env switch, and approved the probe script verbatim ("Apruebo el
+  probe tal cual").
+- L24 (parent, 2026-11-17): REAL-CHILD PROBE (gentle-pi `bin/gentle-shell.mjs --home <tmp>
+  --mode rpc`, `GENTLE_PI_CONFIG_HOME=<tmp>/cfg`, `GENTLE_SHELL_INTERACTIVE_HOST=1`,
+  `GENTLE_SHELL_NO_AUTO_SETUP=1`, no GENTLE_*/PI_* inherited, no model call, 7 s; temp
+  dir and script deleted, output kept at C:/Users/josep/dev/probe-t3/out.log).
+  `capabilities` lists `get_config`, `set_config`, `apply_profile`. `get_config
+  profiles` answers `revision` AND `writeTargets[{target: global, writeRevision}]`
+  (different hashes). `set_config {store: profiles, data: value + workflow.probe =
+  full-delegation, expectedRevision: writeRevision}` -> `ok`, `changed: true`, the new
+  `value`, `writeTarget: global`, a new `writeRevision`; the file on disk gained
+  `workflow`. Writing the value WITHOUT `workflow` -> `ok`, `changed: true`, and the file
+  lost the `workflow` key entirely (organic = absence, confirmed). `apply_profile
+  {mode: session}` -> `applied`, note: "bound profile ... to this session ... not yet
+  persisted ... Subagents and reviewers use this session's routing snapshot. Shared
+  defaults were not written" - it says nothing about the orchestrator mode. NOT
+  established: whether a LIVE chat picks up a changed `workflow` (no channel read of
+  the session's mode exists), and which wins between `workflow` and the spawn-time
+  `GENTLE_PI_ORCHESTRATOR_MODE`.
