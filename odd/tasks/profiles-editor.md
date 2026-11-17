@@ -121,7 +121,7 @@ es valor de producto".
       writing switch is T3 (`set_config` of `workflow`). Route: worker, real-window look.
 - [ ] T2d (L21, L22) remove Settings > Profiles (pane, its tests and copy, the
       session-only env switch); "Edit in terminal" moves to the tab. Separate slice.
-- [ ] T3-mode (L23, L24) the Profile tab's orchestrator-mode switch: Organic / Full
+- [x] T3-mode (L23, L24) (ab09880 + its correction, real window L26) the Profile tab's orchestrator-mode switch: Organic / Full
       delegation for the USED profile, written as `set_config` of the whole `profiles`
       document read by `get_config` (its `value`, canonical form) with only
       `workflow.<profile>` changed (full-delegation sets it, organic REMOVES the entry,
@@ -528,3 +528,19 @@ es valor de producto".
   established: whether a LIVE chat picks up a changed `workflow` (no channel read of
   the session's mode exists), and which wins between `workflow` and the spawn-time
   `GENTLE_PI_ORCHESTRATOR_MODE`.
+- L25 (parent, 2026-11-17): T3-mode DELIVERED (ab09880, branch feat/profile-mode-switch,
+  stacked on feat/profile-tab) and its native review CLOSED (lineage
+  review-ec142e53f2b84332, high tier, lenses risk+reliability, one
+  refuter-corroborated CRITICAL corrected within the 30-line plan, targeted validator
+  passed, approved and acknowledged). The correction (R3-001): `note_chat_profile`
+  replaced the chat's ModeSave wholesale, so a read landing mid-save re-enabled the
+  switch before the write answered; now a successful read clears ONLY `failed`
+  (`bridge/chat_profile.rs`, RED `chat_profile_mode.rs` test, package 15/15). Advisory,
+  NOT blocking, tracked as follow-ups of T3-mode: (a) `with_profile_mode` rebuilds
+  `workflow.<profile>` as a fresh map holding only `orchestratorMode` (full-delegation)
+  and removes the entry whole (organic), so a future member inside that entry would be
+  dropped silently - today entries carry only the mode, per the probe; (b) the
+  independent verifier's advisories: `write_revision` ignores a non-ok target status,
+  and the bridge accepts a second mode-save intent while one is in flight.
+- L26 (maintainer, 2026-11-17): approved continuing after the correction; real-window
+  look of the switch pending.
