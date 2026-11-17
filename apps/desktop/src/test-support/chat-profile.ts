@@ -80,6 +80,10 @@ export function chatProfile(over: Partial<ChatProfile> = {}): ChatProfile {
       worktree_unresolved: false,
     },
     stores: { profiles: 'read', fallbacks: 'read', pins: 'read' },
+    // Nothing is being saved and nothing failed: the switch is drawn enabled and
+    // the tab says nothing about a save (profiles-editor T3-mode).
+    saving: false,
+    save_failed: false,
     ...over,
   }
 }

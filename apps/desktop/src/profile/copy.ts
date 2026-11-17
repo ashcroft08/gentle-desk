@@ -62,9 +62,14 @@ export interface ProfileCopy {
   modeLabel: string
   modeOrganic: string
   modeFullDelegation: string
-  /** The scope line: the mode belongs to the PROFILE, so it reaches every chat
-   * that uses it - never this chat alone (L20, L22). */
-  modeScope: string
+  /**
+   * The line under the switch: the mode is SAVED IN THE PROFILE, whose setting
+   * every chat using it reads (L20, L22). It never claims that a live chat
+   * changes its routing, which the probe of L24 did not establish.
+   */
+  modeNote: (name: string) => string
+  /** The one short line a save that did not happen leaves: nothing was written. */
+  modeNotSaved: string
   /** The pin group's own name (state 5). */
   pinTitle: string
   /** No profile is defined at all. */
@@ -97,8 +102,8 @@ export interface ProfileCopy {
   stores: Record<StoreName, string>
   /** One store could not be read: the line drawn where its content would be. */
   storeMissing: (store: StoreName) => string
-  /** The footer's one word: nothing in this tab writes yet. */
-  readOnly: string
+  /** The footer's one word: what this tab saves, and what it does not. */
+  footer: string
 }
 
 /** English: the artboard's copy, and the house's own words where it has none. */
@@ -124,7 +129,8 @@ const ENGLISH: ProfileCopy = {
   modeLabel: 'Orchestrator mode',
   modeOrganic: 'Organic',
   modeFullDelegation: 'Full delegation',
-  modeScope: "This profile's mode, so every chat that uses it runs this way.",
+  modeNote: (name) => `Saved in the profile "${name}", the setting every chat with that profile uses.`,
+  modeNotSaved: 'The mode could not be saved. Nothing was written.',
   pinTitle: 'Pin',
   noProfiles: 'No profiles are defined.',
   noAgents: 'No agents.',
@@ -145,7 +151,7 @@ const ENGLISH: ProfileCopy = {
   reading: "Reading this chat's profile configuration...",
   stores: { profiles: 'profiles', fallbacks: 'fallbacks', pins: 'pins' },
   storeMissing: (store) => `The ${ENGLISH.stores[store]} store could not be read.`,
-  readOnly: 'Read-only view',
+  footer: 'Only the orchestration mode is saved from this tab.',
 }
 
 /**
@@ -175,7 +181,9 @@ const SPANISH: ProfileCopy = {
   modeLabel: 'Modo de orquestación',
   modeOrganic: 'Orgánico',
   modeFullDelegation: 'Delegación total',
-  modeScope: 'Es el modo de este perfil, así que todos los chats que lo usan funcionan así.',
+  modeNote: (name) =>
+    `Se guarda en el perfil "${name}", el ajuste que usan todos los chats con ese perfil.`,
+  modeNotSaved: 'No se pudo guardar el modo. No se escribió nada.',
   pinTitle: 'Perfil fijado',
   noProfiles: 'No hay perfiles definidos.',
   noAgents: 'No hay agentes.',
@@ -197,7 +205,7 @@ const SPANISH: ProfileCopy = {
   reading: 'Leyendo la configuración de perfiles de este chat...',
   stores: { profiles: 'perfiles', fallbacks: 'cadenas', pins: 'fijados' },
   storeMissing: (store) => `No se pudo leer el almacén de ${SPANISH.stores[store]}.`,
-  readOnly: 'Vista de solo lectura',
+  footer: 'Desde esta pestaña solo se guarda el modo de orquestación.',
 }
 
 /** The tab's own words in `language`, the whole dictionary at once (D4). */

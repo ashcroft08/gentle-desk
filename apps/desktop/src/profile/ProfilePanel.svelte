@@ -1,10 +1,11 @@
 <script lang="ts">
-  // The Profile tab of one chat (profiles-editor T2c, artboard 06-profile-tab.html):
-  // the READ-ONLY half of the chosen design. It says which profile this chat runs
-  // and in whose scope, lists the profiles the store defines, and draws the pins of
-  // this chat's own worktree - and it writes NOTHING: Save, Use in this chat, Make
-  // default, the model pickers and the fallback editor are T3 and later, and none of
-  // them is drawn here, not even disabled.
+  // The Profile tab of one chat (profiles-editor T2c, T3-mode, artboard
+  // 06-profile-tab.html): which profile this chat runs and in whose scope, the
+  // profiles the store defines, the pins of this chat's own worktree - and the one
+  // thing it WRITES, the used profile's orchestration mode (the Organic / Full
+  // delegation switch, saved through the shell in the profile itself). Save, Use
+  // in this chat, Make default, the model pickers and the fallback editor are T3
+  // and T3b: none of them is drawn here, not even disabled.
   //
   // When it reads (L13): opening the tab asks ONCE for the foreground chat's view;
   // the window taking the focus back while the tab is open asks again, and so does
@@ -13,7 +14,10 @@
   // nothing at all once the tab closes - a follow-up queued while a read was in
   // flight is dropped with it. A chat with no id asks for nothing.
   import { dispatchIntent } from '../bridge'
-  import type { ChatProfileView_Serialize as ChatProfile } from '../contract/bindings'
+  import type {
+    ChatProfileView_Serialize as ChatProfile,
+    OrchestratorModeView,
+  } from '../contract/bindings'
   import { language } from '../i18n/language.svelte'
   import { coalesced, type CoalescedRead } from '../settings/files-changed'
   import ProfileBody from './ProfileBody.svelte'
@@ -94,6 +98,20 @@
   function tryAgain(): void {
     void read?.()
   }
+
+  /**
+   * Saves the used profile's orchestration mode (profiles-editor T3-mode): the
+   * chat the tab is about, the profile THIS chat uses, and the mode the user
+   * chose. Nothing is sent for the mode the profile already stores, and nothing
+   * while a save is in flight - the switch draws both rules disabled.
+   */
+  function saveMode(mode: OrchestratorModeView): void {
+    if (chat === null || used === null || mode === used.mode) return
+    void dispatchIntent({
+      type: 'SaveChatProfileMode',
+      data: { chat_id: chat, profile: used.name, mode },
+    })
+  }
 </script>
 
 <div class="pv">
@@ -119,14 +137,21 @@
         <ProfileHead {view} {copy} />
         {#if used !== null}
           <!-- The profile's own pairs and its mode, as Settings > Profiles draws
-               them (L19): read-only, and the mode is the PROFILE's (L20). -->
-          <ProfileRoutes profile={used} {copy} />
+               them (L19): the switch SAVES the profile's mode through the shell
+               (T3-mode, L23), and the copy says whose mode it is. -->
+          <ProfileRoutes
+            profile={used}
+            {copy}
+            saving={view.saving}
+            saveFailed={view.save_failed}
+            onSave={saveMode}
+          />
         {/if}
         <ProfileBody {view} {copy} />
       {/key}
-      <!-- The footer says what this slice is: read-only. The three outcomes of the
-           artboard's footer arrive with T3, T3b. -->
-      <p class="foot">{copy.readOnly}</p>
+      <!-- The footer says what this slice saves: the profile's mode, and nothing
+           else yet. The three outcomes of the artboard's footer arrive with T3b. -->
+      <p class="foot">{copy.footer}</p>
     {/if}
   </div>
 </div>

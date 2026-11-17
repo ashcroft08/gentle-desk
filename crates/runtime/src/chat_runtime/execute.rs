@@ -7,7 +7,7 @@ use gentle_backend::chat_host::Opened;
 use gentle_core::i18n::{messages, Language};
 use gentle_core::rpc::RpcCommand;
 
-use super::{ChatConfigRead, ChatRuntime};
+use super::{ChatConfigRead, ChatRuntime, ModeWriteResult};
 
 /// What running a [`ChatCommand`] came to. Plain data: a failure is a message
 /// for the shell to show, never a panic and never fatal for the whole app.
@@ -53,6 +53,18 @@ pub enum Outcome {
         chat: ChatId,
         /// Boxed: the three typed stores make this variant far larger than the
         /// rest of the enum, and every `Outcome` pays for its largest variant.
+        read: Box<ChatConfigRead>,
+    },
+    /// One profile's orchestration mode was saved over that chat's own child, or
+    /// it was not and this is why (profiles-editor T3-mode, S2, S3). The write is
+    /// followed by the same three reads a plain read makes, so the page draws
+    /// the store's truth instead of what it hoped for.
+    ChatMode {
+        chat: ChatId,
+        /// What the attempt came to: saved, already stored, or the typed reason
+        /// nothing was written.
+        result: ModeWriteResult,
+        /// Boxed for the same reason as [`Outcome::ChatProfile`]'s read.
         read: Box<ChatConfigRead>,
     },
 }
@@ -126,6 +138,23 @@ impl ChatRuntime {
             ChatCommand::ReadChatProfile { chat } => {
                 let read = Box::new(self.read_chat_profile(&chat));
                 Outcome::ChatProfile { chat, read }
+            }
+            // One profile's orchestration mode, over the desktop channel into
+            // that chat's own child, and then the same read a plain read makes
+            // (profiles-editor T3-mode, S2, S3). Blocking on the channel's
+            // deadline under the chat's one client, so the caller runs it off
+            // the window's thread.
+            ChatCommand::SetChatProfileMode {
+                chat,
+                profile,
+                mode,
+            } => {
+                let write = self.save_chat_profile_mode(&chat, &profile, mode);
+                Outcome::ChatMode {
+                    chat,
+                    result: write.result,
+                    read: Box::new(write.read),
+                }
             }
             // The host owns the mark's effect (protection, reaping); the app
             // owns the mark itself, so this carries no answer to fold back.

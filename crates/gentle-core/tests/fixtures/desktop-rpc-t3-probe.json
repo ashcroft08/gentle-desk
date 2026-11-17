@@ -1,0 +1,128 @@
+{
+  "_doc": "The frames a REAL child answered in the probe of profiles-editor L24 (odd/tasks/profiles-editor.md), kept verbatim from its output: `get_config` of the profiles store (whose `revision` and `writeTargets[].writeRevision` are different hashes), the `set_config` that stored `workflow.probe = full-delegation` (the file on disk gained `workflow`), and the `set_config` that wrote the same document WITHOUT `workflow` (the file lost the key entirely: organic is absence, confirmed). Only whitespace was normalised so one frame fits one JSON value.",
+  "get_config_profiles": {
+    "schema": "gentle-shell.desktop-rpc/v1",
+    "kind": "response",
+    "requestId": "probe-2",
+    "ok": true,
+    "data": {
+      "store": "profiles",
+      "scope": "global",
+      "readOnly": false,
+      "status": "ok",
+      "revision": "sha256:00552813cec6dd047480382b193d9dc8",
+      "value": {
+        "kind": "gentle-pi.agent_model_profiles",
+        "version": 1,
+        "active": "probe",
+        "profiles": {
+          "probe": {
+            "orchestrator": {
+              "model": "anthropic/claude-sonnet-4"
+            }
+          }
+        }
+      },
+      "layers": [
+        {
+          "source": "global",
+          "status": "ok"
+        }
+      ],
+      "writeTargets": [
+        {
+          "target": "global",
+          "status": "ok",
+          "writeRevision": "sha256:8c001b89b5a2d05c81003e2b5f0662fb"
+        }
+      ]
+    }
+  },
+  "set_config_full_delegation": {
+    "schema": "gentle-shell.desktop-rpc/v1",
+    "kind": "response",
+    "requestId": "probe-3",
+    "ok": true,
+    "data": {
+      "store": "profiles",
+      "scope": "global",
+      "readOnly": false,
+      "status": "ok",
+      "revision": "sha256:80683c4e7d24acc5944977607c8df6cd",
+      "value": {
+        "kind": "gentle-pi.agent_model_profiles",
+        "version": 1,
+        "active": "probe",
+        "profiles": {
+          "probe": {
+            "orchestrator": {
+              "model": "anthropic/claude-sonnet-4"
+            }
+          }
+        },
+        "workflow": {
+          "probe": {
+            "orchestratorMode": "full-delegation"
+          }
+        }
+      },
+      "layers": [
+        {
+          "source": "global",
+          "status": "ok"
+        }
+      ],
+      "writeTargets": [
+        {
+          "target": "global",
+          "status": "ok",
+          "writeRevision": "sha256:82ca2b24875b87f88a77ce696a966bf3"
+        }
+      ],
+      "writeTarget": "global",
+      "writeRevision": "sha256:82ca2b24875b87f88a77ce696a966bf3",
+      "changed": true
+    }
+  },
+  "set_config_organic": {
+    "schema": "gentle-shell.desktop-rpc/v1",
+    "kind": "response",
+    "requestId": "probe-6",
+    "ok": true,
+    "data": {
+      "store": "profiles",
+      "scope": "global",
+      "readOnly": false,
+      "status": "ok",
+      "revision": "sha256:00552813cec6dd047480382b193d9dc8",
+      "value": {
+        "kind": "gentle-pi.agent_model_profiles",
+        "version": 1,
+        "active": "probe",
+        "profiles": {
+          "probe": {
+            "orchestrator": {
+              "model": "anthropic/claude-sonnet-4"
+            }
+          }
+        }
+      },
+      "layers": [
+        {
+          "source": "global",
+          "status": "ok"
+        }
+      ],
+      "writeTargets": [
+        {
+          "target": "global",
+          "status": "ok",
+          "writeRevision": "sha256:8c001b89b5a2d05c81003e2b5f0662fb"
+        }
+      ],
+      "writeTarget": "global",
+      "writeRevision": "sha256:8c001b89b5a2d05c81003e2b5f0662fb",
+      "changed": true
+    }
+  }
+}

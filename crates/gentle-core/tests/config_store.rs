@@ -1086,3 +1086,309 @@ mod projection_helpers {
         assert_eq!(projection.store, StoreId::Profiles);
     }
 }
+
+/// Saving ONE profile's orchestration mode as a `set_config` of the whole
+/// profiles document (profiles-editor T3-mode, S2, S3, L22, L24).
+///
+/// Two rules are pinned here, and the second is the one that decided the shape:
+/// `data` is the store's `value` EXACTLY as the owner sent it - never the typed
+/// projection, which drops every member this reader does not model - with only
+/// `workflow.<profile>` changed; and the precondition is the read's
+/// `writeTargets[global].writeRevision`, never its `revision`.
+///
+/// The frames are the ones a REAL child answered in the probe of L24
+/// (`fixtures/desktop-rpc-t3-probe.json`), so the edited document is compared
+/// with what gentle-pi itself stored.
+mod profile_mode {
+    use super::*;
+    use gentle_core::rpc::config_store::{parse_config_verbatim, with_profile_mode};
+
+    /// The probe's frames: what the real child answered in L24.
+    fn probe() -> Value {
+        serde_json::from_str(include_str!("fixtures/desktop-rpc-t3-probe.json"))
+            .expect("the probe frames are JSON")
+    }
+
+    /// The `data` of one of the probe's answers.
+    fn probed(name: &str) -> Value {
+        probe()[name]["data"].clone()
+    }
+
+    /// A profiles document that carries every trap this rule must survive: an
+    /// unknown member of its own, an unknown member of a routing row, and a
+    /// `workflow` entry for ANOTHER profile.
+    fn document() -> Value {
+        json!({
+            "kind": "gentle-pi.agent_model_profiles",
+            "version": 1,
+            "active": "team",
+            "future": {"seed": true},
+            "profiles": {
+                "team": {
+                    "orchestrator": {"model": "p/m", "future": "kept"},
+                    "worker": {"model": "p/w", "tier": "cheap"}
+                },
+                "busy": {"orchestrator": {"model": "p/b"}}
+            },
+            "workflow": {"busy": {"orchestratorMode": "full-delegation"}}
+        })
+    }
+
+    #[test]
+    fn the_verbatim_value_keeps_what_the_typed_document_drops() {
+        let mut answer = data("get_config_profiles");
+        answer["value"]["futureTop"] = json!({"anything": 1});
+        answer["value"]["profiles"]["team"]["explore"]["futureRow"] = json!("keep me");
+        answer["value"]["workflow"] =
+            json!({"team": {"orchestratorMode": "full-delegation", "futureEntry": 2}});
+
+        let projection = parse_config_verbatim(&answer).expect("the frame still parses");
+
+        let verbatim = projection.verbatim.expect("the answer carried a value");
+        assert_eq!(
+            verbatim["futureTop"],
+            json!({"anything": 1}),
+            "a member the channel grows with is part of what a write must send back"
+        );
+        assert_eq!(
+            verbatim["profiles"]["team"]["explore"]["futureRow"],
+            json!("keep me")
+        );
+        assert_eq!(verbatim["workflow"]["team"]["futureEntry"], json!(2));
+        let StoreValue::Profiles(typed) = projection.projection.value.expect("a typed value")
+        else {
+            panic!("a profiles store carries a profiles value");
+        };
+        assert_eq!(
+            typed.profiles["team"]["explore"].model.as_deref(),
+            Some("anthropic/claude-sonnet-4"),
+            "the typed half still reads what it models"
+        );
+    }
+
+    #[test]
+    fn an_answer_with_no_value_carries_no_verbatim_document() {
+        let answer = parse_config_verbatim(&data("models_invalid")).expect("a read");
+        assert_eq!(answer.verbatim, None);
+    }
+
+    #[test]
+    fn full_delegation_changes_only_that_profiles_workflow_entry() {
+        let original = document();
+
+        let edited = with_profile_mode(&original, "team", OrchestratorMode::FullDelegation)
+            .expect("the document defines the profile");
+
+        assert_eq!(
+            edited,
+            json!({
+                "kind": "gentle-pi.agent_model_profiles",
+                "version": 1,
+                "active": "team",
+                "future": {"seed": true},
+                "profiles": {
+                    "team": {
+                        "orchestrator": {"model": "p/m", "future": "kept"},
+                        "worker": {"model": "p/w", "tier": "cheap"}
+                    },
+                    "busy": {"orchestrator": {"model": "p/b"}}
+                },
+                "workflow": {
+                    "busy": {"orchestratorMode": "full-delegation"},
+                    "team": {"orchestratorMode": "full-delegation"}
+                }
+            }),
+            "every other member is the owner's, byte for byte (S2: `data` is the COMPLETE content)"
+        );
+    }
+
+    #[test]
+    fn full_delegation_adds_a_workflow_object_a_document_does_not_have() {
+        let mut original = document();
+        original
+            .as_object_mut()
+            .expect("an object")
+            .remove("workflow");
+
+        let edited = with_profile_mode(&original, "team", OrchestratorMode::FullDelegation)
+            .expect("the document defines the profile");
+
+        assert_eq!(
+            edited["workflow"],
+            json!({"team": {"orchestratorMode": "full-delegation"}}),
+            "the only entry of the map this write creates is this profile's"
+        );
+        assert_eq!(
+            edited["profiles"], original["profiles"],
+            "nothing of the definitions moved"
+        );
+    }
+
+    #[test]
+    fn organic_removes_that_profiles_entry_and_leaves_the_others() {
+        let mut original = document();
+        original["workflow"]["team"] = json!({"orchestratorMode": "full-delegation"});
+
+        let edited = with_profile_mode(&original, "team", OrchestratorMode::Organic)
+            .expect("the document defines the profile");
+
+        assert_eq!(
+            edited["workflow"],
+            json!({"busy": {"orchestratorMode": "full-delegation"}}),
+            "organic is absence, and another profile's entry is not this write's business"
+        );
+        assert_eq!(edited["future"], original["future"]);
+        assert_eq!(edited["profiles"], original["profiles"]);
+    }
+
+    #[test]
+    fn organic_removes_a_workflow_it_empties() {
+        let original = json!({
+            "kind": "gentle-pi.agent_model_profiles",
+            "version": 1,
+            "profiles": {"team": {"orchestrator": {"model": "p/m"}}},
+            "workflow": {"team": {"orchestratorMode": "full-delegation"}}
+        });
+
+        let edited = with_profile_mode(&original, "team", OrchestratorMode::Organic)
+            .expect("the document defines the profile");
+
+        assert_eq!(
+            edited.get("workflow"),
+            None,
+            "the probe's own finding (L24): an emptied `workflow` is removed entirely"
+        );
+        assert_eq!(edited["profiles"], original["profiles"]);
+    }
+
+    #[test]
+    fn organic_on_a_document_with_no_workflow_is_the_document_itself() {
+        let mut original = document();
+        original
+            .as_object_mut()
+            .expect("an object")
+            .remove("workflow");
+
+        let edited = with_profile_mode(&original, "team", OrchestratorMode::Organic)
+            .expect("the document defines the profile");
+
+        assert_eq!(edited, original, "nothing to remove is not a change");
+    }
+
+    #[test]
+    fn a_document_that_does_not_define_the_profile_is_never_edited() {
+        let original = document();
+
+        assert_eq!(
+            with_profile_mode(&original, "gone", OrchestratorMode::FullDelegation),
+            None,
+            "a name the profiles store does not define writes nothing at all"
+        );
+        assert_eq!(
+            with_profile_mode(&original, "gone", OrchestratorMode::Organic),
+            None
+        );
+        assert_eq!(
+            with_profile_mode(
+                &json!({"value": "not a document"}),
+                "team",
+                OrchestratorMode::Organic
+            ),
+            None,
+            "an answer that is not an object is not a document to write"
+        );
+    }
+
+    #[test]
+    fn a_workflow_that_is_not_an_object_is_not_rewritten() {
+        let original = json!({
+            "kind": "gentle-pi.agent_model_profiles",
+            "version": 1,
+            "profiles": {"team": {}},
+            "workflow": "organic"
+        });
+
+        assert_eq!(
+            with_profile_mode(&original, "team", OrchestratorMode::FullDelegation),
+            None,
+            "a shape this rule does not model is refused before the owner sees it"
+        );
+    }
+
+    /// L24's frames, pinned: the two tokens a real child answered, and the token
+    /// the request carries.
+    #[test]
+    fn the_real_childs_two_tokens_are_different_and_the_write_sends_the_write_one() {
+        let read = probed("get_config_profiles");
+        let answer = parse_config_verbatim(&read).expect("the probe's read");
+        let projection = &answer.projection;
+
+        assert_eq!(
+            projection.revision.as_str(),
+            "sha256:00552813cec6dd047480382b193d9dc8"
+        );
+        let write = projection
+            .write_revision(WriteTargetName::Global)
+            .expect("the probe's write target");
+        assert_eq!(write.as_str(), "sha256:8c001b89b5a2d05c81003e2b5f0662fb");
+        assert_ne!(
+            projection.revision.as_str(),
+            write.as_str(),
+            "L24: a real child's revision and writeRevision are different hashes"
+        );
+
+        let data = with_profile_mode(
+            answer
+                .verbatim
+                .as_ref()
+                .expect("the read carried its value"),
+            "probe",
+            OrchestratorMode::FullDelegation,
+        )
+        .expect("the probe's document defines its own profile");
+        let params = set_config_params(WritableStore::Profiles, data, write);
+
+        assert_eq!(params["store"], json!("profiles"));
+        assert_eq!(
+            params["expectedRevision"],
+            json!("sha256:8c001b89b5a2d05c81003e2b5f0662fb"),
+            "S3: the token is the write target's, never the store's revision"
+        );
+        assert_eq!(
+            params
+                .as_object()
+                .expect("an object")
+                .keys()
+                .collect::<Vec<_>>(),
+            ["data", "expectedRevision", "store"],
+            "the params are exactly the contract's three"
+        );
+    }
+
+    /// The edited document is EXACTLY what the real child stored, and going back
+    /// to organic is EXACTLY the document it stored then (L24).
+    #[test]
+    fn the_edited_document_matches_what_the_real_child_stored() {
+        let read = parse_config_verbatim(&probed("get_config_profiles")).expect("the read");
+        let read_value = read.verbatim.expect("the read carried its value");
+        let full = parse_config_verbatim(&probed("set_config_full_delegation"))
+            .expect("the probe's write answer")
+            .verbatim
+            .expect("the answer carried its value");
+        let organic = parse_config_verbatim(&probed("set_config_organic"))
+            .expect("the probe's second write answer")
+            .verbatim
+            .expect("the answer carried its value");
+
+        assert_eq!(
+            with_profile_mode(&read_value, "probe", OrchestratorMode::FullDelegation),
+            Some(full.clone()),
+            "full-delegation sets exactly `workflow.<profile>` and nothing else"
+        );
+        assert_eq!(
+            with_profile_mode(&full, "probe", OrchestratorMode::Organic),
+            Some(organic),
+            "organic is the absence of the entry, confirmed on a real child"
+        );
+    }
+}

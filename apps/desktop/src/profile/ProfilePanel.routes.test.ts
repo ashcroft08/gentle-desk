@@ -66,22 +66,27 @@ describe("the used profile's routes and its own mode", () => {
     expect(within(block).getByText('low')).toBeTruthy()
   })
 
-  it('draws the mode the profile stores, labelled as the profile\u2019s own', () => {
+  it('draws the mode the profile stores, as the checked option of a switch', () => {
     draw({ view: chatProfile({ profiles: [BOTH], default_profile: 'both' }) })
 
     const block = routes()
     expect(within(block).getByText(copy.modeLabel)).toBeTruthy()
-    expect(within(block).getByText(copy.modeFullDelegation)).toBeTruthy()
-    // The scope line: every chat using this profile, not this chat alone (L20).
-    expect(within(block).getByText(copy.modeScope)).toBeTruthy()
-    // Read-only: the switch is T3 and is not drawn here, not even disabled.
-    expect(within(block).queryByRole('radiogroup')).toBeNull()
+    const switchOf = within(block).getByRole('radiogroup', { name: copy.modeLabel })
+    expect(within(switchOf).getByRole('radio', { name: copy.modeFullDelegation }).getAttribute('aria-checked')).toBe(
+      'true',
+    )
+    // The note says it is saved in the PROFILE: every chat using it (L20), and
+    // never that this open chat changes its routing (L24).
+    expect(within(block).getByText(copy.modeNote('both'))).toBeTruthy()
   })
 
   it('draws organic for a profile whose workflow names no mode at all', () => {
     draw({ view: chatProfile({ profiles: [TEAM], default_profile: 'team' }) })
 
-    expect(within(routes()).getByText(copy.modeOrganic)).toBeTruthy()
+    const switchOf = within(routes()).getByRole('radiogroup', { name: copy.modeLabel })
+    expect(
+      within(switchOf).getByRole('radio', { name: copy.modeOrganic }).getAttribute('aria-checked'),
+    ).toBe('true')
   })
 
   it("draws the pairs of the profile this chat BOUND, never the default's", () => {
@@ -96,11 +101,17 @@ describe("the used profile's routes and its own mode", () => {
 
     const block = routes()
     expect(within(block).getByText('prov/big')).toBeTruthy()
-    expect(within(block).getByText(copy.modeFullDelegation)).toBeTruthy()
+
+    expect(
+      within(block)
+        .getByRole('radio', { name: copy.modeFullDelegation })
+        .getAttribute('aria-checked'),
+    ).toBe('true')
     // The default profile's own route is nowhere in the routes block: the tab
     // describes the used one (the body may still name the same model in the
     // default's own group).
     expect(within(block).queryByText('anthropic/claude-haiku-4-5')).toBeNull()
+
   })
 
   it('draws no Orchestrator row for a profile that names no orchestrator agent', () => {
@@ -144,8 +155,12 @@ describe("the used profile's routes and its own mode", () => {
     expect(spanish.fallbackLabel).toBe('Fallback')
     expect(within(block).getByText(spanish.fallbackLabel)).toBeTruthy()
     expect(within(block).getByText(spanish.modeLabel)).toBeTruthy()
-    expect(within(block).getByText(spanish.modeFullDelegation)).toBeTruthy()
-    expect(within(block).getByText(spanish.modeScope)).toBeTruthy()
+    expect(
+      within(block)
+        .getByRole('radio', { name: spanish.modeFullDelegation })
+        .getAttribute('aria-checked'),
+    ).toBe('true')
+    expect(within(block).getByText(spanish.modeNote('both'))).toBeTruthy()
     expect(within(block).queryByText(copy.modeLabel)).toBeNull()
   })
 })

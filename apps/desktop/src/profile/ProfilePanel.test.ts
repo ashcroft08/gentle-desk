@@ -133,7 +133,27 @@ describe('the profiles listed read-only', () => {
     expect(bodyOf(group(/^fast/)).hidden).toBe(false)
   })
 
-  it('draws no edit control at all: this tab only reads', () => {
+
+  it('builds the body of the open group only, never every profile in the store', () => {
+    const solo = definition('solo', {
+      agents: [agent('orchestrator', 'google/gemini-3-pro', 'high')],
+      chains: [],
+    })
+    draw({ view: chatProfile({ profiles: [TEAM, FAST, solo], default_profile: 'team' }) })
+
+    // `team` is the group this chat runs, so it is the open one: its agents are here.
+    expect(within(bodyOf(group(/^team/))).getByText('anthropic/claude-sonnet-4')).toBeTruthy()
+    // `fast` and `solo` are collapsed: their bodies are not built at all, which is
+    // what keeps a state push from repainting every profile's agents and chains.
+    expect(screen.queryAllByText('openai/gpt-5-mini')).toHaveLength(0)
+    expect(screen.queryAllByText('google/gemini-3-pro')).toHaveLength(0)
+    // The bodies are still there for the accordion to reveal: only their content waits.
+    expect(bodyOf(group(/^fast/)).hidden).toBe(true)
+    expect(bodyOf(group(/^fast/)).textContent).toBe('')
+  })
+
+  it('draws only the mode switch, and no other edit control', () => {
+
     draw()
 
     for (const name of [/^Edit$/, /^Save$/, /^Use in this chat$/, /^Make default$/, /^Clear$/]) {
@@ -141,14 +161,16 @@ describe('the profiles listed read-only', () => {
     }
     expect(screen.queryByRole('combobox')).toBeNull()
     expect(screen.queryByRole('textbox')).toBeNull()
-    expect(screen.getByText(copy.readOnly)).toBeTruthy()
+    // The one thing that writes is the used profile's orchestration mode (T3-mode).
+    expect(screen.getByRole('radiogroup')).toBeTruthy()
+    expect(screen.getByText(copy.footer)).toBeTruthy()
   })
 
   it('says so when the store defines no profile at all', () => {
     draw({ view: chatProfile({ profiles: [], default_profile: null, bound: null }) })
 
     expect(screen.getByText(copy.noProfiles)).toBeTruthy()
-    expect(screen.queryByText(copy.readOnly)).toBeTruthy()
+    expect(screen.queryByText(copy.footer)).toBeTruthy()
   })
 })
 
@@ -213,7 +235,7 @@ describe('the tab in Spanish', () => {
 
     expect(screen.getByText(spanish.lineDefault('team'))).toBeTruthy()
     expect(screen.getByText(spanish.approximation)).toBeTruthy()
-    expect(screen.getByText(spanish.readOnly)).toBeTruthy()
+    expect(screen.getByText(spanish.footer)).toBeTruthy()
     expect(screen.getByText(spanish.tagDefault)).toBeTruthy()
     expect(screen.queryByText(copy.lineDefault('team'))).toBeNull()
   })
