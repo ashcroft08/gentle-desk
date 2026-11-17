@@ -1,24 +1,27 @@
 // The Settings dialog's rail (settings-dialog L4; 0.1.12 S1-S7; 0.2.0 S2/S4): the
-// eight sections as entries in a left rail, the selected entry highlighted, and
+// seven sections as entries in a left rail, the selected entry highlighted, and
 // that section's content in the pane on the right. The order here is the order
 // the rail draws and the first one is the section the dialog opens on. Each
 // entry's glyph carries no meaning on its own - the entry's word is its name -
-// and the eight follow the house style the settings gear set: Lucide outline
+// and the seven follow the house style the settings gear set: Lucide outline
 // geometry on one 24x24 grid. That word is NOT here: the rail is drawn in the
 // language the app holds (0.2.0, D4), so `settings/copy.ts` keeps the words - the
 // rail's own accessible name included - and this module keeps the order, the
 // glyphs and the ids.
 //
+// Profiles left the rail in profiles-editor T2d (L21, L22): the maintainer ruled
+// that a Settings section made the profiles look global, and they live in the
+// chat's own Profile tab now. The order below is what is left, unchanged.
+//
 // The keys are the chat header's tablist keys (chat/tabs.ts): arrows walk the
 // rail and wrap, Home and End jump to the ends, and one entry is the tab stop.
 import type { IconName } from '../icons/shapes'
 
-/** The eight sections, as the dialog names them. */
+/** The seven sections, as the dialog names them. */
 export type Section =
   | 'appearance'
   | 'home'
   | 'updates'
-  | 'profiles'
   | 'account'
   | 'usage'
   | 'language'
@@ -35,7 +38,6 @@ export const SECTIONS: SectionEntry[] = [
   { id: 'appearance', icon: 'theme' },
   { id: 'home', icon: 'house' },
   { id: 'updates', icon: 'restart' },
-  { id: 'profiles', icon: 'users' },
   { id: 'account', icon: 'key' },
   { id: 'usage', icon: 'gauge' },
   // The language of the app's own words (0.2.0): beside Usage and before About,
@@ -54,7 +56,6 @@ export const TAB_IDS: Record<Section, string> = {
   appearance: 'settings-tab-appearance',
   home: 'settings-tab-home',
   updates: 'settings-tab-updates',
-  profiles: 'settings-tab-profiles',
   account: 'settings-tab-account',
   usage: 'settings-tab-usage',
   language: 'settings-tab-language',

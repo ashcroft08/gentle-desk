@@ -1,7 +1,11 @@
-//! Windowless tests of the Settings pane's reads through the REAL
-//! `Bridge::dispatch` (0.1.12, S1, S2, S3, S5, S7): the profiles file, the auth
-//! store, the update check and the orchestrator switch, with the machine behind
-//! seams the test answers.
+//! Windowless tests of the Settings panes' reads through the REAL
+//! `Bridge::dispatch` (0.1.12, S1, S2, S3, S5, S7): the auth store and the update
+//! check, with the machine behind seams the test answers.
+//!
+//! The profiles file and the session-only orchestrator switch were tested here
+//! until profiles-editor T2d removed both: no pane reads `profiles.json` any
+//! more (the chat's Profile tab reads through that chat's own child,
+//! `tests/chat_profile_view.rs`) and the switch is gone with the pane.
 //!
 //! Every test sets its own `APPDATA`, `LOCALAPPDATA`, `PI_CODING_AGENT_DIR`,
 //! `GENTLE_SHELL_HOME`, `GENTLE_PI_CONFIG_HOME` and `GENTLE_SHELL_CONFIG_HOME`,
@@ -18,8 +22,7 @@ use gentle_core::i18n::Language;
 use gentle_core::rpc::{decode_line, Decoded};
 use gentle_desk_lib::commands::{Bridge, Emit};
 use gentle_desk_lib::contract::{
-    AuthStatusView, OrchestratorModeView, ProfilesStatusView, ProviderStatusView, UiIntent,
-    UpdatesStatusView, ViewState,
+    AuthStatusView, ProviderStatusView, UiIntent, UpdatesStatusView, ViewState,
 };
 use gentle_desk_lib::settings::{ProviderAnswer, ProviderProbe, VersionProbe, WebGet};
 
@@ -66,32 +69,11 @@ impl Harness {
         }
     }
 
-    /// Writes `body` where gentle-pi keeps its profiles.
-    fn write_profiles(&self, body: &str) {
-        let path = self.root.join("config").join("profiles.json");
-        std::fs::write(path, body).expect("the scratch profiles file is writable");
-    }
-
-    /// Writes `body` beside the profiles file: the chains gentle-pi keeps in
-    /// `profile-fallbacks.json`, the sibling of `profiles.json`.
-    fn write_fallbacks(&self, body: &str) {
-        let path = self.root.join("config").join("profile-fallbacks.json");
-        std::fs::write(path, body).expect("the scratch chain file is writable");
-    }
-
     /// Writes `body` where the shell keeps its auth store: the agent folder the
     /// home flags select.
     fn write_auth(&self, body: &str) {
         let path = self.root.join("home").join("auth.json");
         std::fs::write(path, body).expect("the scratch auth store is writable");
-    }
-
-    /// The app config file, if a run wrote one.
-    fn config_file(&self) -> PathBuf {
-        self.root
-            .join("appdata")
-            .join("gentle-desk")
-            .join("config.json")
     }
 }
 
@@ -196,160 +178,6 @@ fn web(
         body.map(str::to_owned)
             .ok_or_else(|| format!("{url} did not answer"))
     })
-}
-
-#[test]
-fn the_profiles_file_reaches_the_pane_and_writes_nothing() {
-    let harness = Harness::new();
-    harness.write_profiles(
-        r#"{
-            "kind": "gentle-pi.agent_model_profiles",
-            "version": 1,
-            "active": "Mine",
-            "profiles": {
-                "Mine": {
-                    "orchestrator": {"model": "prov/big", "thinking": "medium"},
-                    "worker": {"model": "prov/small", "thinking": "high"}
-                }
-            },
-            "workflow": {"Mine": {"orchestratorMode": "full-delegation"}}
-        }"#,
-    );
-    let (emit, views) = recorder();
-    let bridge = Bridge::new().with_emit(emit);
-
-    let answer = bridge
-        .dispatch(UiIntent::RefreshProfiles)
-        .expect("the profiles read answers");
-
-    assert_eq!(answer.profiles.status, ProfilesStatusView::Ready);
-    assert_eq!(answer.profiles.active.as_deref(), Some("Mine"));
-    let profile = &answer.profiles.profiles[0];
-    assert!(profile.active);
-    assert_eq!(profile.name, "Mine");
-    assert_eq!(
-        profile
-            .orchestrator
-            .as_ref()
-            .and_then(|role| role.model.as_deref()),
-        Some("prov/big")
-    );
-    assert_eq!(profile.roles.len(), 1);
-    assert_eq!(
-        profile.mode,
-        Some(OrchestratorModeView::FullDelegation),
-        "the profile's own workflow mode"
-    );
-    assert_eq!(
-        answer.profiles.mode,
-        OrchestratorModeView::Organic,
-        "the pane's mode is the session switch, not the file's"
-    );
-    // The answer is the pushed slice: the page draws what the command returned.
-    assert_eq!(lock(&views).last().cloned(), Some(answer));
-}
-
-#[test]
-fn a_profiles_file_of_another_kind_shows_nothing_and_says_why() {
-    let harness = Harness::new();
-    harness.write_profiles(
-        r#"{"kind": "someone.else", "version": 1, "profiles": {"Mine": {"orchestrator": {}}}}"#,
-    );
-    let (emit, _views) = recorder();
-    let bridge = Bridge::new().with_emit(emit);
-
-    let answer = bridge
-        .dispatch(UiIntent::RefreshProfiles)
-        .expect("a refused document is an answer, not an error");
-
-    match answer.profiles.status {
-        ProfilesStatusView::Failed(reason) => {
-            assert!(reason.contains("someone.else"), "{reason}");
-        }
-        other => panic!("a wrong document must say why, got {other:?}"),
-    }
-    assert!(
-        answer.profiles.profiles.is_empty(),
-        "a wrong document draws no profile"
-    );
-}
-
-#[test]
-fn the_fallback_chain_reaches_the_pane_from_the_sibling_file() {
-    let harness = Harness::new();
-    harness.write_profiles(
-        r#"{
-            "kind": "gentle-pi.agent_model_profiles",
-            "version": 1,
-            "active": "Mine",
-            "profiles": {
-                "Mine": {
-                    "orchestrator": {"model": "orx/main", "thinking": "medium"},
-                    "worker": {"model": "prov/small", "thinking": "high"}
-                }
-            }
-        }"#,
-    );
-    harness.write_fallbacks(
-        r#"{
-            "kind": "gentle-pi.profile_model_fallbacks",
-            "version": 1,
-            "profiles": {
-                "Mine": {
-                    "orchestrator": [{"model": "orx/backup", "thinking": "high"}]
-                }
-            }
-        }"#,
-    );
-    let (emit, _views) = recorder();
-    let bridge = Bridge::new().with_emit(emit);
-
-    let answer = bridge
-        .dispatch(UiIntent::RefreshProfiles)
-        .expect("the profiles read answers");
-
-    let profile = &answer.profiles.profiles[0];
-    let fallback = profile
-        .roles
-        .iter()
-        .find(|role| role.role == "fallback")
-        .expect("the chain the sibling file records is the row");
-    assert_eq!(fallback.model.as_deref(), Some("orx/backup"));
-    assert_eq!(fallback.thinking.as_deref(), Some("high"));
-    assert_eq!(
-        profile.roles.len(),
-        2,
-        "the profile's own role and the chain"
-    );
-    assert_eq!(
-        answer.profiles.status,
-        ProfilesStatusView::Ready,
-        "reading the sibling file never fails the pane"
-    );
-}
-
-#[test]
-fn a_broken_fallbacks_file_leaves_the_pane_ready_and_draws_no_row() {
-    let harness = Harness::new();
-    harness.write_profiles(
-        r#"{"kind": "gentle-pi.agent_model_profiles", "version": 1, "active": "Mine", "profiles": {"Mine": {"orchestrator": {"model": "prov/big"}}}}"#,
-    );
-    harness.write_fallbacks(r#"{"kind": "someone.else", "version": 1, "profiles": {}}"#);
-    let (emit, _views) = recorder();
-    let bridge = Bridge::new().with_emit(emit);
-
-    let answer = bridge
-        .dispatch(UiIntent::RefreshProfiles)
-        .expect("a broken chain file is not a broken pane");
-
-    assert_eq!(answer.profiles.status, ProfilesStatusView::Ready);
-    assert!(
-        answer.profiles.profiles[0]
-            .roles
-            .iter()
-            .all(|role| role.role != "fallback"),
-        "a chain document of another kind draws no row"
-    );
 }
 
 #[test]
@@ -512,59 +340,6 @@ fn the_check_runs_once_when_the_app_opens() {
             .then_some(())
     });
     assert_eq!(lock(&asked).len(), 4, "two checks, two addresses each");
-}
-
-#[test]
-fn the_mode_switch_reaches_the_children_and_is_never_stored() {
-    let harness = Harness::new();
-    let (emit, views) = recorder();
-    let bridge = Bridge::new().with_emit(emit);
-
-    let answer = bridge
-        .dispatch(UiIntent::SetOrchestratorMode {
-            mode: OrchestratorModeView::FullDelegation,
-        })
-        .expect("the switch answers");
-
-    assert_eq!(answer.profiles.mode, OrchestratorModeView::FullDelegation);
-    assert_eq!(
-        lock(&views).last().map(|view| view.profiles.mode),
-        Some(OrchestratorModeView::FullDelegation)
-    );
-    assert_eq!(
-        bridge.executor.orchestrator_mode(),
-        Some(gentle_backend::chat_host::OrchestratorMode::FullDelegation),
-        "the executor's spawner carries the mode to the next children"
-    );
-
-    // Session-scoped (S1): nothing was written. The config file is either
-    // absent or carries no mode at all.
-    let written = std::fs::read_to_string(harness.config_file()).unwrap_or_default();
-    for key in ["orchestrator", "full-delegation", "organic"] {
-        assert!(!written.contains(key), "the config stored {key}: {written}");
-    }
-}
-
-#[test]
-fn the_mode_switch_starts_over_in_a_new_run() {
-    let _harness = Harness::new();
-    let (emit, _views) = recorder();
-    let first = Bridge::new().with_emit(emit);
-    first
-        .dispatch(UiIntent::SetOrchestratorMode {
-            mode: OrchestratorModeView::FullDelegation,
-        })
-        .expect("the switch answers");
-
-    let (emit, _views) = recorder();
-    let second = Bridge::new().with_emit(emit);
-
-    assert_eq!(
-        second.holder.view().profiles.mode,
-        OrchestratorModeView::Organic,
-        "a new run starts on gentle-pi's own default"
-    );
-    assert_eq!(second.executor.orchestrator_mode(), None);
 }
 
 #[test]

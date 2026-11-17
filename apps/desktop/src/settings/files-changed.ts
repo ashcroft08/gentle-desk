@@ -8,6 +8,11 @@
 // own. A pane listens while it is mounted and hands the payload to its own
 // refresh - the very same function its window-focus listener and its buttons
 // call, so there is one read path and not two.
+//
+// The `profiles` group has no listener since profiles-editor T2d removed
+// Settings > Profiles: it still names the files the native watcher sees, and the
+// coalesced read below is shared with the Profile tab, which reads through its
+// chat's child instead.
 
 import { events } from '../contract/bindings'
 

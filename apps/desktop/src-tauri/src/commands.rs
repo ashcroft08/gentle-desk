@@ -31,9 +31,8 @@ use crate::clipboard::{self, Clipboard, SystemClipboard};
 use crate::close::{self, BridgeSteps, CloseFlow};
 use crate::config::{ConfigSnapshot, ConfigWriter};
 use crate::contract::{
-    OrchestratorModeView, SettingsFilesChanged, SettingsFilesChangedView, StateChanged,
-    TerminalActionView, UiIntent, UpdatesStatusView, UpdatesView, UsageStatusView, UsageView,
-    ViewState,
+    SettingsFilesChanged, SettingsFilesChangedView, StateChanged, TerminalActionView, UiIntent,
+    UpdatesStatusView, UpdatesView, UsageStatusView, UsageView, ViewState,
 };
 use crate::effects::{self, Ran, RuntimeExecutor};
 use crate::events::{EventPump, Push};
@@ -559,15 +558,13 @@ impl Bridge {
             emit_view(&emit, &view)?;
             return Ok(view);
         }
-        // The Settings pane's intents (0.1.12) are the shell's, not the
-        // reducer's: they read a file, run the shell's own check, or pass a mode
-        // to the children. Each answers the slice it pushed.
+        // The Settings panes' intents (0.1.12) are the shell's, not the
+        // reducer's: they read a file or run the shell's own check. Each answers
+        // the slice it pushed.
         match &intent {
-            UiIntent::RefreshProfiles => return self.refresh_profiles(),
             UiIntent::RefreshAuth => return self.refresh_auth(),
             UiIntent::CheckUpdates => return self.check_updates(),
             UiIntent::RefreshUsage => return self.refresh_usage(),
-            UiIntent::SetOrchestratorMode { mode } => return self.set_orchestrator_mode(*mode),
             _ => {}
         }
         // A relaunch is the close flow with a different last step: the config
@@ -761,27 +758,6 @@ impl Bridge {
         )
     }
 
-    /// The Profiles pane's read (0.1.12, T2): the config home's `profiles.json`
-    /// through the seam, pushed as the next slice, with the fallback chains of
-    /// its sibling `profile-fallbacks.json` (L13) as each profile's FALLBACK row.
-    /// A document of another kind or version reaches the page as `Failed` with
-    /// its reason, never as a wrong view, and a file that is not there is a pane
-    /// with no profiles. A chain file that is missing or refused only leaves the
-    /// row undrawn: it never fails the pane.
-    pub fn refresh_profiles(&self) -> Result<ViewState, String> {
-        self.accepting_work()?;
-        let emit = self.emitter();
-        let view = self.holder.note_profiles(settings::profiles_view(
-            &self.settings.files,
-            self.settings.paths.profiles.as_deref(),
-            self.settings.paths.fallbacks.as_deref(),
-            self.holder.orchestrator_mode(),
-            self.holder.language(),
-        ));
-        emit_view(&emit, &view)?;
-        Ok(view)
-    }
-
     /// The Account pane's read (0.1.12, T3): the provider names the auth store
     /// lists, and one `auth check --no-refresh` per provider, pushed as the next
     /// slice.
@@ -867,20 +843,6 @@ impl Bridge {
         Ok(view)
     }
 
-    /// The mode the chats opened from now on start with (0.1.12, S1, T4). The
-    /// executor's spawner carries it to each child through
-    /// `GENTLE_PI_ORCHESTRATOR_MODE`, the pane draws which one is on, and nothing
-    /// is stored: a new run starts on gentle-pi's own default again.
-    pub fn set_orchestrator_mode(&self, mode: OrchestratorModeView) -> Result<ViewState, String> {
-        self.accepting_work()?;
-        let emit = self.emitter();
-        self.executor
-            .set_orchestrator_mode(Some(orchestrator_mode(mode)));
-        let view = self.holder.note_orchestrator_mode(mode);
-        emit_view(&emit, &view)?;
-        Ok(view)
-    }
-
     /// The check itself, on a thread of its own: the two versions the shell
     /// prints, the desk's own manifest and pi's registry entry, gathered outside
     /// every lock and pushed when they are all in.
@@ -920,17 +882,6 @@ impl Bridge {
 fn launcher_resolves() -> bool {
     gentle_backend::launcher::resolve(&gentle_backend::launcher::LauncherEnv::from_process())
         .is_ok()
-}
-
-/// The contract's mode as the spawner's own type: the two enums carry the same
-/// two values, so neither side parses a string.
-fn orchestrator_mode(mode: OrchestratorModeView) -> gentle_backend::chat_host::OrchestratorMode {
-    match mode {
-        OrchestratorModeView::Organic => gentle_backend::chat_host::OrchestratorMode::Organic,
-        OrchestratorModeView::FullDelegation => {
-            gentle_backend::chat_host::OrchestratorMode::FullDelegation
-        }
-    }
 }
 
 /// What follows an install, whoever ran it: the outcome reaches the install state
@@ -1044,8 +995,8 @@ fn fold_and_push(holder: &Arc<AppStateHolder>, emit: &Emit, ran: Ran) {
     for input in ran.inputs {
         push(emit, holder.fold_input(input));
     }
-    // One chat's profile configuration is the shell's own view, noted beside
-    // `ProfilesView` (profiles-editor T2b-2, L11-1). Every read of the run is
+    // One chat's profile configuration is the shell's own view, noted on its
+    // own (profiles-editor T2b-2, L11-1). Every read of the run is
     // noted, in the order it answered (T2b-3): the last one is the view the
     // shell holds. A read that reached no store, or whose chat closed while the
     // read was in flight, notes nothing and pushes nothing (L11-4).

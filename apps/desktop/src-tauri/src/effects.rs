@@ -42,9 +42,9 @@ pub struct Ran {
     /// The profile configuration that arrived, with the chat it answers for
     /// (profiles-editor T2b-2), in the order the run answered. It is NOT a
     /// reducer input: the view is the shell's own (`bridge::chat_profile`), so
-    /// it travels beside the inputs for the caller to note next to
-    /// `ProfilesView`. Every read the run answered is carried (T2b-3): two
-    /// reads must not collapse into the last one.
+    /// it travels beside the inputs for the caller to note on its own. Every
+    /// read the run answered is carried (T2b-3): two reads must not collapse
+    /// into the last one.
     pub chat_profile: Vec<(ChatId, ChatConfigRead)>,
     /// Every profile-mode save one run answered, with the chat it belongs to and
     /// the profile configuration the save re-read (profiles-editor T3-mode).

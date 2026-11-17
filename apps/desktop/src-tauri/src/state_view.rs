@@ -21,8 +21,7 @@ use gentle_runtime::badge::{Badge, BadgeMark};
 use crate::contract::{
     AuthView, ChatActivityMark, ChatActivityView, ChatProfileView, ContextUsageView, ImageView,
     LanguageView, ModelChipView, ModelChoiceView, ModelListStatusView, NoticeActionView,
-    NoticeLevel, NoticeView, ProfilesView, ShellView, ThemeView, UpdatesView, UsageView, ViewState,
-    WhatsNewView,
+    NoticeLevel, NoticeView, ShellView, ThemeView, UpdatesView, UsageView, ViewState, WhatsNewView,
 };
 use crate::images::Images;
 use crate::{dialogs, helper_thread, helpers, sessions, view};
@@ -57,9 +56,6 @@ pub struct ShellParts<'a> {
     pub language: Option<Language>,
     /// The shell and home this run sees.
     pub shell: ShellView,
-    /// The agent profiles read for the Profiles pane (0.1.12, T2), and the mode
-    /// the desk's next chats start with.
-    pub profiles: ProfilesView,
     /// The Profile tab's view of one chat (profiles-editor T2b-2, L11), as the
     /// shell holds it: it belongs to the chat its own `chat_id` names.
     pub chat_profile: Option<ChatProfileView>,
@@ -88,7 +84,6 @@ pub fn view_state(state: &AppState, sessions_revision: u32, shell: ShellParts<'_
         theme,
         language,
         shell,
-        profiles,
         chat_profile,
         auth,
         updates,
@@ -141,7 +136,6 @@ pub fn view_state(state: &AppState, sessions_revision: u32, shell: ShellParts<'_
         images_notice: images.notice(),
         model_chip: model_chip_view(state),
         context_usage: context_usage_view(state),
-        profiles,
         chat_profile,
         auth,
         updates,
