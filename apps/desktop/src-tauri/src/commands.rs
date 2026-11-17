@@ -40,6 +40,7 @@ use crate::events::{EventPump, Push};
 use crate::link_opener::{LinkOpener, SystemLinkOpener};
 use crate::pending::PendingFolders;
 use crate::picker::{FolderPicker, NativeFolderPicker};
+use crate::reaper;
 use crate::sessions::{startup, SessionsService};
 use crate::settings::{
     self, Changed, Dirs, FileRead, ProviderProbe, SettingsSeams, SettingsWatch, VersionProbe,
@@ -413,6 +414,13 @@ impl Bridge {
         // installed: it needs no handle of its own.
         self.sessions.arm(push_via(self.emitter()));
         self.sessions.boot();
+    }
+
+    /// Starts the timer that releases the idle chat children (S7). One thread for
+    /// the whole run: the host's window and protection rules decide what goes,
+    /// and the reaper only gives them a clock.
+    pub fn start_reaper(&self) {
+        reaper::start(Arc::clone(&self.executor));
     }
 
     /// The window's own chrome follows the chosen theme from the first frame:

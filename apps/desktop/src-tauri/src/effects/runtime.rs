@@ -128,6 +128,18 @@ impl RuntimeExecutor {
         }
     }
 
+    /// Stops the idle background children, under the host's own window and
+    /// protection rules (S7). The shell runs this on its timer.
+    ///
+    /// Only an already-built host is asked: a run with no chat opened has no
+    /// children to reap, and building one just to reap nothing would start the
+    /// event thread for no chat at all.
+    pub fn reap_idle(&self) {
+        if let Some(Ok(runtime)) = self.runtime.get() {
+            runtime.reap_idle();
+        }
+    }
+
     /// The host, built now if this is the first ask, and its event stream handed
     /// to the pump exactly once.
     fn runtime(&self) -> Result<Arc<ChatRuntime>, String> {
