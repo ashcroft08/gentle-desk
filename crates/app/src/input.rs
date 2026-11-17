@@ -200,6 +200,11 @@ pub enum ChatCommand {
     /// keeps running. A stop that cannot be made is silent: the helper keeps the
     /// mark it had and nothing is said (S7).
     StopHelper { chat: ChatId, helper_id: String },
+    /// Tell the host whether that chat is running a turn. The reducer owns the
+    /// mark (it is the one that reads `agent_start` / `agent_end`), so this is
+    /// how the host's protection rules learn it: a working chat is never the
+    /// victim chosen to make room at the live cap and is never reaped as idle.
+    SetWorking { chat: ChatId, working: bool },
 }
 
 impl ChatCommand {
@@ -210,6 +215,7 @@ impl ChatCommand {
                 chat
             }
             Self::StopHelper { chat, .. } => chat,
+            Self::SetWorking { chat, .. } => chat,
         }
     }
 }

@@ -15,8 +15,11 @@ use std::time::{Duration, Instant};
 
 use super::ChatKey;
 
-/// The caps and the idle window. All three are configurable because the cost
-/// they bound is the user's usage limit, not this process's memory.
+/// The caps and the idle window. Their values come from
+/// [`gentle_core::chat::limits`], which both this crate and the reducer read, so
+/// the cap that stops a child and the cap that queues a prompt cannot drift
+/// apart. The cost they bound is the user's usage limit, not this process's
+/// memory alone.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Limits {
     /// How many children may live at once.
@@ -37,12 +40,13 @@ impl Limits {
     }
 }
 
-/// Four live children and two working ones are the proposal in the batch
-/// document: enough for a chat that keeps working in the background, small
-/// enough that parallel model calls do not drain the usage limit.
 impl Default for Limits {
     fn default() -> Self {
-        Self::new(4, 2, Duration::from_secs(10 * 60))
+        Self::new(
+            gentle_core::chat::limits::MAX_LIVE,
+            gentle_core::chat::limits::MAX_WORKING,
+            gentle_core::chat::limits::IDLE_AFTER,
+        )
     }
 }
 

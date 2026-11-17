@@ -40,13 +40,23 @@ impl Chats {
             entry.unread = true;
         }
         entry.refresh(foreground);
+        // The host learns the mark the reducer owns, so its protection rules
+        // stop guessing: a chat running a turn is never the victim chosen to
+        // make room at the live cap, and never reaped as idle. Only a real
+        // transition is sent, so an event that changes nothing says nothing.
+        let mut released = Vec::new();
+        let now_working = self.is_working(chat);
+        if now_working != was_working {
+            released.push(ChatCommand::SetWorking {
+                chat: chat.clone(),
+                working: now_working,
+            });
+        }
         // The turn that just ended freed a slot: the oldest queued prompt goes
         // out, if any waited.
-        let mut released = if ended && was_working {
-            queue::release(self)
-        } else {
-            Vec::new()
-        };
+        if ended && was_working {
+            released.extend(queue::release(self));
+        }
         // A settled turn may also have moved the context: this chat's own
         // child is the only one that can answer for it, so its `get_session_stats`
         // is asked now (0.1.12, S5). pi pushes nothing, so nothing else would.

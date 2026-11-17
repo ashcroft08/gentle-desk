@@ -28,6 +28,7 @@ pub mod link_opener;
 pub mod new_folder;
 pub mod pending;
 pub mod picker;
+pub mod reaper;
 pub mod release;
 pub mod sessions;
 pub mod settings;
@@ -152,6 +153,9 @@ pub fn run() {
             // The session list is armed the same way, and its first pass asked
             // for here: the window opens with a list that says it is reading.
             app.state::<Bridge>().start_sessions();
+            // The idle children's timer starts beside the list: no chat has a
+            // child yet, and the loop only asks a host that exists.
+            app.state::<Bridge>().start_reaper();
             // The Settings files' watcher (rpc-settings-sync T3b-1) starts beside
             // it and pushes its own typed event: the Profiles and Account panes
             // re-read when the terminal edits the files they draw. A run whose

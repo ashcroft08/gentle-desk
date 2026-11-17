@@ -90,18 +90,29 @@ fn under_the_cap_a_prompt_is_sent_at_once() {
 }
 
 #[test]
-fn the_default_cap_is_two_working_chats() {
-    let state = working_chats(&["a", "b"]);
-    let (state, _) = open(state, &chat("c"));
+fn the_default_cap_is_three_working_chats() {
+    let state = working_chats(&["a", "b", "c"]);
+    let (state, _) = open(state, &chat("d"));
 
     let (state, effects) = prompt(state, "hola");
 
     assert_eq!(sends(&effects), Vec::new());
     assert_eq!(
-        state.chats.activity(&chat("c")),
+        state.chats.activity(&chat("d")),
         Some(ChatActivity::Queued),
         "the app starts with the host's default cap, not no cap"
     );
+}
+
+#[test]
+fn under_the_default_cap_a_third_prompt_is_sent_not_queued() {
+    let state = working_chats(&["a", "b"]);
+    let (state, _) = open(state, &chat("c"));
+
+    let (state, effects) = prompt(state, "hola");
+
+    assert_eq!(sends(&effects), vec![(&chat("c"), "hola")]);
+    assert_eq!(state.chats.activity(&chat("c")), Some(ChatActivity::Idle));
 }
 
 #[test]

@@ -38,10 +38,26 @@ fn pending(mut chat: ChatView) -> ChatView {
 }
 
 #[test]
-fn defaults_are_four_live_two_working_and_ten_minutes() {
+fn defaults_are_six_live_three_working_and_fifteen_minutes() {
     assert_eq!(
         Limits::default(),
-        Limits::new(4, 2, Duration::from_secs(600))
+        Limits::new(6, 3, Duration::from_secs(15 * 60))
+    );
+}
+
+#[test]
+fn the_default_limits_read_the_shared_caps() {
+    assert_eq!(
+        Limits::default().max_live,
+        gentle_core::chat::limits::MAX_LIVE
+    );
+    assert_eq!(
+        Limits::default().max_working,
+        gentle_core::chat::limits::MAX_WORKING
+    );
+    assert_eq!(
+        Limits::default().idle_after,
+        gentle_core::chat::limits::IDLE_AFTER
     );
 }
 

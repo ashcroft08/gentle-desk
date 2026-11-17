@@ -128,6 +128,18 @@ impl RuntimeExecutor {
         }
     }
 
+    /// Stops the idle background children, under the host's own window and
+    /// protection rules (S7). The shell runs this on its timer.
+    ///
+    /// Only an already-built host is asked: a run with no chat opened has no
+    /// children to reap, and building one just to reap nothing would start the
+    /// event thread for no chat at all.
+    pub fn reap_idle(&self) {
+        if let Some(Ok(runtime)) = self.runtime.get() {
+            runtime.reap_idle();
+        }
+    }
+
     /// The host, built now if this is the first ask, and its event stream handed
     /// to the pump exactly once.
     fn runtime(&self) -> Result<Arc<ChatRuntime>, String> {
@@ -184,7 +196,8 @@ impl ChatExecutor for RuntimeExecutor {
             ChatCommand::OpenProcess { chat } => self.folders.take(chat),
             ChatCommand::Send { .. }
             | ChatCommand::CloseProcess { .. }
-            | ChatCommand::StopHelper { .. } => None,
+            | ChatCommand::StopHelper { .. }
+            | ChatCommand::SetWorking { .. } => None,
         };
         // The chat's attached images are merged in HERE, beside the folder and
         // never through `crates/app`: `ChatCommand` carries no image, and the
@@ -202,6 +215,9 @@ impl ChatExecutor for RuntimeExecutor {
                 ChatCommand::StopHelper { chat, helper_id } => {
                     Outcome::NotStopped { chat, helper_id }
                 }
+                // There is no host, so there is nothing to protect from and
+                // nothing to reap: the mark has no reader in this run.
+                ChatCommand::SetWorking { chat, working } => Outcome::Working { chat, working },
             },
         }
     }
@@ -249,6 +265,9 @@ fn refuse(language: Language, command: ChatCommand) -> Outcome {
         // A stop that arrives while the window closes changes nothing: the
         // helpers go with their children, and nothing is said (S7).
         ChatCommand::StopHelper { chat, helper_id } => Outcome::NotStopped { chat, helper_id },
+        // No host is left to mark, and the run that would have read the mark is
+        // the one being torn down.
+        ChatCommand::SetWorking { chat, working } => Outcome::Working { chat, working },
     }
 }
 
