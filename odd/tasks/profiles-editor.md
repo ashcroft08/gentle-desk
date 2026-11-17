@@ -79,7 +79,7 @@ es valor de producto".
 - [x] T0 (S7) design system sync: `design/system.md` is older than
       `apps/desktop/src/app.css`; regenerate it (read-only over the sources) so the
       artboards use current tokens. Route: writer, design files only.
-- [ ] T1 (S7) artboards: the editor's directions on the canvas (profile list,
+- [~] T1 (S7) artboards (three directions drawn, commit 310fb4c; the maintainer's pick is pending): the editor's directions on the canvas (profile list,
       per-agent model + thinking, fallback chain, pin, the conflict and rejection
       states). Maintainer picks one before any code.
 - [ ] T2 (S2, S3, S5, S6) control channel: a temporary control child opened when
@@ -133,3 +133,26 @@ es valor de producto".
   `design/system.html` rewritten (1440 px, no external URLs, 16/16 tokens
   documented). Not exercised in a browser. NOTE: `gentle_design list` reads the
   main checkout, so it keeps reporting the old system.md until this branch lands.
+- L5 (parent, 2026-11-17): T1 artboards drawn by a writer, commit 310fb4c, in
+  `design/profiles-editor/` (linked to this doc): 01-edit-in-place.html (the ledger
+  rows become the fields, sticky save bar), 02-detail-panel.html (the ledger stays
+  read-only, a profile opens in a 322 px panel), 03-focused-mode.html (an explicit
+  Edit mode with a Cancel / Save / Save and make default footer). Each shows 11
+  states through an in-artboard switcher: idle, connecting, dirty draft, model
+  picker, fallback chain (8-step limit, repeated model), pin, revision_conflict,
+  invalid_data, apply confirmation, saved-but-not-applied, degraded read-only.
+  Self-check against design/system.md passed (every hex maps to a dark token; no
+  external URLs; reduced motion respected). Not rendered in a browser by the
+  writer. NOT drawn: profile_apply_busy, unknown_profile, the two other
+  confirmation sentences (empty / orchestrator-only profile), creating a new
+  profile (its shape is the unverified half of the spec), read_only refusals.
+  The other artboards are alternatives until the maintainer picks one. Open
+  questions the writer raised, to settle before T3: (1) does the whole-document
+  write carry `workflow.orchestratorMode`; (2) `active` lives in the profiles
+  document while the pin is a separate file - what does the pane call "the
+  default" and can the editor write `active` at all; (3) the channel's own
+  confirmation text is English - translate the app's copy or the channel's; (4)
+  per-profile fallback chains (T5 scope) or only `*`; (5) a native Spanish pass.
+  PREVIEW: `gentle_design` reads the main checkout's `design/`, which lacks this
+  slug, so the artboards were served from the worktree by a static loopback
+  server (port 5190) instead of the canvas.
