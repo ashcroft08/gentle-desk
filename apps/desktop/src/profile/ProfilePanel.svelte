@@ -47,10 +47,20 @@
   /** This open tab's read, so Try again and a window focus share one path. */
   let read: CoalescedRead | null = null
 
+  /**
+   * The chat this tab reads, as a VALUE. The parent hands `chatId` down off an
+   * object that every state push replaces, so reading the prop subscribes to that
+   * object: without this derived, each push - one per child event of a streaming
+   * chat, and one per answered read - re-ran the read effect below and asked
+   * again, a read loop that froze the window. A derived of a string changes only
+   * when the string does, so the effect depends on the chat, not on the push.
+   */
+  const chat = $derived(chatId)
+
   /** One ask for this chat's view, or nothing when there is no chat to ask about. */
   function ask(): Promise<void> {
-    if (chatId === null) return Promise.resolve()
-    return dispatchIntent({ type: 'RefreshChatProfile', data: { chat_id: chatId } })
+    if (chat === null) return Promise.resolve()
+    return dispatchIntent({ type: 'RefreshChatProfile', data: { chat_id: chat } })
   }
 
   // One read per open, one per focus, and none after the tab closes. The read is
@@ -61,7 +71,7 @@
     if (!active) return
     asked = false
     const current = coalesced(async () => {
-      if (chatId === null) return
+      if (chat === null) return
       await ask()
       asked = true
     })
