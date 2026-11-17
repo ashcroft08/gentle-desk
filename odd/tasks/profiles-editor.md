@@ -32,6 +32,15 @@ es valor de producto".
 - S6 (rpc-settings-sync S4, standing): new copy bilingual EN/ES; the maintainer
   approves any real-child command before it runs; a child that does not answer
   degrades to today's read-only pane, never breaks.
+- S8 (channel spec :839-860 + maintainer, 2026-11-17): saving does not make a profile
+  usable. `apply_profile` has `mode: "default"` ("Make default for new sessions",
+  what new chat children read) and `mode: "session"` (bound to the temporary
+  control child's own RPC session: useless for the app). It reuses
+  `/gentle:profiles`' own actions - diff confirmation (`confirmation_required`
+  with a token), the pinned-repository rule and the rollback. Maintainer: "solo
+  edito y guardo pero no lo puedo usar o que mismo?" - so the editor saves AND
+  offers Make default for new sessions; live chats keep the routing they started
+  with.
 - S7 (session queue, 2026-11-16): "Primero leer la spec de set_config y la forma de
   un perfil NUEVO (no verificada), artboards en el canvas, hijo de control
   temporal mientras se edita, set_config con writeRevision." Artboards first.
@@ -67,6 +76,9 @@ es valor de producto".
 
 ## Tasks (sliced as the roadmap says; each ends with its own check)
 
+- [ ] T0 (S7) design system sync: `design/system.md` is older than
+      `apps/desktop/src/app.css`; regenerate it (read-only over the sources) so the
+      artboards use current tokens. Route: writer, design files only.
 - [ ] T1 (S7) artboards: the editor's directions on the canvas (profile list,
       per-agent model + thinking, fallback chain, pin, the conflict and rejection
       states). Maintainer picks one before any code.
@@ -79,6 +91,10 @@ es valor de producto".
       `get_config`, `revision_conflict` -> re-read and ask, `invalid_data` ->
       show and keep the draft, `profile_apply_busy` -> wait/retry copy, whole
       document replacement.
+- [ ] T3b (S4, S8) apply: `apply_profile` mode `default` with the
+      `confirmation_required` round trip, the `unknown_profile` and
+      `profile_apply_busy` answers, and the copy that says live chats keep their
+      routing.
 - [ ] T4 model + thinking per agent (reuses the 0.1.11 model catalog).
 - [ ] T5 fallback-chain editing (<=8 steps, no repeated model, `*` default).
 - [ ] T6 the pin (local/repo, null clears; read on open since it is not watched).
@@ -100,3 +116,10 @@ es valor de producto".
   (`ProfilesPane.svelte:61-118` read-only, `commands.rs:739-751 refresh_profiles`,
   `settings/profiles.rs:57-100`, `contract.rs:326-371` the views,
   `settings/watch.rs:44-96` two booleans only). Open spec risks listed above.
+- L3 (maintainer + parent, 2026-11-17): rulings at pickup. (a) Sync `design/system.md`
+  before the artboards ("Si, sincronizar antes"). (b) Scope: the maintainer asked
+  "Osea solo edito y guardo pero no lo puedo usar o que mismo?" - right: a save
+  alone is not usable. The parent had recommended save-only; the spec read
+  (`apply_profile` :839-860) shows that would force the terminal for the last
+  step, against the feature's purpose, so S8 and T3b put Make default for new
+  sessions inside this feature.
