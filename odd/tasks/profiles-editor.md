@@ -552,4 +552,14 @@ es valor de producto".
   assertions kept. Checks re-run: cargo app 0 failed, bindings drift guard green,
   fmt/clippy clean, vitest 795/795, svelte-check 0/0, eslint clean. NOT seen rendered
   (maintainer's look pending); GENTLE_PI_ORCHESTRATOR_MODE machinery kept, never armed.
+- L28 (parent, 2026-11-17): the L17(a) liveness hole FIXED on fix/chat-command-spawn-failure
+  (73beed6, from main 17ce970): a `chat-command` thread that cannot be spawned folds a
+  typed failure and PUSHES it (fold_spawn_failure): ReadChatProfile installs the view
+  built from ChatConfigRead::unasked() (every store Unavailable -> the tab's own
+  unavailable panel with Try again); SetChatProfileMode reuses note_chat_mode with a
+  NotConnected NoAnswer (switch re-enables, save_failed notice); a closed chat folds
+  nothing. RED chat_profile_spawn_failure.rs (5 tests over the pushed ViewState only);
+  cargo app 455/455, fmt/clippy clean, vitest 795/795 (web untouched). Native assess:
+  medium, under budget, no review due. Not established: WHY CreateThread answers os
+  error 5 (L17(b)); the one-read-in-flight cap stays a maintainer decision.
 
