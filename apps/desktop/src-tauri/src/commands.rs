@@ -208,10 +208,14 @@ impl Bridge {
         ));
         // The Profile tab's binding half is read from a chat's own session file
         // (profiles-editor T2b-2, L9), through the same file seam the Settings
-        // panes read through: armed once here, like the command sink above.
-        bridge
-            .holder
-            .arm_session_files(Arc::clone(&bridge.settings.files));
+        // panes read through, and only inside this run's sessions store (the
+        // folder the session list itself enumerates, T2b-3): armed once here,
+        // like the command sink above. A run with no store reads no file.
+        if let Some(store) = bridge.settings.paths.sessions.clone() {
+            bridge
+                .holder
+                .arm_session_files(Arc::clone(&bridge.settings.files), store);
+        }
         bridge
     }
 
@@ -1041,9 +1045,11 @@ fn fold_and_push(holder: &Arc<AppStateHolder>, emit: &Emit, ran: Ran) {
         push(emit, holder.fold_input(input));
     }
     // One chat's profile configuration is the shell's own view, noted beside
-    // `ProfilesView` (profiles-editor T2b-2, L11-1). A read that reached no store
-    // notes nothing and pushes nothing, so the tab keeps what it drew (L11-4).
-    if let Some((chat, read)) = ran.chat_profile {
+    // `ProfilesView` (profiles-editor T2b-2, L11-1). Every read of the run is
+    // noted, in the order it answered (T2b-3): the last one is the view the
+    // shell holds. A read that reached no store, or whose chat closed while the
+    // read was in flight, notes nothing and pushes nothing (L11-4).
+    for (chat, read) in ran.chat_profile {
         if let Some(view) = holder.note_chat_profile(&chat, &read) {
             push(emit, view);
         }
@@ -1153,4 +1159,142 @@ pub fn store_last_run_version(
     _app: AppHandle<tauri::Wry>,
 ) -> Result<ViewState, String> {
     bridge.inner().store_last_run_version()
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::{Arc, Mutex};
+
+    use gentle_app::{ChatId, Input, Intent};
+    use gentle_core::rpc::config_store::{self, StoreId, StoreValue};
+    use gentle_runtime::chat_runtime::{ChatConfigRead, StoreRead};
+
+    use super::{fold_and_push, Emit, Ran};
+    use crate::bridge::AppStateHolder;
+    use crate::contract::ViewState;
+
+    /// One chat's profile read, as the channel's own parser answers it: the
+    /// profiles store alone is all a fold test needs to know it reached a store.
+    fn read() -> ChatConfigRead {
+        let value = serde_json::json!({
+            "kind": "gentle-pi.agent_model_profiles",
+            "version": 1,
+            "profiles": {"team": {"worker": {"model": "p/m"}}},
+        });
+        let parsed =
+            config_store::parse_store_value(StoreId::Profiles, &value).expect("a profile document");
+        ChatConfigRead {
+            profiles: StoreRead::Read(match parsed {
+                StoreValue::Profiles(document) => document,
+                _ => panic!("the profiles store answered"),
+            }),
+            ..ChatConfigRead::unasked()
+        }
+    }
+
+    /// `chat` opened and confirmed: the app's open set holds it, and it is in
+    /// front.
+    fn opened(holder: &AppStateHolder, chat: &ChatId) {
+        holder.fold_input(Input::Intent(Intent::OpenChat(chat.clone())));
+        holder.fold_input(Input::ChatOpened { chat: chat.clone() });
+    }
+
+    /// One slice recorder: the pushes of a step, in order.
+    fn recorder() -> (Emit, Arc<Mutex<Vec<ViewState>>>) {
+        let pushed: Arc<Mutex<Vec<ViewState>>> = Arc::new(Mutex::new(Vec::new()));
+        let kept = Arc::clone(&pushed);
+        let emit: Emit = Arc::new(move |view: &ViewState| {
+            kept.lock().expect("pushed mutex").push(view.clone());
+            Ok(())
+        });
+        (emit, pushed)
+    }
+
+    /// The finding R4-late-read-reinstalls-view's first order: the SAME run
+    /// folds the chat's close and carries the read that answered while it was
+    /// closing. The user's close already took the chat out of the open set
+    /// (`Intent::CloseChat`), the host's expected `Closed` arrives in this run,
+    /// and `fold_and_push` folds the inputs before it notes the read.
+    #[test]
+    fn a_read_that_arrives_with_the_close_of_the_same_run_installs_nothing() {
+        let holder = Arc::new(AppStateHolder::default());
+        let chat = ChatId::of_session("/sessions/a.jsonl");
+        opened(&holder, &chat);
+        holder.fold_input(Input::Intent(Intent::CloseChat(chat.clone())));
+        let (emit, pushed) = recorder();
+
+        fold_and_push(
+            &holder,
+            &emit,
+            Ran {
+                inputs: vec![Input::ChatClosed {
+                    chat: chat.clone(),
+                    expected: true,
+                }],
+                chat_profile: vec![(chat.clone(), read())],
+                ..Ran::default()
+            },
+        );
+
+        assert_eq!(
+            pushed.lock().expect("pushed mutex").len(),
+            1,
+            "only the close's own slice is pushed"
+        );
+        // Reopening the same id is how the stale view would reappear: the row
+        // opens the chat again and nothing reads it yet.
+        holder.fold_input(Input::Intent(Intent::OpenChat(chat.clone())));
+        assert!(
+            holder.view().chat_profile.is_none(),
+            "the late read installed no view for the closed chat"
+        );
+    }
+
+    /// The finding R4-ran-single-slot-drops-read: `Ran` carries every read one
+    /// run answered, and the fold notes them in order instead of keeping only
+    /// the last.
+    #[test]
+    fn two_reads_of_one_run_are_noted_in_order() {
+        let holder = Arc::new(AppStateHolder::default());
+        let first = ChatId::of_session("/sessions/a.jsonl");
+        let second = ChatId::of_session("/sessions/b.jsonl");
+        opened(&holder, &first);
+        opened(&holder, &second);
+        // The first chat is in front, so its own read is the one the slice
+        // carries; the second is open behind it.
+        holder.fold_input(Input::Intent(Intent::OpenChat(first.clone())));
+        let (emit, pushed) = recorder();
+
+        fold_and_push(
+            &holder,
+            &emit,
+            Ran {
+                chat_profile: vec![(first.clone(), read()), (second.clone(), read())],
+                ..Ran::default()
+            },
+        );
+
+        let slices = pushed.lock().expect("pushed mutex").clone();
+        assert_eq!(
+            slices.len(),
+            2,
+            "each read of the run is noted and pushes its own slice"
+        );
+        assert_eq!(
+            slices[0]
+                .chat_profile
+                .as_ref()
+                .map(|view| view.chat_id.clone()),
+            Some(first.as_str().to_owned()),
+            "the first read of the run lands first"
+        );
+        // The second read landed after it: it is the view the shell holds, and
+        // seeing it needs only the chat it belongs to in front.
+        holder.fold_input(Input::Intent(Intent::OpenChat(second.clone())));
+        assert_eq!(
+            holder.view().chat_profile.map(|view| view.chat_id),
+            Some(second.as_str().to_owned()),
+            "the second read of the same run was not dropped"
+        );
+    }
 }

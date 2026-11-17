@@ -46,7 +46,6 @@ use crate::sessions::cache::TreeCache;
 use crate::sessions::revision;
 use crate::sessions::tree::Tree;
 use crate::sessions::window::{self, folder_status};
-use crate::settings::FileRead;
 use crate::state_view::{view_state, ShellParts};
 use crate::theme::WindowTheme;
 use crate::workspace;
@@ -152,11 +151,12 @@ pub struct AppStateHolder {
     /// that chat's and only that chat's, and it is dropped when the chat closes
     /// (`bridge::chat_profile`).
     chat_profile: Mutex<Option<ChatProfileView>>,
-    /// The session-file reader the Profile tab's binding half is read through
-    /// (L9): the run's own reader, armed at startup like the command sink. Until
-    /// it is armed no session file is read, so a view says the chat uses the
-    /// default - which is what a chat with no file says too.
-    session_files: Mutex<Option<FileRead>>,
+    /// The session-file seam the Profile tab's binding half is read through
+    /// (L9): the run's own reader and the sessions store a chat's path must stay
+    /// inside, armed together at startup like the command sink. Until it is
+    /// armed no session file is read, so a view says the chat uses the default -
+    /// which is what a chat with no file says too.
+    session_files: Mutex<Option<chat_profile::SessionFiles>>,
     /// The Account pane's slice (0.1.12, T3): the provider names the shell's
     /// store lists and what its own check said about each.
     auth: Mutex<AuthView>,

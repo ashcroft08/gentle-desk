@@ -607,6 +607,7 @@ mod tests {
             fallbacks: Some(PathBuf::from("C:/cfg/profile-fallbacks.json")),
             auth: Some(PathBuf::from("C:/agent/auth.json")),
             agent: Some(PathBuf::from("C:/agent")),
+            sessions: Some(PathBuf::from("C:/agent/sessions")),
             home_args: Vec::new(),
         };
 

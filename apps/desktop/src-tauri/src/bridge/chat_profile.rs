@@ -21,8 +21,15 @@
 //! slice is pushed (L11-4). That is helper-stop's rule (`NotStopped` folds
 //! nothing) and the one `get_session_stats` already follows, so a chat whose
 //! child stopped answering leaves the tab exactly as it was drawn.
+//!
+//! Two guards keep the session-file half honest (T2b-3): the file is only read
+//! when the chat's own id names a path inside this run's sessions store, by the
+//! path's SPELLING (the seam is fake-able, so the filesystem is never asked);
+//! and a read whose chat closed while it was in flight installs nothing, so a
+//! late answer cannot bring back the view the close dropped.
 
-use std::path::Path;
+use std::ffi::OsStr;
+use std::path::{Component, Path, PathBuf};
 
 use gentle_app::ChatId;
 use gentle_core::i18n::Language;
@@ -67,8 +74,18 @@ pub fn compose(chat: &ChatId, read: &ChatConfigRead, session: Option<&str>) -> C
     }
 }
 
+/// The session-file seam of this run: the reader the Settings panes share and
+/// the sessions store a chat's own path must stay inside (T2b-3).
+#[derive(Clone)]
+pub(super) struct SessionFiles {
+    pub(super) files: FileRead,
+    pub(super) store: PathBuf,
+}
+
 /// [`compose`], with the chat's own session file read through `files` - the seam
-/// the Settings panes read through - by the path the chat's id carries.
+/// the Settings panes read through - from the sessions store this run owns:
+/// `session` is that reader and that store together, `None` for a run that
+/// resolved no store (nothing can be proven a session file, so nothing is read).
 ///
 /// A chat with no session file yet asks nothing: no file could have bound a
 /// profile. A file that cannot be read is no session file, so the chat uses the
@@ -76,19 +93,65 @@ pub fn compose(chat: &ChatId, read: &ChatConfigRead, session: Option<&str>) -> C
 pub fn view(
     chat: &ChatId,
     read: &ChatConfigRead,
-    files: Option<&FileRead>,
+    session: Option<(&FileRead, &Path)>,
     language: Language,
 ) -> ChatProfileView {
-    let session = session_text(chat, files, language);
+    let session = session_text(chat, session, language);
     compose(chat, read, session.as_deref())
 }
 
 /// The text of `chat`'s own session file, or `None` for a chat that has none,
-/// one whose id names no path, and one this run cannot read.
-fn session_text(chat: &ChatId, files: Option<&FileRead>, language: Language) -> Option<String> {
+/// one whose id names no path or a path outside this run's sessions store, and
+/// one this run cannot read.
+fn session_text(
+    chat: &ChatId,
+    session: Option<(&FileRead, &Path)>,
+    language: Language,
+) -> Option<String> {
     let path = chat.session_path()?;
-    let files = files?;
-    files(Path::new(path), language).ok().flatten()
+    let (files, store) = session?;
+    let path = Path::new(path);
+    // The id may be any string the web sent (`chat_for`'s own fallback turns
+    // one into a session path), so the read is confined to the store before the
+    // seam is reached (review R1-chat-for-path-fallback).
+    if !session_file(store, path) {
+        return None;
+    }
+    match files(path, language) {
+        Ok(text) => text,
+        // A file that is there and could not be read is the default, never an
+        // error (L9); the line is for an operator, not for the pane (review
+        // R4-unreadable-session-silent).
+        Err(error) => {
+            eprintln!(
+                "chat profile: session file could not be read: {}: {error}",
+                path.display()
+            );
+            None
+        }
+    }
+}
+
+/// Whether `path` may be a session file of `store`, by SPELLING alone: inside
+/// the store, ending in `.jsonl` (the extension the session list itself matches
+/// exactly), and with no `..` component anywhere in it.
+///
+/// The filesystem is never asked: the reader is a seam a test fakes, and a
+/// lexical check is the rule the session index already applies to what it
+/// enumerates (`gentle_backend::session_index::paths`).
+fn session_file(store: &Path, path: &Path) -> bool {
+    // Before anything else: `<store>/../elsewhere.jsonl` still STARTS with the
+    // store, so the climb has to be refused on its own.
+    if path
+        .components()
+        .any(|component| matches!(component, Component::ParentDir))
+    {
+        return false;
+    }
+    if path.extension() != Some(OsStr::new("jsonl")) {
+        return false;
+    }
+    path.starts_with(store)
 }
 
 /// One store's content, or `None` when it was not read.
@@ -201,29 +264,50 @@ fn layer(pin: &PinLayer, mark: ChatProfilePinMarkView) -> ChatProfilePinLayerVie
 }
 
 impl AppStateHolder {
-    /// Installs the session-file reader of this run, once, at startup: the same
-    /// kind of step as the command sink's.
-    pub fn arm_session_files(&self, files: FileRead) {
-        *lock(&self.session_files) = Some(files);
+    /// Installs the session-file seam of this run, once, at startup: the reader
+    /// and the sessions store it may read from. The same kind of step as the
+    /// command sink's, and it is armed only when a store resolves, so a run
+    /// without a home reads no chat's file and every chat says it uses the
+    /// default.
+    pub fn arm_session_files(&self, files: FileRead, store: PathBuf) {
+        *lock(&self.session_files) = Some(SessionFiles { files, store });
     }
 
     /// Records what one chat's own child answered, and answers the slice to push.
     ///
-    /// `None` - and no push at all - when the read reached no store: the tab then
-    /// keeps exactly what it drew (L11-4).
+    /// `None` - and no push at all - when the chat is no longer open: a read
+    /// that answers after its chat closed may not re-install the view the close
+    /// dropped (review R4-late-read-reinstalls-view, R1-closed-chat-view-restored).
+    /// `None` too when the read reached no store: the tab then keeps exactly what
+    /// it drew (L11-4).
     pub fn note_chat_profile(&self, chat: &ChatId, read: &ChatConfigRead) -> Option<ViewState> {
+        // The app state is the authority on the open set, and it is read before
+        // any shell lock is taken, as the shell's other reads are.
+        if !self.is_open(chat) {
+            return None;
+        }
         if !reached_a_store(read) {
             return None;
         }
         // Read off every lock before the state is touched, as the shell's other
         // lines are: the seam, then the language, then the view itself.
-        let files = lock(&self.session_files).clone();
-        let view = view(chat, read, files.as_ref(), self.language());
+        let session = lock(&self.session_files).clone();
+        let session = session
+            .as_ref()
+            .map(|armed| (&armed.files, armed.store.as_path()));
+        let view = view(chat, read, session, self.language());
         {
             let mut held = lock(&self.chat_profile);
             *held = Some(view);
         }
         Some(self.view())
+    }
+
+    /// Whether `chat` is still one of the app's open chats: the state's own set,
+    /// which the user's Close chat takes a chat out of (`Chats::close`). Nothing
+    /// else decides that an answer still belongs to a live chat.
+    fn is_open(&self, chat: &ChatId) -> bool {
+        lock(&self.app).chats.state(chat).is_some()
     }
 
     /// The Profile tab's view as it stands, for the slice. The projection onto the
@@ -331,6 +415,24 @@ mod tests {
     /// The chat of a stored session, named by its path.
     fn stored() -> ChatId {
         ChatId::of_session("/sessions/a.jsonl")
+    }
+
+    /// The sessions store `stored` lives in: the folder a `SessionIndex` of this
+    /// run's agent directory would enumerate.
+    fn store() -> PathBuf {
+        PathBuf::from("/sessions")
+    }
+
+    /// A reader that records every path it was asked for and answers
+    /// [`SESSION`].
+    fn recording() -> (FileRead, Arc<Mutex<Vec<PathBuf>>>) {
+        let asked: Arc<Mutex<Vec<PathBuf>>> = Arc::new(Mutex::new(Vec::new()));
+        let kept = Arc::clone(&asked);
+        let files: FileRead = Arc::new(move |path: &Path, _language: Language| {
+            lock(&kept).push(path.to_path_buf());
+            Ok(Some(SESSION.to_owned()))
+        });
+        (files, asked)
     }
 
     /// The documented read, seen as one chat's own.
@@ -565,14 +667,15 @@ mod tests {
 
     #[test]
     fn the_session_file_is_read_for_that_chats_own_path() {
-        let asked: Arc<Mutex<Vec<PathBuf>>> = Arc::new(Mutex::new(Vec::new()));
-        let kept = Arc::clone(&asked);
-        let files: FileRead = Arc::new(move |path: &Path, _language: Language| {
-            lock(&kept).push(path.to_path_buf());
-            Ok(Some(SESSION.to_owned()))
-        });
+        let (files, asked) = recording();
+        let store = store();
 
-        let view = view(&stored(), &documented(), Some(&files), Language::En);
+        let view = view(
+            &stored(),
+            &documented(),
+            Some((&files, store.as_path())),
+            Language::En,
+        );
 
         assert_eq!(
             *lock(&asked),
@@ -583,15 +686,96 @@ mod tests {
     }
 
     #[test]
-    fn a_fresh_chat_has_no_session_file_to_read() {
-        let asked: Arc<Mutex<Vec<PathBuf>>> = Arc::new(Mutex::new(Vec::new()));
-        let kept = Arc::clone(&asked);
-        let files: FileRead = Arc::new(move |path: &Path, _language: Language| {
-            lock(&kept).push(path.to_path_buf());
-            Ok(None)
-        });
+    fn a_session_file_outside_the_store_is_not_read() {
+        let (files, asked) = recording();
+        let store = store();
 
-        let view = view(&ChatId::fresh(), &documented(), Some(&files), Language::En);
+        let view = view(
+            &ChatId::of_session("/etc/a.jsonl"),
+            &documented(),
+            Some((&files, store.as_path())),
+            Language::En,
+        );
+
+        assert!(
+            lock(&asked).is_empty(),
+            "the seam is never asked for a file outside the sessions store"
+        );
+        assert_eq!(
+            view.bound, None,
+            "nothing was read, so the chat uses the default - never an error"
+        );
+        assert_eq!(view.default_profile.as_deref(), Some("team"));
+    }
+
+    #[test]
+    fn a_path_that_climbs_out_of_the_store_is_not_read() {
+        let (files, asked) = recording();
+        let store = store();
+
+        let view = view(
+            &ChatId::of_session("/sessions/../etc/a.jsonl"),
+            &documented(),
+            Some((&files, store.as_path())),
+            Language::En,
+        );
+
+        assert!(
+            lock(&asked).is_empty(),
+            "a `..` component is refused by spelling, before the file is touched"
+        );
+        assert_eq!(view.bound, None);
+    }
+
+    #[test]
+    fn a_file_of_another_kind_inside_the_store_is_not_read() {
+        let (files, asked) = recording();
+        let store = store();
+
+        let view = view(
+            &ChatId::of_session("/sessions/notes.txt"),
+            &documented(),
+            Some((&files, store.as_path())),
+            Language::En,
+        );
+
+        assert!(
+            lock(&asked).is_empty(),
+            "only the `.jsonl` files the session list enumerates are session files"
+        );
+        assert_eq!(view.bound, None);
+    }
+
+    #[test]
+    fn a_windows_style_path_outside_the_store_is_not_read() {
+        let (files, asked) = recording();
+        let store = store();
+
+        let view = view(
+            &ChatId::of_session(r"C:\Users\someone\.pi\agent\sessions\a.jsonl"),
+            &documented(),
+            Some((&files, store.as_path())),
+            Language::En,
+        );
+
+        assert!(
+            lock(&asked).is_empty(),
+            "a drive letter names another place: nothing is asked, on either platform"
+        );
+        assert_eq!(view.bound, None);
+    }
+
+    #[test]
+    fn a_fresh_chat_has_no_session_file_to_read() {
+        let (files, asked) = recording();
+        let store = store();
+
+        let view = view(
+            &ChatId::fresh(),
+            &documented(),
+            Some((&files, store.as_path())),
+            Language::En,
+        );
 
         assert!(
             lock(&asked).is_empty(),
@@ -605,8 +789,14 @@ mod tests {
     fn a_session_file_that_cannot_be_read_uses_the_default() {
         let denied: FileRead =
             Arc::new(|_path: &Path, _language: Language| Err("permission denied".to_owned()));
+        let store = store();
 
-        let view = view(&stored(), &documented(), Some(&denied), Language::En);
+        let view = view(
+            &stored(),
+            &documented(),
+            Some((&denied, store.as_path())),
+            Language::En,
+        );
 
         assert_eq!(
             view.bound, None,

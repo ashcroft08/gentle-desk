@@ -39,11 +39,13 @@ pub trait ChatExecutor: Send + Sync {
 pub struct Ran {
     /// The reducer inputs the outcome implies, to fold one after another.
     pub inputs: Vec<Input>,
-    /// One chat's profile configuration that arrived, with that chat
-    /// (profiles-editor T2b-2). It is NOT a reducer input: the view is the
-    /// shell's own (`bridge::chat_profile`), so it travels beside the inputs for
-    /// the caller to note next to `ProfilesView`.
-    pub chat_profile: Option<(ChatId, ChatConfigRead)>,
+    /// The profile configuration that arrived, with the chat it answers for
+    /// (profiles-editor T2b-2), in the order the run answered. It is NOT a
+    /// reducer input: the view is the shell's own (`bridge::chat_profile`), so
+    /// it travels beside the inputs for the caller to note next to
+    /// `ProfilesView`. Every read the run answered is carried (T2b-3): two
+    /// reads must not collapse into the last one.
+    pub chat_profile: Vec<(ChatId, ChatConfigRead)>,
     /// A fresh child's start only proved its process was created, which takes
     /// milliseconds while the child takes seconds to speak. Its opening phase
     /// therefore ends with the chat's own first event, and the caller arms
@@ -107,7 +109,7 @@ fn run_into(command: ChatCommand, executor: &dyn ChatExecutor, ran: &mut Ran) {
         // shell's own view takes it, not the reducer, so nothing is folded here
         // and the read travels beside the inputs. A read that reached no store
         // leaves the tab exactly as it was drawn (S6, L11-4).
-        Outcome::ChatProfile { chat, read } => ran.chat_profile = Some((chat, *read)),
+        Outcome::ChatProfile { chat, read } => ran.chat_profile.push((chat, *read)),
     }
 }
 

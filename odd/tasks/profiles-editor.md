@@ -348,3 +348,26 @@ es valor de producto".
   KNOWN LIMIT: per-layer pin marks carry only what the `pins` value names (winner /
   stale / invalid); `layers[]` lives in the projection that T2b-1 drops, so T6 may
   need it.
+- L13 (parent, 2026-11-17): T2b-3 RESCOPED and DELIVERED as hardening
+  (`fix/chat-profile-hardening`). DECISION: the refresh trigger is the Profile TAB
+  (T2c: on open, on window focus, after an apply), NOT every chat open and not every
+  `AgentSettled`. A read costs a `capabilities` round trip plus three `get_config`,
+  each under the channel's 5 s deadline, against a child that may be mid-turn; paying
+  that on every chat open for a tab most users never visit is waste, and it is
+  reversible (the intent already exists). T2b-3 therefore fixes what the T2b-2 review
+  found: (1) a profile read that answers AFTER its chat closed no longer re-installs
+  the view (`note_chat_profile` asks the app state whether the chat is still open;
+  tested in the same run and in a later one, and reopening shows no stale view);
+  (2) the session-file read is CONFINED, lexically, to `<agent dir>/sessions/`,
+  ending in `.jsonl`, with no `..` component, no filesystem canonicalization, and the
+  seam is never asked otherwise (the chat then uses the default); the sessions root
+  is `SettingsPaths::sessions`, the same rule `sessions::startup` gives the index;
+  (3) `Ran` carries every profile read (a Vec), so two reads in one run both land;
+  (4) a session file that exists but cannot be read now leaves a stderr line, the
+  result unchanged. VERIFIED by the parent: workspace 1513/0 (`-j 2`), clippy
+  -D warnings, fmt. Known residuals, recorded not fixed: a close racing between the
+  open check and the install can still install a view (closing it needs a lock-order
+  change in `apply`; the shell forbids nested state locks); "open" is the app state's
+  chat entry, so a chat whose child died unexpectedly (entry kept, ended) still
+  accepts a read; the single view slot means the last noted read wins when two chats
+  are read in one run.

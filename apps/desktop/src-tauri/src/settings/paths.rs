@@ -37,6 +37,10 @@ pub struct SettingsPaths {
     /// reads the shell's `settings.json` from here and locates the sources'
     /// checkout under it (`<agent>/git/<host>/<owner>/<repo>`).
     pub agent: Option<PathBuf>,
+    /// The sessions store: `<agent dir>/sessions`, the folder the session list
+    /// enumerates (`sessions::startup`) and the only place a chat's own session
+    /// file may live (profiles-editor T2b-3). `None` whenever `agent` is.
+    pub sessions: Option<PathBuf>,
     /// The home flags the children get, reused by every shell run of the pane so
     /// the check reads the same store the chats do.
     pub home_args: Vec<OsString>,
@@ -73,6 +77,9 @@ pub fn resolve(choice: Option<HomeChoice>) -> SettingsPaths {
         profiles: config.as_ref().map(|dir| dir.join(PROFILES_FILE)),
         fallbacks: config.as_deref().map(|dir| dir.join(FALLBACKS_FILE)),
         auth: agent.as_ref().map(|dir| dir.join("auth.json")),
+        // The sessions store is the agent directory's `sessions/`, exactly the
+        // folder `sessions::startup` hands its `SessionIndex`.
+        sessions: agent.as_ref().map(|dir| dir.join("sessions")),
         agent,
         home_args,
     }
