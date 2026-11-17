@@ -433,3 +433,19 @@ es valor de producto".
   freezes idle, the next suspects are the focus-driven re-read and the whole-session-
   file read per refresh. LESSON: a UI slice is not closed by jsdom; the next UI slice
   (T2d, T3) is looked at in a real window BEFORE its PR is opened.
+- L17 (maintainer, 2026-11-17): SECOND real-window look WITH the perf fix (43280ef):
+  "igual, se congelo esta vez hasta dejo de responder la app y se congelo por completo".
+  NOT slowness, a hard hang: my perf fix was not the cause (or not the whole cause). The
+  dev window's log for that run ends with EIGHT repeats of `chat command thread
+  unavailable: Acceso denegado. (os error 5)` (commands.rs:1036, the thread a
+  `ChatCommand` runs on could not be spawned), which means the tab asked for the chat's
+  profile about eight times and NO read ever ran. Two facts follow and are recorded
+  before any further attempt: (a) an ask whose thread cannot be spawned leaves the tab
+  in `reading` for ever (nothing tells it the read failed), so a user retries, each
+  retry is another thread, and the app never answers; (b) why CreateThread answers
+  "access denied" here is NOT established (insufficient handles, teardown, or a retry
+  storm) and must be measured, not guessed. Decision taken: PR #192 is not to be merged
+  while its tab can freeze the app; the read plumbing under it (T2b-1..3) is already in
+  main and is unaffected. Next steps belong to a fresh session with a real window each
+  round: instrument the asks and the pushes (count + timestamps), fix the liveness hole
+  first (a failed spawn must answer the web, not vanish), THEN reopen the tab.
