@@ -214,6 +214,369 @@ export type ChatBadge = {
 };
 
 /**
+ *  One agent of one profile, as the chat's Profile tab draws it (profiles-editor
+ *  T2b-2, S1): the key the store names the agent by and the route it stores.
+ *  Every route member is optional because the file allows a partial row, and a
+ *  missing one is drawn as nothing rather than as a guess.
+ */
+export type ChatProfileAgentView = ChatProfileAgentView_Serialize | ChatProfileAgentView_Deserialize;
+
+/**
+ *  One agent of one profile, as the chat's Profile tab draws it (profiles-editor
+ *  T2b-2, S1): the key the store names the agent by and the route it stores.
+ *  Every route member is optional because the file allows a partial row, and a
+ *  missing one is drawn as nothing rather than as a guess.
+ */
+export type ChatProfileAgentView_Deserialize = {
+	/**  The agent's name, the store's own key (`orchestrator`, `worker`, ...). */
+	agent: string,
+	model?: string | null,
+	thinking?: string | null,
+	tier?: string | null,
+};
+
+/**
+ *  One agent of one profile, as the chat's Profile tab draws it (profiles-editor
+ *  T2b-2, S1): the key the store names the agent by and the route it stores.
+ *  Every route member is optional because the file allows a partial row, and a
+ *  missing one is drawn as nothing rather than as a guess.
+ */
+export type ChatProfileAgentView_Serialize = {
+	/**  The agent's name, the store's own key (`orchestrator`, `worker`, ...). */
+	agent: string,
+	model: string | null,
+	thinking: string | null,
+	tier: string | null,
+};
+
+/**  How one of the three stores a chat's profile is read from answered. */
+export type ChatProfileAvailabilityView = 
+/**  The store answered with its content. */
+"read" | 
+/**
+ *  The store answered, and the answer carried no content this contract
+ *  reads: a refusal the owner words itself, or an unusable payload.
+ */
+"unavailable" | 
+/**
+ *  The store was NEVER ASKED, because an earlier one got no answer at all
+ *  and asking could only wait out another deadline. It is state 10 of the
+ *  artboard - this chat's child is not answering - and it reaches the page
+ *  without a channel error.
+ */
+"skipped";
+
+/**
+ *  One fallback chain of one profile: the agent it is for, and the models in the
+ *  order gentle-pi would move through them.
+ */
+export type ChatProfileChainView = ChatProfileChainView_Serialize | ChatProfileChainView_Deserialize;
+
+/**
+ *  One fallback chain of one profile: the agent it is for, and the models in the
+ *  order gentle-pi would move through them.
+ */
+export type ChatProfileChainView_Deserialize = {
+	/**  The store's own key: an agent's name, or `*` for the profile-wide chain. */
+	agent: string,
+	steps: ChatProfileStepView_Deserialize[],
+};
+
+/**
+ *  One fallback chain of one profile: the agent it is for, and the models in the
+ *  order gentle-pi would move through them.
+ */
+export type ChatProfileChainView_Serialize = {
+	/**  The store's own key: an agent's name, or `*` for the profile-wide chain. */
+	agent: string,
+	steps: ChatProfileStepView_Serialize[],
+};
+
+/**
+ *  One profile definition, so the tab can draw a profile this chat is not bound
+ *  to. The chains are the ones the sibling `profile_fallbacks` store records for
+ *  it, and an empty list means the store names none.
+ */
+export type ChatProfileDefinitionView = ChatProfileDefinitionView_Serialize | ChatProfileDefinitionView_Deserialize;
+
+/**
+ *  One profile definition, so the tab can draw a profile this chat is not bound
+ *  to. The chains are the ones the sibling `profile_fallbacks` store records for
+ *  it, and an empty list means the store names none.
+ */
+export type ChatProfileDefinitionView_Deserialize = {
+	name: string,
+	/**  Every agent of the profile, in the order the store reports them. */
+	agents: ChatProfileAgentView_Deserialize[],
+	/**  Every chain this profile has, `*` included, in the store's own order. */
+	chains: ChatProfileChainView_Deserialize[],
+};
+
+/**
+ *  One profile definition, so the tab can draw a profile this chat is not bound
+ *  to. The chains are the ones the sibling `profile_fallbacks` store records for
+ *  it, and an empty list means the store names none.
+ */
+export type ChatProfileDefinitionView_Serialize = {
+	name: string,
+	/**  Every agent of the profile, in the order the store reports them. */
+	agents: ChatProfileAgentView_Serialize[],
+	/**  Every chain this profile has, `*` included, in the store's own order. */
+	chains: ChatProfileChainView_Serialize[],
+};
+
+/**
+ *  One pin layer: the file it lives in, the profile it names, and what became of
+ *  it.
+ */
+export type ChatProfilePinLayerView = ChatProfilePinLayerView_Serialize | ChatProfilePinLayerView_Deserialize;
+
+/**
+ *  One pin layer: the file it lives in, the profile it names, and what became of
+ *  it.
+ */
+export type ChatProfilePinLayerView_Deserialize = {
+	/**  `local` or `repo`: the file the pin is kept in. */
+	source: string,
+	/**  The profile the layer names, `None` when it names none. */
+	profile?: string | null,
+	mark: ChatProfilePinMarkView,
+};
+
+/**
+ *  One pin layer: the file it lives in, the profile it names, and what became of
+ *  it.
+ */
+export type ChatProfilePinLayerView_Serialize = {
+	/**  `local` or `repo`: the file the pin is kept in. */
+	source: string,
+	/**  The profile the layer names, `None` when it names none. */
+	profile: string | null,
+	mark: ChatProfilePinMarkView,
+};
+
+/**
+ *  Where one pin layer stands, in the three states the `pins` value itself
+ *  names (`desktop-rpc.md:211-234`).
+ * 
+ *  A layer that holds a VALID profile another layer outranks is not reported by
+ *  that value at all, so it is not drawn here either: the tab shows the winner
+ *  and the two broken lists, and invents no third mark.
+ */
+export type ChatProfilePinMarkView = 
+/**  The layer that decides which profile this chat's worktree uses. */
+"winner" | 
+/**  The layer names a profile the profiles store no longer defines. */
+"stale" | 
+/**  The layer is not a pin at all. */
+"invalid";
+
+/**
+ *  What the `pins` store answered for THIS chat's own worktree: the pins belong
+ *  to a folder, so they are read from the chat's child and never globally.
+ */
+export type ChatProfilePinsView = ChatProfilePinsView_Serialize | ChatProfilePinsView_Deserialize;
+
+/**
+ *  What the `pins` store answered for THIS chat's own worktree: the pins belong
+ *  to a folder, so they are read from the chat's child and never globally.
+ */
+export type ChatProfilePinsView_Deserialize = {
+	/**  Whether a layer named a profile the profiles store still defines. */
+	resolved: boolean,
+	/**  The layer that decides here, when one does. */
+	winner?: ChatProfilePinLayerView_Deserialize | null,
+	/**
+	 *  Every layer the answer names, each with its own mark: the winner first,
+	 *  then the stale ones, then the ones that are not a pin at all.
+	 */
+	layers: ChatProfilePinLayerView_Deserialize[],
+	/**
+	 *  The owner's own code for why nothing resolved; `worktree_unresolved`
+	 *  today.
+	 */
+	reason?: string | null,
+	/**
+	 *  Whether `reason` is the no-worktree case: no working directory inside a
+	 *  resolvable Git worktree, so there is no pin file to read or write (state 5
+	 *  of the artboard).
+	 */
+	worktree_unresolved: boolean,
+};
+
+/**
+ *  What the `pins` store answered for THIS chat's own worktree: the pins belong
+ *  to a folder, so they are read from the chat's child and never globally.
+ */
+export type ChatProfilePinsView_Serialize = {
+	/**  Whether a layer named a profile the profiles store still defines. */
+	resolved: boolean,
+	/**  The layer that decides here, when one does. */
+	winner: ChatProfilePinLayerView_Serialize | null,
+	/**
+	 *  Every layer the answer names, each with its own mark: the winner first,
+	 *  then the stale ones, then the ones that are not a pin at all.
+	 */
+	layers: ChatProfilePinLayerView_Serialize[],
+	/**
+	 *  The owner's own code for why nothing resolved; `worktree_unresolved`
+	 *  today.
+	 */
+	reason: string | null,
+	/**
+	 *  Whether `reason` is the no-worktree case: no working directory inside a
+	 *  resolvable Git worktree, so there is no pin file to read or write (state 5
+	 *  of the artboard).
+	 */
+	worktree_unresolved: boolean,
+};
+
+/**
+ *  One step of a fallback chain: the model, and the effort gentle-pi switches to
+ *  with it when the step names one.
+ */
+export type ChatProfileStepView = ChatProfileStepView_Serialize | ChatProfileStepView_Deserialize;
+
+/**
+ *  One step of a fallback chain: the model, and the effort gentle-pi switches to
+ *  with it when the step names one.
+ */
+export type ChatProfileStepView_Deserialize = {
+	model: string,
+	thinking?: string | null,
+};
+
+/**
+ *  One step of a fallback chain: the model, and the effort gentle-pi switches to
+ *  with it when the step names one.
+ */
+export type ChatProfileStepView_Serialize = {
+	model: string,
+	thinking: string | null,
+};
+
+/**
+ *  How each of the three stores answered, so the page can draw "unavailable"
+ *  without knowing one channel error.
+ */
+export type ChatProfileStoresView = {
+	/**  `profiles`: the definitions and the global `active` marker. */
+	profiles: ChatProfileAvailabilityView,
+	/**  `profile_fallbacks`: the chains per profile and agent. */
+	fallbacks: ChatProfileAvailabilityView,
+	/**  `pins`: the layers of this chat's own worktree. */
+	pins: ChatProfileAvailabilityView,
+};
+
+/**
+ *  The Profile tab's view of ONE chat (profiles-editor T2b-2, L8, L9, L11): which
+ *  profile this chat uses, the definitions it could switch to, their fallback
+ *  chains, and the pin of its own worktree.
+ * 
+ *  It carries codes and names only - the words the tab says are its own, in the
+ *  page (T2b-3) - and no revision and no write token: nothing here writes (T3).
+ */
+export type ChatProfileView = ChatProfileView_Serialize | ChatProfileView_Deserialize;
+
+/**
+ *  The Profile tab's view of ONE chat (profiles-editor T2b-2, L8, L9, L11): which
+ *  profile this chat uses, the definitions it could switch to, their fallback
+ *  chains, and the pin of its own worktree.
+ * 
+ *  It carries codes and names only - the words the tab says are its own, in the
+ *  page (T2b-3) - and no revision and no write token: nothing here writes (T3).
+ */
+export type ChatProfileView_Deserialize = {
+	/**
+	 *  The chat this view belongs to. [`ViewState::chat_profile`] carries it only
+	 *  while that chat is the foreground one.
+	 */
+	chat_id: string,
+	/**
+	 *  The profile this chat BOUND, `None` for a chat that uses the default: a
+	 *  chat with no session file, a session file with no bind entry, a cleared
+	 *  one, and an unreadable one are all the default.
+	 */
+	bound?: string | null,
+	/**
+	 *  Whether `bound` came from the chat's session file - which is the only way
+	 *  it can be read (L8: no channel read exposes the binding), so the tab
+	 *  labels the answer as the approximation the maintainer accepted in L9.
+	 *  `false` for a chat that bound nothing.
+	 */
+	bound_from_session_file: boolean,
+	/**
+	 *  The layer the session file recorded the binding for: `user`, `local`,
+	 *  `repo` or `global`, as the record itself names them.
+	 */
+	bound_origin?: string | null,
+	/**
+	 *  The profiles store's `active`: the GLOBAL default, which a valid pin
+	 *  outranks (L8). `None` when that store was not read, and when it names no
+	 *  active profile.
+	 */
+	default_profile?: string | null,
+	/**  Every profile the store defines, in the order it reports them. */
+	profiles: ChatProfileDefinitionView_Deserialize[],
+	/**
+	 *  The pins as this chat's own worktree resolves them, `None` when that store
+	 *  was not read ([`ChatProfileStoresView::pins`] then says why).
+	 */
+	pins?: ChatProfilePinsView_Deserialize | null,
+	/**  How each of the three stores answered. */
+	stores: ChatProfileStoresView,
+};
+
+/**
+ *  The Profile tab's view of ONE chat (profiles-editor T2b-2, L8, L9, L11): which
+ *  profile this chat uses, the definitions it could switch to, their fallback
+ *  chains, and the pin of its own worktree.
+ * 
+ *  It carries codes and names only - the words the tab says are its own, in the
+ *  page (T2b-3) - and no revision and no write token: nothing here writes (T3).
+ */
+export type ChatProfileView_Serialize = {
+	/**
+	 *  The chat this view belongs to. [`ViewState::chat_profile`] carries it only
+	 *  while that chat is the foreground one.
+	 */
+	chat_id: string,
+	/**
+	 *  The profile this chat BOUND, `None` for a chat that uses the default: a
+	 *  chat with no session file, a session file with no bind entry, a cleared
+	 *  one, and an unreadable one are all the default.
+	 */
+	bound: string | null,
+	/**
+	 *  Whether `bound` came from the chat's session file - which is the only way
+	 *  it can be read (L8: no channel read exposes the binding), so the tab
+	 *  labels the answer as the approximation the maintainer accepted in L9.
+	 *  `false` for a chat that bound nothing.
+	 */
+	bound_from_session_file: boolean,
+	/**
+	 *  The layer the session file recorded the binding for: `user`, `local`,
+	 *  `repo` or `global`, as the record itself names them.
+	 */
+	bound_origin: string | null,
+	/**
+	 *  The profiles store's `active`: the GLOBAL default, which a valid pin
+	 *  outranks (L8). `None` when that store was not read, and when it names no
+	 *  active profile.
+	 */
+	default_profile: string | null,
+	/**  Every profile the store defines, in the order it reports them. */
+	profiles: ChatProfileDefinitionView_Serialize[],
+	/**
+	 *  The pins as this chat's own worktree resolves them, `None` when that store
+	 *  was not read ([`ChatProfileStoresView::pins`] then says why).
+	 */
+	pins: ChatProfilePinsView_Serialize | null,
+	/**  How each of the three stores answered. */
+	stores: ChatProfileStoresView,
+};
+
+/**
  *  How full the foreground chat's context is (0.1.12, S5): pi's own
  *  `contextUsage` numbers, one reading per chat. Every field is nullable and a
  *  null is drawn as nothing at all - never as `0` - because pi answers null
@@ -1362,6 +1725,18 @@ export type UiIntent = { type: "SendPrompt"; data: {
  */
 { type: "RefreshProfiles" } | 
 /**
+ *  Re-read THIS chat's own profile configuration (profiles-editor T2b-2,
+ *  L11): the profiles, their fallback chains and the pin of that chat's
+ *  worktree, asked of that chat's OWN child, which is the only one that knows
+ *  them. The Profile tab sends it when it opens and when it asks again.
+ *  Nothing is written, and a read that reached no store leaves the view as it
+ *  was. The answer travels back on [`ViewState::chat_profile`], for that chat
+ *  alone.
+ */
+{ type: "RefreshChatProfile"; data: {
+	chat_id: string,
+} } | 
+/**
  *  Re-read the provider names and re-run one `auth check` per provider
  *  (0.1.12, T3). The answer travels back on [`ViewState::auth`].
  */
@@ -1804,6 +2179,20 @@ export type ViewState_Deserialize = {
 	 */
 	profiles: ProfilesView_Deserialize,
 	/**
+	 *  The Profile tab's view of the FOREGROUND chat (profiles-editor T2b-2,
+	 *  L11): which profile this chat uses, the definitions, their chains and the
+	 *  pin of its own worktree, as that chat's own child answered it.
+	 * 
+	 *  Shell-owned, like [`profiles`](Self::profiles): the reducer knows nothing
+	 *  about a session file or a child's config store. A read belongs to the one
+	 *  chat [`ChatProfileView::chat_id`] names and is carried only while that
+	 *  chat is the foreground one, so a read that lands after the user moved on
+	 *  never draws on the wrong chat. `None` until a read answered, for a chat
+	 *  that is not the foreground one, and for every chat without a view of its
+	 *  own.
+	 */
+	chat_profile?: ChatProfileView_Deserialize | null,
+	/**
 	 *  Where the shell's authentication stands (0.1.12, T3): provider names and
 	 *  their own check, never a key.
 	 */
@@ -2009,6 +2398,20 @@ export type ViewState_Serialize = {
 	 *  behalf and never written.
 	 */
 	profiles: ProfilesView_Serialize,
+	/**
+	 *  The Profile tab's view of the FOREGROUND chat (profiles-editor T2b-2,
+	 *  L11): which profile this chat uses, the definitions, their chains and the
+	 *  pin of its own worktree, as that chat's own child answered it.
+	 * 
+	 *  Shell-owned, like [`profiles`](Self::profiles): the reducer knows nothing
+	 *  about a session file or a child's config store. A read belongs to the one
+	 *  chat [`ChatProfileView::chat_id`] names and is carried only while that
+	 *  chat is the foreground one, so a read that lands after the user moved on
+	 *  never draws on the wrong chat. `None` until a read answered, for a chat
+	 *  that is not the foreground one, and for every chat without a view of its
+	 *  own.
+	 */
+	chat_profile: ChatProfileView_Serialize | null,
 	/**
 	 *  Where the shell's authentication stands (0.1.12, T3): provider names and
 	 *  their own check, never a key.

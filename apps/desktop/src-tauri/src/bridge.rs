@@ -38,17 +38,20 @@ use gentle_runtime::clock::now_ms;
 
 use crate::config::{ConfigSnapshot, ConfigWriter};
 use crate::contract::{
-    AuthView, ProfilesView, SessionsWindow, UiIntent, UpdatesView, UsageView, ViewState,
+    AuthView, ChatProfileView, ProfilesView, SessionsWindow, UiIntent, UpdatesView, UsageView,
+    ViewState,
 };
 use crate::images::Images;
 use crate::sessions::cache::TreeCache;
 use crate::sessions::revision;
 use crate::sessions::tree::Tree;
 use crate::sessions::window::{self, folder_status};
+use crate::settings::FileRead;
 use crate::state_view::{view_state, ShellParts};
 use crate::theme::WindowTheme;
 use crate::workspace;
 
+mod chat_profile;
 mod config;
 mod fatal;
 mod images;
@@ -144,6 +147,16 @@ pub struct AppStateHolder {
     /// The Profiles pane's slice (0.1.12, T2): what the config home's
     /// `profiles.json` said, read on the pane's behalf and never written.
     profiles: Mutex<ProfilesView>,
+    /// The Profile tab's view of one chat (profiles-editor T2b-2, L11): what that
+    /// chat's own child answered and which profile its session file binds. It is
+    /// that chat's and only that chat's, and it is dropped when the chat closes
+    /// (`bridge::chat_profile`).
+    chat_profile: Mutex<Option<ChatProfileView>>,
+    /// The session-file reader the Profile tab's binding half is read through
+    /// (L9): the run's own reader, armed at startup like the command sink. Until
+    /// it is armed no session file is read, so a view says the chat uses the
+    /// default - which is what a chat with no file says too.
+    session_files: Mutex<Option<FileRead>>,
     /// The Account pane's slice (0.1.12, T3): the provider names the shell's
     /// store lists and what its own check said about each.
     auth: Mutex<AuthView>,
@@ -210,6 +223,18 @@ impl AppStateHolder {
             return (view, Vec::new());
         }
         let state = self.state();
+        // The Profile tab's read (profiles-editor T2b-2, L11) is the shell's, and
+        // it is a per-chat command: ONE chat's own child is where that chat's
+        // profiles and its worktree's pin live. The answer is the slice as it
+        // stands, and the read pushes what it found when it lands (`bridge::chat_profile`).
+        if let UiIntent::RefreshChatProfile { chat_id } = &intent {
+            return (
+                self.view(),
+                vec![gentle_app::ChatCommand::ReadChatProfile {
+                    chat: crate::intent::chat_for(&state, chat_id),
+                }],
+            );
+        }
         match crate::intent::to_intent(&state, intent) {
             Some(intent) => self.apply(gentle_app::Input::Intent(intent)),
             // Every intent has an answer: the reducer's, or the config's above.
@@ -340,6 +365,14 @@ impl AppStateHolder {
     }
 
     fn apply(&self, input: gentle_app::Input) -> (ViewState, Vec<gentle_app::ChatCommand>) {
+        // A chat that closes takes the Profile tab's view with it (profiles-editor
+        // T2b-2, L11-4): the view is that chat's, and a read still in flight for
+        // it may not leave a stale one behind for the next frame to draw. Done
+        // before the slice is taken, so the push that reports the close carries
+        // no view of it.
+        if let gentle_app::Input::ChatClosed { chat, .. } = &input {
+            self.forget_chat_profile(chat);
+        }
         // One lock for the fold and the slice it answers: a revision read here
         // describes exactly the state it is pushed with. Everything the shell
         // owns is read before it, so no path ever holds the state and another
@@ -377,6 +410,7 @@ impl AppStateHolder {
             language: self.language_value(),
             shell: self.shell_view(),
             profiles: self.profiles(),
+            chat_profile: self.chat_profile(),
             auth: self.auth(),
             updates: self.updates(),
             usage: self.usage(),

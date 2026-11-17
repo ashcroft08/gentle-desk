@@ -206,6 +206,12 @@ impl Bridge {
             Some(Arc::clone(&bridge.sessions)),
             Arc::clone(&bridge.clipboard),
         ));
+        // The Profile tab's binding half is read from a chat's own session file
+        // (profiles-editor T2b-2, L9), through the same file seam the Settings
+        // panes read through: armed once here, like the command sink above.
+        bridge
+            .holder
+            .arm_session_files(Arc::clone(&bridge.settings.files));
         bridge
     }
 
@@ -1033,6 +1039,14 @@ pub fn run_chat_commands(
 fn fold_and_push(holder: &Arc<AppStateHolder>, emit: &Emit, ran: Ran) {
     for input in ran.inputs {
         push(emit, holder.fold_input(input));
+    }
+    // One chat's profile configuration is the shell's own view, noted beside
+    // `ProfilesView` (profiles-editor T2b-2, L11-1). A read that reached no store
+    // notes nothing and pushes nothing, so the tab keeps what it drew (L11-4).
+    if let Some((chat, read)) = ran.chat_profile {
+        if let Some(view) = holder.note_chat_profile(&chat, &read) {
+            push(emit, view);
+        }
     }
     if let Some(chat) = ran.confirm_after {
         let holder = Arc::clone(holder);

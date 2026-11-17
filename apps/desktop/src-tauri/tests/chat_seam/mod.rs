@@ -10,7 +10,7 @@ use std::sync::Mutex;
 use gentle_app::{ChatCommand, ChatId};
 use gentle_backend::chat_host::Opened;
 use gentle_desk_lib::effects::ChatExecutor;
-use gentle_runtime::chat_runtime::Outcome;
+use gentle_runtime::chat_runtime::{ChatConfigRead, Outcome};
 
 /// A stored session, as the sidebar names one: by its path, before any chat of
 /// it exists. The app builds the chat id from it.
@@ -32,6 +32,9 @@ pub enum Answer {
     /// No stop happened: no child, an inactive channel, a timeout or a refusal
     /// (helper-stop S7).
     HelperNotStopped,
+    /// The chat's own child answered its profile configuration with this read
+    /// (profiles-editor T2b-2).
+    ChatProfile(Box<ChatConfigRead>),
 }
 
 impl Answer {
@@ -70,6 +73,12 @@ impl Answer {
                 chat,
                 helper_id: stopped.clone(),
             },
+            (Self::ChatProfile(read), ChatCommand::ReadChatProfile { .. }) => {
+                Outcome::ChatProfile {
+                    chat,
+                    read: read.clone(),
+                }
+            }
             // Sent, and every send after an open: the child took it.
             _ => Outcome::Sent,
         }

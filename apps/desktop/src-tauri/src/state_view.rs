@@ -19,9 +19,10 @@ use gentle_runtime::app_config::Theme;
 use gentle_runtime::badge::{Badge, BadgeMark};
 
 use crate::contract::{
-    AuthView, ChatActivityMark, ChatActivityView, ContextUsageView, ImageView, LanguageView,
-    ModelChipView, ModelChoiceView, ModelListStatusView, NoticeActionView, NoticeLevel, NoticeView,
-    ProfilesView, ShellView, ThemeView, UpdatesView, UsageView, ViewState, WhatsNewView,
+    AuthView, ChatActivityMark, ChatActivityView, ChatProfileView, ContextUsageView, ImageView,
+    LanguageView, ModelChipView, ModelChoiceView, ModelListStatusView, NoticeActionView,
+    NoticeLevel, NoticeView, ProfilesView, ShellView, ThemeView, UpdatesView, UsageView, ViewState,
+    WhatsNewView,
 };
 use crate::images::Images;
 use crate::{dialogs, helper_thread, helpers, sessions, view};
@@ -59,6 +60,9 @@ pub struct ShellParts<'a> {
     /// The agent profiles read for the Profiles pane (0.1.12, T2), and the mode
     /// the desk's next chats start with.
     pub profiles: ProfilesView,
+    /// The Profile tab's view of one chat (profiles-editor T2b-2, L11), as the
+    /// shell holds it: it belongs to the chat its own `chat_id` names.
+    pub chat_profile: Option<ChatProfileView>,
     /// Where the shell's authentication stands (0.1.12, T3).
     pub auth: AuthView,
     /// The versions this machine runs (0.1.12, S2, S7).
@@ -85,6 +89,7 @@ pub fn view_state(state: &AppState, sessions_revision: u32, shell: ShellParts<'_
         language,
         shell,
         profiles,
+        chat_profile,
         auth,
         updates,
         usage,
@@ -95,6 +100,13 @@ pub fn view_state(state: &AppState, sessions_revision: u32, shell: ShellParts<'_
         .chats
         .foreground()
         .map(|chat| chat.as_str().to_owned());
+    // The Profile tab's view is the foreground chat's and nobody else's, the same
+    // rule the images follow (profiles-editor T2b-2, L11): a read that lands after
+    // the user moved to another chat never draws on the wrong one.
+    let chat_profile = match (chat_profile, foreground.as_deref()) {
+        (Some(view), Some(chat)) if view.chat_id == chat => Some(view),
+        _ => None,
+    };
     ViewState {
         theme: view_theme(theme),
         language: view_language(language),
@@ -130,6 +142,7 @@ pub fn view_state(state: &AppState, sessions_revision: u32, shell: ShellParts<'_
         model_chip: model_chip_view(state),
         context_usage: context_usage_view(state),
         profiles,
+        chat_profile,
         auth,
         updates,
         usage,

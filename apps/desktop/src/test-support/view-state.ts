@@ -51,6 +51,8 @@ export function viewState(overrides: Partial<ViewState_Serialize> = {}): ViewSta
     },
     // A chat that has not answered yet: every field null, never a zero.
     context_usage: { tokens: null, percent: null, window: null },
+    // No chat profile read yet: the Profile tab (T2c) draws nothing from this.
+    chat_profile: null,
     // The Settings panes before their first read (0.1.12): nothing known yet.
     profiles: {
       status: { type: 'Unknown' },
