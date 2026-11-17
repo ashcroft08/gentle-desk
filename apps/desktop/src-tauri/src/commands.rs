@@ -314,6 +314,12 @@ impl Bridge {
         // handle this step is the only place to get.
         self.arm_settings_notify(app);
         let emit = self.emitter();
+        // The pump folds a child's event and hands the chat commands that fold
+        // asked for to this sink (chat-event-commands, S1-S4): the same runner
+        // the intent path uses, on the same worker threads, and never on the
+        // pump's own thread. Armed before the pump's push, because arming the
+        // push is what may start it.
+        self.arm_chat_commands(&emit);
         self.pump.arm(push_via(emit.clone()));
         // The folder dialog is owned by the window, so it is modal to the app
         // instead of to the desktop. The window exists only from this step, and
@@ -326,6 +332,28 @@ impl Bridge {
         self.writer.on_failure(Arc::new(move |message: String| {
             let view = holder.note_config_problem(message);
             push(&failure_emit, view);
+        }));
+    }
+
+    /// Arms what runs the per-chat commands a CHILD EVENT's fold asked for: the
+    /// pump's delivery (chat-event-commands, S1-S4). It is [`run_chat_commands`],
+    /// the same runner the intent path hands its own commands to, so a command
+    /// has one implementation and each fold one delivery - the pump's or the
+    /// intent path's, never both.
+    fn arm_chat_commands(&self, emit: &Emit) {
+        // Weak handles, because the holder owns this sink and the pump the
+        // executor holds is held by the same holder: a strong handle to either
+        // would keep the whole run alive. Neither can be gone while the pump
+        // folds - the bridge holds both for the run's whole life - and a sink
+        // that finds neither simply runs nothing.
+        let holder = Arc::downgrade(&self.holder);
+        let executor = Arc::downgrade(&self.executor);
+        let emit = Arc::clone(emit);
+        self.holder.arm_chat_commands(Arc::new(move |commands| {
+            let (Some(holder), Some(executor)) = (holder.upgrade(), executor.upgrade()) else {
+                return;
+            };
+            run_chat_commands(&holder, executor, &emit, commands);
         }));
     }
 
@@ -577,26 +605,12 @@ impl Bridge {
     /// Never waits for one: each outcome folds back through the reducer and
     /// pushes the next `state-changed`.
     pub(crate) fn run_chat_commands(&self, commands: Vec<gentle_app::ChatCommand>) {
-        let emit = self.emitter();
-        for command in commands {
-            let holder = Arc::clone(&self.holder);
-            let executor = Arc::clone(&self.executor);
-            // The seam is `Send + Sync`, so a worker thread pushes with it and
-            // no window handle is cloned anywhere.
-            let emit = Arc::clone(&emit);
-            let spawned = std::thread::Builder::new()
-                .name("chat-command".to_owned())
-                .spawn(move || {
-                    let ran = effects::run_one(command, executor.as_ref());
-                    fold_and_push(&holder, &emit, ran);
-                });
-            if let Err(error) = spawned {
-                // A command that never runs leaves its chat opening until its
-                // own first event or a later open ends the phase: a log line,
-                // never a silent click that nobody can explain.
-                eprintln!("chat command thread unavailable: {error}");
-            }
-        }
+        run_chat_commands(
+            &self.holder,
+            Arc::clone(&self.executor),
+            &self.emitter(),
+            commands,
+        );
     }
 
     /// The close a workspace removal runs before it deletes (S5), as a value a
@@ -968,6 +982,44 @@ pub fn command_sink(
         Command::Send(_) => {}
     })
 }
+
+/// Runs the per-chat commands one fold asked for, one worker thread per chat
+/// command, because a child takes seconds to start and a write to it blocks.
+/// Never waits for one: each outcome folds back through the reducer and pushes
+/// the next `state-changed`.
+///
+/// This is the ONE runner of the per-chat commands (chat-event-commands, T1):
+/// [`Bridge::run_chat_commands`] hands it the commands an intent's fold answered
+/// with, and the sink [`Bridge::arm_chat_commands`] installs hands it the ones a
+/// child event's fold asked for. The two paths differ in who asks, never in what
+/// running a command means.
+pub fn run_chat_commands(
+    holder: &Arc<AppStateHolder>,
+    executor: Arc<RuntimeExecutor>,
+    emit: &Emit,
+    commands: Vec<gentle_app::ChatCommand>,
+) {
+    for command in commands {
+        let holder = Arc::clone(holder);
+        let executor = Arc::clone(&executor);
+        // The seam is `Send + Sync`, so a worker thread pushes with it and
+        // no window handle is cloned anywhere.
+        let emit = Arc::clone(emit);
+        let spawned = std::thread::Builder::new()
+            .name("chat-command".to_owned())
+            .spawn(move || {
+                let ran = effects::run_one(command, executor.as_ref());
+                fold_and_push(&holder, &emit, ran);
+            });
+        if let Err(error) = spawned {
+            // A command that never runs leaves its chat opening until its own
+            // first event or a later open ends the phase: a log line, never a
+            // silent click that nobody can explain.
+            eprintln!("chat command thread unavailable: {error}");
+        }
+    }
+}
+
 /// Folds what one command came to and pushes each step, then arms the 20 s net
 /// of a fresh child against the same state and the same emit seam.
 fn fold_and_push(holder: &Arc<AppStateHolder>, emit: &Emit, ran: Ran) {
