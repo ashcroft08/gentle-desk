@@ -121,7 +121,7 @@ es valor de producto".
       writing switch is T3 (`set_config` of `workflow`). Route: worker, real-window look.
 - [ ] T2d (L21, L22) remove Settings > Profiles (pane, its tests and copy, the
       session-only env switch); "Edit in terminal" moves to the tab. Separate slice.
-- [x] T3-mode (L23, L24) (ab09880 + its correction, real window L26) the Profile tab's orchestrator-mode switch: Organic / Full
+- [x] T3-mode (L23, L24) (4deee32 with its review correction, real window L26) the Profile tab's orchestrator-mode switch: Organic / Full
       delegation for the USED profile, written as `set_config` of the whole `profiles`
       document read by `get_config` (its `value`, canonical form) with only
       `workflow.<profile>` changed (full-delegation sets it, organic REMOVES the entry,
@@ -542,5 +542,5 @@ es valor de producto".
   dropped silently - today entries carry only the mode, per the probe; (b) the
   independent verifier's advisories: `write_revision` ignores a non-ok target status,
   and the bridge accepts a second mode-save intent while one is in flight.
-- L26 (maintainer, 2026-11-17): approved continuing after the correction; real-window
-  look of the switch pending.
+- L26 (maintainer, 2026-11-17, verbatim): "si funciono cambiar lo del modo y se guardo" -
+  the switch's write and its persistence SEEN in the real window.
