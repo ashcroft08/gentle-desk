@@ -371,3 +371,19 @@ es valor de producto".
   chat entry, so a chat whose child died unexpectedly (entry kept, ended) still
   accepts a read; the single view slot means the last noted read wins when two chats
   are read in one run.
+- L14 (parent, 2026-11-17): T2b-3 REVIEWED AND APPROVED, lineage
+  review-a09b1c5b66cabb43 (risk + resilience + reliability, 9 paths, 608 lines, tier
+  high): 3 lens runs, no refuter needed, about $0.034, each asked first; authority
+  burned. SIX advisory findings, none reopens it; four are the residuals L13 already
+  named (the close racing between the open check and the install: R1-close-race-stale-
+  view, R3-001, R4-late-close-race-window; an ended chat still counting as open:
+  R4-ended-entry-still-read). TWO are new and worth keeping:
+  (1) R3-002: the open check is keyed by ChatId, not by a chat GENERATION, so a late
+  read from a closed incarnation can be accepted if the same id is reopened before the
+  read is noted; the tests cover a late read before the reopen but not close, reopen,
+  old read. A generation counter on the chat entry would close it together with the
+  lock-order race.
+  (2) R1-lexical-confinement-symlink: the confinement is lexical only, so a symlink
+  planted inside the sessions store would still be followed by the real reader to a
+  target outside it. Needs local write access to the sessions directory and matches
+  the rule the session index applies; hardening, not a reachable new risk.
