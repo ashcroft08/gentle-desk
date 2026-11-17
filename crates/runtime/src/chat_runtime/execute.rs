@@ -67,11 +67,24 @@ impl ChatRuntime {
     ) -> Outcome {
         match command {
             ChatCommand::OpenProcess { chat } => {
-                // A chat being (re)opened gets a fresh stop client: the
-                // capabilities a stop caches belong to the child that reported
-                // them, and an open reaches a child that may be a new one.
-                self.forget_stopper(&chat);
-                self.open(language, chat, folder)
+                let outcome = self.open(language, chat.clone(), folder);
+                // The capabilities a stop caches (and its requestId counter)
+                // belong to the child that reported them. Focusing a chat whose
+                // child is already up, or on its way, reaches that SAME child, so
+                // its client stays; any other result (a child started now, one
+                // discarded, a failed start) leaves a different child or none,
+                // so the next stop asks again (helper-stop S8).
+                let same_child = matches!(
+                    outcome,
+                    Outcome::Opened {
+                        how: Opened::Existing | Opened::Starting,
+                        ..
+                    }
+                );
+                if !same_child {
+                    self.forget_stopper(&chat);
+                }
+                outcome
             }
             ChatCommand::Send { chat, rpc } => self.send(language, chat, &rpc),
             // The child is stopped here, on the caller's thread: the host's grace

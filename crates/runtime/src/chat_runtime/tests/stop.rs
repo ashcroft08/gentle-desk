@@ -37,20 +37,42 @@ fn one_chat_keeps_one_stop_client_and_another_chat_gets_its_own() {
 }
 
 #[test]
-fn reopening_a_chat_forgets_its_stop_client() {
-    let (runtime, _spawner) = runtime();
+fn reopening_a_live_chat_keeps_its_stop_client() {
+    let (runtime, spawner) = runtime();
     let chat = ChatId::fresh();
     runtime.execute(open(&chat));
     let before = runtime.stopper(&chat).expect("the chat was opened");
 
-    // The child a reopen reaches may be a new one, and capabilities belong to
-    // the child that reported them: the next stop must ask it again.
+    // Clicking an already-open chat only focuses it: the same child answers, so
+    // the client's counter and the capabilities it cached still belong to it.
+    // Dropping them would restart the requestId at desktop-1 (S8).
+    runtime.execute(open(&chat));
+    let after = runtime.stopper(&chat).expect("the chat is still open");
+
+    assert_eq!(spawner.started().len(), 1, "one child, not two");
+    assert!(
+        Arc::ptr_eq(&before, &after),
+        "a focus-only open keeps the client, so the counter keeps growing"
+    );
+}
+
+#[test]
+fn a_new_child_gets_a_fresh_stop_client() {
+    let (runtime, spawner) = runtime();
+    let chat = ChatId::fresh();
+    runtime.execute(open(&chat));
+    let before = runtime.stopper(&chat).expect("the chat was opened");
+
+    // Close chat stops the child; opening the chat again starts a NEW one, and
+    // capabilities belong to the child that reported them.
+    runtime.execute(super::closing(&chat));
     runtime.execute(open(&chat));
     let after = runtime.stopper(&chat).expect("the chat is open again");
 
+    assert_eq!(spawner.started().len(), 2, "the reopen started a new child");
     assert!(
         !Arc::ptr_eq(&before, &after),
-        "a reopen drops the cached client, so the next stop re-reads capabilities"
+        "a new child is asked for its own capabilities, so it gets a new client"
     );
 }
 
