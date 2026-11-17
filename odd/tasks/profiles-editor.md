@@ -113,7 +113,7 @@ es valor de producto".
       `get_config` read + typed answers; silent degradation to read-only. TDD on
       the fake channel; the real-child proof waits for the maintainer's approved
       script (home temporal, `GENTLE_SHELL_NO_AUTO_SETUP=1`, cleanup).
-- [ ] T2c-2 (S9, L19-L22) in the read-only Profile tab (#192): the used profile's
+- [x] T2c-2 (S9, L19-L22) (2578e6a; real window L23) in the read-only Profile tab (#192): the used profile's
       Orchestrator and Fallback pair (as Settings > Profiles draws them: orchestrator =
       the `orchestrator` agent, fallback = the profile's `*` chain) and the used
       profile's orchestrator mode as `profiles.json` `workflow` stores it (absent =
@@ -496,3 +496,5 @@ es valor de producto".
   (read-only mode + Orchestrator/Fallback in the tab), T3 (the writing switch), T2d
   (remove Settings > Profiles and the env switch). Native review of eb82482..564cec6
   (lineage review-1e2691ed49a0029c, lens reliability): approved, acknowledged.
+- L23 (maintainer, 2026-11-17, verbatim, after the real-window look at 2578e6a): "Se ven
+  bien, lo del modo de orquestacion deberia ser con un switch como en configuracion"
