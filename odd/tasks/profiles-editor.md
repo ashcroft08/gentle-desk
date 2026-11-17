@@ -98,7 +98,7 @@ es valor de producto".
       inside the chat. CHOSEN: 06-profile-tab.html (maintainer, L7).: the editor's directions on the canvas (profile list,
       per-agent model + thinking, fallback chain, pin, the conflict and rejection
       states). Maintainer picks one before any code.
-- [ ] T2 (S2, S3, S9, S6) channel through the CHAT's own child, sliced:
+- [~] T2 (S2, S3, S9, S6) channel through the CHAT's own child, sliced:
       T2a PURE CORE (this slice first): typed builders and answer parsers for
       `get_config` (profiles, profile_fallbacks, pins), `set_config`
       (`expectedRevision` from `writeTargets[].writeRevision`) and `apply_profile`
@@ -256,3 +256,32 @@ es valor de producto".
   for a real read goes into the upstream issue draft (queue item 5) alongside the
   external-config-events one. A chat with no such entry shows the default. T2 is
   sliced T2a core (pure, TDD) -> T2b plumbing -> T2c read-only tab; writes are T3.
+- L10 (parent, 2026-11-17): T2a DELIVERED, commit db35bfc (writer, pure core, no
+  process). gentle-core: `rpc::answer` (StoreRevision and WriteRevision as DISTINCT
+  types, so a write can never be preconditioned on the store revision),
+  `rpc::config_store` (get_config / set_config builders and typed projections of
+  profiles, profile_fallbacks and pins; WritableStore gate; read_config and
+  write_config over DesktopClient with helper-stop's degradation ladder; the 64 KiB
+  cap), `rpc::profile_apply` (Session | Default, validated 1-128 name,
+  ConfirmationToken, Applied / NotApplied / ConfirmationRequired / UnknownProfile /
+  Busy / ProfilesUnavailable; `session` + confirmation_required is reported as an
+  unexpected answer, per L8). gentle-runtime: `session_profile` (the L9 reader of the
+  last `gentle-pi.session-profile/v1` bind; newest entry terminal; malformed lines
+  and CRLF tolerated; no branch replay). Verified by the parent: gentle-core +
+  gentle-runtime 541/0 (69 new: config_store 34, profile_apply 22, session_profile
+  13), clippy -D warnings and fmt clean. RED observed by the writer for the three
+  modules (unresolved import before each existed). Frames pinned from the doc with
+  their line numbers; the pins `worktree_unresolved` frame and `not_applied` are
+  assembled from the doc's prose, not from a printed frame. DECISIONS the writer
+  took (to confirm at review): an unknown `orchestratorMode` or an unknown
+  profiles/fallbacks `kind`/`version` is a typed parse error (degrade the pane,
+  never misrepresent); a missing `notes` reads as an empty list. ENVIRONMENT: this
+  session's TMP pointed at a vanished directory and made 31 unrelated runtime tests
+  fail with NotFound until TMP was reset; not a code defect.
+  DELIVERY STRATEGY (the slice boundary the commit hook asked for): this branch is
+  past 400 lines only because T1's artboards are ~6k lines of HTML for the eye, not
+  for native review. It ships as separate PRs cut from main in order, never stacked
+  on each other (the 0.2.0 squash lesson): PR 1 docs + design (feature doc, T0
+  system sync, the six artboards); then one PR per code slice of about 400 authored
+  lines or less (T2a core now; T2b plumbing; T2c read-only tab; T3 writes; ...), each
+  with its own native review when its tier is high.
