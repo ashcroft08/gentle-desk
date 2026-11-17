@@ -449,3 +449,22 @@ es valor de producto".
   main and is unaffected. Next steps belong to a fresh session with a real window each
   round: instrument the asks and the pushes (count + timestamps), fix the liveness hole
   first (a failed spawn must answer the web, not vanish), THEN reopen the tab.
+- L18 (parent, 2026-11-17): THE FREEZE MEASURED AND FIXED (eb82482). Local, uncommitted
+  instrumentation (a 500 ms sampler of RSS / OS threads / counters, a line per
+  `RefreshChatProfile` in, per chat-command spawn/run/end and per push with its bytes, and
+  the web's own lines forwarded on the same clock). Run 1 (chat Curriculum): the web sent
+  `RefreshChatProfile` every ~7 ms from the moment the tab opened; 4,570 asks in 25 s, each
+  a `chat-command` thread serialised on the child's client (~100 ms per read), so 4,282
+  were alive at +62 s, ~4,300 OS threads, 264 MiB, 22 s per read, 6,350 pushes of ~28 KB
+  (180 MB) into the WebView. The `os error 5` of L17 is the END of that storm, not its
+  cause. Run 2: ONE `ProfilePanel` instance; its read `$effect` was cleaned up and re-run
+  on every push. Cause: the effect read the `chatId` prop, which App.svelte passes as
+  `chat.chat` off `$derived($chrome)` - a new object per push - so the effect subscribed
+  to the object, not to the id. Fix: `const chat = $derived(chatId)`. RED
+  `ProfilePanel.push.test.ts` (mounted as App mounts it): 20 pushes naming the same chat
+  -> 21 reads; GREEN 1. Run 3 (real window, maintainer: "ahora si funciona"): 3 reads in
+  160 s (open + focus), RSS 51 MiB flat, no failed spawn. Still open: the liveness hole of
+  L17(a) (a failed spawn must answer the web) and an optional Rust-side bound of one
+  profile read in flight per chat - a separate change against main.
+- L19 (maintainer, 2026-11-17, verbatim): "ahora si funciona, una cosa falta Fallback y
+  Modo de orquestación, tiene que tenes lo mismo que lo de perfil en configuracion."
