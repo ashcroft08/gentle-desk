@@ -97,8 +97,10 @@ describe("the used profile's routes and its own mode", () => {
     const block = routes()
     expect(within(block).getByText('prov/big')).toBeTruthy()
     expect(within(block).getByText(copy.modeFullDelegation)).toBeTruthy()
-    // The default profile's own route is nowhere: the tab describes the used one.
-    expect(screen.queryByText('anthropic/claude-haiku-4-5')).toBeNull()
+    // The default profile's own route is nowhere in the routes block: the tab
+    // describes the used one (the body may still name the same model in the
+    // default's own group).
+    expect(within(block).queryByText('anthropic/claude-haiku-4-5')).toBeNull()
   })
 
   it('draws no Orchestrator row for a profile that names no orchestrator agent', () => {
