@@ -257,3 +257,13 @@ editor and the subagents/jobs slices.
   or editing profiles from the app is roadmap step 3, the editor (`set_config` with
   `writeRevision`, a control child, artboards first; what a NEW profile must look
   like is unverified and is the first thing to read in that feature's spec).
+- L11 (parent, 2026-11-17): BACKLOG R3-due-check-after-option (L8) RESOLVED.
+  `Debouncer::push` returned on an event that named no group (`let group = group?;`)
+  BEFORE the due check, so a noise event (a temp file, any other name in a watched
+  folder) did not release a batch that was already due; the loop's next turn did, so
+  the impact was bounded as L8 said, but L8's "due before merge" rule held for
+  relevant events only. The due check now runs first and only an event that names a
+  group opens or extends a batch. RED observed (the ignored-event-after-deadline test
+  failed; the two tests that pin what must NOT change, an ignored event before the
+  deadline and one with no batch open, passed before and after). Workspace 1407/0.
+  The watcher thread is the single caller and already handles a `Some` from any push.
