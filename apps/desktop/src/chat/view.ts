@@ -19,7 +19,10 @@
 // - the run's one fatal failure, which belongs to no chat and outlives all of
 //   them: a launcher that cannot be resolved means no chat can start at all;
 // - the notes of the version this run follows, which the what's-new modal draws
-//   (S4): they belong to the run too, so they are read whatever chat is open.
+//   (S4): they belong to the run too, so they are read whatever chat is open;
+// - that chat's profile view, which the Profile tab draws (profiles-editor T2c):
+//   Rust projects it only while its chat is the foreground one, and the tab reads
+//   it fresh when it opens (L13).
 //
 // No chat open draws no chat chrome at all: a push that carries a title, a
 // notice or a dialog for a chat that is already gone must not leave a header
@@ -27,6 +30,7 @@
 
 import type {
   ChatActivityMark,
+  ChatProfileView_Serialize as ChatProfileView,
   ContextUsageView_Serialize as ContextUsageView,
   DialogView,
   ImageView,
@@ -68,6 +72,9 @@ export type ChatViewState = {
   /** How full this chat's context is (0.1.12, S5): pi's own reading, every
    * field null when there is none. `null` while no chat is open. */
   contextUsage: ContextUsageView | null
+  /** The profile view the shell holds for this chat (profiles-editor T2c), or
+   * `null` until a read answered and after a chat closes. */
+  chatProfile: ChatProfileView | null
   /** The run's fatal launcher failure, or `null`; not about any one chat. */
   fatal: string | null
   /** The notes of the version this run follows, or `null`; not about a chat. */
@@ -125,6 +132,7 @@ export function chatOf(view: ViewState | null): ChatViewState {
       imagesNotice: null,
       modelChip: null,
       contextUsage: null,
+      chatProfile: null,
       fatal,
       whatsNew,
       shell,
@@ -143,6 +151,7 @@ export function chatOf(view: ViewState | null): ChatViewState {
     imagesNotice: view?.images_notice ?? null,
     modelChip: view?.model_chip ?? null,
     contextUsage: view?.context_usage ?? null,
+    chatProfile: view?.chat_profile ?? null,
     fatal,
     whatsNew,
     shell,
@@ -193,6 +202,7 @@ export function createChatView(deps: ChatViewDeps = {}): ChatView {
     imagesNotice: null,
     modelChip: null,
     contextUsage: null,
+    chatProfile: null,
     fatal: null,
     whatsNew: null,
     shell: NO_SHELL,
@@ -220,6 +230,7 @@ export function createChatView(deps: ChatViewDeps = {}): ChatView {
       next.images === state.images &&
       next.imagesNotice === state.imagesNotice &&
       next.contextUsage === state.contextUsage &&
+      next.chatProfile === state.chatProfile &&
       next.fatal === state.fatal &&
       next.whatsNew === state.whatsNew &&
       sameShell(next.shell, state.shell)

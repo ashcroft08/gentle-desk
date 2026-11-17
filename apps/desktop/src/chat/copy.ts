@@ -1,7 +1,7 @@
-// The chat header's words (0.2.0, S3, D5): the tablist's accessible name, the two
-// tab words and the working badge the Helpers tab carries. 01b draws them, and
-// `./tabs` keeps the ORDER, the ids and the walk - this module keeps the words, so
-// the area that draws them owns them and no string-keyed lookup is introduced.
+// The chat header's words (0.2.0, S3, D5): the tablist's accessible name, the
+// three tab words and the working badge the Helpers tab carries. 01b draws them,
+// and `./tabs` keeps the ORDER, the ids and the walk - this module keeps the words,
+// so the area that draws them owns them and no string-keyed lookup is introduced.
 //
 // The shape is one dictionary per language and a builder that answers the whole
 // object (D4), so the parametrized badge (one helper singular, every other count
@@ -46,7 +46,7 @@ export interface ChatCopy {
 /** English: the words 01b already drew. */
 const ENGLISH: ChatCopy = {
   tabsLabel: 'View',
-  tabs: { chat: 'Chat', helpers: 'Helpers' },
+  tabs: { chat: 'Chat', helpers: 'Helpers', profile: 'Profile' },
   renameChat: 'Rename chat',
   chatName: 'Chat name',
   renameReason: 'No chat is open to rename.',
@@ -57,7 +57,7 @@ const ENGLISH: ChatCopy = {
 const SPANISH: typeof ENGLISH = {
   tabsLabel: 'Vista',
   // "Chat" is the same word in Spanish, so it is shared on purpose.
-  tabs: { chat: 'Chat', helpers: 'Ayudantes' },
+  tabs: { chat: 'Chat', helpers: 'Ayudantes', profile: 'Perfil' },
   renameChat: 'Renombrar el chat',
   chatName: 'Nombre del chat',
   renameReason: 'Ningún chat abierto para renombrar.',

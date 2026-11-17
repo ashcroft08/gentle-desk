@@ -387,3 +387,25 @@ es valor de producto".
   planted inside the sessions store would still be followed by the real reader to a
   target outside it. Needs local write access to the sessions directory and matches
   the rule the session index applies; hardening, not a reachable new risk.
+- L15 (parent, 2026-11-17): T2c DELIVERED on `feat/profile-tab` (writer, web only): the
+  third tab `Profile` beside Chat | Helpers (roving tabindex and arrows as the others),
+  read-only. It draws artboard 06's states 1 (uses the default), 2 (bound, "this chat
+  only"), 5 (pin layers with winner / stale / invalid marks; `worktree_unresolved` as
+  "Pins need a Git workspace") and 10 (calm "could not read this chat's profile
+  configuration" with Try again); a partial read draws what was read and marks each
+  missing store where its content would be. The L9 approximation is one honest line in
+  both states. One RefreshChatProfile on open, one per window focus while open, one per
+  Try again, coalesced (one in flight, one queued, cancelled on close), none without a
+  foreground id; the panel is mounted but reads only while it is the open tab. NO
+  edit control exists, not even disabled, and no "Edit in terminal" (T3+). Copy EN+ES in
+  `profile/copy.ts`; every value is a design/system.md token. VERIFIED by the parent:
+  vitest 788/788 (42 new), svelte-check 0/0, eslint. THE DRAWING WAS NOT SEEN
+  RENDERED: no browser here, so contrast, the chevron, scrolling and the 880 px column
+  are unverified by eye. DECISIONS where the artboard was silent: the four artboard
+  groups become one group per profile (agents and chains inside) plus a Pin group,
+  with the profile the chat RUNS open first; the artboard's "read at 14:18" meta line
+  is dropped (no read time in the contract); Spanish invented where the app had none
+  (`Perfil fijado`, `Cadena de respaldo`, `Razonamiento`, `Nivel`). FOLLOW-UP T2d, not
+  built: Settings > Profiles still reads as global (S9's original complaint). It needs
+  its scope labelled ("Default for new chats") and a pointer to the chat's tab; small
+  and web-only, so its own slice.

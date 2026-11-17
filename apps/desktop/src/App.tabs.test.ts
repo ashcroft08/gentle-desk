@@ -1,15 +1,18 @@
-// The Chat | Helpers views of the shell (T7b-1), one test per rule: no chat
-// means no tabs, the header's tabs switch the two panels, the composer keeps
-// its draft and the thread keeps its place across a trip to Helpers, and the
-// helpers panel follows the pushed state.
+// The Chat | Helpers | Profile views of the shell (T7b-1, profiles-editor T2c),
+// one test per rule: no chat means no tabs, the header's tabs switch the three
+// panels, the composer keeps its draft and the thread keeps its place across a
+// trip to Helpers, the helpers panel follows the pushed state, and opening the
+// Profile tab reads that chat's profile once.
 
 import './test-support/dom-env'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/svelte'
+import type { UiIntent } from './contract/bindings'
 import { serveSidebar } from './test-support/sidebar'
 import { helperRow, helpersPanel } from './test-support/helpers'
 import { helperThread, saidItem } from './test-support/helper-thread'
 import { resetTauriMock, viewState } from './test-support/tauri-mock'
+import { chatProfile } from './test-support/chat-profile'
 import App from './App.svelte'
 
 vi.mock('@tauri-apps/api/core', () => import('./test-support/tauri-mock').then((m) => m.coreModule()))
@@ -31,6 +34,11 @@ function open(over: Parameters<typeof viewState>[0] = {}) {
 async function tab(name: RegExp): Promise<void> {
   await fireEvent.click(screen.getByRole('tab', { name }))
   await waitFor(() => expect(screen.getByRole('tab', { name }).getAttribute('aria-selected')).toBe('true'))
+}
+
+/** The intents the app sent, oldest first. */
+function intentTypes(intents: UiIntent[]): string[] {
+  return intents.map((intent) => intent.type)
 }
 
 afterEach(cleanup)
@@ -152,5 +160,57 @@ describe('the Chat | Helpers views', () => {
 
     await waitFor(() => expect(screen.getAllByRole('option')).toHaveLength(2))
     expect(screen.getByRole('option', { name: /Bridge event types/ })).toBeTruthy()
+  })
+
+  it('walks to the third tab with the arrow keys of the header, Profile included', async () => {
+    serveSidebar({ view: open() })
+    render(App)
+    const chatTab = await screen.findByRole('tab', { name: 'Chat' })
+
+    await fireEvent.keyDown(chatTab, { key: 'ArrowRight' })
+
+    await waitFor(() =>
+      expect(screen.getByRole('tab', { name: /Helpers/ }).getAttribute('aria-selected')).toBe('true'),
+    )
+
+    await fireEvent.keyDown(screen.getByRole('tab', { name: /Helpers/ }), { key: 'ArrowRight' })
+
+    await waitFor(() =>
+      // The Helpers tab carries the working badge, so its name is a regexp here.
+      expect(screen.getByRole('tab', { name: 'Profile' }).getAttribute('aria-selected')).toBe('true'),
+    )
+    expect(document.activeElement).toBe(screen.getByRole('tab', { name: 'Profile' }))
+  })
+
+  it('draws the Profile panel of this chat and reads its profile once', async () => {
+    const fixture = serveSidebar({ view: open({ foreground_chat: 'foreground_chat' }) })
+    render(App)
+    await screen.findByRole('tablist', { name: 'View' })
+
+    await tab(/^Profile$/)
+
+    await waitFor(() =>
+      expect(intentTypes(fixture.intents()).filter((type) => type === 'RefreshChatProfile')).toHaveLength(1),
+    )
+    expect(fixture.intents().find((intent) => intent.type === 'RefreshChatProfile')).toEqual({
+      type: 'RefreshChatProfile',
+      data: { chat_id: 'foreground_chat' },
+    })
+
+    // Rust answers with that chat's view, drawn in the panel the tab points at.
+    fixture.view = open({
+      foreground_chat: 'foreground_chat',
+      chat_profile: chatProfile({ chat_id: 'foreground_chat' }),
+    })
+    fixture.push()
+
+    const panel = document.getElementById('p-profile')
+    if (panel === null) throw new Error('the Profile tab points at no panel')
+    await waitFor(() =>
+      expect(within(panel).getByRole('heading', { level: 2, name: /team/ })).toBeTruthy(),
+    )
+    expect(within(panel).getByText('This chat uses the default profile, team.')).toBeTruthy()
+    // The Profile view has no composer either: it is a view of the chat, not it.
+    expect(screen.queryByRole('textbox')).toBeNull()
   })
 })

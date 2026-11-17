@@ -44,7 +44,10 @@ describe('Header', () => {
     render(Header, { props: { title: 'Idle one' } })
 
     expect(screen.getByRole('tablist', { name: 'View' })).toBeTruthy()
-    expect(screen.getAllByRole('tab')).toHaveLength(2)
+    // Chat, Helpers and Profile (profiles-editor T2c): the third view is a chat's
+    // own profile, so it is drawn by the same switch and never as a fourth button.
+    expect(screen.getAllByRole('tab')).toHaveLength(3)
+    expect(screen.getByRole('tab', { name: 'Profile' })).toBeTruthy()
     // The artboard's "..." menu (Delete and the rest) is not built; the buttons
     // are the sidebar toggle and the pencil (S2).
     expect(screen.getAllByRole('button')).toHaveLength(2)
