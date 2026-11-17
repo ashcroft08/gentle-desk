@@ -35,6 +35,9 @@ pub enum Answer {
     /// The chat's own child answered its profile configuration with this read
     /// (profiles-editor T2b-2).
     ChatProfile(Box<ChatConfigRead>),
+    /// The user's Close chat stopped that chat's child, as the host reports it
+    /// (profiles-editor T2b-3).
+    Closed,
 }
 
 impl Answer {
@@ -79,6 +82,7 @@ impl Answer {
                     read: read.clone(),
                 }
             }
+            (Self::Closed, ChatCommand::CloseProcess { .. }) => Outcome::Closed { chat },
             // Sent, and every send after an open: the child took it.
             _ => Outcome::Sent,
         }

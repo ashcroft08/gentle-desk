@@ -10,8 +10,8 @@
 mod chat_seam;
 use chat_seam::{stored, Answer, Fake};
 
-use std::path::Path;
-use std::sync::Arc;
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 
 use gentle_app::{ChatCommand, ChatId, Input, Intent};
 use gentle_core::i18n::Language;
@@ -84,6 +84,24 @@ fn session_files(text: &'static str) -> FileRead {
     Arc::new(move |_path: &Path, _language: Language| Ok(Some(text.to_owned())))
 }
 
+/// The sessions store `stored` lives in: the `<agent>/sessions` folder the
+/// session list of this run enumerates (`sessions::startup`).
+fn sessions_store() -> PathBuf {
+    PathBuf::from("/sessions")
+}
+
+/// A session-file reader that answers `text` and records every path it was
+/// asked for, so a test can prove the seam was never reached.
+fn recording_files(text: &'static str) -> (FileRead, Arc<Mutex<Vec<PathBuf>>>) {
+    let asked: Arc<Mutex<Vec<PathBuf>>> = Arc::new(Mutex::new(Vec::new()));
+    let kept = Arc::clone(&asked);
+    let files: FileRead = Arc::new(move |path: &Path, _language: Language| {
+        kept.lock().expect("asked mutex").push(path.to_path_buf());
+        Ok(Some(text.to_owned()))
+    });
+    (files, asked)
+}
+
 /// The holder with the stored chat opened and confirmed, so it is the foreground
 /// chat and it is idle.
 fn open_stored() -> (AppStateHolder, ChatId) {
@@ -97,7 +115,7 @@ fn open_stored() -> (AppStateHolder, ChatId) {
 #[test]
 fn the_fold_stores_the_view_of_that_chat_and_answers_the_slice_to_push() {
     let (holder, chat) = open_stored();
-    holder.arm_session_files(session_files(SESSION));
+    holder.arm_session_files(session_files(SESSION), sessions_store());
 
     let pushed = holder
         .note_chat_profile(&chat, &documented())
@@ -133,9 +151,48 @@ fn the_fold_stores_the_view_of_that_chat_and_answers_the_slice_to_push() {
 }
 
 #[test]
+fn the_refresh_intent_cannot_read_a_session_file_outside_the_store() {
+    let holder = AppStateHolder::default();
+    let outside = ChatId::of_session("/etc/a.jsonl");
+    holder.fold_input(Input::Intent(Intent::OpenChat(outside.clone())));
+    holder.fold_input(Input::ChatOpened {
+        chat: outside.clone(),
+    });
+    let (files, asked) = recording_files(SESSION);
+    holder.arm_session_files(files, sessions_store());
+    let fake = Fake::answering(Answer::ChatProfile(Box::new(documented())));
+
+    // The web names the chat by the id it holds, and the mapping turns any
+    // string into a session path (`chat_for`). The read must not follow that
+    // fallback out of the sessions store.
+    let (_view, commands) = holder.dispatch_commands(UiIntent::RefreshChatProfile {
+        chat_id: outside.as_str().to_owned(),
+    });
+    let ran = effects::run_one(commands[0].clone(), &fake);
+    let (named, read) = ran
+        .chat_profile
+        .into_iter()
+        .next()
+        .expect("the child's answer travels");
+    let pushed = holder
+        .note_chat_profile(&named, &read)
+        .expect("the channel read reached its stores");
+
+    assert!(
+        asked.lock().expect("asked mutex").is_empty(),
+        "the file seam is never asked for a path outside the sessions store"
+    );
+    let view = pushed.chat_profile.expect("the open chat's own view");
+    assert_eq!(
+        view.bound, None,
+        "nothing was read, so the chat uses the default - never an error"
+    );
+}
+
+#[test]
 fn a_read_that_reached_no_store_keeps_the_previous_view_and_pushes_nothing() {
     let (holder, chat) = open_stored();
-    holder.arm_session_files(session_files(SESSION));
+    holder.arm_session_files(session_files(SESSION), sessions_store());
     holder
         .note_chat_profile(&chat, &documented())
         .expect("the first read");
@@ -163,7 +220,7 @@ fn only_the_foreground_chats_view_is_carried() {
         holder.fold_input(Input::Intent(Intent::OpenChat(chat.clone())));
         holder.fold_input(Input::ChatOpened { chat: chat.clone() });
     }
-    holder.arm_session_files(session_files(SESSION));
+    holder.arm_session_files(session_files(SESSION), sessions_store());
     holder
         .note_chat_profile(&viewed, &documented())
         .expect("the read of the chat that is not in front");
@@ -185,7 +242,7 @@ fn only_the_foreground_chats_view_is_carried() {
 #[test]
 fn closing_the_chat_drops_its_view() {
     let (holder, chat) = open_stored();
-    holder.arm_session_files(session_files(SESSION));
+    holder.arm_session_files(session_files(SESSION), sessions_store());
     holder
         .note_chat_profile(&chat, &documented())
         .expect("the read");
@@ -203,6 +260,57 @@ fn closing_the_chat_drops_its_view() {
     assert!(
         holder.view().chat_profile.is_none(),
         "reopening the same chat asks again: the dropped view is not resurrected"
+    );
+}
+
+#[test]
+fn a_read_for_a_chat_that_is_still_open_installs_its_view() {
+    let (holder, chat) = open_stored();
+    holder.arm_session_files(session_files(SESSION), sessions_store());
+
+    let pushed = holder
+        .note_chat_profile(&chat, &documented())
+        .expect("an open chat's read is noted");
+
+    assert_eq!(
+        pushed.chat_profile.map(|view| view.chat_id),
+        Some(chat.as_str().to_owned()),
+        "the open chat's own read still draws its tab"
+    );
+}
+
+#[test]
+fn a_read_that_answers_after_a_separate_close_installs_nothing_and_a_reopen_shows_no_stale_view() {
+    let (holder, chat) = open_stored();
+    holder.arm_session_files(session_files(SESSION), sessions_store());
+    holder
+        .note_chat_profile(&chat, &documented())
+        .expect("the read that draws the tab while the chat is open");
+
+    // The user's Close chat takes the chat out of the open set, and the fake
+    // answers the host's expected close for the command it asked for.
+    holder.fold_input(Input::Intent(Intent::CloseChat(chat.clone())));
+    let closer = Fake::answering(Answer::Closed);
+    let closed = effects::run_one(ChatCommand::CloseProcess { chat: chat.clone() }, &closer);
+    holder.fold_inputs(closed.inputs);
+
+    // The read that was in flight answers now. Its chat is gone, so it may not
+    // re-install the view the close dropped (review R4-late-read).
+    assert!(
+        holder.note_chat_profile(&chat, &documented()).is_none(),
+        "a read for a chat that is no longer open is dropped, with no push"
+    );
+    assert!(
+        holder.view().chat_profile.is_none(),
+        "the late answer leaves the shell with no view of the closed chat"
+    );
+
+    // The row opens the same chat again: it asks its child afresh, and the
+    // stale view may not reappear under the reused id.
+    holder.fold_input(Input::Intent(Intent::OpenChat(chat.clone())));
+    assert!(
+        holder.view().chat_profile.is_none(),
+        "a reopen shows nothing until its own read answers"
     );
 }
 
@@ -251,7 +359,7 @@ fn the_intent_reads_the_chat_it_names_and_not_the_foreground_one() {
 #[test]
 fn the_childs_answer_reaches_the_shell_view_through_the_effects_run() {
     let (holder, chat) = open_stored();
-    holder.arm_session_files(session_files(SESSION));
+    holder.arm_session_files(session_files(SESSION), sessions_store());
     let fake = Fake::answering(Answer::ChatProfile(Box::new(documented())));
 
     let ran = effects::run_one(ChatCommand::ReadChatProfile { chat: chat.clone() }, &fake);
@@ -260,8 +368,11 @@ fn the_childs_answer_reaches_the_shell_view_through_the_effects_run() {
         ran.inputs.is_empty(),
         "the reducer knows nothing about a chat's profile (L11-1)"
     );
+    assert_eq!(ran.chat_profile.len(), 1, "one command, one read");
     let (named, read) = ran
         .chat_profile
+        .into_iter()
+        .next()
         .expect("the read travels beside the inputs");
     assert_eq!(named, chat, "the read stays that chat's");
     let view = holder
@@ -281,7 +392,7 @@ fn the_childs_answer_reaches_the_shell_view_through_the_effects_run() {
 #[test]
 fn a_child_that_never_answered_changes_nothing_in_the_view() {
     let (holder, chat) = open_stored();
-    holder.arm_session_files(session_files(SESSION));
+    holder.arm_session_files(session_files(SESSION), sessions_store());
     holder
         .note_chat_profile(&chat, &documented())
         .expect("the read that drew the tab");
@@ -289,7 +400,11 @@ fn a_child_that_never_answered_changes_nothing_in_the_view() {
     let fake = Fake::answering(Answer::ChatProfile(Box::new(ChatConfigRead::unasked())));
 
     let ran = effects::run_one(ChatCommand::ReadChatProfile { chat: chat.clone() }, &fake);
-    let (named, read) = ran.chat_profile.expect("the read travels");
+    let (named, read) = ran
+        .chat_profile
+        .into_iter()
+        .next()
+        .expect("the read travels");
 
     assert!(
         holder.note_chat_profile(&named, &read).is_none(),
