@@ -121,6 +121,16 @@ es valor de producto".
       writing switch is T3 (`set_config` of `workflow`). Route: worker, real-window look.
 - [ ] T2d (L21, L22) remove Settings > Profiles (pane, its tests and copy, the
       session-only env switch); "Edit in terminal" moves to the tab. Separate slice.
+- [ ] T3-mode (L23, L24) the Profile tab's orchestrator-mode switch: Organic / Full
+      delegation for the USED profile, written as `set_config` of the whole `profiles`
+      document read by `get_config` (its `value`, canonical form) with only
+      `workflow.<profile>` changed (full-delegation sets it, organic REMOVES the entry,
+      and an emptied `workflow` is removed), `expectedRevision` =
+      `writeTargets[global].writeRevision`; then the tab re-reads. `revision_conflict`,
+      `invalid_data`, `profile_apply_busy`, no answer -> nothing changes, the tab says
+      the mode could not be saved and shows the re-read truth. Copy says it is saved in
+      the profile, never that a live chat changes. Risk item 1 (rewrites the user's
+      profiles.json): independent verify. Route: worker.
 - [ ] T3 (S2, S3, S4) write path: `set_config` with `expectedRevision` from
       `get_config`, `revision_conflict` -> re-read and ask, `invalid_data` ->
       show and keep the draft, `profile_apply_busy` -> wait/retry copy, whole
@@ -498,3 +508,23 @@ es valor de producto".
   (lineage review-1e2691ed49a0029c, lens reliability): approved, acknowledged.
 - L23 (maintainer, 2026-11-17, verbatim, after the real-window look at 2578e6a): "Se ven
   bien, lo del modo de orquestacion deberia ser con un switch como en configuracion"
+- L23b (maintainer, 2026-11-17): chose "Switch que guarda en el perfil (como la
+  terminal)" over the env switch, and approved the probe script verbatim ("Apruebo el
+  probe tal cual").
+- L24 (parent, 2026-11-17): REAL-CHILD PROBE (gentle-pi `bin/gentle-shell.mjs --home <tmp>
+  --mode rpc`, `GENTLE_PI_CONFIG_HOME=<tmp>/cfg`, `GENTLE_SHELL_INTERACTIVE_HOST=1`,
+  `GENTLE_SHELL_NO_AUTO_SETUP=1`, no GENTLE_*/PI_* inherited, no model call, 7 s; temp
+  dir and script deleted, output kept at C:/Users/josep/dev/probe-t3/out.log).
+  `capabilities` lists `get_config`, `set_config`, `apply_profile`. `get_config
+  profiles` answers `revision` AND `writeTargets[{target: global, writeRevision}]`
+  (different hashes). `set_config {store: profiles, data: value + workflow.probe =
+  full-delegation, expectedRevision: writeRevision}` -> `ok`, `changed: true`, the new
+  `value`, `writeTarget: global`, a new `writeRevision`; the file on disk gained
+  `workflow`. Writing the value WITHOUT `workflow` -> `ok`, `changed: true`, and the file
+  lost the `workflow` key entirely (organic = absence, confirmed). `apply_profile
+  {mode: session}` -> `applied`, note: "bound profile ... to this session ... not yet
+  persisted ... Subagents and reviewers use this session's routing snapshot. Shared
+  defaults were not written" - it says nothing about the orchestrator mode. NOT
+  established: whether a LIVE chat picks up a changed `workflow` (no channel read of
+  the session's mode exists), and which wins between `workflow` and the spawn-time
+  `GENTLE_PI_ORCHESTRATOR_MODE`.
