@@ -133,7 +133,9 @@ describe('the profiles listed read-only', () => {
     expect(bodyOf(group(/^fast/)).hidden).toBe(false)
   })
 
-  it('draws no edit control at all: this tab only reads', () => {
+
+  it('draws only the mode switch, and no other edit control', () => {
+
     draw()
 
     for (const name of [/^Edit$/, /^Save$/, /^Use in this chat$/, /^Make default$/, /^Clear$/]) {
@@ -141,14 +143,16 @@ describe('the profiles listed read-only', () => {
     }
     expect(screen.queryByRole('combobox')).toBeNull()
     expect(screen.queryByRole('textbox')).toBeNull()
-    expect(screen.getByText(copy.readOnly)).toBeTruthy()
+    // The one thing that writes is the used profile's orchestration mode (T3-mode).
+    expect(screen.getByRole('radiogroup')).toBeTruthy()
+    expect(screen.getByText(copy.footer)).toBeTruthy()
   })
 
   it('says so when the store defines no profile at all', () => {
     draw({ view: chatProfile({ profiles: [], default_profile: null, bound: null }) })
 
     expect(screen.getByText(copy.noProfiles)).toBeTruthy()
-    expect(screen.queryByText(copy.readOnly)).toBeTruthy()
+    expect(screen.queryByText(copy.footer)).toBeTruthy()
   })
 })
 
@@ -213,7 +217,7 @@ describe('the tab in Spanish', () => {
 
     expect(screen.getByText(spanish.lineDefault('team'))).toBeTruthy()
     expect(screen.getByText(spanish.approximation)).toBeTruthy()
-    expect(screen.getByText(spanish.readOnly)).toBeTruthy()
+    expect(screen.getByText(spanish.footer)).toBeTruthy()
     expect(screen.getByText(spanish.tagDefault)).toBeTruthy()
     expect(screen.queryByText(copy.lineDefault('team'))).toBeNull()
   })

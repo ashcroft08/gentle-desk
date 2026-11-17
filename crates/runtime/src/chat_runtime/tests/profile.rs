@@ -23,7 +23,7 @@ use crate::chat_runtime::{ChatConfigRead, ChatRuntime, Outcome, StoreRead};
 /// One interactive host whose children answer `script`, plus the chat event
 /// stream kept alive: the desktop channel observes a child's frames on that
 /// stream, so a test that drops it gets one answer and no more.
-fn answering(
+pub(super) fn answering(
     script: Script,
 ) -> (
     ChatRuntime,
@@ -42,7 +42,7 @@ fn answering(
 
 /// The stored chat these tests read: a session path, so the host knows its key
 /// before anything is opened.
-fn stored_chat() -> (gentle_app::ChatId, ChatKey) {
+pub(super) fn stored_chat() -> (gentle_app::ChatId, ChatKey) {
     (
         gentle_app::ChatId::of_session("s.jsonl"),
         ChatKey::Saved("s.jsonl".into()),
@@ -133,10 +133,10 @@ fn documented() -> Script {
 
 /// One desktop request as it went out: its id, its method and its params.
 #[derive(Debug, PartialEq)]
-struct Asked {
-    id: String,
-    method: String,
-    params: Value,
+pub(super) struct Asked {
+    pub(super) id: String,
+    pub(super) method: String,
+    pub(super) params: Value,
 }
 
 impl Asked {
@@ -150,7 +150,7 @@ impl Asked {
 }
 
 /// Every desktop request the child of `key` was written, in order.
-fn wire(spawner: &FakeSpawner, key: &ChatKey) -> Vec<Asked> {
+pub(super) fn wire(spawner: &FakeSpawner, key: &ChatKey) -> Vec<Asked> {
     spawner
         .written_to(key)
         .iter()

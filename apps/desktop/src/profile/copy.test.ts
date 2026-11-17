@@ -54,7 +54,8 @@ const ENGLISH = {
   storeFallbacks: 'fallbacks',
   storePins: 'pins',
   storeMissing: 'The pins store could not be read.',
-  readOnly: 'Read-only view',
+  modeNote: 'Saved in the profile "team", the setting every chat with that profile uses.',
+  modeNotSaved: 'The mode could not be saved. Nothing was written.',
 }
 
 /** The same words in the app's neutral Spanish. */
@@ -98,7 +99,8 @@ const SPANISH = {
   storeFallbacks: 'cadenas',
   storePins: 'fijados',
   storeMissing: 'No se pudo leer el almacén de fijados.',
-  readOnly: 'Vista de solo lectura',
+  modeNote: 'Se guarda en el perfil "team", el ajuste que usan todos los chats con ese perfil.',
+  modeNotSaved: 'No se pudo guardar el modo. No se escribió nada.',
 }
 
 /** The one word both languages spell the same on purpose (`Local` is Spanish too). */
@@ -146,7 +148,8 @@ function words(language: 'en' | 'es'): typeof ENGLISH {
     storeFallbacks: copy.stores.fallbacks,
     storePins: copy.stores.pins,
     storeMissing: copy.storeMissing('pins'),
-    readOnly: copy.readOnly,
+    modeNote: copy.modeNote('team'),
+    modeNotSaved: copy.modeNotSaved,
   }
 }
 

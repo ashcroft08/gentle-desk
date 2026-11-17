@@ -36,7 +36,7 @@ use gentle_core::i18n::Language;
 use gentle_core::rpc::config_store::{
     FallbacksDocument, OrchestratorMode, PinLayer, PinsValue, ProfilesDocument,
 };
-use gentle_runtime::chat_runtime::{ChatConfigRead, StoreRead};
+use gentle_runtime::chat_runtime::{ChatConfigRead, ModeWriteResult, StoreRead};
 use gentle_runtime::session_profile::last_session_profile;
 
 use super::{lock, AppStateHolder};
@@ -74,7 +74,19 @@ pub fn compose(chat: &ChatId, read: &ChatConfigRead, session: Option<&str>) -> C
             fallbacks: availability(&read.fallbacks),
             pins: availability(&read.pins),
         },
+        // The save state is the SHELL's, not the read's: `chat_profile` overlays
+        // it from `mode_saves` every time the slice is built (T3-mode).
+        saving: false,
+        save_failed: false,
     }
+}
+
+/// One chat's mode-save state (profiles-editor T3-mode): whether a write is in
+/// flight, and whether the last one failed and wrote nothing.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(super) struct ModeSave {
+    pub(super) in_flight: bool,
+    pub(super) failed: bool,
 }
 
 /// The session-file seam of this run: the reader the Settings panes share and
@@ -306,18 +318,81 @@ impl AppStateHolder {
         if !reached_a_store(read) {
             return None;
         }
-        // Read off every lock before the state is touched, as the shell's other
-        // lines are: the seam, then the language, then the view itself.
+        // A read that answered is the truth the tab draws: it clears the notice
+        // of a failed mode save (T3-mode: the next successful read, no timer).
+        // A save still in flight is NOT touched: the write lives until its own
+        // answer, so a mid-save read may not re-enable the switch
+        // (review R3-001, correction of ab09880).
+        {
+            let mut saves = lock(&self.mode_saves);
+            saves.entry(chat.as_str().to_owned()).or_default().failed = false;
+        }
+        let view = self.compose_view(chat, read);
+        self.install_chat_profile(view);
+        Some(self.view())
+    }
+
+    /// Records what one attempt to save a profile's orchestration mode came to,
+    /// with the configuration the attempt re-read, and answers the slice to push
+    /// (profiles-editor T3-mode, S2, S3).
+    ///
+    /// The re-read is installed exactly as a plain read installs it, and a read
+    /// that reached no store leaves what the tab drew standing (L11-4). The
+    /// attempt's own answer - that the switch may be used again, and whether the
+    /// mode could not be saved - travels either way, because it is the user's
+    /// click that has to be answered. A chat that closed while the write ran is
+    /// dropped with its state, as its view is.
+    pub fn note_chat_mode(
+        &self,
+        chat: &ChatId,
+        result: &ModeWriteResult,
+        read: &ChatConfigRead,
+    ) -> Option<ViewState> {
+        if !self.is_open(chat) {
+            lock(&self.mode_saves).remove(chat.as_str());
+            return None;
+        }
+        self.note_mode_save(
+            chat,
+            ModeSave {
+                in_flight: false,
+                failed: !result.saved(),
+            },
+        );
+        if reached_a_store(read) {
+            let view = self.compose_view(chat, read);
+            self.install_chat_profile(view);
+        }
+        Some(self.view())
+    }
+
+    /// Marks a mode save of `chat` as in flight, before its command is run: the
+    /// slice the intent answers with disables the switch until the save answers
+    /// (profiles-editor T3-mode).
+    pub(super) fn begin_chat_mode_save(&self, chat: &ChatId) {
+        let mut saves = lock(&self.mode_saves);
+        saves.entry(chat.as_str().to_owned()).or_default().in_flight = true;
+    }
+
+    /// The view of one read, built off every lock it needs.
+    fn compose_view(&self, chat: &ChatId, read: &ChatConfigRead) -> ChatProfileView {
         let session = lock(&self.session_files).clone();
         let session = session
             .as_ref()
             .map(|armed| (&armed.files, armed.store.as_path()));
-        let view = view(chat, read, session, self.language());
-        {
-            let mut held = lock(&self.chat_profile);
-            *held = Some(view);
-        }
-        Some(self.view())
+        view(chat, read, session, self.language())
+    }
+
+    /// Stores one chat's view. Nothing else decides what the tab draws: the slice
+    /// reads it back through [`Self::chat_profile`].
+    fn install_chat_profile(&self, view: ChatProfileView) {
+        let mut held = lock(&self.chat_profile);
+        *held = Some(view);
+    }
+
+    /// One chat's save state, written without holding any other lock.
+    fn note_mode_save(&self, chat: &ChatId, state: ModeSave) {
+        lock(&self.mode_saves).insert(chat.as_str().to_owned(), state);
     }
 
     /// Whether `chat` is still one of the app's open chats: the state's own set,
@@ -329,20 +404,34 @@ impl AppStateHolder {
 
     /// The Profile tab's view as it stands, for the slice. The projection onto the
     /// foreground chat is [`view_state`](crate::state_view::view_state)'s.
+    ///
+    /// The save state is overlaid here, from the shell's own map, so every slice
+    /// is built with the same truth about a write in flight: a push, an intent's
+    /// answer and the first read a view makes all carry it (profiles-editor
+    /// T3-mode). The two locks are taken one after another, never together.
     pub(super) fn chat_profile(&self) -> Option<ChatProfileView> {
-        lock(&self.chat_profile).clone()
+        let mut view = lock(&self.chat_profile).clone()?;
+        let saves = lock(&self.mode_saves);
+        let state = saves.get(&view.chat_id).copied().unwrap_or_default();
+        view.saving = state.in_flight;
+        view.save_failed = state.failed;
+        Some(view)
     }
 
-    /// Drops the view when it is that chat's. Read by the fold that closes a chat:
-    /// a view may not outlive the chat it was read for (L11-4).
+    /// Drops the view when it is that chat's, and that chat's save state with it.
+    /// Read by the fold that closes a chat: a view may not outlive the chat it was
+    /// read for (L11-4), and neither may a write that will never answer.
     pub(super) fn forget_chat_profile(&self, chat: &ChatId) {
-        let mut held = lock(&self.chat_profile);
-        if held
-            .as_ref()
-            .is_some_and(|view| view.chat_id == chat.as_str())
         {
-            *held = None;
+            let mut held = lock(&self.chat_profile);
+            if held
+                .as_ref()
+                .is_some_and(|view| view.chat_id == chat.as_str())
+            {
+                *held = None;
+            }
         }
+        lock(&self.mode_saves).remove(chat.as_str());
     }
 }
 

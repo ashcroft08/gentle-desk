@@ -14,6 +14,7 @@ mod calls;
 mod fake;
 mod folder;
 mod mark;
+mod mode;
 mod open_chat;
 mod profile;
 mod rekey;
