@@ -40,6 +40,20 @@ export interface HelpersCopy {
    * did with it.
    */
   back: string
+  /** The thread bar's stop square, tip and first word (helper-stop S4). */
+  stop: string
+  /** The same square once the helper is no longer running: its tip. */
+  stopped: string
+  /**
+   * The stop square's accessible name while the helper runs, naming the helper
+   * it would stop (`Stop <agent> - <task>`, 01b's own condition).
+   */
+  stopNamed: (helper: string) => string
+  /**
+   * The accessible name once that helper is already stopped, so a reader learns
+   * the helper's name and that there is nothing left to stop.
+   */
+  alreadyStopped: (helper: string) => string
   /** What a helper whose thread holds no item says: iced's own line. */
   noActivity: string
   /** "2 turns <dot> 1 tool calls", the counts iced's card spells out. */
@@ -59,6 +73,10 @@ const ENGLISH: HelpersCopy = {
   threadLabel: 'Helper thread',
   noHelpers: 'No helpers for this chat',
   back: 'Back to helpers',
+  stop: 'Stop',
+  stopped: 'Stopped',
+  stopNamed: (helper) => `Stop ${helper}`,
+  alreadyStopped: (helper) => `${helper} already stopped`,
   noActivity: 'No activity yet',
   cardMeta: (turns, toolCalls) => `${turns} turns ${DOT} ${toolCalls} tool calls`,
   droppedLine: (dropped) => `${dropped} earlier items were dropped`,
@@ -84,6 +102,10 @@ const SPANISH: typeof ENGLISH = {
   threadLabel: 'Hilo del ayudante',
   noHelpers: 'Este chat no tiene ayudantes',
   back: 'Volver a los ayudantes',
+  stop: 'Detener',
+  stopped: 'Detenido',
+  stopNamed: (helper) => `Detener ${helper}`,
+  alreadyStopped: (helper) => `${helper} ya está detenido`,
   noActivity: 'Todavía no hay actividad',
   cardMeta: (turns, toolCalls) =>
     `${turns} turnos ${DOT} ${toolCalls} ${

@@ -65,6 +65,16 @@
     void dispatchIntent({ type: 'CloseHelper' })
   }
 
+  /**
+   * The thread bar's red square (helper-stop S2, S4): stop THAT helper, named by
+   * the thread's own id, so the panel can never stop the card next to it. The
+   * reducer decides whether it can be stopped at all (only a running helper of
+   * the foreground chat is), and the child's answer comes back as a push.
+   */
+  function stopHelper(id: string): void {
+    void dispatchIntent({ type: 'StopHelper', data: { helper_id: id } })
+  }
+
   /** Moves the roving tab stop and the focus to `id`. */
   function moveTo(id: string): void {
     focused = id
@@ -143,7 +153,7 @@
          empty column while the push has not arrived. -->
     <div class="threadcol">
       {#if open !== null}
-        <HelperThreadView thread={open} onBack={back} />
+        <HelperThreadView thread={open} onBack={back} onStop={stopHelper} />
       {/if}
     </div>
   {/if}
