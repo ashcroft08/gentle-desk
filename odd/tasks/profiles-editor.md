@@ -93,9 +93,9 @@ es valor de producto".
 - [x] T0 (S7) design system sync: `design/system.md` is older than
       `apps/desktop/src/app.css`; regenerate it (read-only over the sources) so the
       artboards use current tokens. Route: writer, design files only.
-- [~] T1 (S7, S9) artboards: 01-03 (commit 310fb4c) frame the editor INSIDE SETTINGS
+- [x] T1 (S7, S9) artboards: 01-03 (commit 310fb4c) frame the editor INSIDE SETTINGS
       and are SUPERSEDED by S9 (kept as alternatives, not to be built). 04-06 redo it
-      inside the chat. The maintainer's pick is pending.: the editor's directions on the canvas (profile list,
+      inside the chat. CHOSEN: 06-profile-tab.html (maintainer, L7).: the editor's directions on the canvas (profile list,
       per-agent model + thinking, fallback chain, pin, the conflict and rejection
       states). Maintainer picks one before any code.
 - [ ] T2 (S2, S3, S9, S6) channel through the CHAT's own child (reuse helper-stop's
@@ -198,3 +198,44 @@ es valor de producto".
   `confirmation_required`; (c) whether a chat that is mid-turn may apply at all;
   (d) whether the writer refuses the whole `pins` store or only `repo` without a
   worktree; (e) `active`: writable by the editor, or only via `apply_profile`.
+- L7 (maintainer, 2026-11-17): T1 PICK - "Elijo la F": 06-profile-tab.html, a third
+  Profile tab beside Chat | Helpers. 04 and 05 become alternatives. The preview
+  server (port 5190) was stopped. NOTE: `gentle_design implement` reads the main
+  checkout's `design/`, so the canvas hand-off cannot record the choice for this
+  worktree's slug; the choice lives here.
+- L8 (parent, 2026-11-17): explorer read of gentle-pi on what a chat's profile IS
+  (path:line in the explorer report; gentle-pi lib/ and extensions/). FINDINGS:
+  (1) NO channel read exposes a session's profile binding. `get_config` has six
+  stores, none session-scoped; `get_snapshot` is identity/revision only; there is no
+  profiles analogue of the permission `mode`. `apply_profile` mode `session` answers
+  `{profile, mode, status:"applied", notes}` and emits `profile_applied`, both
+  ephemeral (`seq` resets per session), so a later connection sees nothing. The
+  binding IS persisted in the chat's session JSONL as `customType:
+  "gentle-pi.session-profile/v1"` `{kind:"bind", origin:"user", name,
+  modelProfiles}` (lib/session-profile-append-controller.ts:361,
+  docs/session-profile-format.md:9-27); gentle-pi replays it with a corroboration
+  rule (`replaySessionProfileBranch`, :37-60). `list_subagents` `modelSource:
+  "binding"` proves a session is bound but not to which profile.
+  (2) `session` writes only the session file plus an in-process binding; it does not
+  touch profiles.json, models.json, settings, pins or other sessions. Subagents
+  ALREADY running keep their routing (resolved at task-request creation); only
+  launches from then on use it. It survives a child restart (replayed from disk) but
+  the live ORCHESTRATOR is not re-applied after a reopen. When the profile defines
+  `orchestrator.model` it switches the live orchestrator at apply time.
+  (3) `confirmation_required` exists ONLY for `default` (the screen's apply-global
+  path, gentle-ai.ts:6238, 6305); `session` never asks (desktop-rpc.md:880), so its
+  round trip has no token.
+  (4) Mid-turn: gentle-pi has no turn guard; the gates are the single apply slot
+  (`profile_apply_busy`) and `set_config` refused during an apply. Whether pi
+  dispatches `/gentle:desktop` while a run streams is UNVERIFIED, and the host
+  channel's 5 s deadline would surface a deferred request as a timeout.
+  (5) `active` is only the GLOBAL layer of pin > profile pin > active; a valid pin
+  outranks it, and in a pinned repo "Make default" re-pins instead of writing
+  `active`. `set_config` with `active` moves only the marker (no routing). The
+  first-run seed of a missing profiles.json sets `active: "current"`, a side effect
+  of the first apply.
+  (6) Today's pane shows `active` from a file read, nothing session-scoped.
+  CONSEQUENCES FOR THE DESIGN: the tab's state 1/2 ("this chat uses X") cannot be
+  read from the channel; copy for "Use in this chat" must say it applies to
+  subagents launched FROM NOW ON; "default" copy must say it can be outranked by a
+  repo pin; the artboard's 8th state needs no token for `session`.
