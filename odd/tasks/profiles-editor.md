@@ -76,7 +76,7 @@ es valor de producto".
 
 ## Tasks (sliced as the roadmap says; each ends with its own check)
 
-- [ ] T0 (S7) design system sync: `design/system.md` is older than
+- [x] T0 (S7) design system sync: `design/system.md` is older than
       `apps/desktop/src/app.css`; regenerate it (read-only over the sources) so the
       artboards use current tokens. Route: writer, design files only.
 - [ ] T1 (S7) artboards: the editor's directions on the canvas (profile list,
@@ -123,3 +123,13 @@ es valor de producto".
   (`apply_profile` :839-860) shows that would force the terminal for the last
   step, against the feature's purpose, so S8 and T3b put Make default for new
   sessions inside this feature.
+- L4 (parent, 2026-11-17): T0 delivered, commit e30f8a3 (writer, design files only):
+  `design/system.md` re-synced against `theme.css` + `app.css` (87 token rows: 14
+  colors x 6 theme blocks, `--chat-max`, `--swatch`, `--d`; a Python diff against
+  theme.css found 0 mismatches; Cute and Sexy split into their own tables because
+  the merged one broke the one-value-per-row rule; `system` got its own block),
+  new Layout / Component-scoped / Motion sections and the component rules app.css
+  gained (menu hover band `--tint`, the Working pulse, the helper stop square).
+  `design/system.html` rewritten (1440 px, no external URLs, 16/16 tokens
+  documented). Not exercised in a browser. NOTE: `gentle_design list` reads the
+  main checkout, so it keeps reporting the old system.md until this branch lands.
