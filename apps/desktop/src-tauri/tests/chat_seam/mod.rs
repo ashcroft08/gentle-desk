@@ -27,6 +27,11 @@ pub enum Answer {
     Started,
     Existing,
     OpenFailed(&'static str),
+    /// The chat's child accepted the stop of one helper (helper-stop T3).
+    HelperStopped,
+    /// No stop happened: no child, an inactive channel, a timeout or a refusal
+    /// (helper-stop S7).
+    HelperNotStopped,
 }
 
 impl Answer {
@@ -47,6 +52,24 @@ impl Answer {
             },
             (Self::Started, ChatCommand::OpenProcess { .. }) => opened(Opened::Started),
             (Self::Existing, ChatCommand::OpenProcess { .. }) => opened(Opened::Existing),
+            (
+                Self::HelperStopped,
+                ChatCommand::StopHelper {
+                    helper_id: stopped, ..
+                },
+            ) => Outcome::Stopped {
+                chat,
+                helper_id: stopped.clone(),
+            },
+            (
+                Self::HelperNotStopped,
+                ChatCommand::StopHelper {
+                    helper_id: stopped, ..
+                },
+            ) => Outcome::NotStopped {
+                chat,
+                helper_id: stopped.clone(),
+            },
             // Sent, and every send after an open: the child took it.
             _ => Outcome::Sent,
         }
