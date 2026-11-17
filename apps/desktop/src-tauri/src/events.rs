@@ -8,6 +8,14 @@
 //! Neither runs on an async command or on one of the window's threads: a child
 //! takes seconds to speak, and a blocked thread must never be the one that draws.
 //!
+//! Folding a child event is the one fold whose caller owns no executor, so the
+//! commands that fold asks for are delivered here: [`pump`] folds through
+//! [`AppStateHolder::fold_event`] and then hands the commands to
+//! [`AppStateHolder::deliver_chat_commands`], so each one runs on a
+//! `chat-command` worker thread off this one (chat-event-commands, S1-S4). A
+//! fold the intent path takes is answered to that path instead, so nothing runs
+//! twice.
+//!
 //! The seam is [`spawn_pump`]: it takes a plain channel of ALREADY TRANSLATED
 //! values and the emit step as a closure, so a test feeds events without a child
 //! and records the slices without a window.
@@ -217,11 +225,17 @@ pub fn spawn_pump(
 }
 
 /// The pump itself: one translated event in, one pushed slice out, until the
-/// channel disconnects. Folding goes through the same reducer the intents use.
+/// channel disconnects. Folding goes through the same reducer the intents use,
+/// and the chat commands that fold asks for are run here too
+/// (chat-event-commands, S1-S4): the slice is pushed first, as the intent path
+/// shows before it runs, and each command then goes to its own `chat-command`
+/// worker thread - which is why this thread, the one that keeps delivering every
+/// other chat's events, never waits on a child's pipe (S3).
 pub fn pump(source: Receiver<Converted>, holder: &AppStateHolder, push: Push) {
     for converted in source {
-        let input = input_of(converted);
-        push(holder.fold_input(input));
+        let (view, chat_commands) = holder.fold_event(input_of(converted));
+        push(view);
+        holder.deliver_chat_commands(chat_commands);
     }
 }
 

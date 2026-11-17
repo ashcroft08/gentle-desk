@@ -18,6 +18,13 @@
 //! bridge, which asks the sessions service for that pass. Both kinds run off the
 //! window's thread.
 //!
+//! A fold has exactly one delivery, and which one it is depends on the entry
+//! point that took it: [`AppStateHolder::dispatch_commands`] ANSWERS its
+//! per-chat commands to its caller (the intent path runs them), and
+//! [`AppStateHolder::deliver_chat_commands`] HANDS the ones a child event's fold
+//! asked for to the [`ChatCommandSink`] the bridge armed, off the pump's thread.
+//! Nothing both answers and delivers, so nothing is run twice.
+//!
 //! The config snapshot and everything that writes it live in the `config`
 //! module below: one atomic edit, one version per snapshot, one writer.
 
@@ -58,6 +65,16 @@ mod whats_new;
 /// run (a thread, a service, nothing at all before it is installed).
 pub type CommandSink = Arc<dyn Fn(Command) + Send + Sync>;
 
+/// What runs the per-chat commands ONE CHILD EVENT'S fold asked for
+/// (chat-event-commands, S1-S4). The child-event pump is the only fold that
+/// hands them over, because it is the only one whose caller owns no executor.
+///
+/// It is called ON the folding thread - the pump behind every chat's events -
+/// so it must never block and must never write to a child's pipe (S3): the sink
+/// the bridge installs starts one `chat-command` worker thread per command,
+/// exactly as the intent path does with the commands it is answered.
+pub type ChatCommandSink = Arc<dyn Fn(Vec<gentle_app::ChatCommand>) + Send + Sync>;
+
 /// The app state the Tauri shell owns. Created at startup, managed by Tauri;
 /// nothing else anywhere holds an `AppState`.
 #[derive(Default)]
@@ -66,6 +83,10 @@ pub struct AppStateHolder {
     /// Installed once at startup: before it exists a shared command is simply
     /// dropped, which is what the earlier slices did with all of them.
     commands: Mutex<Option<CommandSink>>,
+    /// Installed once at startup: what runs the per-chat commands a CHILD
+    /// EVENT's fold asked for. Before it exists such a fold's commands are
+    /// dropped, which is what a run with no window does.
+    chat_commands: Mutex<Option<ChatCommandSink>>,
     /// Bumped whenever the folded list, its status or the config changes, and
     /// carried by every slice as `ViewState::sessions_revision`. It wraps: the
     /// web side compares two revisions for inequality, so a wrap names no old
@@ -158,6 +179,14 @@ impl AppStateHolder {
         *lock(&self.commands) = Some(sink);
     }
 
+    /// Installs what runs the per-chat commands of a child event's fold. Armed
+    /// in the same startup step that arms the pump's push, because the pump is
+    /// what folds a child event and hands its commands over
+    /// ([`Self::deliver_chat_commands`]).
+    pub fn arm_chat_commands(&self, sink: ChatCommandSink) {
+        *lock(&self.chat_commands) = Some(sink);
+    }
+
     /// Folds one intent of the contract through the reducer and answers the
     /// slice to push. Also the path the `state-changed` event payload takes.
     pub fn dispatch(&self, intent: UiIntent) -> ViewState {
@@ -182,11 +211,47 @@ impl AppStateHolder {
         }
     }
 
-    /// Folds one reducer input through the same path. This is the slot the
-    /// backend and the session passes fold through (`Input::ChatEvent`,
-    /// `Input::SessionsProgress`), and it is what the tests seed state with.
+    /// Folds one reducer input through the same path, answering the slice only.
+    /// This is the slot the session passes fold through
+    /// (`Input::SessionsProgress`) and what the shell's own code seeds state
+    /// with, so it runs nothing: the per-chat commands the fold asked for are
+    /// dropped here. [`Self::fold_event`] folds the pump's events and pairs with
+    /// [`Self::deliver_chat_commands`], which runs them.
     pub fn fold_input(&self, input: gentle_app::Input) -> ViewState {
         self.apply(input).0
+    }
+
+    /// Folds ONE CHILD EVENT through the same reducer and answers the slice to
+    /// push together with the per-chat commands the fold asked for
+    /// (chat-event-commands, S1-S4). The child-event pump is the only caller:
+    /// it pushes the slice and then hands the commands to
+    /// [`Self::deliver_chat_commands`], which is the order the intent path keeps
+    /// (show, then run).
+    ///
+    /// The delivery of those commands is that one pair's and no other entry
+    /// point's: [`Self::fold_input`] runs nothing and [`Self::dispatch_commands`]
+    /// answers its commands to its caller, which runs them for the intent path.
+    /// One fold therefore has one runner by construction - never both - so no
+    /// command can run twice (S4).
+    pub fn fold_event(
+        &self,
+        input: gentle_app::Input,
+    ) -> (ViewState, Vec<gentle_app::ChatCommand>) {
+        self.apply(input)
+    }
+
+    /// Hands the per-chat commands of one child event's fold to the armed sink,
+    /// if any. Called on the folding thread and never under a state lock: the
+    /// sink starts a worker per command and returns, so this thread is never the
+    /// one waiting on a child's pipe (S3).
+    pub fn deliver_chat_commands(&self, commands: Vec<gentle_app::ChatCommand>) {
+        if commands.is_empty() {
+            return;
+        }
+        let sink = lock(&self.chat_commands).clone();
+        if let Some(sink) = sink {
+            sink(commands);
+        }
     }
 
     /// Folds several inputs in order, answering the slice after the last one.
