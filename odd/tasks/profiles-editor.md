@@ -468,3 +468,14 @@ es valor de producto".
   profile read in flight per chat - a separate change against main.
 - L19 (maintainer, 2026-11-17, verbatim): "ahora si funciona, una cosa falta Fallback y
   Modo de orquestación, tiene que tenes lo mismo que lo de perfil en configuracion."
+- L20 (maintainer, 2026-11-17, verbatim, answering whether the mode is this chat's):
+  "Se supone que en la terminal al cambiar eso, cambia la forma en que se trabaja en ese
+  chat pero en la app lo que vamos a tener es que solo en cada nuevo chat se aplicaria"
+  then "una cosa en si eso cambia para todos los chats igual en la terminal no es algo que
+  afecte solo al chat en que se trabaja". Reading: the orchestrator mode is GLOBAL (not
+  per chat); the Profile tab carries the same switch and the same Fallback pair as
+  Settings > Profiles.
+- L21 (maintainer, 2026-11-17, verbatim, a proposal under discussion - not yet a ruling):
+  "otra cosa, creo que tener en configuracion es algo que no tiene sentido, creo que
+  eliminamos en configuracion y dejamos en cada chat, porque lo que afecta de forma
+  global se mantedria ahi tambien. que te parece?"
