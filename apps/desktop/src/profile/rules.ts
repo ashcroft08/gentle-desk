@@ -13,7 +13,6 @@ import type {
   ChatProfileChainView_Serialize as ProfileChain,
   ChatProfileDefinitionView_Serialize as ProfileDefinition,
   ChatProfileView_Serialize as ChatProfile,
-  OrchestratorModeView,
 } from '../contract/bindings'
 
 /**
@@ -121,18 +120,4 @@ export function fallbackPair(chain: ProfileChain): { model: string; thinking: st
   const first = chain.steps[0].thinking ?? null
   const thinking = chain.steps.every((step) => (step.thinking ?? null) === first) ? first : null
   return { model, thinking }
-}
-
-/**
- * The words for one stored mode: the value `profiles.json` writes, said the way
- * the Settings pane says them, so neither view translates a value differently.
- */
-export function modeName(mode: OrchestratorModeView, copy: ModeWords): string {
-  return mode === 'full-delegation' ? copy.modeFullDelegation : copy.modeOrganic
-}
-
-/** The two words a stored mode needs, so the rule never depends on a dictionary. */
-interface ModeWords {
-  modeOrganic: string
-  modeFullDelegation: string
 }

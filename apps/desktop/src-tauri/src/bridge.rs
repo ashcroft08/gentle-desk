@@ -157,6 +157,10 @@ pub struct AppStateHolder {
     /// armed no session file is read, so a view says the chat uses the default -
     /// which is what a chat with no file says too.
     session_files: Mutex<Option<chat_profile::SessionFiles>>,
+    /// The Profile tab's mode saves, one entry per chat: whether a write is in
+    /// flight (the switch is disabled while it is) and whether the last one
+    /// failed (profiles-editor T3-mode). Shell-owned, and dropped with the chat.
+    mode_saves: Mutex<std::collections::HashMap<String, chat_profile::ModeSave>>,
     /// The Account pane's slice (0.1.12, T3): the provider names the shell's
     /// store lists and what its own check said about each.
     auth: Mutex<AuthView>,
@@ -232,6 +236,28 @@ impl AppStateHolder {
                 self.view(),
                 vec![gentle_app::ChatCommand::ReadChatProfile {
                     chat: crate::intent::chat_for(&state, chat_id),
+                }],
+            );
+        }
+        // Saving one profile's mode (profiles-editor T3-mode, S2, S3) is the
+        // same kind of per-chat command: the chat's own child holds the
+        // document, the token and the worktree that a write needs. The write
+        // runs on a worker thread, so the slice this answers with already says
+        // `saving`, which is what disables the switch until the answer lands.
+        if let UiIntent::SaveChatProfileMode {
+            chat_id,
+            profile,
+            mode,
+        } = &intent
+        {
+            let chat = crate::intent::chat_for(&state, chat_id);
+            self.begin_chat_mode_save(&chat);
+            return (
+                self.view(),
+                vec![gentle_app::ChatCommand::SetChatProfileMode {
+                    chat,
+                    profile: profile.clone(),
+                    mode: crate::intent::mode_of(*mode),
                 }],
             );
         }

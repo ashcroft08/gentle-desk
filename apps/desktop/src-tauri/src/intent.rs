@@ -75,6 +75,7 @@ pub fn to_intent(state: &gentle_app::AppState, intent: UiIntent) -> Option<gentl
         // with a command of its own (`AppStateHolder::dispatch_commands`).
         UiIntent::RefreshProfiles
         | UiIntent::RefreshChatProfile { .. }
+        | UiIntent::SaveChatProfileMode { .. }
         | UiIntent::RefreshAuth
         | UiIntent::CheckUpdates
         | UiIntent::RefreshUsage
@@ -89,6 +90,21 @@ fn ui_answer(answer: crate::contract::DialogAnswer) -> gentle_core::rpc::UiAnswe
         DialogAnswer::Value { value } => gentle_core::rpc::UiAnswer::Value(value),
         DialogAnswer::Confirmed { confirmed } => gentle_core::rpc::UiAnswer::Confirmed(confirmed),
         DialogAnswer::Cancelled => gentle_core::rpc::UiAnswer::Cancelled,
+    }
+}
+
+/// The mode the contract names, as the channel spells it (`organic`,
+/// `full-delegation`): the two enums carry the same values, so a write never
+/// translates the string the store holds (profiles-editor T3-mode).
+pub(crate) fn mode_of(
+    mode: crate::contract::OrchestratorModeView,
+) -> gentle_core::rpc::config_store::OrchestratorMode {
+    use crate::contract::OrchestratorModeView;
+    match mode {
+        OrchestratorModeView::Organic => gentle_core::rpc::config_store::OrchestratorMode::Organic,
+        OrchestratorModeView::FullDelegation => {
+            gentle_core::rpc::config_store::OrchestratorMode::FullDelegation
+        }
     }
 }
 

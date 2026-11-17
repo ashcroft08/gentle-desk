@@ -207,6 +207,22 @@ pub enum ChatCommand {
     /// chat's own; nothing here is global. A read that cannot be made changes
     /// nothing: the pane keeps what it drew (S6).
     ReadChatProfile { chat: ChatId },
+    /// Save the orchestration mode of ONE profile, over that chat's own child
+    /// (profiles-editor T3-mode, S2, S3): `profiles.json`'s
+    /// `workflow.<profile>.orchestratorMode`, which every chat using that
+    /// profile reads. The write is the WHOLE profiles document as this chat's
+    /// child read it, with only that one entry changed, preconditioned on the
+    /// read's own `writeRevision` (`set_config`), and it is followed by the same
+    /// read `ReadChatProfile` makes so the tab draws the store's truth.
+    ///
+    /// The profile name is the store's own key, and the mode is the value the
+    /// store spells (`organic`, `full-delegation`): nothing here interprets
+    /// either.
+    SetChatProfileMode {
+        chat: ChatId,
+        profile: String,
+        mode: gentle_core::rpc::config_store::OrchestratorMode,
+    },
     /// Tell the host whether that chat is running a turn. The reducer owns the
     /// mark (it is the one that reads `agent_start` / `agent_end`), so this is
     /// how the host's protection rules learn it: a working chat is never the
@@ -223,6 +239,7 @@ impl ChatCommand {
             }
             Self::StopHelper { chat, .. } => chat,
             Self::ReadChatProfile { chat } => chat,
+            Self::SetChatProfileMode { chat, .. } => chat,
             Self::SetWorking { chat, .. } => chat,
         }
     }

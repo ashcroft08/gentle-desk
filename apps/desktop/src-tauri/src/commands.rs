@@ -1054,6 +1054,14 @@ fn fold_and_push(holder: &Arc<AppStateHolder>, emit: &Emit, ran: Ran) {
             push(emit, view);
         }
     }
+    // One profile's mode was saved, or it was not (profiles-editor T3-mode): the
+    // answer enables the switch again, says whether the mode could not be saved,
+    // and installs the configuration the attempt re-read.
+    for (chat, result, read) in ran.chat_mode {
+        if let Some(view) = holder.note_chat_mode(&chat, &result, &read) {
+            push(emit, view);
+        }
+    }
     if let Some(chat) = ran.confirm_after {
         let holder = Arc::clone(holder);
         let emit = Arc::clone(emit);

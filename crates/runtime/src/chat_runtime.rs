@@ -30,7 +30,7 @@ mod stop;
 pub use events::Converted;
 pub use execute::Outcome;
 pub use open::request_after_open;
-pub use profile::{ChatConfigRead, StoreRead};
+pub use profile::{ChatConfigRead, ChatModeWrite, ModeWriteResult, StoreRead};
 pub use rekey::session_file_of;
 
 /// The chat host plus the id/key registry that goes with it.

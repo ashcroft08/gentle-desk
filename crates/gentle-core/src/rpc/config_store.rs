@@ -541,18 +541,40 @@ pub fn read_config<C: DesktopChannel>(
     client: &mut DesktopClient<C>,
     store: StoreId,
 ) -> GetConfigOutcome {
+    ask_config(client, store).0
+}
+
+/// [`read_config`] for a caller that must send the store's `value` BACK: the
+/// typed outcome, and the store's `value` exactly as the owner sent it.
+///
+/// This is the one read a whole-document write makes (`set_config`'s `data` is
+/// the complete content of the store, so the document must be the owner's own,
+/// unknown members and all); the typed projection alone cannot be sent back
+/// without losing what this contract does not model.
+pub fn read_config_verbatim<C: DesktopChannel>(
+    client: &mut DesktopClient<C>,
+    store: StoreId,
+) -> (GetConfigOutcome, Option<Value>) {
+    ask_config(client, store)
+}
+
+/// One `get_config` exchange: the typed outcome, and the store's raw `value`.
+fn ask_config<C: DesktopChannel>(
+    client: &mut DesktopClient<C>,
+    store: StoreId,
+) -> (GetConfigOutcome, Option<Value>) {
     if client.capabilities().is_none() {
         client.connect();
     }
     match client.ask(GET_CONFIG, get_config_params(store)) {
-        DesktopOutcome::Data { data, .. } => match parse_config_projection(&data) {
-            Ok(projection) => GetConfigOutcome::Read(projection),
-            Err(error) => GetConfigOutcome::UnexpectedAnswer(error),
+        DesktopOutcome::Data { data, .. } => match parse_config_verbatim(&data) {
+            Ok(answer) => (GetConfigOutcome::Read(answer.projection), answer.verbatim),
+            Err(error) => (GetConfigOutcome::UnexpectedAnswer(error), None),
         },
-        DesktopOutcome::Rejected { error, .. } => GetConfigOutcome::Rejected(error),
-        DesktopOutcome::Unsupported { .. } => GetConfigOutcome::Unsupported,
-        DesktopOutcome::NoAnswer(reason) => GetConfigOutcome::NoAnswer(reason),
-        DesktopOutcome::Invalid(error) => GetConfigOutcome::InvalidRequest(error),
+        DesktopOutcome::Rejected { error, .. } => (GetConfigOutcome::Rejected(error), None),
+        DesktopOutcome::Unsupported { .. } => (GetConfigOutcome::Unsupported, None),
+        DesktopOutcome::NoAnswer(reason) => (GetConfigOutcome::NoAnswer(reason), None),
+        DesktopOutcome::Invalid(error) => (GetConfigOutcome::InvalidRequest(error), None),
     }
 }
 
@@ -629,6 +651,89 @@ pub fn parse_config_projection(data: &Value) -> Result<ConfigProjection, AnswerE
         layers,
         write_targets,
     })
+}
+
+/// One `get_config` answer, with its store's `value` EXACTLY as the owner sent
+/// it: the store's projection, and the document a whole-document write must send
+/// back (profiles-editor T3-mode, S2).
+///
+/// [`ConfigProjection::value`] is the TYPED reading, and typing discards every
+/// member this contract does not model. A write must not: `set_config`'s `data`
+/// is the complete content of the store, so a document rebuilt from the typed
+/// half would silently drop whatever the channel grew. `verbatim` is `None` for
+/// an answer that carried no `value`, and for one this contract could not read.
+pub struct VerbatimAnswer {
+    pub projection: ConfigProjection,
+    pub verbatim: Option<Value>,
+}
+/// [`parse_config_projection`], keeping the store's `value` as the owner sent it.
+pub fn parse_config_verbatim(data: &Value) -> Result<VerbatimAnswer, AnswerError> {
+    let projection = parse_config_projection(data)?;
+    let verbatim = as_object(data, "data")?
+        .get("value")
+        .filter(|value| value.is_object())
+        .cloned();
+    Ok(VerbatimAnswer {
+        projection,
+        verbatim,
+    })
+}
+
+/// The `profiles` document `verbatim` with ONLY `workflow.<profile>` set to
+/// `mode`, or `None` when there is nothing this rule may write.
+///
+/// The document is the store's own `value`, taken exactly as the owner sent it
+/// ([`VerbatimAnswer::verbatim`](VerbatimAnswer)), and every member of it
+/// survives the edit: `data` is the COMPLETE content of the store, so this
+/// changes one entry and touches nothing else (`desktop-rpc.md:275-302`).
+///
+/// The two modes are the owner's own spelling of them (`desktop-rpc.md:319`,
+/// `:329`), and the probe of L24 confirmed both halves on a real child:
+///
+/// - `full-delegation` SETS the entry; the `workflow` map is created when the
+///   document has none;
+/// - `organic` REMOVES it, because absence is the default, and a `workflow` the
+///   removal empties is removed entirely.
+///
+/// `None` - nothing is written - for a name the document's `profiles` does not
+/// define, for a `value` that is not an object, and for a `workflow` that is not
+/// one: a shape this rule does not model is never guessed at.
+pub fn with_profile_mode(verbatim: &Value, profile: &str, mode: OrchestratorMode) -> Option<Value> {
+    let mut document = verbatim.as_object()?.clone();
+    let profiles = document.get("profiles")?.as_object()?;
+    if !profiles.contains_key(profile) {
+        return None;
+    }
+    match mode {
+        OrchestratorMode::FullDelegation => {
+            let workflow = document
+                .entry("workflow")
+                .or_insert_with(|| Value::Object(serde_json::Map::new()))
+                .as_object_mut()?;
+            let mut entry = serde_json::Map::new();
+            entry.insert(
+                "orchestratorMode".to_owned(),
+                Value::String(mode.as_str().to_owned()),
+            );
+            workflow.insert(profile.to_owned(), Value::Object(entry));
+        }
+        OrchestratorMode::Organic => {
+            let emptied = match document.get_mut("workflow") {
+                Some(Value::Object(workflow)) => {
+                    workflow.remove(profile);
+                    workflow.is_empty()
+                }
+                // No workflow at all is the same answer as an absent entry.
+                None => false,
+                // A `workflow` this rule cannot read is not a document to write.
+                Some(_) => return None,
+            };
+            if emptied {
+                document.remove("workflow");
+            }
+        }
+    }
+    Some(Value::Object(document))
 }
 
 /// Reads one store's `value` into the type that store carries.

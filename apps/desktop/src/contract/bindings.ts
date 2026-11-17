@@ -488,7 +488,10 @@ export type ChatProfileStoresView = {
  *  chains, and the pin of its own worktree.
  * 
  *  It carries codes and names only - the words the tab says are its own, in the
- *  page (T2b-3) - and no revision and no write token: nothing here writes (T3).
+ *  page (T2b-3) - and no revision and no write token: the shell keeps the token
+ *  a write needs to itself, inside the chat's own client, and this view only
+ *  says whether a save is in flight and whether the last one failed
+ *  (profiles-editor T3-mode).
  */
 export type ChatProfileView = ChatProfileView_Serialize | ChatProfileView_Deserialize;
 
@@ -498,7 +501,10 @@ export type ChatProfileView = ChatProfileView_Serialize | ChatProfileView_Deseri
  *  chains, and the pin of its own worktree.
  * 
  *  It carries codes and names only - the words the tab says are its own, in the
- *  page (T2b-3) - and no revision and no write token: nothing here writes (T3).
+ *  page (T2b-3) - and no revision and no write token: the shell keeps the token
+ *  a write needs to itself, inside the chat's own client, and this view only
+ *  says whether a save is in flight and whether the last one failed
+ *  (profiles-editor T3-mode).
  */
 export type ChatProfileView_Deserialize = {
 	/**
@@ -539,6 +545,22 @@ export type ChatProfileView_Deserialize = {
 	pins?: ChatProfilePinsView_Deserialize | null,
 	/**  How each of the three stores answered. */
 	stores: ChatProfileStoresView,
+	/**
+	 *  Whether a save of this profile's mode is in flight right now: the switch
+	 *  is DISABLED while it is, so a second click cannot write twice
+	 *  (profiles-editor T3-mode). Shell-owned: it is cleared by the save's own
+	 *  answer, and a chat that closes drops it with the view.
+	 */
+	saving: boolean,
+	/**
+	 *  Whether the last attempt to save this profile's mode FAILED, and nothing
+	 *  was written: a stale `expectedRevision`, a document the owner refuses, an
+	 *  apply in flight, a child that did not answer, or a method it does not
+	 *  advertise. The tab says so in one short line next to the switch and draws
+	 *  the re-read truth. Cleared by the next successful read, by a save that
+	 *  worked, and never set by the read itself.
+	 */
+	save_failed: boolean,
 };
 
 /**
@@ -547,7 +569,10 @@ export type ChatProfileView_Deserialize = {
  *  chains, and the pin of its own worktree.
  * 
  *  It carries codes and names only - the words the tab says are its own, in the
- *  page (T2b-3) - and no revision and no write token: nothing here writes (T3).
+ *  page (T2b-3) - and no revision and no write token: the shell keeps the token
+ *  a write needs to itself, inside the chat's own client, and this view only
+ *  says whether a save is in flight and whether the last one failed
+ *  (profiles-editor T3-mode).
  */
 export type ChatProfileView_Serialize = {
 	/**
@@ -588,6 +613,22 @@ export type ChatProfileView_Serialize = {
 	pins: ChatProfilePinsView_Serialize | null,
 	/**  How each of the three stores answered. */
 	stores: ChatProfileStoresView,
+	/**
+	 *  Whether a save of this profile's mode is in flight right now: the switch
+	 *  is DISABLED while it is, so a second click cannot write twice
+	 *  (profiles-editor T3-mode). Shell-owned: it is cleared by the save's own
+	 *  answer, and a chat that closes drops it with the view.
+	 */
+	saving: boolean,
+	/**
+	 *  Whether the last attempt to save this profile's mode FAILED, and nothing
+	 *  was written: a stale `expectedRevision`, a document the owner refuses, an
+	 *  apply in flight, a child that did not answer, or a method it does not
+	 *  advertise. The tab says so in one short line next to the switch and draws
+	 *  the re-read truth. Cleared by the next successful read, by a save that
+	 *  worked, and never set by the read itself.
+	 */
+	save_failed: boolean,
 };
 
 /**
@@ -1749,6 +1790,28 @@ export type UiIntent = { type: "SendPrompt"; data: {
  */
 { type: "RefreshChatProfile"; data: {
 	chat_id: string,
+} } | 
+/**
+ *  Save ONE profile's orchestration mode, the way the terminal does: the
+ *  value `profiles.json` stores under `workflow.<profile>.orchestratorMode`,
+ *  which EVERY chat using that profile reads, never this chat alone (L20,
+ *  L22).
+ * 
+ *  The write is the whole `profiles` document as this chat's own child read
+ *  it, with only that profile's entry changed, preconditioned on the read's
+ *  `writeTargets[global].writeRevision` (S2, S3), and it is followed by a
+ *  fresh read of that chat's configuration. A write that did not happen - a
+ *  stale token, a document the owner refuses, an apply in flight, a child
+ *  that does not answer - changes nothing and leaves
+ *  [`ChatProfileView::save_failed`] set, which the tab says in one short
+ *  line and clears on the next successful read.
+ */
+{ type: "SaveChatProfileMode"; data: {
+	chat_id: string,
+	/**  The profiles store's own key for the profile (the one this chat uses). */
+	profile: string,
+	/**  The mode to store. `organic` is stored as the ABSENCE of the entry. */
+	mode: OrchestratorModeView,
 } } | 
 /**
  *  Re-read the provider names and re-run one `auth check` per provider

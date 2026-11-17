@@ -20,7 +20,7 @@ use std::time::Duration;
 
 use gentle_app::{ChatCommand, ChatId, Input};
 use gentle_backend::chat_host::Opened;
-use gentle_runtime::chat_runtime::{request_after_open, ChatConfigRead, Outcome};
+use gentle_runtime::chat_runtime::{request_after_open, ChatConfigRead, ModeWriteResult, Outcome};
 
 mod runtime;
 
@@ -46,6 +46,11 @@ pub struct Ran {
     /// `ProfilesView`. Every read the run answered is carried (T2b-3): two
     /// reads must not collapse into the last one.
     pub chat_profile: Vec<(ChatId, ChatConfigRead)>,
+    /// Every profile-mode save one run answered, with the chat it belongs to and
+    /// the profile configuration the save re-read (profiles-editor T3-mode).
+    /// Shell-owned like [`Self::chat_profile`]: whether the write failed is a
+    /// state of the tab's own, not the reducer's.
+    pub chat_mode: Vec<(ChatId, ModeWriteResult, ChatConfigRead)>,
     /// A fresh child's start only proved its process was created, which takes
     /// milliseconds while the child takes seconds to speak. Its opening phase
     /// therefore ends with the chat's own first event, and the caller arms
@@ -110,6 +115,11 @@ fn run_into(command: ChatCommand, executor: &dyn ChatExecutor, ran: &mut Ran) {
         // and the read travels beside the inputs. A read that reached no store
         // leaves the tab exactly as it was drawn (S6, L11-4).
         Outcome::ChatProfile { chat, read } => ran.chat_profile.push((chat, *read)),
+        // One profile's orchestration mode was saved, or it was not and the
+        // result says why (profiles-editor T3-mode): the shell's own state, kept
+        // beside the read so the tab can say the mode could not be saved and
+        // draw the truth the re-read brought.
+        Outcome::ChatMode { chat, result, read } => ran.chat_mode.push((chat, result, *read)),
     }
 }
 
