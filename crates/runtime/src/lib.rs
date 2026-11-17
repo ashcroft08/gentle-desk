@@ -17,6 +17,7 @@ pub mod profiles;
 pub mod refresh_flow;
 pub mod refresh_queue;
 pub mod save_throttle;
+pub mod session_profile;
 pub mod session_refresh;
 pub mod sessions;
 pub mod startup;
