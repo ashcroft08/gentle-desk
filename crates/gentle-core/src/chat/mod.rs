@@ -6,6 +6,7 @@
 //! logic; it only mirrors what `gentle-shell --mode rpc` reports.
 
 mod history;
+pub mod limits;
 mod reducer;
 mod state;
 

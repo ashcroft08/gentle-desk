@@ -14,7 +14,10 @@ use super::{ChatId, Chats};
 use crate::input::ChatCommand;
 
 /// The cap [`Chats::default`] carries before the boot input names the host's.
-pub(crate) const DEFAULT_MAX_WORKING: usize = 2;
+///
+/// It reads the same constant the host's `Limits` reads, so the two cannot
+/// disagree even for the frames before the boot input lands.
+pub(crate) const DEFAULT_MAX_WORKING: usize = gentle_core::chat::limits::MAX_WORKING;
 
 /// Reads and marks on `Chats` that only the cap knows the meaning of. They live
 /// here, next to the queue, so `store` stays the plain map it was.
@@ -119,5 +122,19 @@ pub(crate) fn rekeyed(chats: &mut Chats, from: &ChatId, to: ChatId) {
         if queued == from {
             *queued = to.clone();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn the_default_cap_reads_the_shared_cap() {
+        // Both caps must come from the same constant: the host's `Limits` and
+        // this one are enforced by different crates, and a second copy of the
+        // number is exactly how they drifted before.
+        assert_eq!(
+            super::DEFAULT_MAX_WORKING,
+            gentle_core::chat::limits::MAX_WORKING
+        );
     }
 }

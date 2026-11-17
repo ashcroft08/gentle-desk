@@ -169,6 +169,12 @@ impl AppStateHolder {
         // The reducer words its own notices, so it starts the run in the
         // language the config holds: `None` is English (D2).
         lock(&holder.app).language = language;
+        // The working cap is the host's, dispatched once here so the reducer
+        // never enforces a number of its own: over it a prompt waits, it is
+        // never refused.
+        holder.fold_input(gentle_app::Input::SetWorkingCap(
+            gentle_backend::chat_host::Limits::default().max_working,
+        ));
         holder
     }
 
