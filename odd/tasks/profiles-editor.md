@@ -41,6 +41,20 @@ es valor de producto".
   edito y guardo pero no lo puedo usar o que mismo?" - so the editor saves AND
   offers Make default for new sessions; live chats keep the routing they started
   with.
+- S9 (maintainer, 2026-11-17, RULING - supersedes the Settings framing of S1/S5):
+  "en la terminal nosotros tenemos abierta una sesion y editamos/creamos [perfiles]
+  desde una sesion y ahi podemos elegir guardar, usarla en esa sesion o usarla
+  como default, en cambio en la app lo tengo en configuracion algo que lo veo
+  confuso ya que hace parecer como si fuera global". The editor lives INSIDE THE
+  CHAT, with the terminal's three outcomes: Save, Use in this chat
+  (`apply_profile` mode `session`, sent to THAT chat's own child), Make default
+  (`mode: default`, global, labelled as such). Evidence for the scope: the repo pin
+  needs a session with a working directory in a resolvable worktree (spec :263,
+  :381 `config_unavailable`), which a workspace-less control child cannot have; and
+  every real chat child already runs with the channel on (helper-stop). Settings >
+  Profiles stays the GLOBAL view (the default and the definitions, scope labelled)
+  and points at the chat for editing. The temporary control child of S5 is
+  expected to disappear (to be confirmed by T2's approved probe).
 - S7 (session queue, 2026-11-16): "Primero leer la spec de set_config y la forma de
   un perfil NUEVO (no verificada), artboards en el canvas, hijo de control
   temporal mientras se edita, set_config con writeRevision." Artboards first.
@@ -79,11 +93,14 @@ es valor de producto".
 - [x] T0 (S7) design system sync: `design/system.md` is older than
       `apps/desktop/src/app.css`; regenerate it (read-only over the sources) so the
       artboards use current tokens. Route: writer, design files only.
-- [~] T1 (S7) artboards (three directions drawn, commit 310fb4c; the maintainer's pick is pending): the editor's directions on the canvas (profile list,
+- [~] T1 (S7, S9) artboards: 01-03 (commit 310fb4c) frame the editor INSIDE SETTINGS
+      and are SUPERSEDED by S9 (kept as alternatives, not to be built). 04-06 redo it
+      inside the chat. The maintainer's pick is pending.: the editor's directions on the canvas (profile list,
       per-agent model + thinking, fallback chain, pin, the conflict and rejection
       states). Maintainer picks one before any code.
-- [ ] T2 (S2, S3, S5, S6) control channel: a temporary control child opened when
-      the editor opens and closed with it, behind the swappable channel seam;
+- [ ] T2 (S2, S3, S9, S6) channel through the CHAT's own child (reuse helper-stop's
+      per-chat `DesktopClient`; no control child unless the probe shows a need),
+      behind the swappable channel seam;
       `get_config` read + typed answers; silent degradation to read-only. TDD on
       the fake channel; the real-child proof waits for the maintainer's approved
       script (home temporal, `GENTLE_SHELL_NO_AUTO_SETUP=1`, cleanup).
@@ -91,7 +108,8 @@ es valor de producto".
       `get_config`, `revision_conflict` -> re-read and ask, `invalid_data` ->
       show and keep the draft, `profile_apply_busy` -> wait/retry copy, whole
       document replacement.
-- [ ] T3b (S4, S8) apply: `apply_profile` mode `default` with the
+- [ ] T3b (S4, S8, S9) apply: `apply_profile` mode `session` (this chat, the
+      terminal's "Use in this session") and `default` with the
       `confirmation_required` round trip, the `unknown_profile` and
       `profile_apply_busy` answers, and the copy that says live chats keep their
       routing.
