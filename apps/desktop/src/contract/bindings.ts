@@ -16,7 +16,7 @@ export const commands = {
 	 *  run what it asked for. The emitted event is typed through tauri-specta, so
 	 *  the Svelte side gets the same [`ViewState`] for the return and the payload.
 	 */
-	dispatchIntent: (intent: UiIntent) => typedError<ViewState_Serialize, string>(__TAURI_INVOKE("dispatch_intent", { intent })),
+	dispatchIntent: (intent: UiIntent_Deserialize) => typedError<ViewState_Serialize, string>(__TAURI_INVOKE("dispatch_intent", { intent })),
 	/**
 	 *  One page of the flattened workspace tree (S3): the rows
 	 *  `[offset, offset + length)` of it, and how many rows the tree has in total -
@@ -129,6 +129,24 @@ export const events = {
 };
 
 /* Types */
+/**
+ *  Which of the terminal's two APPLY outcomes a request asks for, named exactly
+ *  as the channel's `apply_profile` params name them (`session`, `default`), so
+ *  neither side translates the value (profiles-editor T3b, S8, S9).
+ */
+export type ApplyModeView = 
+/**
+ *  `Use in this chat`: bind the profile to this chat's OWN child, write no
+ *  store, and never ask for a confirmation. The other open chats keep the
+ *  routing they started with.
+ */
+"session" | 
+/**
+ *  `Make default`: the channel's own global apply, which writes the store's
+ *  `active` and may answer `confirmation_required` first (L30 ruling 1).
+ */
+"default";
+
 /**
  *  One provider the shell's auth store lists, with what its own check said. The
  *  NAME is all that is read from the store: no key, token or account identity
@@ -248,6 +266,68 @@ export type ChatProfileAgentView_Serialize = {
 	thinking: string | null,
 	tier: string | null,
 };
+
+/**
+ *  The screen's own dialog, carried to the page EXACTLY as the child wrote it
+ *  (profiles-editor T3b, L30 ruling 2).
+ * 
+ *  `title` and `message` are the child's text, in the child's language, never
+ *  translated and never re-worded: this is the same dialog the terminal shows.
+ *  `token` is what the acceptance carries back, and it is bound to the content it
+ *  was issued for, so a resend with anything else re-asks instead of writing.
+ */
+export type ChatProfileApplyConfirmationView = {
+	/**  The profile the dialog is about, as the child echoed it. */
+	profile: string,
+	/**  The mode it asks about (`default` today: `session` never asks). */
+	mode: ApplyModeView,
+	/**  The child's own title, verbatim. */
+	title: string,
+	/**  The child's own message (the diff and the question), verbatim. */
+	message: string,
+	/**  The token to carry back if, and only if, the human accepts. */
+	token: string,
+};
+
+/**
+ *  The one short line an apply that wrote nothing leaves, in the cases the
+ *  channel names (profiles-editor T3b, S4).
+ * 
+ *  It is a TYPE, not a sentence: the page words each case in its own language
+ *  (D4), and Rust never writes a user-facing line for a view.
+ */
+export type ChatProfileApplyNoticeView = 
+/**  No profile by that name is saved, and nothing was written. */
+"unknown_profile" | 
+/**
+ *  Another apply is already running: nothing was written, and it can be
+ *  retried after it finishes.
+ */
+"busy" | 
+/**  The store moved between the read and the write: nothing was written. */
+"revision_conflict" | 
+/**  The owner refused the data it was given: nothing was written. */
+"invalid_data" | 
+/**
+ *  No answer at all: a deadline, a child that is gone, a host that is not
+ *  interactive. Nothing was written.
+ */
+"no_answer" | 
+/**
+ *  This chat's child does not advertise `apply_profile` at all. Nothing was
+ *  sent.
+ */
+"unsupported" | 
+/**
+ *  The apply ran and its own notices did not end well: the screen's path
+ *  rolled its write back, so nothing stands.
+ */
+"not_applied" | 
+/**
+ *  Any other refusal, reported as the one line a case this slice does not
+ *  model deserves.
+ */
+"refused";
 
 /**  How one of the three stores a chat's profile is read from answered. */
 export type ChatProfileAvailabilityView = 
@@ -561,6 +641,29 @@ export type ChatProfileView_Deserialize = {
 	 *  worked, and never set by the read itself.
 	 */
 	save_failed: boolean,
+	/**
+	 *  Whether an APPLY of the used profile is in flight right now (profiles-editor
+	 *  T3b): both buttons - `Use in this chat` and `Make default` - are DISABLED
+	 *  while it is, so one click cannot become two applies. Shell-owned and
+	 *  shell-side capped like the save: a second ask is dropped, never queued
+	 *  (L18, L29), and a chat that closes drops it with the view.
+	 */
+	applying: boolean,
+	/**
+	 *  The one short line the last apply that WROTE NOTHING left, `None` when it
+	 *  worked, when it is still in flight, and when the child is asking its own
+	 *  confirmation. Cleared by the next apply's own answer and by the next
+	 *  successful read.
+	 */
+	apply_notice?: ChatProfileApplyNoticeView | null,
+	/**
+	 *  The screen's own confirmation, when the child answered
+	 *  `confirmation_required` and nothing was written yet. Its `title` and
+	 *  `message` are the CHILD's text and are drawn verbatim (L30 ruling 2);
+	 *  accepting sends the SAME profile and mode back with its `token`, and
+	 *  cancelling sends nothing at all.
+	 */
+	apply_confirmation?: ChatProfileApplyConfirmationView | null,
 };
 
 /**
@@ -629,6 +732,29 @@ export type ChatProfileView_Serialize = {
 	 *  worked, and never set by the read itself.
 	 */
 	save_failed: boolean,
+	/**
+	 *  Whether an APPLY of the used profile is in flight right now (profiles-editor
+	 *  T3b): both buttons - `Use in this chat` and `Make default` - are DISABLED
+	 *  while it is, so one click cannot become two applies. Shell-owned and
+	 *  shell-side capped like the save: a second ask is dropped, never queued
+	 *  (L18, L29), and a chat that closes drops it with the view.
+	 */
+	applying: boolean,
+	/**
+	 *  The one short line the last apply that WROTE NOTHING left, `None` when it
+	 *  worked, when it is still in flight, and when the child is asking its own
+	 *  confirmation. Cleared by the next apply's own answer and by the next
+	 *  successful read.
+	 */
+	apply_notice: ChatProfileApplyNoticeView | null,
+	/**
+	 *  The screen's own confirmation, when the child answered
+	 *  `confirmation_required` and nothing was written yet. Its `title` and
+	 *  `message` are the CHILD's text and are drawn verbatim (L30 ruling 2);
+	 *  accepting sends the SAME profile and mode back with its `token`, and
+	 *  cancelling sends nothing at all.
+	 */
+	apply_confirmation: ChatProfileApplyConfirmationView | null,
 };
 
 /**
@@ -1505,7 +1631,15 @@ export type ToolStatusView = "Running" | "Failed" | "Ok";
  *  explicit mapping into `gentle-app`'s [`gentle_app::Intent`] keeps this
  *  enum free of every `crates/app` type.
  */
-export type UiIntent = { type: "SendPrompt"; data: {
+export type UiIntent = UiIntent_Serialize | UiIntent_Deserialize;
+
+/**
+ *  What the user asked for, as the web side sends it. Only the intents the
+ *  current slice needs; the rest are added when their views arrive. The
+ *  explicit mapping into `gentle-app`'s [`gentle_app::Intent`] keeps this
+ *  enum free of every `crates/app` type.
+ */
+export type UiIntent_Deserialize = { type: "SendPrompt"; data: {
 	text: string,
 } } | { type: "Abort" } | { type: "NewChat" } | 
 /**  Make that chat the foreground one, asking the host for its child. */
@@ -1677,6 +1811,272 @@ export type UiIntent = { type: "SendPrompt"; data: {
 	profile: string,
 	/**  The mode to store. `organic` is stored as the ABSENCE of the entry. */
 	mode: OrchestratorModeView,
+} } | 
+/**
+ *  Apply one saved profile over THIS chat's own child (profiles-editor T3b,
+ *  S4, S8, S9): the terminal's other two outcomes, which a save never
+ *  reaches.
+ * 
+ *  `Use in this chat` ([`ApplyModeView::Session`]) binds the profile to the
+ *  chat the intent names and to no other, so the other open chats keep the
+ *  routing they started with. `Make default` ([`ApplyModeView::Default`]) is
+ *  the channel's own global apply (L30 ruling 1): it writes the store's
+ *  `active` and claims the routing of every new chat, and it is the only mode
+ *  that answers `confirmation_required` - the screen's own dialog, whose
+ *  title and message are shown AS THEY ARRIVED (L30 ruling 2) and whose
+ *  `token` comes back in [`confirmation`](Self::ApplyChatProfile::confirmation)
+ *  when, and only when, the human accepts.
+ * 
+ *  The answer travels back on [`ViewState::chat_profile`]: the buttons are
+ *  disabled while it is in flight, the dialog is drawn verbatim, and every
+ *  answer that wrote nothing leaves one short notice
+ *  ([`ChatProfileView::apply_notice`]).
+ */
+{ type: "ApplyChatProfile"; data: {
+	chat_id: string,
+	/**  The profiles store's own key for the profile to apply. */
+	profile: string,
+	mode: ApplyModeView,
+	/**
+	 *  The token of the dialog that was SHOWN, and nothing else: a first
+	 *  apply carries none, and an empty or unrecognisable string is not a
+	 *  token at all - it is dropped, so the apply asks again and a fresh
+	 *  dialog (with a fresh token) answers instead of writing.
+	 */
+	confirmation?: string | null,
+} } | 
+/**
+ *  Re-read the provider names and re-run one `auth check` per provider
+ *  (0.1.12, T3). The answer travels back on [`ViewState::auth`].
+ */
+{ type: "RefreshAuth" } | 
+/**
+ *  Check the three versions again (0.1.12, S2, S7), the same check the app
+ *  runs once when it opens. It only ever CHECKS: no update is installed
+ *  from here. The answer travels back on [`ViewState::updates`].
+ */
+{ type: "CheckUpdates" } | 
+/**
+ *  Read the subscription usage the shell's own sources report, and run them
+ *  if they are installed: what the Usage pane asks for when it appears and
+ *  on "Check again". This is the ONE run the pane makes, on the intent's own
+ *  thread, because a run takes seconds and the keyboard must not wait.
+ *  Nothing of it reads a chat, so no open chat can hold it back. The answer
+ *  travels back on [`ViewState::usage`].
+ */
+{ type: "RefreshUsage" };
+
+/**
+ *  What the user asked for, as the web side sends it. Only the intents the
+ *  current slice needs; the rest are added when their views arrive. The
+ *  explicit mapping into `gentle-app`'s [`gentle_app::Intent`] keeps this
+ *  enum free of every `crates/app` type.
+ */
+export type UiIntent_Serialize = { type: "SendPrompt"; data: {
+	text: string,
+} } | { type: "Abort" } | { type: "NewChat" } | 
+/**  Make that chat the foreground one, asking the host for its child. */
+{ type: "OpenChat"; data: {
+	chat_id: string,
+} } | 
+/**  The same for a chat that did not exist before. */
+{ type: "OpenNewChat" } | 
+/**
+ *  Start a NEW chat in the workspace at `path`: what the header's New
+ *  session button (D2) and a workspace's own new-chat icon (D3) send. The
+ *  web side decides which workspace is the current one and names it; the
+ *  chat started here is the same new chat `OpenNewChat` starts, only in
+ *  that folder, and never the legacy single-child `NewChat`.
+ */
+{ type: "NewChatInWorkspace"; data: {
+	path: string,
+} } | 
+/**
+ *  Fold or unfold the chats of the workspace at `path` in the sidebar (D8):
+ *  the state is remembered in the app config, so it survives the run.
+ */
+{ type: "SetWorkspaceCollapsed"; data: {
+	path: string,
+	collapsed: boolean,
+} } | 
+/**
+ *  Choose the window's theme (the v1 Appearance setting). The choice is
+ *  remembered in the app config, so it survives the run, and the window's
+ *  own chrome follows it ([`gentle_runtime::app_config::Theme`]).
+ */
+{ type: "SetTheme"; data: {
+	theme: ThemeView,
+} } | 
+/**
+ *  Choose the language the app's own words are written in (0.2.0, S2): the
+ *  one tag the picker sent, stored in the app config so it survives the run,
+ *  and re-emitted as the very slice this call answers with - the words change
+ *  in this same tick, with no restart and no webview reload ([`LanguageView`]).
+ *  The same language again changes nothing and saves nothing.
+ */
+{ type: "SetLanguage"; data: {
+	language: LanguageView,
+} } | 
+/**
+ *  Choose which home `gentle-shell` runs on (the welcome screen and the
+ *  sidebar footer). Remembered in the app config; it applies from the next
+ *  start of the app.
+ */
+{ type: "SetShellHome"; data: {
+	choice: HomeChoiceView,
+} } | 
+/**
+ *  Start the app again after the orderly close (config and cache flushed
+ *  first): a home chosen at the welcome question applies to a new run.
+ */
+{ type: "RestartApp" } | 
+/**
+ *  The user gave permission to install gentle-shell (the button of the
+ *  permission screen). Nothing installs without this intent.
+ */
+{ type: "InstallShell" } | 
+/**  Look for the `gentle-shell` launcher once more ("Check again"). */
+{ type: "CheckShellAgain" } | 
+/**  Start the child of a chat that died again and reopen it (S3). */
+{ type: "RestartChat"; data: {
+	chat_id: string,
+} } | 
+/**
+ *  Close one chat (0.1.14): stop that chat's child and take it off the open
+ *  set, which is what the Updates pane's chats-closed gate counts. NOT a
+ *  delete: nothing on disk changes and the session list keeps its row, so
+ *  the row opens the chat again. A chat that is running a turn is refused,
+ *  with the same rule and words the delete flow refuses with.
+ */
+{ type: "CloseChat"; data: {
+	chat_id: string,
+} } | 
+/**
+ *  Copy one message's raw markdown: the message is named by the id the
+ *  thread was given ([`MessageView::id`]), and the copy itself is the
+ *  shell's side effect, never the view's.
+ */
+{ type: "CopyMessage"; data: {
+	message_id: string,
+} } | { type: "DismissNotice"; data: {
+	id: number,
+} } | 
+/**
+ *  Answer the foreground chat's pending dialog, named by [`DialogView`]'s
+ *  `id`. An id that is no longer pending answers nothing, so a second click
+ *  on the same dialog never reaches the child twice.
+ */
+{ type: "AnswerDialog"; data: {
+	id: string,
+	answer: DialogAnswer,
+} } | 
+/**
+ *  Open the thread of one delegated helper (T7b-2). The id is the one
+ *  [`HelperRowView::id`] carried, and the reducer only selects a helper of
+ *  the foreground chat: an id that names no task changes nothing.
+ */
+{ type: "SelectHelper"; data: {
+	helper_id: string,
+} } | 
+/**
+ *  Back from a helper's thread to the helpers list: the same intent the
+ *  iced panel's Back sends (`crates/ui/src/app.rs`).
+ */
+{ type: "CloseHelper" } | 
+/**
+ *  Stop the RUNNING helper whose thread is open (helper-stop S2): one helper,
+ *  never the chat. The id is the one [`HelperRowView::id`] carried, and the
+ *  reducer only stops a helper of the foreground chat that is running and is
+ *  that chat's own: any other id changes nothing and asks nothing of the
+ *  child.
+ */
+{ type: "StopHelper"; data: {
+	helper_id: string,
+} } | 
+/**
+ *  Ask the child what models it offers: what the chip's dropdown shows
+ *  (0.1.11). The answer travels back on
+ *  [`ViewState::model_chip`].
+ */
+{ type: "RequestModels" } | 
+/**
+ *  Make a model the session's model (RPC `set_model`). The chip updates
+ *  from the reply's Model object, never from the choice alone.
+ */
+{ type: "SelectModel"; data: {
+	provider: string,
+	model_id: string,
+} } | 
+/**  Set the session's thinking level (RPC `set_thinking_level`). */
+{ type: "SelectThinkingLevel"; data: {
+	level: string,
+} } | 
+/**
+ *  Re-read THIS chat's own profile configuration (profiles-editor T2b-2,
+ *  L11): the profiles, their fallback chains and the pin of that chat's
+ *  worktree, asked of that chat's OWN child, which is the only one that knows
+ *  them. The Profile tab sends it when it opens and when it asks again.
+ *  Nothing is written, and a read that reached no store leaves the view as it
+ *  was. The answer travels back on [`ViewState::chat_profile`], for that chat
+ *  alone.
+ */
+{ type: "RefreshChatProfile"; data: {
+	chat_id: string,
+} } | 
+/**
+ *  Save ONE profile's orchestration mode, the way the terminal does: the
+ *  value `profiles.json` stores under `workflow.<profile>.orchestratorMode`,
+ *  which EVERY chat using that profile reads, never this chat alone (L20,
+ *  L22).
+ * 
+ *  The write is the whole `profiles` document as this chat's own child read
+ *  it, with only that profile's entry changed, preconditioned on the read's
+ *  `writeTargets[global].writeRevision` (S2, S3), and it is followed by a
+ *  fresh read of that chat's configuration. A write that did not happen - a
+ *  stale token, a document the owner refuses, an apply in flight, a child
+ *  that does not answer - changes nothing and leaves
+ *  [`ChatProfileView::save_failed`] set, which the tab says in one short
+ *  line and clears on the next successful read.
+ */
+{ type: "SaveChatProfileMode"; data: {
+	chat_id: string,
+	/**  The profiles store's own key for the profile (the one this chat uses). */
+	profile: string,
+	/**  The mode to store. `organic` is stored as the ABSENCE of the entry. */
+	mode: OrchestratorModeView,
+} } | 
+/**
+ *  Apply one saved profile over THIS chat's own child (profiles-editor T3b,
+ *  S4, S8, S9): the terminal's other two outcomes, which a save never
+ *  reaches.
+ * 
+ *  `Use in this chat` ([`ApplyModeView::Session`]) binds the profile to the
+ *  chat the intent names and to no other, so the other open chats keep the
+ *  routing they started with. `Make default` ([`ApplyModeView::Default`]) is
+ *  the channel's own global apply (L30 ruling 1): it writes the store's
+ *  `active` and claims the routing of every new chat, and it is the only mode
+ *  that answers `confirmation_required` - the screen's own dialog, whose
+ *  title and message are shown AS THEY ARRIVED (L30 ruling 2) and whose
+ *  `token` comes back in [`confirmation`](Self::ApplyChatProfile::confirmation)
+ *  when, and only when, the human accepts.
+ * 
+ *  The answer travels back on [`ViewState::chat_profile`]: the buttons are
+ *  disabled while it is in flight, the dialog is drawn verbatim, and every
+ *  answer that wrote nothing leaves one short notice
+ *  ([`ChatProfileView::apply_notice`]).
+ */
+{ type: "ApplyChatProfile"; data: {
+	chat_id: string,
+	/**  The profiles store's own key for the profile to apply. */
+	profile: string,
+	mode: ApplyModeView,
+	/**
+	 *  The token of the dialog that was SHOWN, and nothing else: a first
+	 *  apply carries none, and an empty or unrecognisable string is not a
+	 *  token at all - it is dropped, so the apply asks again and a fresh
+	 *  dialog (with a fresh token) answers instead of writing.
+	 */
+	confirmation: string | null,
 } } | 
 /**
  *  Re-read the provider names and re-run one `auth check` per provider

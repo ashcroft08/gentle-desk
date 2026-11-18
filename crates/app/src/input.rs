@@ -223,6 +223,28 @@ pub enum ChatCommand {
         profile: String,
         mode: gentle_core::rpc::config_store::OrchestratorMode,
     },
+    /// Apply one saved profile over that chat's own child (profiles-editor T3b,
+    /// S4, S8, S9): the terminal's other two outcomes, which a save alone never
+    /// reaches.
+    ///
+    /// `mode: session` is **Use in this chat**: the profile binds to this chat's
+    /// own child and to no other, so the other open chats keep the routing they
+    /// started with. `mode: default` is **Make default**: the channel's own apply
+    /// writes the store's `active` and claims the global routing for new
+    /// sessions, and it is the only mode that answers `confirmation_required` -
+    /// the screen's own dialog, which the human must see before anything is
+    /// written (L30 ruling 1 and 2).
+    ///
+    /// `confirmation` is the token of the dialog that was SHOWN, and it is only
+    /// ever the one this app received: a first apply carries none, and the answer
+    /// is what asks. A token is bound to what it was issued for, so anything else
+    /// the child answers with re-asks and never writes.
+    ApplyChatProfile {
+        chat: ChatId,
+        profile: String,
+        mode: gentle_core::rpc::profile_apply::ApplyMode,
+        confirmation: Option<gentle_core::rpc::profile_apply::ConfirmationToken>,
+    },
     /// Tell the host whether that chat is running a turn. The reducer owns the
     /// mark (it is the one that reads `agent_start` / `agent_end`), so this is
     /// how the host's protection rules learn it: a working chat is never the
@@ -240,6 +262,7 @@ impl ChatCommand {
             Self::StopHelper { chat, .. } => chat,
             Self::ReadChatProfile { chat } => chat,
             Self::SetChatProfileMode { chat, .. } => chat,
+            Self::ApplyChatProfile { chat, .. } => chat,
             Self::SetWorking { chat, .. } => chat,
         }
     }

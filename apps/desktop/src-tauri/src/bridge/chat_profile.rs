@@ -36,13 +36,15 @@ use gentle_core::i18n::Language;
 use gentle_core::rpc::config_store::{
     FallbacksDocument, OrchestratorMode, PinLayer, PinsValue, ProfilesDocument, SetConfigOutcome,
 };
+use gentle_core::rpc::profile_apply::ApplyProfileOutcome;
 use gentle_core::rpc::NoAnswer;
-use gentle_runtime::chat_runtime::{ChatConfigRead, ModeWriteResult, StoreRead};
+use gentle_runtime::chat_runtime::{ChatConfigRead, ChatProfileApply, ModeWriteResult, StoreRead};
 use gentle_runtime::session_profile::last_session_profile;
 
 use super::{lock, AppStateHolder};
 use crate::contract::{
-    ChatProfileAgentView, ChatProfileAvailabilityView, ChatProfileChainView,
+    ApplyModeView, ChatProfileAgentView, ChatProfileApplyConfirmationView,
+    ChatProfileApplyNoticeView, ChatProfileAvailabilityView, ChatProfileChainView,
     ChatProfileDefinitionView, ChatProfilePinLayerView, ChatProfilePinMarkView,
     ChatProfilePinsView, ChatProfileStepView, ChatProfileStoresView, ChatProfileView,
     OrchestratorModeView, ViewState,
@@ -75,10 +77,14 @@ pub fn compose(chat: &ChatId, read: &ChatConfigRead, session: Option<&str>) -> C
             fallbacks: availability(&read.fallbacks),
             pins: availability(&read.pins),
         },
-        // The save state is the SHELL's, not the read's: `chat_profile` overlays
-        // it from `profile_work` every time the slice is built (T3-mode).
+        // The save and apply states are the SHELL's, not the read's:
+        // `chat_profile` overlays them from `profile_work` every time the slice
+        // is built (T3-mode, T3b).
         saving: false,
         save_failed: false,
+        applying: false,
+        apply_notice: None,
+        apply_confirmation: None,
     }
 }
 
@@ -92,11 +98,22 @@ pub fn compose(chat: &ChatId, read: &ChatConfigRead, session: Option<&str>) -> C
 /// a web bug that asked in a loop must never again queue thousands of
 /// `chat-command` threads against one child (L18: 4,570 asks in 25 s, ~4,300 OS
 /// threads alive, 22 s per read). Shell-owned, and dropped with the chat.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(super) struct ProfileWork {
     pub(super) reading: bool,
     pub(super) saving: bool,
     pub(super) failed: bool,
+    /// An APPLY of one of this chat's profiles is in flight (profiles-editor
+    /// T3b): both buttons are drawn disabled while it is, and a second ask is
+    /// dropped rather than queued - the same rule the read and the save keep.
+    pub(super) applying: bool,
+    /// The one short line the last apply that wrote nothing left, `None` when it
+    /// worked and when nothing failed.
+    pub(super) notice: Option<ChatProfileApplyNoticeView>,
+    /// The child's own dialog while it is waiting for the human, verbatim: the
+    /// shell keeps it so every later slice carries the same text and the same
+    /// token (L30 ruling 2).
+    pub(super) confirmation: Option<ChatProfileApplyConfirmationView>,
 }
 
 /// Which profile work a per-chat command does, and so which of its chat's two
@@ -108,6 +125,7 @@ pub(super) struct ProfileWork {
 pub enum ChatWork {
     Read,
     Save,
+    Apply,
 }
 
 impl ChatWork {
@@ -116,6 +134,7 @@ impl ChatWork {
         match command {
             ChatCommand::ReadChatProfile { .. } => Some(Self::Read),
             ChatCommand::SetChatProfileMode { .. } => Some(Self::Save),
+            ChatCommand::ApplyChatProfile { .. } => Some(Self::Apply),
             _ => None,
         }
     }
@@ -315,6 +334,47 @@ fn pins_view(pins: &PinsValue) -> ChatProfilePinsView {
     }
 }
 
+/// The apply mode the contract names, for a dialog the child answered with.
+fn apply_mode_view(mode: gentle_core::rpc::profile_apply::ApplyMode) -> ApplyModeView {
+    match mode {
+        gentle_core::rpc::profile_apply::ApplyMode::Session => ApplyModeView::Session,
+        gentle_core::rpc::profile_apply::ApplyMode::Default => ApplyModeView::Default,
+    }
+}
+
+/// The one short line an answer that wrote nothing leaves, `None` for an attempt
+/// that ran (its answer is the re-read) and for the child's own question.
+///
+/// The channel's own codes are the cases this slice models; every other refusal
+/// is `Refused`, so the page always has something short to say and nothing is
+/// invented.
+fn notice_of(result: &ApplyProfileOutcome) -> Option<ChatProfileApplyNoticeView> {
+    match result {
+        // The attempt ran: the re-read is what the page draws.
+        ApplyProfileOutcome::Applied(_) => None,
+        ApplyProfileOutcome::NotApplied(_) => Some(ChatProfileApplyNoticeView::NotApplied),
+        ApplyProfileOutcome::UnknownProfile(_) => Some(ChatProfileApplyNoticeView::UnknownProfile),
+        ApplyProfileOutcome::Busy(_) => Some(ChatProfileApplyNoticeView::Busy),
+        ApplyProfileOutcome::ProfilesUnavailable(_) | ApplyProfileOutcome::NoAnswer(_) => {
+            Some(ChatProfileApplyNoticeView::NoAnswer)
+        }
+        ApplyProfileOutcome::Unsupported => Some(ChatProfileApplyNoticeView::Unsupported),
+        ApplyProfileOutcome::Rejected(error) => Some(match error.code.as_str() {
+            "revision_conflict" => ChatProfileApplyNoticeView::RevisionConflict,
+            "invalid_data" => ChatProfileApplyNoticeView::InvalidData,
+            _ => ChatProfileApplyNoticeView::Refused,
+        }),
+        // A request this app could not build, one the channel refused, and an
+        // `ok` answer that is not this contract's: all of them wrote nothing.
+        ApplyProfileOutcome::InvalidParams(_)
+        | ApplyProfileOutcome::InvalidRequest(_)
+        | ApplyProfileOutcome::UnexpectedAnswer(_) => Some(ChatProfileApplyNoticeView::Refused),
+        // The child is asking, and `note_chat_apply` carries its dialog: being
+        // asked is not a failure.
+        ApplyProfileOutcome::ConfirmationRequired(_) => None,
+    }
+}
+
 /// One pin layer, as the store named it and the page draws it.
 fn layer(pin: &PinLayer, mark: ChatProfilePinMarkView) -> ChatProfilePinLayerView {
     ChatProfilePinLayerView {
@@ -361,12 +421,15 @@ impl AppStateHolder {
                 // reached: a read that answered nothing still answered (L18).
                 state.reading = false;
                 // A read that answered IS the truth the tab draws: it clears the
-                // notice of a failed mode save (T3-mode: the next successful
-                // read, no timer). A save still in flight is NOT touched: the
-                // write lives until its own answer, so a mid-save read may not
-                // re-enable the switch (review R3-001, correction of ab09880).
+                // notice of a failed mode save, and the one a failed apply left
+                // (T3-mode, T3b: the next successful read, no timer). A write
+                // still in flight is NOT touched, and neither is the child's
+                // pending dialog: the write lives until its own answer, so a
+                // mid-write read may not re-enable the switch (review R3-001,
+                // correction of ab09880), and a dialog is answered by a human.
                 if reached {
                     state.failed = false;
+                    state.notice = None;
                 }
             }
         }
@@ -455,6 +518,75 @@ impl AppStateHolder {
         Some(self.view())
     }
 
+    /// Records that an attempt to APPLY one of `chat`'s profiles could not even
+    /// START: the worker thread its command runs on could not be created, so the
+    /// request never left and will never answer (profiles-editor T3b, L17(a)).
+    ///
+    /// It is [`Self::note_chat_apply`] with the failure a child that did not
+    /// answer leaves - nothing was applied - so both buttons come back and one
+    /// short line says why. A chat that closed meanwhile is dropped with its
+    /// state.
+    pub fn note_chat_apply_unstarted(&self, chat: &ChatId) -> Option<ViewState> {
+        self.note_chat_apply(chat, &ChatProfileApply::unasked())
+    }
+
+    /// Records what one attempt to APPLY a profile came to, and answers the slice
+    /// to push (profiles-editor T3b, S4, S8, S9, L30).
+    ///
+    /// Three shapes, and nothing else goes to the page:
+    ///
+    /// - the attempt RAN: both buttons are enabled again, any notice and any
+    ///   pending dialog are dropped, and the configuration the attempt re-read is
+    ///   installed exactly as a plain read installs it (a read that reached no
+    ///   store leaves what the tab drew, L11-4);
+    /// - the child is ASKING: its own `title` and `message` travel verbatim, with
+    ///   the token the acceptance carries back, and no notice - being asked is not
+    ///   a failure, and nothing was written (L30 ruling 2);
+    /// - the attempt wrote NOTHING: one short notice names the case, and the view
+    ///   the tab drew stays as it is.
+    ///
+    /// A chat that closed while the apply ran is dropped with its state, as its
+    /// view is.
+    pub fn note_chat_apply(&self, chat: &ChatId, attempt: &ChatProfileApply) -> Option<ViewState> {
+        if !self.is_open(chat) {
+            lock(&self.profile_work).remove(chat.as_str());
+            return None;
+        }
+        // One lock, one entry: the apply's own answer, and nothing about a read
+        // or a save that may be in flight at the same time (L18).
+        {
+            let mut held = lock(&self.profile_work);
+            let state = held.entry(chat.as_str().to_owned()).or_default();
+            state.applying = false;
+            match &attempt.result {
+                ApplyProfileOutcome::ConfirmationRequired(confirmation) => {
+                    state.confirmation = Some(ChatProfileApplyConfirmationView {
+                        profile: confirmation.profile.clone(),
+                        mode: apply_mode_view(confirmation.mode),
+                        title: confirmation.title.clone(),
+                        message: confirmation.message.clone(),
+                        token: confirmation.token.as_str().to_owned(),
+                    });
+                    state.notice = None;
+                }
+                // Every other answer ends the flow that produced it: nothing is
+                // pending any more, and what the page says is said below.
+                result => {
+                    state.confirmation = None;
+                    state.notice = notice_of(result);
+                }
+            }
+        }
+        // An attempt that RAN re-read the configuration, and that read is the
+        // truth the tab draws; one that wrote nothing re-read nothing, so what it
+        // drew stays.
+        if let Some(read) = attempt.read.as_ref().filter(|read| reached_a_store(read)) {
+            let view = self.compose_view(chat, read);
+            self.install_chat_profile(view);
+        }
+        Some(self.view())
+    }
+
     /// Gives back the slot `work` of `chat` when the worker thread that would
     /// have run its command could not be CREATED (profiles-editor L18, L17(a)):
     /// a command that never ran left nothing in flight, so the chat's next ask
@@ -470,6 +602,7 @@ impl AppStateHolder {
         match work {
             ChatWork::Read => state.reading = false,
             ChatWork::Save => state.saving = false,
+            ChatWork::Apply => state.applying = false,
         }
     }
 
@@ -490,6 +623,7 @@ impl AppStateHolder {
         let slot = match work {
             ChatWork::Read => &mut state.reading,
             ChatWork::Save => &mut state.saving,
+            ChatWork::Apply => &mut state.applying,
         };
         if *slot {
             return false;
@@ -533,9 +667,12 @@ impl AppStateHolder {
     pub(super) fn chat_profile(&self) -> Option<ChatProfileView> {
         let mut view = lock(&self.chat_profile).clone()?;
         let work = lock(&self.profile_work);
-        let state = work.get(&view.chat_id).copied().unwrap_or_default();
+        let state = work.get(&view.chat_id).cloned().unwrap_or_default();
         view.saving = state.saving;
         view.save_failed = state.failed;
+        view.applying = state.applying;
+        view.apply_notice = state.notice;
+        view.apply_confirmation = state.confirmation;
         Some(view)
     }
 
