@@ -576,4 +576,19 @@ es valor de producto".
   Gentleman-Programming/gentle-shell#3321 (CLOSED, status:approved) - publishing ours would
   be a duplicate; the session-profile-read half overlaps #2716/#2742, so nothing new was
   filed and the maintainer may comment there instead.
+- L35 (parent, 2026-11-17): T5 slice 1 DELIVERED (not committed by the worker; the parent
+  committed it) on feat/profile-chains, from origin/main 4b103a7: the used profile's
+  chains (agent-named and `*`) are EDITABLE in the tab - pure-core
+  validate_chain/with_profile_chain (verbatim document, <=8 steps, no repeated model,
+  local validation so invalid_data is never ours), runtime read-edit-write-reread over the
+  chat's child mirroring the mode switch, the SAVE slot shared with it (a chain save is
+  dropped while a MODE save runs and vice versa; a READ does not block a save - two
+  independent slots, pinned by tests, deviation documented), chain_failed notice (parallel
+  to save_failed), ChainEditor web component (draft survives same-content pushes, no
+  dispatch on unchanged content, EN+ES, read-only for other profiles). RED at 4 layers;
+  cargo workspace 1596/1596, bindings guard green, fmt/clippy clean, vitest 819/819.
+  One out-of-surface assertion updated (App.tabs.test: no composer textbox). NOT seen
+  rendered; the real-window look and any real-child probe are the maintainer's. Empty
+  chains cannot be created here (the owner refuses them; the terminal remains where a
+  chainless profile gets its first chain).
 
