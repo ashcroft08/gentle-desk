@@ -160,7 +160,12 @@ fn cut_string(text: &mut String) -> bool {
     while !text.is_char_boundary(end) {
         end -= 1;
     }
-    text.truncate(end);
+    // Rebuilt, not truncated in place: `String::truncate` only lowers the length
+    // and keeps the original allocation, so a multi-megabyte output cut to the
+    // bound would still HOLD its full buffer for the life of the chat - a bound
+    // that reports a small length and keeps a large allocation is no bound at all
+    // (review R3-001). A fresh string allocates exactly `end` bytes.
+    *text = text[..end].to_owned();
     true
 }
 
@@ -403,4 +408,30 @@ impl ChatState {
 /// The `<n>` of a `msg-<n>` id, when it has that shape.
 fn text_id_number(id: &str) -> Option<u64> {
     id.strip_prefix("msg-")?.parse().ok()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{cut_string, TOOL_PAYLOAD_MAX_BYTES};
+
+    /// The bound must bound MEMORY, not only a number: `String::truncate` keeps
+    /// the original allocation, so a cut string could still hold its whole buffer
+    /// while reporting a small length (review R3-001 of the card artboard
+    /// candidate). Capacity is the thing that proves it.
+    #[test]
+    fn a_cut_string_does_not_keep_its_original_allocation() {
+        let mut text = "x".repeat(TOOL_PAYLOAD_MAX_BYTES * 8);
+
+        assert!(
+            text.capacity() >= TOOL_PAYLOAD_MAX_BYTES * 8,
+            "precondition: the buffer starts big"
+        );
+        assert!(cut_string(&mut text), "an oversized string is cut");
+        assert_eq!(text.len(), TOOL_PAYLOAD_MAX_BYTES, "the length is bounded");
+        assert!(
+            text.capacity() <= TOOL_PAYLOAD_MAX_BYTES,
+            "the ALLOCATION must be bounded too, capacity was {}",
+            text.capacity()
+        );
+    }
 }
