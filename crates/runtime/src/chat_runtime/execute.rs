@@ -7,7 +7,7 @@ use gentle_backend::chat_host::Opened;
 use gentle_core::i18n::{messages, Language};
 use gentle_core::rpc::RpcCommand;
 
-use super::{ChatConfigRead, ChatProfileApply, ChatRuntime, ModeWriteResult};
+use super::{ChainWriteResult, ChatConfigRead, ChatProfileApply, ChatRuntime, ModeWriteResult};
 
 /// What running a [`ChatCommand`] came to. Plain data: a failure is a message
 /// for the shell to show, never a panic and never fatal for the whole app.
@@ -77,6 +77,19 @@ pub enum Outcome {
         /// Boxed because the attempt is far larger than the other variants and
         /// every `Outcome` pays for its largest one.
         attempt: Box<ChatProfileApply>,
+    },
+    /// ONE fallback chain of one profile was saved over that chat's own child, or
+    /// it was not and this is why (profiles-editor T5, S2, S3, L30-3). The write
+    /// is followed by the same three reads a plain read makes, so the page draws
+    /// the store's truth instead of what it hoped for.
+    ChatChain {
+        chat: ChatId,
+        /// What the attempt came to: saved, already stored, a profile or chain the
+        /// store does not record, a chain the owner's rules refuse, or the typed
+        /// reason nothing was written.
+        result: ChainWriteResult,
+        /// Boxed for the same reason as [`Outcome::ChatProfile`]'s read.
+        read: Box<ChatConfigRead>,
     },
 }
 
@@ -183,6 +196,24 @@ impl ChatRuntime {
                 Outcome::ChatApply {
                     chat,
                     attempt: Box::new(attempt),
+                }
+            }
+            // ONE fallback chain of one profile, over the desktop channel into
+            // that chat's own child, and then the same read a plain read makes
+            // (profiles-editor T5, S2, S3, L30-3). Blocking on the channel's
+            // deadline under the chat's one client, so the caller runs it off the
+            // window's thread.
+            ChatCommand::SetChatProfileChain {
+                chat,
+                profile,
+                agent,
+                steps,
+            } => {
+                let write = self.save_chat_profile_chain(&chat, &profile, &agent, &steps);
+                Outcome::ChatChain {
+                    chat,
+                    result: write.result,
+                    read: Box::new(write.read),
                 }
             }
             // The host owns the mark's effect (protection, reaping); the app

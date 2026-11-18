@@ -28,7 +28,7 @@
 //! [`WritableStore`], which [`WritableStore::try_from_store`] refuses for
 //! `models`, `subagents` and `managed_assets`.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
 use serde_json::{json, Value};
@@ -56,6 +56,8 @@ pub const FALLBACKS_KIND: &str = "gentle-pi.profile_model_fallbacks";
 pub const FALLBACKS_VERSION: u64 = 1;
 /// The agent key whose chain every agent of a profile without one takes.
 pub const DEFAULT_CHAIN_KEY: &str = "*";
+/// The most steps one fallback chain may hold (`desktop-rpc.md:345`).
+pub const MAX_CHAIN_STEPS: usize = 8;
 /// The `value.reason` a `pins` read reports outside a resolvable Git worktree
 /// (`desktop-rpc.md:234`).
 pub const WORKTREE_UNRESOLVED: &str = "worktree_unresolved";
@@ -734,6 +736,117 @@ pub fn with_profile_mode(verbatim: &Value, profile: &str, mode: OrchestratorMode
         }
     }
     Some(Value::Object(document))
+}
+
+/// Why one fallback chain is not a chain the owner would keep.
+///
+/// The owner's own normalizer decides these (`normalizeFallbacksFile`): a chain
+/// of at most [`MAX_CHAIN_STEPS`] steps, each step `{model, thinking?}`, a model
+/// at most once per chain, and no empty chain (`desktop-rpc.md:345`, `:382`).
+/// Checking them here is what keeps an `invalid_data` from ever being this
+/// app's fault: a chain this type refuses never leaves.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ChainInvalid {
+    /// No steps at all: the owner does not persist an empty chain.
+    Empty,
+    /// More than [`MAX_CHAIN_STEPS`] steps.
+    TooLong { steps: usize },
+    /// The same model twice in one chain.
+    RepeatedModel { model: String },
+    /// A step whose model is absent or blank.
+    MissingModel { index: usize },
+}
+
+impl fmt::Display for ChainInvalid {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Empty => write!(f, "a fallback chain needs at least one step"),
+            Self::TooLong { steps } => write!(
+                f,
+                "a fallback chain holds at most {MAX_CHAIN_STEPS} steps, not {steps}"
+            ),
+            Self::RepeatedModel { model } => {
+                write!(f, "the model {model} appears twice in one chain")
+            }
+            Self::MissingModel { index } => {
+                write!(f, "step {} names no model", index + 1)
+            }
+        }
+    }
+}
+
+impl std::error::Error for ChainInvalid {}
+
+/// Whether `steps` is a chain the owner would keep, or the first rule it breaks.
+///
+/// The rules are the owner's, in the owner's own order of cheapness: the count,
+/// then every step, then the repetition. `thinking` is not validated at all - a
+/// value the owner refuses is its own `invalid_data`, which the page shows.
+pub fn validate_chain(steps: &[FallbackStep]) -> Result<(), ChainInvalid> {
+    if steps.is_empty() {
+        return Err(ChainInvalid::Empty);
+    }
+    if steps.len() > MAX_CHAIN_STEPS {
+        return Err(ChainInvalid::TooLong { steps: steps.len() });
+    }
+    let mut seen = BTreeSet::new();
+    for (index, step) in steps.iter().enumerate() {
+        if step.model.trim().is_empty() {
+            return Err(ChainInvalid::MissingModel { index });
+        }
+        if !seen.insert(step.model.as_str()) {
+            return Err(ChainInvalid::RepeatedModel {
+                model: step.model.clone(),
+            });
+        }
+    }
+    Ok(())
+}
+
+/// The `profile_fallbacks` document `verbatim` with ONLY
+/// `profiles.<profile>.<agent>` replaced by `steps`, or `None` when there is
+/// nothing this rule may write.
+///
+/// The document is the store's own `value`, taken exactly as the owner sent it
+/// ([`VerbatimAnswer::verbatim`](VerbatimAnswer)), so every member of it - the
+/// envelope's unknown ones, the other profiles' chains, the chains of this
+/// profile the user did not touch, and even an unknown member inside a step of
+/// another chain - survives the edit: `data` is the COMPLETE content of the
+/// store (`desktop-rpc.md:275-302`).
+///
+/// The edited chain itself is written as the user built it (`{model, thinking?}`
+/// per step), which is the shape the owner documents; a step's members this app
+/// does not model are not carried over into the chain being replaced, because
+/// the chain being replaced is exactly what the user replaced.
+///
+/// `None` - nothing is written - for a `value` that is not an object, a
+/// `profiles` that is not one, and a profile the document does not record: a
+/// chain is edited under a profile that EXISTS, never invented with one.
+/// [`validate_chain`] is the caller's step: this only edits.
+pub fn with_profile_chain(
+    verbatim: &Value,
+    profile: &str,
+    agent: &str,
+    steps: &[FallbackStep],
+) -> Option<Value> {
+    let mut document = verbatim.as_object()?.clone();
+    let chains = document.get_mut("profiles")?.as_object_mut()?;
+    let chains = chains.get_mut(profile)?.as_object_mut()?;
+    chains.insert(
+        agent.to_owned(),
+        Value::Array(steps.iter().map(fallback_step_json).collect()),
+    );
+    Some(Value::Object(document))
+}
+
+/// One step as the owner's own shape: `{model, thinking?}`.
+fn fallback_step_json(step: &FallbackStep) -> Value {
+    let mut object = serde_json::Map::new();
+    object.insert("model".to_owned(), Value::String(step.model.clone()));
+    if let Some(thinking) = &step.thinking {
+        object.insert("thinking".to_owned(), Value::String(thinking.clone()));
+    }
+    Value::Object(object)
 }
 
 /// Reads one store's `value` into the type that store carries.
