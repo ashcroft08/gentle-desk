@@ -1,19 +1,39 @@
 <script lang="ts">
-  // The thread: one scrollable column of the foreground chat's messages. It owns
-  // two things and nothing else - the incremental markdown cache (one render of
-  // the growing tail per delta, never the finished blocks again) and the scroll
-  // rule (stick to the bottom while the reader is there, leave them be if they
-  // scrolled up).
-  import type { ChatActivityMark, MessageView } from '../contract/bindings'
+  // The thread: one scrollable column of the foreground chat's TRANSCRIPT. It
+  // owns three things and nothing else - the incremental markdown cache (one
+  // render of the growing tail per delta, never the finished blocks again), the
+  // scroll rule (stick to the bottom while the reader is there, leave them be if
+  // they scrolled up), and the one list that draws every kind of row.
+  //
+  // chat-transcript T2b: the transcript is the ITEMS the contract pushes - text,
+  // reasoning and tool calls, in the child's own order - so this list is keyed by
+  // the id each row carries. A tool row and a reasoning row draw no markdown and
+  // keep no cache entry. `messages` is still read while the shell finishes moving
+  // to the list: when no row list arrives, the text rows it carries are the only
+  // rows there are, drawn exactly as they were before.
+  //
+  // Nothing here measures a row: the window is Rust's (`last_items`), the fold of
+  // a body is a slice, so a chat of 400 tool calls stays a bounded list of bounded
+  // rows and the thread keeps ONE scroll container.
+  import type {
+    ChatActivityMark,
+    ChatItemView_Serialize as ChatItem,
+    MessageView,
+    ThinkingItemView_Serialize as ThinkingItem,
+    ToolCallItemView_Serialize as ToolItem,
+  } from '../contract/bindings'
   import { language } from '../i18n/language.svelte'
   import Activity from './Activity.svelte'
   import Message from './Message.svelte'
+  import ReasoningRow from './ReasoningRow.svelte'
+  import ToolCard from './ToolCard.svelte'
   import { threadCopy } from './copy'
   import { createMarkdownCache } from './markdown'
   import { nearBottom, nextScrollTop } from './scroll'
 
   let {
     messages = [],
+    items = [],
     foregroundChat = null,
     visible = true,
     scrollTop = $bindable(0),
@@ -21,6 +41,8 @@
   }: {
     /** The foreground chat's messages, oldest first, as Rust pushed them. */
     messages?: MessageView[]
+    /** The same chat's whole transcript: text, reasoning and tool rows. */
+    items?: ChatItem[]
     /** The foreground chat id: a change means the reader starts at the bottom. */
     foregroundChat?: string | null
     /**
@@ -39,6 +61,15 @@
   /** The thread's own words in the language the app holds (0.2.0, S3/D4). */
   const copy = $derived(threadCopy(language.current))
 
+  /**
+   * One drawn row: the id it is keyed by and the row itself, told apart by `kind`
+   * so the template draws each one with its own component.
+   */
+  type Row =
+    | { kind: 'message'; id: string; message: MessageView; html: string }
+    | { kind: 'thinking'; id: string; thinking: ThinkingItem }
+    | { kind: 'tool'; id: string; tool: ToolItem }
+
   /** The one cache of this thread: per message id, only the growing tail renders. */
   const cache = createMarkdownCache()
 
@@ -51,23 +82,44 @@
   /** Whether the Chat view was the one on screen last time this ran. */
   let shownVisible: boolean | null = null
 
-  const streaming = $derived(messages.some((message) => message.streaming))
+  /** A reply draws markdown; a user message and a model error draw none. */
+  function htmlOf(message: MessageView): string {
+    return message.role === 'Assistant' && message.error == null
+      ? cache.htmlFor(message.id, message.text)
+      : ''
+  }
 
-  /** Every message with its html: a user message and a model error draw no markdown. */
-  const rows = $derived.by(() =>
-    messages.map((message) => ({
+  /** One pushed transcript row, as this thread draws it. */
+  function rowOf(item: ChatItem): Row {
+    if (item.kind === 'Message') {
+      return { kind: 'message', id: item.data.id, message: item.data, html: htmlOf(item.data) }
+    }
+    if (item.kind === 'Thinking') return { kind: 'thinking', id: item.data.id, thinking: item.data }
+    return { kind: 'tool', id: item.data.id, tool: item.data }
+  }
+
+  /**
+   * Every row with its html: the pushed transcript when there is one, and the
+   * text rows alone while the shell still hands this thread `messages`.
+   */
+  const rows = $derived.by<Row[]>(() => {
+    if (items.length > 0) return items.map(rowOf)
+    return messages.map((message) => ({
+      kind: 'message',
+      id: message.id,
       message,
-      html:
-        message.role === 'Assistant' && message.error == null
-          ? cache.htmlFor(message.id, message.text)
-          : '',
-    })),
+      html: htmlOf(message),
+    }))
+  })
+
+  const streaming = $derived(
+    rows.some((row) => row.kind === 'message' && row.message.streaming),
   )
 
   // The cache follows the window Rust pushes: a message that left the last fifty
   // keeps nothing, so a long session does not keep a render cache per turn.
   $effect(() => {
-    cache.retain(messages.map((message) => message.id))
+    cache.retain(rows.filter((row) => row.kind === 'message').map((row) => row.id))
   })
 
   $effect(() => {
@@ -114,8 +166,14 @@
 
 <section class="thread" aria-label={copy.threadLabel} bind:this={box} onscroll={onScroll}>
   <div class="thread-in">
-    {#each rows as row (row.message.id)}
-      <Message message={row.message} html={row.html} />
+    {#each rows as row (row.id)}
+      {#if row.kind === 'message'}
+        <Message message={row.message} html={row.html} />
+      {:else if row.kind === 'thinking'}
+        <ReasoningRow item={row.thinking} />
+      {:else}
+        <ToolCard tool={row.tool} />
+      {/if}
     {/each}
     <Activity {mark} />
   </div>

@@ -8,6 +8,9 @@
 // the iced view - so a change of copy is a change here. A message's text and the
 // provider's error text are not words of this module: they travel through it
 // exactly as they arrived (D7).
+//
+// chat-transcript T2b adds the card's and the reasoning row's words to the same
+// two columns, the counting fold button included.
 import { describe, expect, it } from 'vitest'
 import { threadCopy } from './copy'
 
@@ -21,6 +24,15 @@ const ENGLISH = {
   modelErrorTitle: 'Model error',
   opening: 'Opening chat',
   working: 'Working',
+  toolDone: 'Done',
+  toolRunning: 'Running',
+  toolFailed: 'Failed',
+  thought: 'Thought',
+  expand: 'Expand',
+  collapse: 'Collapse',
+  showLess: 'Show less',
+  cutShort: 'output cut at the bound',
+  droppedField: 'a payload field was lost',
 }
 
 /** The Spanish words: neutral Spanish, no voseo, no regionalisms, accents kept. */
@@ -33,6 +45,15 @@ const SPANISH = {
   modelErrorTitle: 'Error del modelo',
   opening: 'Abriendo el chat',
   working: 'Trabajando',
+  toolDone: 'Hecho',
+  toolRunning: 'Ejecutando',
+  toolFailed: 'Falló',
+  thought: 'Pensamiento',
+  expand: 'Expandir',
+  collapse: 'Contraer',
+  showLess: 'Mostrar menos',
+  cutShort: 'salida cortada en el límite',
+  droppedField: 'se perdió un campo del payload',
 }
 
 /** The plain words of one language. */
@@ -68,5 +89,10 @@ describe('the thread copy', () => {
       }
       expect(spanish[word], word).not.toBe(english[word])
     }
+  })
+
+  it('counts the folded lines in both languages', () => {
+    expect(threadCopy('en').earlierLines(14)).toBe('14 earlier lines')
+    expect(threadCopy('es').earlierLines(14)).toBe('14 líneas antes')
   })
 })

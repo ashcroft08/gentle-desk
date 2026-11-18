@@ -406,6 +406,280 @@ p {
   overflow-wrap: anywhere;
 }
 
+/* A tool call, drawn as ONE quiet card (chat-transcript T2b; the artboard is
+   `design/tool-card/01-quiet-cards.html`, the tokens are `design/system.md`):
+   the header's kind glyph, the tool's own name and the chip that name implies,
+   the monospace subject, the output folded to its tail behind a count, and a
+   footer that carries the state and the elapsed time - never a sentence.
+   Every value is a house token and the house monospace stack, so the six themes
+   draw the card with no colour of its own.
+   `overflow: hidden` here is not a scroll container: the fold is a slice of the
+   text (`thread/card.ts`), so the thread keeps the ONE scroll box it has. */
+.tool-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.tc-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  min-height: 34px;
+}
+
+.tc-tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* The kind's glyph: a house stroke mark, `currentColor`, no fill. */
+.tc-glyph {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* The language or kind chip: drawn only when the tool's name names one. */
+.tc-chip {
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  font-size: 11px;
+  line-height: 1;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  border-radius: 5px;
+  padding: 3px 6px;
+  background: var(--surface2);
+}
+
+.tc-grow {
+  flex: 1;
+}
+
+/* The two honest marks of a payload that did not arrive whole (L10 R3-2): the
+   output was cut at the bound, or a field of it was dropped. Different words,
+   because they are different facts - and a border only, so no colour is added. */
+.tc-cut {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--warning);
+  font-size: 11.5px;
+  border: 1px solid var(--warning);
+  border-radius: 6px;
+  padding: 1px 6px;
+}
+
+.tc-chev {
+  background: none;
+  border: 0;
+  color: var(--faint);
+  cursor: pointer;
+  padding: 2px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 4px;
+}
+
+.tc-chev:hover {
+  color: var(--text);
+  background: var(--surface2);
+}
+
+.tc-chev svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* The one thing a card always shows: the command of a shell-like tool, or the
+   tool and a bounded summary of its arguments. */
+.tc-cmd {
+  margin: 0;
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  font-size: 12.5px;
+  color: var(--text);
+  background: var(--surface2);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  padding: 8px 10px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* A shell command is drawn the way a prompt draws it; the glyph is not a word,
+   so no language rewrites it (the shell's own `$` is the same in both). */
+.tc-cmd.shell::before {
+  content: '$ ';
+  color: var(--faint);
+}
+
+.tc-out {
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  font-size: 12.2px;
+  color: var(--muted);
+  padding: 8px 10px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* One line of an output is its own block, so the count of hidden lines is the
+   count of elements the card decided to draw - no layout is measured. The
+   minimum height keeps an empty line of an output visible as the empty line it
+   is, without asking the browser how tall a line is. */
+.tc-line {
+  display: block;
+  min-height: 1.5em;
+}
+
+/* The first line of a failed call: the reason, never folded away. */
+.tc-line-error {
+  color: var(--danger);
+}
+
+.tc-more {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  background: none;
+  border: 0;
+  border-top: 1px solid var(--border);
+  color: var(--faint);
+  font: inherit;
+  font-size: 11.5px;
+  padding: 5px 10px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.tc-more:hover {
+  color: var(--text);
+  background: var(--surface2);
+}
+
+/* The footer: the state and the time, tabular so the numbers do not shift. */
+.tc-foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-top: 1px solid var(--border);
+  font-size: 11.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* `.mark` gives the stroke; the card's own footer only sizes and tones it. */
+.tc-foot .tc-mark {
+  width: 13px;
+  height: 13px;
+  color: var(--success);
+}
+
+.tc-foot.bad .tc-mark {
+  color: var(--danger);
+}
+
+.tc-spin {
+  width: 11px;
+  height: 11px;
+  flex: none;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: tc-spin 0.9s linear infinite;
+}
+
+@keyframes tc-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* The reasoning row: NOT a card. One quiet line - a spark, the word, the
+   duration chip and a chevron - and the text behind a hairline, so a thought
+   never competes with the tool call beside it (T2b, the artboard's tradeoff). */
+.think-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.think {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  align-self: flex-start;
+  width: fit-content;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.think .spark {
+  color: var(--accent);
+  font-size: 13px;
+  line-height: 1;
+}
+
+.think .dur {
+  font-variant-numeric: tabular-nums;
+  color: var(--faint);
+  font-size: 12px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 0 5px;
+}
+
+.think .chev {
+  color: var(--faint);
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 120ms ease;
+}
+
+.think[aria-expanded='true'] .chev {
+  transform: rotate(90deg);
+}
+
+.think-text {
+  margin: 0 0 0 20px;
+  color: var(--muted);
+  font-size: 13px;
+  border-left: 2px solid var(--border);
+  padding-left: 10px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 /* A line only a screen reader reads: the author line of a message and the one
    live status of the thread. */
 .vh {

@@ -314,3 +314,22 @@ turn)"), and any gpui-kit widget.
   The reasoning row is text with a hairline, never a card, so it does not compete
   with the tool call - that is the tradeoff the artboard states and the maintainer
   approved by approving the design.
+- L15 (2026-11-18, T2a and T2b land): the contract exposes the transcript items
+  (lineage `review-fec7a6623e0a61a6`, tier high - the process boundary in
+  `pump_seam` - **APPROVED and burned**; three review findings were TEST gaps and
+  are closed by `686237c`, +354 test-only lines: the running row, both loss marks
+  with `is_error`, and the streaming reasoning row). Then the card itself:
+  `thread/card.ts` (per-row rules, fold, duration), `ToolCard.svelte`,
+  `ReasoningRow.svelte`, `ToolIcon.svelte`, `Thread.svelte` rendering `items`
+  (keyed by id, `messages` still accepted alone), tokens-only CSS, copy in EN and
+  ES, and the one line in `App.svelte` that hands the rows to the thread. Verified
+  with `npx vitest run --maxWorkers=2 src/thread` (105) and `src/App` (33), and the
+  App assertion is RED without the wiring - proved by removing the line.
+  HONEST LIMITS recorded, not hidden: (a) a chat REOPENED from a session file draws
+  no cards, because history arrives through `replace_messages` as text-only rows -
+  only a turn that runs live in this run carries tool and thinking rows; (b) the
+  chip and the glyph are inferred from `tool_name` (the wire has no kind or language
+  field); (c) the card counts the lines it HOLDS, because the contract carries no
+  total-line count, and says "cut at the bound", because `truncated` is a boolean;
+  (d) the footer shows the number the child measured or none - no ticking clock,
+  because a ticking number would be one nothing measured.

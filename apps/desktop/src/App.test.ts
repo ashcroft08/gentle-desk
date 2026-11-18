@@ -33,6 +33,23 @@ const MESSAGE = {
   images: [],
 }
 
+/** One tool row of the pushed transcript: the only shape `messages` cannot carry. */
+const TOOL = {
+  kind: 'Tool' as const,
+  data: {
+    id: 'tool-call-1',
+    tool_name: 'bash',
+    args: { command: 'ls node_modules' },
+    partial_result: null,
+    result: 'mocker.d.ts',
+    is_error: false,
+    running: false,
+    duration_ms: 200,
+    truncated: false,
+    dropped: false,
+  },
+}
+
 afterEach(cleanup)
 
 beforeEach(() => {
@@ -43,13 +60,20 @@ describe('App', () => {
 
   it('draws the foreground chat thread instead of the placeholder', async () => {
     serveSidebar({
-      view: viewState({ foreground_chat: 'chat-1', messages: [MESSAGE] }),
+      view: viewState({
+        foreground_chat: 'chat-1',
+        messages: [MESSAGE],
+        items: [{ kind: 'Message', data: MESSAGE }, TOOL],
+      }),
     })
     render(App)
 
     expect(await screen.findByText(MESSAGE.text)).toBeTruthy()
     expect(screen.queryByText('No chat open')).toBeNull()
     expect(screen.getByRole('region', { name: 'Chat thread' })).toBeTruthy()
+    // The shell hands the thread the ROWS, not only the messages: a tool row is
+    // drawn as its card, which `messages` alone could never produce (T2b).
+    expect(screen.getByText('ls node_modules')).toBeTruthy()
   })
 
   it('draws the open chat as its header, its thread and its composer', async () => {

@@ -191,6 +191,7 @@
         >
           <Thread
             messages={model.messages}
+            items={model.items}
             foregroundChat={model.chat}
             mark={chat.mark}
             visible={tab === 'chat'}
