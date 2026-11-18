@@ -10,6 +10,7 @@
 // names, the agent keys, the models, the efforts and the tiers. The one key the
 // view INTERPRETS is `*`, whose label is ours (`profileWide`).
 import type { LanguageView } from '../contract/bindings'
+import { applyCopy, type ApplyCopy } from './apply-copy'
 import { DOT } from '../helpers/copy'
 import type { StoreName } from './rules'
 
@@ -70,6 +71,10 @@ export interface ProfileCopy {
   modeNote: (name: string) => string
   /** The one short line a save that did not happen leaves: nothing was written. */
   modeNotSaved: string
+  /** The terminal's other two outcomes, their scopes and their notices
+   * (profiles-editor T3b, S9, L30), in their own module so this one stays a
+   * readable read-only dictionary. */
+  apply: ApplyCopy
   /** The pin group's own name (state 5). */
   pinTitle: string
   /** No profile is defined at all. */
@@ -102,8 +107,9 @@ export interface ProfileCopy {
   stores: Record<StoreName, string>
   /** One store could not be read: the line drawn where its content would be. */
   storeMissing: (store: StoreName) => string
-  /** The footer's one line: what this tab saves (the used profile's mode, T3-mode)
-   * and what it does not - every other profile edit is the terminal's (T2d). */
+  /** The footer's one line: what this tab WRITES for the used profile - its
+   * orchestration mode (T3-mode) and the two apply outcomes (T3b) - and what it
+   * does not: every profile EDIT is still the terminal's (T2d). */
   footer: string
   /** The footer's one action (T2d, L21-L22): the terminal, where profiles ARE
    * written, and the note that keeps it honest about what it opens. */
@@ -136,6 +142,7 @@ const ENGLISH: ProfileCopy = {
   modeFullDelegation: 'Full delegation',
   modeNote: (name) => `Saved in the profile "${name}", the setting every chat with that profile uses.`,
   modeNotSaved: 'The mode could not be saved. Nothing was written.',
+  apply: applyCopy('en'),
   pinTitle: 'Pin',
   noProfiles: 'No profiles are defined.',
   noAgents: 'No agents.',
@@ -156,10 +163,11 @@ const ENGLISH: ProfileCopy = {
   reading: "Reading this chat's profile configuration...",
   stores: { profiles: 'profiles', fallbacks: 'fallbacks', pins: 'pins' },
   storeMissing: (store) => `The ${ENGLISH.stores[store]} store could not be read.`,
-  footer: 'Only the orchestration mode is saved from this tab.',
+  footer:
+    "From this tab: the profile's orchestration mode, and applying it here or as the default.",
   editInTerminal: 'Edit in terminal',
   editNote:
-    'Opens the shell: type /gentle:profiles there to edit, create and switch profiles - this tab only reads them.',
+    'Opens the shell: type /gentle:profiles there to edit, create and switch profiles - this tab reads them and applies one, it does not edit them.',
 }
 
 /**
@@ -192,6 +200,7 @@ const SPANISH: ProfileCopy = {
   modeNote: (name) =>
     `Se guarda en el perfil "${name}", el ajuste que usan todos los chats con ese perfil.`,
   modeNotSaved: 'No se pudo guardar el modo. No se escribió nada.',
+  apply: applyCopy('es'),
   pinTitle: 'Perfil fijado',
   noProfiles: 'No hay perfiles definidos.',
   noAgents: 'No hay agentes.',
@@ -213,10 +222,11 @@ const SPANISH: ProfileCopy = {
   reading: 'Leyendo la configuración de perfiles de este chat...',
   stores: { profiles: 'perfiles', fallbacks: 'cadenas', pins: 'fijados' },
   storeMissing: (store) => `No se pudo leer el almacén de ${SPANISH.stores[store]}.`,
-  footer: 'Desde esta pestaña solo se guarda el modo de orquestación.',
+  footer:
+    'Desde esta pestaña: el modo de orquestación del perfil y aplicarlo aquí o como predeterminado.',
   editInTerminal: 'Editar en la terminal',
   editNote:
-    'Abre la shell: escribe /gentle:profiles allí para editar, crear y cambiar de perfil - esta pestaña solo los lee.',
+    'Abre la shell: escribe /gentle:profiles allí para editar, crear y cambiar de perfil - esta pestaña los lee y aplica uno, no los edita.',
 }
 
 /** The tab's own words in `language`, the whole dictionary at once (D4). */

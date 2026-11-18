@@ -20,7 +20,9 @@ use std::time::Duration;
 
 use gentle_app::{ChatCommand, ChatId, Input};
 use gentle_backend::chat_host::Opened;
-use gentle_runtime::chat_runtime::{request_after_open, ChatConfigRead, ModeWriteResult, Outcome};
+use gentle_runtime::chat_runtime::{
+    request_after_open, ChatConfigRead, ChatProfileApply, ModeWriteResult, Outcome,
+};
 
 mod runtime;
 
@@ -51,6 +53,11 @@ pub struct Ran {
     /// Shell-owned like [`Self::chat_profile`]: whether the write failed is a
     /// state of the tab's own, not the reducer's.
     pub chat_mode: Vec<(ChatId, ModeWriteResult, ChatConfigRead)>,
+    /// Every profile APPLY one run answered, with the chat it belongs to
+    /// (profiles-editor T3b): the channel's own dialog, a typed refusal, or an
+    /// attempt that ran together with the configuration it re-read. Shell-owned
+    /// like the two above: the reducer knows nothing about a profile.
+    pub chat_apply: Vec<(ChatId, ChatProfileApply)>,
     /// A fresh child's start only proved its process was created, which takes
     /// milliseconds while the child takes seconds to speak. Its opening phase
     /// therefore ends with the chat's own first event, and the caller arms
@@ -120,6 +127,10 @@ fn run_into(command: ChatCommand, executor: &dyn ChatExecutor, ran: &mut Ran) {
         // beside the read so the tab can say the mode could not be saved and
         // draw the truth the re-read brought.
         Outcome::ChatMode { chat, result, read } => ran.chat_mode.push((chat, result, *read)),
+        // One saved profile was applied, or the answer is the child's own dialog
+        // or a typed refusal (profiles-editor T3b): the shell's own state, kept
+        // whole so the page can draw the dialog verbatim and the notice.
+        Outcome::ChatApply { chat, attempt } => ran.chat_apply.push((chat, *attempt)),
     }
 }
 

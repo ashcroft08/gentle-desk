@@ -7,7 +7,7 @@ use gentle_backend::chat_host::Opened;
 use gentle_core::i18n::{messages, Language};
 use gentle_core::rpc::RpcCommand;
 
-use super::{ChatConfigRead, ChatRuntime, ModeWriteResult};
+use super::{ChatConfigRead, ChatProfileApply, ChatRuntime, ModeWriteResult};
 
 /// What running a [`ChatCommand`] came to. Plain data: a failure is a message
 /// for the shell to show, never a panic and never fatal for the whole app.
@@ -66,6 +66,17 @@ pub enum Outcome {
         result: ModeWriteResult,
         /// Boxed for the same reason as [`Outcome::ChatProfile`]'s read.
         read: Box<ChatConfigRead>,
+    },
+    /// One saved profile was APPLIED over that chat's own child, or it was not
+    /// and the typed answer says why (profiles-editor T3b, S4, S8, S9): the
+    /// channel's own dialog for `default` (its text carried verbatim, L30 ruling
+    /// 2), the typed refusals, or nothing at all.
+    ChatApply {
+        chat: ChatId,
+        /// The answer, with the configuration the attempt re-read when it ran.
+        /// Boxed because the attempt is far larger than the other variants and
+        /// every `Outcome` pays for its largest one.
+        attempt: Box<ChatProfileApply>,
     },
 }
 
@@ -154,6 +165,24 @@ impl ChatRuntime {
                     chat,
                     result: write.result,
                     read: Box::new(write.read),
+                }
+            }
+            // One saved profile, applied over the desktop channel into that
+            // chat's own child (profiles-editor T3b, S4, S8, S9): `session`
+            // binds this chat only, `default` is the channel's global apply and
+            // may answer the screen's own dialog first. Blocking on the
+            // channel's deadline under the chat's one client, so the caller runs
+            // it off the window's thread.
+            ChatCommand::ApplyChatProfile {
+                chat,
+                profile,
+                mode,
+                confirmation,
+            } => {
+                let attempt = self.apply_chat_profile(&chat, &profile, mode, confirmation.as_ref());
+                Outcome::ChatApply {
+                    chat,
+                    attempt: Box::new(attempt),
                 }
             }
             // The host owns the mark's effect (protection, reaping); the app

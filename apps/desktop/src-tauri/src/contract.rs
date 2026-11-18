@@ -279,6 +279,35 @@ pub enum UiIntent {
         /// The mode to store. `organic` is stored as the ABSENCE of the entry.
         mode: OrchestratorModeView,
     },
+    /// Apply one saved profile over THIS chat's own child (profiles-editor T3b,
+    /// S4, S8, S9): the terminal's other two outcomes, which a save never
+    /// reaches.
+    ///
+    /// `Use in this chat` ([`ApplyModeView::Session`]) binds the profile to the
+    /// chat the intent names and to no other, so the other open chats keep the
+    /// routing they started with. `Make default` ([`ApplyModeView::Default`]) is
+    /// the channel's own global apply (L30 ruling 1): it writes the store's
+    /// `active` and claims the routing of every new chat, and it is the only mode
+    /// that answers `confirmation_required` - the screen's own dialog, whose
+    /// title and message are shown AS THEY ARRIVED (L30 ruling 2) and whose
+    /// `token` comes back in [`confirmation`](Self::ApplyChatProfile::confirmation)
+    /// when, and only when, the human accepts.
+    ///
+    /// The answer travels back on [`ViewState::chat_profile`]: the buttons are
+    /// disabled while it is in flight, the dialog is drawn verbatim, and every
+    /// answer that wrote nothing leaves one short notice
+    /// ([`ChatProfileView::apply_notice`]).
+    ApplyChatProfile {
+        chat_id: String,
+        /// The profiles store's own key for the profile to apply.
+        profile: String,
+        mode: ApplyModeView,
+        /// The token of the dialog that was SHOWN, and nothing else: a first
+        /// apply carries none, and an empty or unrecognisable string is not a
+        /// token at all - it is dropped, so the apply asks again and a fresh
+        /// dialog (with a fresh token) answers instead of writing.
+        confirmation: Option<String>,
+    },
     /// Re-read the provider names and re-run one `auth check` per provider
     /// (0.1.12, T3). The answer travels back on [`ViewState::auth`].
     RefreshAuth,
@@ -346,6 +375,74 @@ pub enum OrchestratorModeView {
     Organic,
     #[serde(rename = "full-delegation")]
     FullDelegation,
+}
+
+/// Which of the terminal's two APPLY outcomes a request asks for, named exactly
+/// as the channel's `apply_profile` params name them (`session`, `default`), so
+/// neither side translates the value (profiles-editor T3b, S8, S9).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub enum ApplyModeView {
+    /// `Use in this chat`: bind the profile to this chat's OWN child, write no
+    /// store, and never ask for a confirmation. The other open chats keep the
+    /// routing they started with.
+    #[serde(rename = "session")]
+    Session,
+    /// `Make default`: the channel's own global apply, which writes the store's
+    /// `active` and may answer `confirmation_required` first (L30 ruling 1).
+    #[serde(rename = "default")]
+    Default,
+}
+
+/// The one short line an apply that wrote nothing leaves, in the cases the
+/// channel names (profiles-editor T3b, S4).
+///
+/// It is a TYPE, not a sentence: the page words each case in its own language
+/// (D4), and Rust never writes a user-facing line for a view.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum ChatProfileApplyNoticeView {
+    /// No profile by that name is saved, and nothing was written.
+    UnknownProfile,
+    /// Another apply is already running: nothing was written, and it can be
+    /// retried after it finishes.
+    Busy,
+    /// The store moved between the read and the write: nothing was written.
+    RevisionConflict,
+    /// The owner refused the data it was given: nothing was written.
+    InvalidData,
+    /// No answer at all: a deadline, a child that is gone, a host that is not
+    /// interactive. Nothing was written.
+    NoAnswer,
+    /// This chat's child does not advertise `apply_profile` at all. Nothing was
+    /// sent.
+    Unsupported,
+    /// The apply ran and its own notices did not end well: the screen's path
+    /// rolled its write back, so nothing stands.
+    NotApplied,
+    /// Any other refusal, reported as the one line a case this slice does not
+    /// model deserves.
+    Refused,
+}
+
+/// The screen's own dialog, carried to the page EXACTLY as the child wrote it
+/// (profiles-editor T3b, L30 ruling 2).
+///
+/// `title` and `message` are the child's text, in the child's language, never
+/// translated and never re-worded: this is the same dialog the terminal shows.
+/// `token` is what the acceptance carries back, and it is bound to the content it
+/// was issued for, so a resend with anything else re-asks instead of writing.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub struct ChatProfileApplyConfirmationView {
+    /// The profile the dialog is about, as the child echoed it.
+    pub profile: String,
+    /// The mode it asks about (`default` today: `session` never asks).
+    pub mode: ApplyModeView,
+    /// The child's own title, verbatim.
+    pub title: String,
+    /// The child's own message (the diff and the question), verbatim.
+    pub message: String,
+    /// The token to carry back if, and only if, the human accepts.
+    pub token: String,
 }
 
 /// One agent of one profile, as the chat's Profile tab draws it (profiles-editor
@@ -521,6 +618,23 @@ pub struct ChatProfileView {
     /// the re-read truth. Cleared by the next successful read, by a save that
     /// worked, and never set by the read itself.
     pub save_failed: bool,
+    /// Whether an APPLY of the used profile is in flight right now (profiles-editor
+    /// T3b): both buttons - `Use in this chat` and `Make default` - are DISABLED
+    /// while it is, so one click cannot become two applies. Shell-owned and
+    /// shell-side capped like the save: a second ask is dropped, never queued
+    /// (L18, L29), and a chat that closes drops it with the view.
+    pub applying: bool,
+    /// The one short line the last apply that WROTE NOTHING left, `None` when it
+    /// worked, when it is still in flight, and when the child is asking its own
+    /// confirmation. Cleared by the next apply's own answer and by the next
+    /// successful read.
+    pub apply_notice: Option<ChatProfileApplyNoticeView>,
+    /// The screen's own confirmation, when the child answered
+    /// `confirmation_required` and nothing was written yet. Its `title` and
+    /// `message` are the CHILD's text and are drawn verbatim (L30 ruling 2);
+    /// accepting sends the SAME profile and mode back with its `token`, and
+    /// cancelling sends nothing at all.
+    pub apply_confirmation: Option<ChatProfileApplyConfirmationView>,
 }
 
 /// What one "Open in terminal" button asks the shell to do (0.1.12, S1, S2,

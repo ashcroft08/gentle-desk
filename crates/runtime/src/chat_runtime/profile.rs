@@ -35,6 +35,9 @@ use gentle_core::rpc::config_store::{
     GetConfigOutcome, OrchestratorMode, PinsValue, ProfilesDocument, SetConfigOutcome, StoreId,
     WritableStore, WriteTargetName,
 };
+use gentle_core::rpc::profile_apply::{
+    apply_profile, ApplyMode, ApplyProfileOutcome, ConfirmationToken,
+};
 use gentle_core::rpc::{AnswerError, DesktopClient, NoAnswer, StoreValue};
 
 use super::ChatRuntime;
@@ -84,6 +87,43 @@ pub enum StoreRead<T> {
     /// Never asked: an earlier store got no answer at all, so asking this one
     /// could only wait out another deadline under the same client.
     Skipped,
+}
+
+/// What one attempt to APPLY a profile came to, with the configuration re-read
+/// after an attempt that actually ran (profiles-editor T3b, S4, S8, S9).
+///
+/// The two modes are the terminal's own two outcomes and they are not
+/// interchangeable:
+///
+/// - [`ApplyMode::Session`] binds the profile to THIS chat's child and writes no
+///   store at all, so the re-read is the one that shows the binding;
+/// - [`ApplyMode::Default`] is the channel's own global apply, which writes the
+///   store's `active` and may answer `confirmation_required` first - the
+///   screen's dialog, whose text is the child's and travels verbatim (L30 ruling
+///   2).
+///
+/// `read` is `None` for every answer that wrote nothing (a dialog, a refusal, a
+/// child that did not answer, a method it does not advertise): the store cannot
+/// have moved, so the tab keeps exactly what it drew.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ChatProfileApply {
+    /// The channel's typed answer, in the terms the page draws: applied, the
+    /// screen's dialog, or one of the reasons nothing was written.
+    pub result: ApplyProfileOutcome,
+    /// The three stores read again after an attempt that RAN, exactly as a plain
+    /// read reads them.
+    pub read: Option<ChatConfigRead>,
+}
+
+impl ChatProfileApply {
+    /// Nothing was asked, because the chat has no child to ask: no profile was
+    /// applied and there is nothing to read.
+    pub fn unasked() -> Self {
+        Self {
+            result: ApplyProfileOutcome::NoAnswer(NoAnswer::NotConnected),
+            read: None,
+        }
+    }
 }
 
 impl ChatRuntime {
@@ -145,6 +185,51 @@ impl ChatRuntime {
         // read is the SAME one a plain read makes (S6: never a broken pane).
         let read = reads.the_three();
         ChatModeWrite { result, read }
+    }
+
+    /// Applies `profile` over `chat`'s OWN child (profiles-editor T3b, S4, S8,
+    /// S9) and, when the attempt ran, re-reads that chat's profile configuration
+    /// exactly as [`Self::read_chat_profile`] does.
+    ///
+    /// The request is the chat's own: `session` binds this chat and no other, and
+    /// `default` is the channel's global apply, which is the only one that can
+    /// answer [`ApplyProfileOutcome::ConfirmationRequired`]. That answer is
+    /// returned with the child's own title, message and token untouched, so the
+    /// caller shows it as it arrived and resends it only if the human approves
+    /// (L30 ruling 2).
+    ///
+    /// Blocking on the channel's deadline under the chat's one client, so the
+    /// caller runs it off the window's thread. The re-read is the same three
+    /// stores a plain read asks, in the same order, under the same one-deadline
+    /// bound.
+    pub fn apply_chat_profile(
+        &self,
+        chat: &ChatId,
+        profile: &str,
+        mode: ApplyMode,
+        confirmation: Option<&ConfirmationToken>,
+    ) -> ChatProfileApply {
+        let Some(client) = self.desktop_client(chat) else {
+            return ChatProfileApply::unasked();
+        };
+        // ONE exchange with this chat at a time: the apply, and the re-read that
+        // follows it, are numbered by the chat's single request counter.
+        let mut client = super::lock(&client);
+        let result = apply_profile(&mut client, profile, mode, confirmation);
+        // Only an attempt that RAN can have moved the store (the session file for
+        // `session`, `active` and the routing for `default`); an answer that
+        // wrote nothing leaves the tab with the view it drew.
+        let read = match &result {
+            ApplyProfileOutcome::Applied(_) | ApplyProfileOutcome::NotApplied(_) => {
+                let mut reads = Reads {
+                    client: &mut client,
+                    stopped: false,
+                };
+                Some(reads.the_three())
+            }
+            _ => None,
+        };
+        ChatProfileApply { result, read }
     }
 }
 

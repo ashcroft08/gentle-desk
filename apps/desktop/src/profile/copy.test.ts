@@ -58,7 +58,7 @@ const ENGLISH = {
   modeNotSaved: 'The mode could not be saved. Nothing was written.',
   editInTerminal: 'Edit in terminal',
   editNote:
-    'Opens the shell: type /gentle:profiles there to edit, create and switch profiles - this tab only reads them.',
+    'Opens the shell: type /gentle:profiles there to edit, create and switch profiles - this tab reads them and applies one, it does not edit them.',
 }
 
 /** The same words in the app's neutral Spanish. */
@@ -106,7 +106,7 @@ const SPANISH = {
   modeNotSaved: 'No se pudo guardar el modo. No se escribió nada.',
   editInTerminal: 'Editar en la terminal',
   editNote:
-    'Abre la shell: escribe /gentle:profiles allí para editar, crear y cambiar de perfil - esta pestaña solo los lee.',
+    'Abre la shell: escribe /gentle:profiles allí para editar, crear y cambiar de perfil - esta pestaña los lee y aplica uno, no los edita.',
 }
 
 /** The one word both languages spell the same on purpose (`Local` is Spanish too). */

@@ -22,7 +22,9 @@ use gentle_backend::chat_host::{
 use gentle_backend::home::{with_home_flag, HomeChoice, HomeEnv};
 use gentle_backend::launcher::{self, LauncherEnv};
 use gentle_core::i18n::{messages, Language};
-use gentle_runtime::chat_runtime::{ChatConfigRead, ChatModeWrite, ChatRuntime, Outcome};
+use gentle_runtime::chat_runtime::{
+    ChatConfigRead, ChatModeWrite, ChatProfileApply, ChatRuntime, Outcome,
+};
 
 use super::ChatExecutor;
 use crate::bridge::AppStateHolder;
@@ -181,6 +183,7 @@ impl ChatExecutor for RuntimeExecutor {
             | ChatCommand::StopHelper { .. }
             | ChatCommand::ReadChatProfile { .. }
             | ChatCommand::SetChatProfileMode { .. }
+            | ChatCommand::ApplyChatProfile { .. }
             | ChatCommand::SetWorking { .. } => None,
         };
         // The chat's attached images are merged in HERE, beside the folder and
@@ -209,6 +212,9 @@ impl ChatExecutor for RuntimeExecutor {
                 // written, and the page hears the not-connected reason a read of
                 // that chat would report (profiles-editor T3-mode).
                 ChatCommand::SetChatProfileMode { chat, .. } => unasked_mode(chat),
+                // Nor is there a child to apply a profile to: nothing was
+                // applied and nothing is re-read (profiles-editor T3b).
+                ChatCommand::ApplyChatProfile { chat, .. } => unasked_apply(chat),
                 // There is no host, so there is nothing to protect from and
                 // nothing to reap: the mark has no reader in this run.
                 ChatCommand::SetWorking { chat, working } => Outcome::Working { chat, working },
@@ -268,6 +274,9 @@ fn refuse(language: Language, command: ChatCommand) -> Outcome {
         // The window is closing and its children go with it: a mode write that
         // arrives now never reaches a store (profiles-editor T3-mode).
         ChatCommand::SetChatProfileMode { chat, .. } => unasked_mode(chat),
+        // Nor does an apply: its child is going away, so nothing is applied and
+        // nothing is read (profiles-editor T3b).
+        ChatCommand::ApplyChatProfile { chat, .. } => unasked_apply(chat),
         // No host is left to mark, and the run that would have read the mark is
         // the one being torn down.
         ChatCommand::SetWorking { chat, working } => Outcome::Working { chat, working },
@@ -282,6 +291,15 @@ fn unasked_mode(chat: gentle_app::ChatId) -> Outcome {
         chat,
         result: write.result,
         read: Box::new(write.read),
+    }
+}
+
+/// The apply a run with no host - or a window that is closing - answers: no
+/// child to ask, so no profile was applied and nothing was read (T3b).
+fn unasked_apply(chat: gentle_app::ChatId) -> Outcome {
+    Outcome::ChatApply {
+        chat,
+        attempt: Box::new(ChatProfileApply::unasked()),
     }
 }
 
