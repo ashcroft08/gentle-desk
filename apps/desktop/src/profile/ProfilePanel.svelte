@@ -12,7 +12,8 @@
   // writes: its confirmation is drawn verbatim, in the child's own words, with
   // Accept (resend the same profile and mode with its token) and Cancel (send
   // nothing at all). An apply that wrote nothing says so in one short line and
-  // never claims a live chat changed its routing (S9, L30).
+  // never claims a live chat changed its routing (S9, L30); an apply that RAN says
+  // what it did in the child's own notes, drawn verbatim (T3b, L32).
   //
   // The one action it does offer is the terminal (T2d, L21-L22): Settings > Profiles
   // is gone, so the profiles screen the terminal already edits is opened from this
@@ -196,6 +197,7 @@
             saveFailed={view.save_failed}
             applying={view.applying}
             applyNotice={view.apply_notice}
+            applyAnswer={view.apply_answer}
             onSave={saveMode}
             onApply={applyProfile}
           />

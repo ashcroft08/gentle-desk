@@ -43,11 +43,11 @@ use gentle_runtime::session_profile::last_session_profile;
 
 use super::{lock, AppStateHolder};
 use crate::contract::{
-    ApplyModeView, ChatProfileAgentView, ChatProfileApplyConfirmationView,
-    ChatProfileApplyNoticeView, ChatProfileAvailabilityView, ChatProfileChainView,
-    ChatProfileDefinitionView, ChatProfilePinLayerView, ChatProfilePinMarkView,
-    ChatProfilePinsView, ChatProfileStepView, ChatProfileStoresView, ChatProfileView,
-    OrchestratorModeView, ViewState,
+    ApplyModeView, ChatProfileAgentView, ChatProfileApplyAnswerView,
+    ChatProfileApplyConfirmationView, ChatProfileApplyNoticeView, ChatProfileAvailabilityView,
+    ChatProfileChainView, ChatProfileDefinitionView, ChatProfilePinLayerView,
+    ChatProfilePinMarkView, ChatProfilePinsView, ChatProfileStepView, ChatProfileStoresView,
+    ChatProfileView, OrchestratorModeView, ViewState,
 };
 use crate::settings::FileRead;
 
@@ -84,6 +84,7 @@ pub fn compose(chat: &ChatId, read: &ChatConfigRead, session: Option<&str>) -> C
         save_failed: false,
         applying: false,
         apply_notice: None,
+        apply_answer: None,
         apply_confirmation: None,
     }
 }
@@ -110,6 +111,11 @@ pub(super) struct ProfileWork {
     /// The one short line the last apply that wrote nothing left, `None` when it
     /// worked and when nothing failed.
     pub(super) notice: Option<ChatProfileApplyNoticeView>,
+    /// The child's own answer to the last apply that RAN (`applied` or
+    /// `not_applied`), verbatim: a profile whose routing already matched answers
+    /// `applied` with no dialog at all, so this is the only thing that tells the
+    /// user the click happened (T3b, L32).
+    pub(super) answer: Option<ChatProfileApplyAnswerView>,
     /// The child's own dialog while it is waiting for the human, verbatim: the
     /// shell keeps it so every later slice carries the same text and the same
     /// token (L30 ruling 2).
@@ -375,6 +381,22 @@ fn notice_of(result: &ApplyProfileOutcome) -> Option<ChatProfileApplyNoticeView>
     }
 }
 
+/// The child's own answer to an attempt that RAN, `None` for one that wrote
+/// nothing and for one the child is asking about.
+///
+/// `applied` and `not_applied` both ran, and both carry the screen's notes: its
+/// own words, in its own language, several lines each - never a sentence this
+/// shell composes, which is why the texts travel as they arrived (L30 ruling 2).
+/// An answer with no note has nothing to say and is not one.
+fn answer_of(result: &ApplyProfileOutcome) -> Option<ChatProfileApplyAnswerView> {
+    let ran = match result {
+        ApplyProfileOutcome::Applied(ran) | ApplyProfileOutcome::NotApplied(ran) => ran,
+        _ => return None,
+    };
+    let notes: Vec<String> = ran.notes.iter().map(|note| note.text.clone()).collect();
+    (!notes.is_empty()).then_some(ChatProfileApplyAnswerView { notes })
+}
+
 /// One pin layer, as the store named it and the page draws it.
 fn layer(pin: &PinLayer, mark: ChatProfilePinMarkView) -> ChatProfilePinLayerView {
     ChatProfilePinLayerView {
@@ -430,6 +452,10 @@ impl AppStateHolder {
                 if reached {
                     state.failed = false;
                     state.notice = None;
+                    // The child's own answer to an apply that RAN goes with the
+                    // notice: the next successful read is the truth the tab
+                    // draws, and it is the same one lifecycle (T3b).
+                    state.answer = None;
                 }
             }
         }
@@ -536,14 +562,17 @@ impl AppStateHolder {
     /// Three shapes, and nothing else goes to the page:
     ///
     /// - the attempt RAN: both buttons are enabled again, any notice and any
-    ///   pending dialog are dropped, and the configuration the attempt re-read is
-    ///   installed exactly as a plain read installs it (a read that reached no
-    ///   store leaves what the tab drew, L11-4);
+    ///   pending dialog are dropped, the child's own notes travel as the answer
+    ///   ([`ChatProfileView::apply_answer`]: `applied` on a profile whose routing
+    ///   already matched asks nothing, so without them the click says nothing at
+    ///   all), and the configuration the attempt re-read is installed exactly as a
+    ///   plain read installs it (a read that reached no store leaves what the tab
+    ///   drew, L11-4);
     /// - the child is ASKING: its own `title` and `message` travel verbatim, with
     ///   the token the acceptance carries back, and no notice - being asked is not
     ///   a failure, and nothing was written (L30 ruling 2);
-    /// - the attempt wrote NOTHING: one short notice names the case, and the view
-    ///   the tab drew stays as it is.
+    /// - the attempt wrote NOTHING: one short notice names the case, no answer
+    ///   travels, and the view the tab drew stays as it is.
     ///
     /// A chat that closed while the apply ran is dropped with its state, as its
     /// view is.
@@ -568,12 +597,16 @@ impl AppStateHolder {
                         token: confirmation.token.as_str().to_owned(),
                     });
                     state.notice = None;
+                    state.answer = None;
                 }
                 // Every other answer ends the flow that produced it: nothing is
                 // pending any more, and what the page says is said below.
                 result => {
                     state.confirmation = None;
                     state.notice = notice_of(result);
+                    // An attempt that RAN said what it did, in the child's own
+                    // words; one that wrote nothing has its short notice instead.
+                    state.answer = answer_of(result);
                 }
             }
         }
@@ -672,6 +705,7 @@ impl AppStateHolder {
         view.save_failed = state.failed;
         view.applying = state.applying;
         view.apply_notice = state.notice;
+        view.apply_answer = state.answer;
         view.apply_confirmation = state.confirmation;
         Some(view)
     }

@@ -25,8 +25,8 @@ use chat_seam::{stored, Answer, Fake};
 use gentle_app::{ChatCommand, ChatId, Input, Intent};
 use gentle_core::rpc::config_store::{self, StoreId, StoreValue};
 use gentle_core::rpc::profile_apply::{
-    ApplyMode, ApplyProfileOutcome, ConfirmationToken, ProfileAnswerError, ProfileConfirmation,
-    ProfileParamsError,
+    ApplyMode, ApplyProfileOutcome, ConfirmationToken, NoteLevel, ProfileAnswerError, ProfileApply,
+    ProfileConfirmation, ProfileNote, ProfileParamsError,
 };
 use gentle_core::rpc::{DesktopError, NoAnswer};
 use gentle_desk_lib::bridge::AppStateHolder;
@@ -85,13 +85,45 @@ fn asking() -> ChatProfileApply {
 /// An apply that ran, with the configuration it re-read.
 fn ran() -> ChatProfileApply {
     ChatProfileApply {
-        result: ApplyProfileOutcome::Applied(gentle_core::rpc::profile_apply::ProfileApply {
+        result: ApplyProfileOutcome::Applied(ProfileApply {
             profile: "team".to_owned(),
             mode: ApplyMode::Session,
             notes: Vec::new(),
         }),
         read: Some(read()),
     }
+}
+
+/// The child's own notes, verbatim as the approved T3b probe (L32) had them: it
+/// writes them in its own language, in two or three lines, and names itself.
+const APPLIED_NOTES: [&str; 2] = [
+    "el Gentleman applied profile \"team\" — 0 agents updated.\nNew routing takes effect on the next subagent launch.\nOrchestrator set to anthropic/claude-sonnet-4 in settings.json.",
+    "anthropic/claude-sonnet-4 is not in the model catalog; this session keeps its current model.",
+];
+
+/// An apply that RAN with the child's own notes, and the configuration it re-read.
+fn ran_with(notes: &[&str]) -> ChatProfileApply {
+    ChatProfileApply {
+        result: ApplyProfileOutcome::Applied(ProfileApply {
+            profile: "team".to_owned(),
+            mode: ApplyMode::Default,
+            notes: notes
+                .iter()
+                .map(|text| ProfileNote {
+                    level: NoteLevel::Info,
+                    text: (*text).to_owned(),
+                })
+                .collect(),
+        }),
+        read: Some(read()),
+    }
+}
+
+/// The child's own answer notes the slice carries, exactly as the page receives
+/// them, `None` when it carries none.
+fn answer_notes(pushed: &gentle_desk_lib::contract::ViewState) -> Option<serde_json::Value> {
+    let view = serde_json::to_value(pushed.chat_profile.clone()?).expect("a view is JSON");
+    Some(view.get("apply_answer")?.get("notes")?.clone())
 }
 
 /// The answer that wrote nothing for one typed reason.
@@ -309,6 +341,123 @@ fn an_apply_that_ran_installs_the_reread_truth_and_clears_the_notice() {
             .collect::<Vec<_>>(),
         ["team"],
         "and the re-read is installed"
+    );
+}
+
+#[test]
+fn an_applied_answer_carries_the_children_notes_to_the_tab() {
+    let (holder, chat) = drawn();
+
+    let pushed = holder
+        .note_chat_apply(&chat, &ran_with(&APPLIED_NOTES))
+        .expect("the answer is pushed");
+
+    assert_eq!(
+        answer_notes(&pushed),
+        Some(serde_json::json!(APPLIED_NOTES)),
+        "an apply that RAN said what it did, in the child's own words: the tab draws them \
+         verbatim, one line per note (L32, and the maintainer's real-window finding of \
+         2026-11-17: the apply answered and the tab drew nothing)"
+    );
+    let view = pushed.chat_profile.expect("the chat's own view");
+    assert!(!view.applying, "the answer enabled the buttons again");
+    assert_eq!(
+        view.apply_notice, None,
+        "an apply that ran is not a failure: the child's own answer is what says it happened"
+    );
+}
+
+#[test]
+fn a_not_applied_answer_carries_the_children_notes_beside_its_notice() {
+    let (holder, chat) = drawn();
+    let answer = ChatProfileApply {
+        result: ApplyProfileOutcome::NotApplied(ProfileApply {
+            profile: "team".to_owned(),
+            mode: ApplyMode::Default,
+            notes: vec![ProfileNote {
+                level: NoteLevel::Warning,
+                text: APPLIED_NOTES[1].to_owned(),
+            }],
+        }),
+        read: Some(read()),
+    };
+
+    let pushed = holder
+        .note_chat_apply(&chat, &answer)
+        .expect("the answer is pushed");
+
+    assert_eq!(
+        answer_notes(&pushed),
+        Some(serde_json::json!([APPLIED_NOTES[1]])),
+        "not_applied RAN too: its notes say why, and they are the child's own words"
+    );
+    assert_eq!(
+        pushed.chat_profile.expect("the view").apply_notice,
+        Some(ChatProfileApplyNoticeView::NotApplied),
+        "and the short line that nothing stands stays exactly as it was"
+    );
+}
+
+#[test]
+fn the_children_answer_goes_away_on_the_next_successful_read() {
+    let (holder, chat) = drawn();
+    holder.note_chat_apply(&chat, &ran_with(&APPLIED_NOTES));
+    assert!(
+        answer_notes(&holder.view()).is_some(),
+        "the answer is drawn"
+    );
+
+    let pushed = holder
+        .note_chat_profile(&chat, &read())
+        .expect("a read that reached a store is a view");
+
+    assert_eq!(
+        answer_notes(&pushed),
+        None,
+        "the next successful read clears the child's answer exactly as it clears the notice: \
+         one lifecycle, no second timer"
+    );
+}
+
+#[test]
+fn a_read_that_reached_no_store_keeps_the_children_answer() {
+    let (holder, chat) = drawn();
+    holder.note_chat_apply(&chat, &ran_with(&APPLIED_NOTES));
+
+    assert!(
+        holder
+            .note_chat_profile(&chat, &ChatConfigRead::unasked())
+            .is_none(),
+        "a read that reached nothing keeps what it drew (L11-4)"
+    );
+    assert_eq!(
+        answer_notes(&holder.view()),
+        Some(serde_json::json!(APPLIED_NOTES))
+    );
+}
+
+#[test]
+fn an_answer_that_wrote_nothing_and_the_children_dialog_carry_no_notes() {
+    let (holder, chat) = drawn();
+    holder.note_chat_apply(&chat, &ran_with(&APPLIED_NOTES));
+
+    let wrote_nothing = holder
+        .note_chat_apply(&chat, &refused(ApplyProfileOutcome::Unsupported))
+        .expect("the answer is pushed");
+    assert_eq!(
+        answer_notes(&wrote_nothing),
+        None,
+        "nothing ran, so nothing of the child's answer stands: the short notice says why"
+    );
+
+    holder.note_chat_apply(&chat, &ran_with(&APPLIED_NOTES));
+    let asks = holder
+        .note_chat_apply(&chat, &asking())
+        .expect("the answer is pushed");
+    assert_eq!(
+        answer_notes(&asks),
+        None,
+        "and the child's own dialog is the next thing said, never beside the last answer"
     );
 }
 

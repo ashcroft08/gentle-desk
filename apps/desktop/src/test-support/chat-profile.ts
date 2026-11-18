@@ -84,10 +84,12 @@ export function chatProfile(over: Partial<ChatProfile> = {}): ChatProfile {
     // the tab says nothing about a save (profiles-editor T3-mode).
     saving: false,
     save_failed: false,
-    // Nor is anything being applied, nothing failed to apply, and no dialog is
-    // waiting for the human (profiles-editor T3b).
+    // Nor is anything being applied, nothing failed to apply, no answer of the
+    // child's is on screen, and no dialog is waiting for the human
+    // (profiles-editor T3b).
     applying: false,
     apply_notice: null,
+    apply_answer: null,
     apply_confirmation: null,
     ...over,
   }

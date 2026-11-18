@@ -13,13 +13,21 @@
   // chat here and every chat that starts with the default there. Both are
   // disabled while an apply is in flight, and an answer that wrote nothing leaves
   // ONE short line under them (S4).
-  import type { ChatProfileApplyNoticeView } from '../contract/bindings'
+  //
+  // An answer that RAN draws the child's own notes (T3b, L32): `Make default` on a
+  // profile whose routing already matches answers `applied` with no dialog, and
+  // the maintainer's real-window finding of 2026-11-17 was that clicking it said
+  // nothing at all. The notes are the child's words, in the child's language, in
+  // its own voice - they are drawn verbatim, one entry each with its own line
+  // breaks kept, and never wrapped in a sentence of the app's.
+  import type { ChatProfileApplyAnswerView, ChatProfileApplyNoticeView } from '../contract/bindings'
   import type { ApplyCopy } from './apply-copy'
 
   let {
     copy,
     applying = false,
     notice = null,
+    answer = null,
     onApply,
   }: {
     copy: ApplyCopy
@@ -27,6 +35,8 @@
     applying?: boolean
     /** The last apply wrote nothing: its own short line says why. */
     notice?: ChatProfileApplyNoticeView | null
+    /** The last apply RAN: the child's own notes, as it wrote them. */
+    answer?: ChatProfileApplyAnswerView | null
     /** Ask the shell to apply this chat's profile, in one of the two modes. */
     onApply?: (mode: 'session' | 'default') => void
   } = $props()
@@ -56,6 +66,15 @@
   {#if notice !== null}
     <!-- One short line, one per answer that wrote nothing (S4). -->
     <p class="afail" role="status">{copy.notices[notice]}</p>
+  {/if}
+  {#if answer !== null && answer.notes.length > 0}
+    <!-- The child's own answer to an apply that RAN (T3b, L32): its notes, in its
+         own voice, one per line, and nothing of ours around them. -->
+    <div class="aanswer" role="status">
+      {#each answer.notes as note}
+        <p class="aline">{note}</p>
+      {/each}
+    </div>
   {/if}
 </div>
 
@@ -114,5 +133,19 @@
     color: var(--danger);
     font-size: 11.5px;
     line-height: 1.5;
+  }
+
+  /* The child's own answer (L32): read as what happened, not as a warning, and
+     kept as the lines it wrote. */
+  .aanswer {
+    flex-basis: 100%;
+    color: var(--text);
+    font-size: 11.5px;
+    line-height: 1.55;
+  }
+
+  .aline {
+    margin: 0;
+    white-space: pre-wrap;
   }
 </style>

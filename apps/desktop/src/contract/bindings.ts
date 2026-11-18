@@ -268,6 +268,27 @@ export type ChatProfileAgentView_Serialize = {
 };
 
 /**
+ *  The child's own ANSWER to an apply that RAN - `applied` or `not_applied`,
+ *  which both ran - carried to the page as it wrote it (profiles-editor T3b, S4,
+ *  L32).
+ * 
+ *  Its notes are the child's text, in the child's language, in its own voice: the
+ *  approved probe of L32 has them start with `el Gentleman applied profile ...`,
+ *  and the one for a profile whose routing already matches says so instead of
+ *  claiming a change. The page draws them VERBATIM and wraps them in no sentence
+ *  of its own, exactly as it draws the child's dialog (L30 ruling 2) - a
+ *  maintainer's real-window finding (2026-11-17) was that an apply that ran left
+ *  the tab with nothing at all said.
+ */
+export type ChatProfileApplyAnswerView = {
+	/**
+	 *  One entry per note the child wrote, in the child's own order, each with its
+	 *  OWN line breaks kept (a note is two or three lines long).
+	 */
+	notes: string[],
+};
+
+/**
  *  The screen's own dialog, carried to the page EXACTLY as the child wrote it
  *  (profiles-editor T3b, L30 ruling 2).
  * 
@@ -657,6 +678,23 @@ export type ChatProfileView_Deserialize = {
 	 */
 	apply_notice?: ChatProfileApplyNoticeView | null,
 	/**
+	 *  The child's own answer to the last apply that RAN, `None` for an attempt
+	 *  still in flight, one that wrote nothing (its
+	 *  [`apply_notice`](Self::apply_notice) says why), and one the child is asking
+	 *  about (its [`apply_confirmation`](Self::apply_confirmation) is the words).
+	 * 
+	 *  `applied` and `not_applied` both RAN, and both said what they did: a
+	 *  profile whose routing already matches answers `applied` with the child's
+	 *  own "already matches" line, and a dialog never appears for it, so this is
+	 *  the ONLY thing the user learns from clicking. A `not_applied` answer
+	 *  carries both the short notice that nothing stands and these notes, which
+	 *  say why.
+	 * 
+	 *  Cleared by the next apply's own answer and by the next successful read, the
+	 *  same one lifecycle the notice keeps: no second rule, no timer.
+	 */
+	apply_answer?: ChatProfileApplyAnswerView | null,
+	/**
 	 *  The screen's own confirmation, when the child answered
 	 *  `confirmation_required` and nothing was written yet. Its `title` and
 	 *  `message` are the CHILD's text and are drawn verbatim (L30 ruling 2);
@@ -747,6 +785,23 @@ export type ChatProfileView_Serialize = {
 	 *  successful read.
 	 */
 	apply_notice: ChatProfileApplyNoticeView | null,
+	/**
+	 *  The child's own answer to the last apply that RAN, `None` for an attempt
+	 *  still in flight, one that wrote nothing (its
+	 *  [`apply_notice`](Self::apply_notice) says why), and one the child is asking
+	 *  about (its [`apply_confirmation`](Self::apply_confirmation) is the words).
+	 * 
+	 *  `applied` and `not_applied` both RAN, and both said what they did: a
+	 *  profile whose routing already matches answers `applied` with the child's
+	 *  own "already matches" line, and a dialog never appears for it, so this is
+	 *  the ONLY thing the user learns from clicking. A `not_applied` answer
+	 *  carries both the short notice that nothing stands and these notes, which
+	 *  say why.
+	 * 
+	 *  Cleared by the next apply's own answer and by the next successful read, the
+	 *  same one lifecycle the notice keeps: no second rule, no timer.
+	 */
+	apply_answer: ChatProfileApplyAnswerView | null,
 	/**
 	 *  The screen's own confirmation, when the child answered
 	 *  `confirmation_required` and nothing was written yet. Its `title` and
@@ -1828,9 +1883,12 @@ export type UiIntent_Deserialize = { type: "SendPrompt"; data: {
  *  when, and only when, the human accepts.
  * 
  *  The answer travels back on [`ViewState::chat_profile`]: the buttons are
- *  disabled while it is in flight, the dialog is drawn verbatim, and every
- *  answer that wrote nothing leaves one short notice
- *  ([`ChatProfileView::apply_notice`]).
+ *  disabled while it is in flight, the dialog is drawn verbatim, every answer
+ *  that wrote nothing leaves one short notice
+ *  ([`ChatProfileView::apply_notice`]), and every answer that RAN leaves the
+ *  child's own notes, verbatim, in
+ *  [`ChatProfileView::apply_answer`] - the only thing an `applied` answer that
+ *  asked nothing says.
  */
 { type: "ApplyChatProfile"; data: {
 	chat_id: string,
@@ -2061,9 +2119,12 @@ export type UiIntent_Serialize = { type: "SendPrompt"; data: {
  *  when, and only when, the human accepts.
  * 
  *  The answer travels back on [`ViewState::chat_profile`]: the buttons are
- *  disabled while it is in flight, the dialog is drawn verbatim, and every
- *  answer that wrote nothing leaves one short notice
- *  ([`ChatProfileView::apply_notice`]).
+ *  disabled while it is in flight, the dialog is drawn verbatim, every answer
+ *  that wrote nothing leaves one short notice
+ *  ([`ChatProfileView::apply_notice`]), and every answer that RAN leaves the
+ *  child's own notes, verbatim, in
+ *  [`ChatProfileView::apply_answer`] - the only thing an `applied` answer that
+ *  asked nothing says.
  */
 { type: "ApplyChatProfile"; data: {
 	chat_id: string,
