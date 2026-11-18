@@ -26,7 +26,7 @@ use gentle_runtime::whats_new::{self, Decision, Latest, UpdateRun};
 use tauri::{AppHandle, Manager};
 use tauri_specta::Event;
 
-use crate::bridge::{AppStateHolder, CommandSink};
+use crate::bridge::{AppStateHolder, ChatWork, CommandSink};
 use crate::clipboard::{self, Clipboard, SystemClipboard};
 use crate::close::{self, BridgeSteps, CloseFlow};
 use crate::config::{ConfigSnapshot, ConfigWriter};
@@ -969,27 +969,35 @@ pub fn run_chat_commands(
     commands: Vec<gentle_app::ChatCommand>,
 ) {
     for command in commands {
-        let run_holder = Arc::clone(holder);
+        let worker = Arc::clone(holder);
         let executor = Arc::clone(&executor);
         // The seam is `Send + Sync`, so a worker thread pushes with it and
         // no window handle is cloned anywhere.
-        let run_emit = Arc::clone(emit);
-        // Kept for the branch below: a command that could not be started was
-        // moved into the closure that never ran.
+        let emit_arc = Arc::clone(emit);
+        // The worker's clone moves into the closure; the failure branch keeps
+        // its own so a failed spawn still has an emit to push through.
+        let emit = emit_arc.clone();
+        // A thread that cannot be created never runs the command, and
+        // `command` itself moves into the worker: the command names, below,
+        // both the profile work slot it took (the one-in-flight cap, L18) and
+        // the web answer it can no longer give.
         let unstarted = command.clone();
         let spawned = std::thread::Builder::new()
             .name("chat-command".to_owned())
             .spawn(move || {
                 let ran = effects::run_one(command, executor.as_ref());
-                fold_and_push(&run_holder, &run_emit, ran);
+                fold_and_push(&worker, &emit, ran);
             });
         if let Err(error) = spawned {
-            // A failed OS call is worth a log line, and the web side must not be
-            // left waiting for the answer the command can no longer give: the
-            // two commands the page asks of a chat fail in a way it can draw
-            // ([`fold_spawn_failure`], L17(a), L18).
+            // A failed OS call is worth a log line, and neither side may be
+            // left behind: the profile work slot the command took (the
+            // one-in-flight cap, L18) is given back, and the web side gets the
+            // failure it can draw ([`fold_spawn_failure`], L17(a), L18).
+            if let Some(work) = ChatWork::of(&unstarted) {
+                holder.note_chat_work_unstarted(unstarted.chat(), work);
+            }
             eprintln!("chat command thread unavailable: {error}");
-            fold_spawn_failure(holder, emit, &unstarted);
+            fold_spawn_failure(holder, &emit_arc, &unstarted);
         }
     }
 }

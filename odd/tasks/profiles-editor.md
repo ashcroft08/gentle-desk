@@ -562,4 +562,18 @@ es valor de producto".
   cargo app 455/455, fmt/clippy clean, vitest 795/795 (web untouched). Native assess:
   medium, under budget, no review due. Not established: WHY CreateThread answers os
   error 5 (L17(b)); the one-read-in-flight cap stays a maintainer decision.
+- L29 (parent, 2026-11-17): the L18 cap DELIVERED (maintainer approved it 2026-11-17) on
+  fix/chat-profile-read-cap, REBASED onto fix/chat-command-spawn-failure so both compose:
+  dd23da6. At most ONE profile read and ONE mode save in flight per chat, enforced in the
+  bridge (ProfileWork {reading, saving, failed} replacing ModeSave; ChatWork::of names the
+  slot; begin_chat_command takes it on BOTH entry paths); a duplicate ask is DROPPED,
+  answered with the current view and zero commands - which also closes the reviews'
+  R1-002/R3-002 advisory. The slot frees at the existing clearing points, in the
+  spawn-failure branch, and on close. Read cap travels in no slice (contract byte-identical
+  to main). RED observed (6 failing), GREEN 12 cap tests; differential check of the shared
+  runner against base: identical; cargo app 467/467, fmt/clippy clean, vitest 795/795.
+  Upstream issue NOTE: the events half of the drafted issue is ALREADY upstream at
+  Gentleman-Programming/gentle-shell#3321 (CLOSED, status:approved) - publishing ours would
+  be a duplicate; the session-profile-read half overlaps #2716/#2742, so nothing new was
+  filed and the maintainer may comment there instead.
 
