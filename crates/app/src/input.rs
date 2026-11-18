@@ -223,6 +223,25 @@ pub enum ChatCommand {
         profile: String,
         mode: gentle_core::rpc::config_store::OrchestratorMode,
     },
+    /// Save ONE fallback chain of ONE profile, over that chat's own child
+    /// (profiles-editor T5, S2, S3, L30-3): `profile-fallbacks.json`'s
+    /// `profiles.<profile>.<agent>`, where the agent key is an agent's name or the
+    /// profile-wide `*`, edited the way the terminal edits it.
+    ///
+    /// The write is the WHOLE `profile_fallbacks` document as this chat's child
+    /// read it, with only that one chain replaced, preconditioned on that store's
+    /// own `writeRevision` (`set_config`), and it is followed by the same read
+    /// `ReadChatProfile` makes so the tab draws the store's truth. The chain is
+    /// checked here against the owner's own rules (at most eight steps, a model
+    /// per step, no model twice, never empty) before anything is sent.
+    SetChatProfileChain {
+        chat: ChatId,
+        profile: String,
+        /// The store's own chain key: an agent's name, or `*`.
+        agent: String,
+        /// The chain as the user built it, in order.
+        steps: Vec<gentle_core::rpc::config_store::FallbackStep>,
+    },
     /// Tell the host whether that chat is running a turn. The reducer owns the
     /// mark (it is the one that reads `agent_start` / `agent_end`), so this is
     /// how the host's protection rules learn it: a working chat is never the
@@ -240,6 +259,7 @@ impl ChatCommand {
             Self::StopHelper { chat, .. } => chat,
             Self::ReadChatProfile { chat } => chat,
             Self::SetChatProfileMode { chat, .. } => chat,
+            Self::SetChatProfileChain { chat, .. } => chat,
             Self::SetWorking { chat, .. } => chat,
         }
     }

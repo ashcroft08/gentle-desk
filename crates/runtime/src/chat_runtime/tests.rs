@@ -11,6 +11,7 @@ use gentle_core::rpc::{Decoded, RpcCommand, RpcEvent};
 use super::{ChatRuntime, Converted, Outcome};
 
 mod calls;
+mod chain;
 mod fake;
 mod folder;
 mod mark;

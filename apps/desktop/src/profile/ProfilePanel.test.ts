@@ -111,8 +111,12 @@ describe('the profiles listed read-only', () => {
     expect(within(team).getByText('standard')).toBeTruthy()
     // The `*` chain is the profile-wide one, and it says so.
     expect(within(team).getByText(copy.profileWide)).toBeTruthy()
-    // The worker's model, and the same model as the chain's second step.
-    expect(within(team).getAllByText('openai/gpt-5-codex')).toHaveLength(2)
+    // The worker's model, and the same model as the chain's second step - which is
+    // an EDITABLE field for the profile this chat uses (T5), so it is a value.
+    expect(within(team).getAllByText('openai/gpt-5-codex')).toHaveLength(1)
+    expect(
+      (within(team).getByRole('textbox', { name: copy.chainModel(2) }) as HTMLInputElement).value,
+    ).toBe('openai/gpt-5-codex')
 
     // One group open at a time: opening `fast` closes `team`.
     await fireEvent.click(group(/^fast/))
@@ -134,16 +138,20 @@ describe('the profiles listed read-only', () => {
   })
 
 
-  it('draws only the mode switch, and no other edit control', () => {
-
+  it('draws no edit control for a profile this chat does not use', async () => {
     draw()
 
-    for (const name of [/^Edit$/, /^Save$/, /^Use in this chat$/, /^Make default$/, /^Clear$/]) {
-      expect(screen.queryByRole('button', { name }), String(name)).toBeNull()
+    // The used profile's group is the only one that may be written (T5): opening
+    // another one draws the same read-only list the whole tab drew before it.
+    await fireEvent.click(group(/^fast/))
+
+    const fast = bodyOf(group(/^fast/))
+    expect(within(fast).queryByRole('textbox')).toBeNull()
+    for (const name of [/^Save$/, /^Cancel$/, /^Edit$/, /^Use in this chat$/, /^Make default$/]) {
+      expect(within(fast).queryByRole('button', { name }), String(name)).toBeNull()
     }
-    expect(screen.queryByRole('combobox')).toBeNull()
-    expect(screen.queryByRole('textbox')).toBeNull()
-    // The one thing that writes is the used profile's orchestration mode (T3-mode).
+    expect(within(fast).queryByRole('combobox')).toBeNull()
+    // The one control outside the chains is still the used profile's mode switch.
     expect(screen.getByRole('radiogroup')).toBeTruthy()
     expect(screen.getByText(copy.footer)).toBeTruthy()
   })

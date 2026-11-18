@@ -10,7 +10,7 @@ use std::sync::Mutex;
 use gentle_app::{ChatCommand, ChatId};
 use gentle_backend::chat_host::Opened;
 use gentle_desk_lib::effects::ChatExecutor;
-use gentle_runtime::chat_runtime::{ChatConfigRead, ModeWriteResult, Outcome};
+use gentle_runtime::chat_runtime::{ChainWriteResult, ChatConfigRead, ModeWriteResult, Outcome};
 
 /// A stored session, as the sidebar names one: by its path, before any chat of
 /// it exists. The app builds the chat id from it.
@@ -38,6 +38,9 @@ pub enum Answer {
     /// One profile's orchestration mode was saved (or not) and this is the
     /// configuration the attempt re-read (profiles-editor T3-mode).
     ChatMode(Box<ModeWriteResult>, Box<ChatConfigRead>),
+    /// One profile's fallback chain was saved (or not) and this is the
+    /// configuration the attempt re-read (profiles-editor T5).
+    ChatChain(Box<ChainWriteResult>, Box<ChatConfigRead>),
     /// The user's Close chat stopped that chat's child, as the host reports it
     /// (profiles-editor T2b-3).
     Closed,
@@ -87,6 +90,13 @@ impl Answer {
             }
             (Self::ChatMode(result, read), ChatCommand::SetChatProfileMode { .. }) => {
                 Outcome::ChatMode {
+                    chat,
+                    result: (**result).clone(),
+                    read: read.clone(),
+                }
+            }
+            (Self::ChatChain(result, read), ChatCommand::SetChatProfileChain { .. }) => {
+                Outcome::ChatChain {
                     chat,
                     result: (**result).clone(),
                     read: read.clone(),

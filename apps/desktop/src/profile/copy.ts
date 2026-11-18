@@ -11,6 +11,7 @@
 // view INTERPRETS is `*`, whose label is ours (`profileWide`).
 import type { LanguageView } from '../contract/bindings'
 import { DOT } from '../helpers/copy'
+import { CHAIN_ENGLISH, CHAIN_SPANISH, type ChainCopy } from './chain-copy'
 import type { StoreName } from './rules'
 
 /**
@@ -18,8 +19,12 @@ import type { StoreName } from './rules'
  * (U+00B7, `helpers/copy.ts`), imported so the two views cannot drift apart.
  */
 
-/** The Profile tab's own words for one language. */
-export interface ProfileCopy {
+/**
+ * The Profile tab's own words for one language: this file's, plus the fallback
+ * editor's own ([`ChainCopy`](chain-copy), spread in so a component names one
+ * object - D4's whole-dictionary builder - and still fits the file lint).
+ */
+export interface ProfileCopy extends ChainCopy {
   /** The line above the name: which chat this view belongs to. */
   kicker: string
   /** The tag of a chat that follows the global default (state 1). */
@@ -113,6 +118,7 @@ export interface ProfileCopy {
 
 /** English: the artboard's copy, and the house's own words where it has none. */
 const ENGLISH: ProfileCopy = {
+  ...CHAIN_ENGLISH,
   kicker: 'This chat',
   tagDefault: 'default',
   tagSession: 'this chat only',
@@ -156,10 +162,10 @@ const ENGLISH: ProfileCopy = {
   reading: "Reading this chat's profile configuration...",
   stores: { profiles: 'profiles', fallbacks: 'fallbacks', pins: 'pins' },
   storeMissing: (store) => `The ${ENGLISH.stores[store]} store could not be read.`,
-  footer: 'Only the orchestration mode is saved from this tab.',
+  footer: 'The orchestration mode and the fallback chains are saved from this tab.',
   editInTerminal: 'Edit in terminal',
   editNote:
-    'Opens the shell: type /gentle:profiles there to edit, create and switch profiles - this tab only reads them.',
+    'Opens the shell: type /gentle:profiles there to edit, create and switch profiles - this tab edits the used profile\u2019s mode and chains.',
 }
 
 /**
@@ -167,6 +173,7 @@ const ENGLISH: ProfileCopy = {
  * counted lines mark the singular, which the English column does too.
  */
 const SPANISH: ProfileCopy = {
+  ...CHAIN_SPANISH,
   kicker: 'Este chat',
   tagDefault: 'predeterminado',
   tagSession: 'solo este chat',
@@ -213,10 +220,10 @@ const SPANISH: ProfileCopy = {
   reading: 'Leyendo la configuración de perfiles de este chat...',
   stores: { profiles: 'perfiles', fallbacks: 'cadenas', pins: 'fijados' },
   storeMissing: (store) => `No se pudo leer el almacén de ${SPANISH.stores[store]}.`,
-  footer: 'Desde esta pestaña solo se guarda el modo de orquestación.',
+  footer: 'Desde esta pestaña se guardan el modo de orquestación y las cadenas de respaldo.',
   editInTerminal: 'Editar en la terminal',
   editNote:
-    'Abre la shell: escribe /gentle:profiles allí para editar, crear y cambiar de perfil - esta pestaña solo los lee.',
+    'Abre la shell: escribe /gentle:profiles allí para editar, crear y cambiar de perfil - esta pestaña edita el modo y las cadenas del perfil en uso.',
 }
 
 /** The tab's own words in `language`, the whole dictionary at once (D4). */

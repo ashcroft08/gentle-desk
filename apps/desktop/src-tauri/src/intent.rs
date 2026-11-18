@@ -75,6 +75,7 @@ pub fn to_intent(state: &gentle_app::AppState, intent: UiIntent) -> Option<gentl
         // with a command of its own (`AppStateHolder::dispatch_commands`).
         UiIntent::RefreshChatProfile { .. }
         | UiIntent::SaveChatProfileMode { .. }
+        | UiIntent::SaveChatProfileChain { .. }
         | UiIntent::RefreshAuth
         | UiIntent::CheckUpdates
         | UiIntent::RefreshUsage => return None,
@@ -104,6 +105,22 @@ pub(crate) fn mode_of(
             gentle_core::rpc::config_store::OrchestratorMode::FullDelegation
         }
     }
+}
+
+/// The chain the page built, as the store's own steps (profiles-editor T5): the
+/// model it typed and the effort it chose, where `None` is NO effort rather than
+/// an empty one - the store refuses an empty `thinking`, and the page's empty
+/// input means "no effort".
+pub(crate) fn chain_steps(
+    steps: &[crate::contract::ChatProfileStepView],
+) -> Vec<gentle_core::rpc::config_store::FallbackStep> {
+    steps
+        .iter()
+        .map(|step| gentle_core::rpc::config_store::FallbackStep {
+            model: step.model.clone(),
+            thinking: step.thinking.clone(),
+        })
+        .collect()
 }
 
 /// The app's chat for an id the web side sent back.

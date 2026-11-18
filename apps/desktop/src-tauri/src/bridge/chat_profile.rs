@@ -37,7 +37,7 @@ use gentle_core::rpc::config_store::{
     FallbacksDocument, OrchestratorMode, PinLayer, PinsValue, ProfilesDocument, SetConfigOutcome,
 };
 use gentle_core::rpc::NoAnswer;
-use gentle_runtime::chat_runtime::{ChatConfigRead, ModeWriteResult, StoreRead};
+use gentle_runtime::chat_runtime::{ChainWriteResult, ChatConfigRead, ModeWriteResult, StoreRead};
 use gentle_runtime::session_profile::last_session_profile;
 
 use super::{lock, AppStateHolder};
@@ -76,16 +76,18 @@ pub fn compose(chat: &ChatId, read: &ChatConfigRead, session: Option<&str>) -> C
             pins: availability(&read.pins),
         },
         // The save state is the SHELL's, not the read's: `chat_profile` overlays
-        // it from `profile_work` every time the slice is built (T3-mode).
+        // it from `profile_work` every time the slice is built (T3-mode, T5).
         saving: false,
         save_failed: false,
+        chain_failed: false,
     }
 }
 
-/// One chat's profile work state (profiles-editor T3-mode, L18): whether a READ
-/// of that chat's configuration is in flight, whether a mode SAVE is (the switch
-/// is drawn disabled while it is), and whether the last save failed and wrote
-/// nothing.
+/// One chat's profile work state (profiles-editor T3-mode, T5, L18): whether a
+/// READ of that chat's configuration is in flight, whether a SAVE is (the mode
+/// switch and the chain editor are drawn disabled while it is), and whether the
+/// last save failed and wrote nothing - one notice for the mode and one for the
+/// chains, because they are different controls that say different things.
 ///
 /// At most one of each is in flight per chat, and a second ask while one is in
 /// flight is DROPPED rather than queued ([`AppStateHolder::begin_chat_command`]):
@@ -97,13 +99,18 @@ pub(super) struct ProfileWork {
     pub(super) reading: bool,
     pub(super) saving: bool,
     pub(super) failed: bool,
+    /// The chain editor's own notice: the parallel slot to `failed`, so a chain
+    /// write that did not happen never lights the mode switch's line (T5).
+    pub(super) chain_failed: bool,
 }
 
 /// Which profile work a per-chat command does, and so which of its chat's two
 /// slots it takes (profiles-editor L18).
 ///
-/// Only the Profile tab's two commands hold one: every other per-chat command
-/// runs as often as it is asked for.
+/// Only the Profile tab's commands hold one: every other per-chat command runs as
+/// often as it is asked for. The mode switch and the chain editor SHARE the save
+/// slot (profiles-editor T5): one write per chat in flight, whichever control
+/// started it, so a mode save can never race a chain save of the same profile.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ChatWork {
     Read,
@@ -115,7 +122,9 @@ impl ChatWork {
     pub(crate) fn of(command: &ChatCommand) -> Option<Self> {
         match command {
             ChatCommand::ReadChatProfile { .. } => Some(Self::Read),
-            ChatCommand::SetChatProfileMode { .. } => Some(Self::Save),
+            ChatCommand::SetChatProfileMode { .. } | ChatCommand::SetChatProfileChain { .. } => {
+                Some(Self::Save)
+            }
             _ => None,
         }
     }
@@ -361,12 +370,14 @@ impl AppStateHolder {
                 // reached: a read that answered nothing still answered (L18).
                 state.reading = false;
                 // A read that answered IS the truth the tab draws: it clears the
-                // notice of a failed mode save (T3-mode: the next successful
-                // read, no timer). A save still in flight is NOT touched: the
-                // write lives until its own answer, so a mid-save read may not
-                // re-enable the switch (review R3-001, correction of ab09880).
+                // notices of a failed save - the mode's and the chains' (T3-mode,
+                // T5: the next successful read, no timer). A save still in flight
+                // is NOT touched: the write lives until its own answer, so a
+                // mid-save read may not re-enable a control (review R3-001,
+                // correction of ab09880).
                 if reached {
                     state.failed = false;
+                    state.chain_failed = false;
                 }
             }
         }
@@ -418,6 +429,59 @@ impl AppStateHolder {
             &ModeWriteResult::failed(SetConfigOutcome::NoAnswer(NoAnswer::NotConnected)),
             &ChatConfigRead::unasked(),
         )
+    }
+
+    /// Records that an attempt to save one of `chat`'s fallback chains could not
+    /// even START (profiles-editor T5, the same liveness hole of L17(a)): the
+    /// worker thread its command runs on could not be created, so the write never
+    /// ran and will never answer.
+    ///
+    /// It is [`Self::note_chat_chain`] with the failure a child that did not
+    /// answer leaves: nothing was written, the editor is usable again, and one
+    /// short line says the chain could not be saved. A chat that closed meanwhile
+    /// is dropped with its state.
+    pub fn note_chat_chain_unstarted(&self, chat: &ChatId) -> Option<ViewState> {
+        self.note_chat_chain(
+            chat,
+            &ChainWriteResult::failed(SetConfigOutcome::NoAnswer(NoAnswer::NotConnected)),
+            &ChatConfigRead::unasked(),
+        )
+    }
+
+    /// Records what one attempt to save a fallback chain came to, with the
+    /// configuration the attempt re-read, and answers the slice to push
+    /// (profiles-editor T5, S2, S3, L30-3).
+    ///
+    /// The same lifecycle as [`Self::note_chat_mode`]: the re-read is installed
+    /// exactly as a plain read installs it (a read that reached no store leaves
+    /// what the tab drew standing, L11-4), the save slot comes free either way,
+    /// and the attempt's own answer - whether the chain could not be saved -
+    /// travels in the chain editor's own notice, never in the mode switch's. A
+    /// chat that closed while the write ran is dropped with its state.
+    pub fn note_chat_chain(
+        &self,
+        chat: &ChatId,
+        result: &ChainWriteResult,
+        read: &ChatConfigRead,
+    ) -> Option<ViewState> {
+        if !self.is_open(chat) {
+            lock(&self.profile_work).remove(chat.as_str());
+            return None;
+        }
+        // One lock, one entry: the save's own answer, and nothing about a read
+        // that may be in flight at the same time (L18). `failed` is the mode
+        // switch's notice and is not touched: this write was not that one.
+        {
+            let mut held = lock(&self.profile_work);
+            let state = held.entry(chat.as_str().to_owned()).or_default();
+            state.saving = false;
+            state.chain_failed = !result.saved();
+        }
+        if reached_a_store(read) {
+            let view = self.compose_view(chat, read);
+            self.install_chat_profile(view);
+        }
+        Some(self.view())
     }
 
     /// Records what one attempt to save a profile's orchestration mode came to,
@@ -527,7 +591,7 @@ impl AppStateHolder {
     /// The save state is overlaid here, from the shell's own map, so every slice
     /// is built with the same truth about a write in flight: a push, an intent's
     /// answer and the first read a view makes all carry it (profiles-editor
-    /// T3-mode). Only a SAVE disables the switch: a read in flight is the
+    /// T3-mode, T5). Only a SAVE disables the controls: a read in flight is the
     /// shell's own business and travels in no slice (L18).
     /// The two locks are taken one after another, never together.
     pub(super) fn chat_profile(&self) -> Option<ChatProfileView> {
@@ -536,6 +600,7 @@ impl AppStateHolder {
         let state = work.get(&view.chat_id).copied().unwrap_or_default();
         view.saving = state.saving;
         view.save_failed = state.failed;
+        view.chain_failed = state.chain_failed;
         Some(view)
     }
 

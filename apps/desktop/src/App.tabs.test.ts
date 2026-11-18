@@ -210,7 +210,8 @@ describe('the Chat | Helpers views', () => {
       expect(within(panel).getByRole('heading', { level: 2, name: /team/ })).toBeTruthy(),
     )
     expect(within(panel).getByText('This chat uses the default profile, team.')).toBeTruthy()
-    // The Profile view has no composer either: it is a view of the chat, not it.
-    expect(screen.queryByRole('textbox')).toBeNull()
+    // The Profile view has no COMPOSER either: it is a view of the chat, not it.
+    // (It does have text boxes of its own since T5: the used profile's chains.)
+    expect(screen.queryByRole('textbox', { name: 'Message' })).toBeNull()
   })
 })

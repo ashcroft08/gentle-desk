@@ -273,6 +273,32 @@ impl AppStateHolder {
             }
             return (self.view(), vec![command]);
         }
+        // Saving ONE fallback chain of the used profile (profiles-editor T5,
+        // L30-3) is the same kind of per-chat command and takes the SAME save slot
+        // (L18): a chain save and a mode save of one chat can never be in flight
+        // together, and a second ask is dropped with the slice as it stands. The
+        // chain is the page's own draft, converted to the store's own step shape
+        // here: `null` thinking is no effort, never an empty string the owner
+        // would refuse.
+        if let UiIntent::SaveChatProfileChain {
+            chat_id,
+            profile,
+            agent,
+            steps,
+        } = &intent
+        {
+            let chat = crate::intent::chat_for(&state, chat_id);
+            let command = gentle_app::ChatCommand::SetChatProfileChain {
+                chat,
+                profile: profile.clone(),
+                agent: agent.clone(),
+                steps: crate::intent::chain_steps(steps),
+            };
+            if !self.begin_chat_command(&command) {
+                return (self.view(), Vec::new());
+            }
+            return (self.view(), vec![command]);
+        }
         match crate::intent::to_intent(&state, intent) {
             Some(intent) => self.apply(gentle_app::Input::Intent(intent)),
             // Every intent has an answer: the reducer's, or the config's above.

@@ -1,11 +1,12 @@
 <script lang="ts">
-  // The Profile tab of one chat (profiles-editor T2c, T3-mode, artboard
+  // The Profile tab of one chat (profiles-editor T2c, T3-mode, T5, artboard
   // 06-profile-tab.html): which profile this chat runs and in whose scope, the
-  // profiles the store defines, the pins of this chat's own worktree - and the one
-  // thing it WRITES, the used profile's orchestration mode (the Organic / Full
-  // delegation switch, saved through the shell in the profile itself). Save, Use
-  // in this chat, Make default, the model pickers and the fallback editor are T3
-  // and T3b: none of them is drawn here, not even disabled.
+  // profiles the store defines, the pins of this chat's own worktree - and what it
+  // WRITES, which is the profile itself: the used profile's orchestration mode
+  // (the Organic / Full delegation switch, T3-mode) and, since T5, its fallback
+  // chains - an agent's own and the profile-wide `*` - saved through the shell in
+  // the profile (L30-3). Save, Use in this chat, Make default and the model
+  // pickers are T3 and T3b: none of them is drawn here.
   //
   // The one action it does offer is the terminal (T2d, L21-L22): Settings > Profiles
   // is gone, so the profiles screen the terminal already edits is opened from this
@@ -21,6 +22,7 @@
   // flight is dropped with it. A chat with no id asks for nothing.
   import { dispatchIntent, openTerminal } from '../bridge'
   import type {
+    ChatProfileStepView_Serialize as Step,
     ChatProfileView_Serialize as ChatProfile,
     OrchestratorModeView,
   } from '../contract/bindings'
@@ -123,6 +125,21 @@
   }
 
   /**
+   * Saves ONE chain of the used profile (profiles-editor T5, L30-3): the chat the
+   * tab is about, the profile THIS chat uses, the chain's own key (an agent's
+   * name or `*`) and the steps the editor built. The editor already refuses an
+   * unchanged draft and a chain the owner would reject; this guard keeps a
+   * keyboard or a second click from going around a save in flight.
+   */
+  function saveChain(agent: string, steps: Step[]): void {
+    if (chat === null || used === null || view === null || view.saving) return
+    void dispatchIntent({
+      type: 'SaveChatProfileChain',
+      data: { chat_id: chat, profile: used.name, agent, steps },
+    })
+  }
+
+  /**
    * The footer's one action: the shell's own profiles screen in a terminal
    * window, the way the Settings pane opened it. Nothing of this tab is written
    * and nothing is sent: Rust resolves the launcher, and a refusal - no launcher,
@@ -167,7 +184,14 @@
             onSave={saveMode}
           />
         {/if}
-        <ProfileBody {view} {copy} />
+        <ProfileBody
+          {view}
+          {copy}
+          editable={used?.name ?? null}
+          saving={view.saving}
+          chainFailed={view.chain_failed}
+          onSaveChain={saveChain}
+        />
       {/key}
       <!-- The footer line says what this slice saves: the profile's mode, and
            nothing else yet. The three outcomes of the artboard's footer arrive

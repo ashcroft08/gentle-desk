@@ -1023,6 +1023,12 @@ pub fn fold_spawn_failure(
         gentle_app::ChatCommand::SetChatProfileMode { chat, .. } => {
             holder.note_chat_mode_unstarted(chat)
         }
+        // A chain write that never ran owes the page the same answer a write that
+        // got no answer gives: nothing was written, the editor is usable again, and
+        // one short line says so (profiles-editor T5).
+        gentle_app::ChatCommand::SetChatProfileChain { chat, .. } => {
+            holder.note_chat_chain_unstarted(chat)
+        }
         // Every other command has already answered the web side with the slice
         // its intent folded, and none of them is a slice the failure changes.
         _ => None,
@@ -1053,6 +1059,14 @@ fn fold_and_push(holder: &Arc<AppStateHolder>, emit: &Emit, ran: Ran) {
     // and installs the configuration the attempt re-read.
     for (chat, result, read) in ran.chat_mode {
         if let Some(view) = holder.note_chat_mode(&chat, &result, &read) {
+            push(emit, view);
+        }
+    }
+    // One fallback chain was saved, or it was not (profiles-editor T5): the same
+    // answer as a mode save's, in the chain editor's own notice, with the
+    // configuration the attempt re-read.
+    for (chat, result, read) in ran.chat_chain {
+        if let Some(view) = holder.note_chat_chain(&chat, &result, &read) {
             push(emit, view);
         }
     }

@@ -16,7 +16,7 @@ export const commands = {
 	 *  run what it asked for. The emitted event is typed through tauri-specta, so
 	 *  the Svelte side gets the same [`ViewState`] for the return and the payload.
 	 */
-	dispatchIntent: (intent: UiIntent) => typedError<ViewState_Serialize, string>(__TAURI_INVOKE("dispatch_intent", { intent })),
+	dispatchIntent: (intent: UiIntent_Deserialize) => typedError<ViewState_Serialize, string>(__TAURI_INVOKE("dispatch_intent", { intent })),
 	/**
 	 *  One page of the flattened workspace tree (S3): the rows
 	 *  `[offset, offset + length)` of it, and how many rows the tree has in total -
@@ -561,6 +561,18 @@ export type ChatProfileView_Deserialize = {
 	 *  worked, and never set by the read itself.
 	 */
 	save_failed: boolean,
+	/**
+	 *  Whether the last attempt to save ONE of this profile's fallback chains
+	 *  FAILED, and nothing was written (profiles-editor T5, L30-3): a stale
+	 *  `expectedRevision`, a document the owner refuses, an apply in flight, a
+	 *  child that did not answer, a chain the owner's own rules refuse, or a
+	 *  profile/chain key the store does not record. It is the PARALLEL of
+	 *  [`Self::save_failed`] - one notice per control, never one for both - and
+	 *  its lifecycle is the same: cleared by the next successful read, by a save
+	 *  that worked, and never set by the read itself. A chain save holds the SAME
+	 *  one-save slot as the mode switch, so [`Self::saving`] disables both.
+	 */
+	chain_failed: boolean,
 };
 
 /**
@@ -629,6 +641,18 @@ export type ChatProfileView_Serialize = {
 	 *  worked, and never set by the read itself.
 	 */
 	save_failed: boolean,
+	/**
+	 *  Whether the last attempt to save ONE of this profile's fallback chains
+	 *  FAILED, and nothing was written (profiles-editor T5, L30-3): a stale
+	 *  `expectedRevision`, a document the owner refuses, an apply in flight, a
+	 *  child that did not answer, a chain the owner's own rules refuse, or a
+	 *  profile/chain key the store does not record. It is the PARALLEL of
+	 *  [`Self::save_failed`] - one notice per control, never one for both - and
+	 *  its lifecycle is the same: cleared by the next successful read, by a save
+	 *  that worked, and never set by the read itself. A chain save holds the SAME
+	 *  one-save slot as the mode switch, so [`Self::saving`] disables both.
+	 */
+	chain_failed: boolean,
 };
 
 /**
@@ -1505,7 +1529,15 @@ export type ToolStatusView = "Running" | "Failed" | "Ok";
  *  explicit mapping into `gentle-app`'s [`gentle_app::Intent`] keeps this
  *  enum free of every `crates/app` type.
  */
-export type UiIntent = { type: "SendPrompt"; data: {
+export type UiIntent = UiIntent_Serialize | UiIntent_Deserialize;
+
+/**
+ *  What the user asked for, as the web side sends it. Only the intents the
+ *  current slice needs; the rest are added when their views arrive. The
+ *  explicit mapping into `gentle-app`'s [`gentle_app::Intent`] keeps this
+ *  enum free of every `crates/app` type.
+ */
+export type UiIntent_Deserialize = { type: "SendPrompt"; data: {
 	text: string,
 } } | { type: "Abort" } | { type: "NewChat" } | 
 /**  Make that chat the foreground one, asking the host for its child. */
@@ -1677,6 +1709,268 @@ export type UiIntent = { type: "SendPrompt"; data: {
 	profile: string,
 	/**  The mode to store. `organic` is stored as the ABSENCE of the entry. */
 	mode: OrchestratorModeView,
+} } | 
+/**
+ *  Save ONE fallback chain of the used profile, the way the terminal edits
+ *  `profile-fallbacks.json` (profiles-editor T5, S2, S3, L30-3): the chain of
+ *  one agent, or the profile-wide `*` one, stored under
+ *  `profiles.<profile>.<agent>`. Every chat using that profile reads it, never
+ *  this chat alone.
+ * 
+ *  The write is the whole `profile_fallbacks` document as this chat's own
+ *  child read it, with only that chain replaced, preconditioned on THAT
+ *  store's `writeTargets[global].writeRevision` (S2, S3), and it is followed
+ *  by a fresh read of that chat's configuration. The chain is checked against
+ *  the owner's own rules before anything is sent (at most eight steps, a model
+ *  per step, no model twice, never empty); a write that did not happen - a
+ *  stale token, a document the owner refuses, an apply in flight, a child that
+ *  does not answer - changes nothing and leaves
+ *  [`ChatProfileView::chain_failed`] set, which the tab says in one short line
+ *  and clears on the next successful read.
+ */
+{ type: "SaveChatProfileChain"; data: {
+	chat_id: string,
+	/**  The profiles store's own key for the profile (the one this chat uses). */
+	profile: string,
+	/**  The chain's own key: an agent's name, or `*` for the profile-wide one. */
+	agent: string,
+	/**
+	 *  The chain as the user built it, in the order gentle-pi would move
+	 *  through it. An empty list is a page bug, not a way to delete a chain:
+	 *  the owner keeps no empty chain, so the shell refuses it too.
+	 */
+	steps: ChatProfileStepView_Deserialize[],
+} } | 
+/**
+ *  Re-read the provider names and re-run one `auth check` per provider
+ *  (0.1.12, T3). The answer travels back on [`ViewState::auth`].
+ */
+{ type: "RefreshAuth" } | 
+/**
+ *  Check the three versions again (0.1.12, S2, S7), the same check the app
+ *  runs once when it opens. It only ever CHECKS: no update is installed
+ *  from here. The answer travels back on [`ViewState::updates`].
+ */
+{ type: "CheckUpdates" } | 
+/**
+ *  Read the subscription usage the shell's own sources report, and run them
+ *  if they are installed: what the Usage pane asks for when it appears and
+ *  on "Check again". This is the ONE run the pane makes, on the intent's own
+ *  thread, because a run takes seconds and the keyboard must not wait.
+ *  Nothing of it reads a chat, so no open chat can hold it back. The answer
+ *  travels back on [`ViewState::usage`].
+ */
+{ type: "RefreshUsage" };
+
+/**
+ *  What the user asked for, as the web side sends it. Only the intents the
+ *  current slice needs; the rest are added when their views arrive. The
+ *  explicit mapping into `gentle-app`'s [`gentle_app::Intent`] keeps this
+ *  enum free of every `crates/app` type.
+ */
+export type UiIntent_Serialize = { type: "SendPrompt"; data: {
+	text: string,
+} } | { type: "Abort" } | { type: "NewChat" } | 
+/**  Make that chat the foreground one, asking the host for its child. */
+{ type: "OpenChat"; data: {
+	chat_id: string,
+} } | 
+/**  The same for a chat that did not exist before. */
+{ type: "OpenNewChat" } | 
+/**
+ *  Start a NEW chat in the workspace at `path`: what the header's New
+ *  session button (D2) and a workspace's own new-chat icon (D3) send. The
+ *  web side decides which workspace is the current one and names it; the
+ *  chat started here is the same new chat `OpenNewChat` starts, only in
+ *  that folder, and never the legacy single-child `NewChat`.
+ */
+{ type: "NewChatInWorkspace"; data: {
+	path: string,
+} } | 
+/**
+ *  Fold or unfold the chats of the workspace at `path` in the sidebar (D8):
+ *  the state is remembered in the app config, so it survives the run.
+ */
+{ type: "SetWorkspaceCollapsed"; data: {
+	path: string,
+	collapsed: boolean,
+} } | 
+/**
+ *  Choose the window's theme (the v1 Appearance setting). The choice is
+ *  remembered in the app config, so it survives the run, and the window's
+ *  own chrome follows it ([`gentle_runtime::app_config::Theme`]).
+ */
+{ type: "SetTheme"; data: {
+	theme: ThemeView,
+} } | 
+/**
+ *  Choose the language the app's own words are written in (0.2.0, S2): the
+ *  one tag the picker sent, stored in the app config so it survives the run,
+ *  and re-emitted as the very slice this call answers with - the words change
+ *  in this same tick, with no restart and no webview reload ([`LanguageView`]).
+ *  The same language again changes nothing and saves nothing.
+ */
+{ type: "SetLanguage"; data: {
+	language: LanguageView,
+} } | 
+/**
+ *  Choose which home `gentle-shell` runs on (the welcome screen and the
+ *  sidebar footer). Remembered in the app config; it applies from the next
+ *  start of the app.
+ */
+{ type: "SetShellHome"; data: {
+	choice: HomeChoiceView,
+} } | 
+/**
+ *  Start the app again after the orderly close (config and cache flushed
+ *  first): a home chosen at the welcome question applies to a new run.
+ */
+{ type: "RestartApp" } | 
+/**
+ *  The user gave permission to install gentle-shell (the button of the
+ *  permission screen). Nothing installs without this intent.
+ */
+{ type: "InstallShell" } | 
+/**  Look for the `gentle-shell` launcher once more ("Check again"). */
+{ type: "CheckShellAgain" } | 
+/**  Start the child of a chat that died again and reopen it (S3). */
+{ type: "RestartChat"; data: {
+	chat_id: string,
+} } | 
+/**
+ *  Close one chat (0.1.14): stop that chat's child and take it off the open
+ *  set, which is what the Updates pane's chats-closed gate counts. NOT a
+ *  delete: nothing on disk changes and the session list keeps its row, so
+ *  the row opens the chat again. A chat that is running a turn is refused,
+ *  with the same rule and words the delete flow refuses with.
+ */
+{ type: "CloseChat"; data: {
+	chat_id: string,
+} } | 
+/**
+ *  Copy one message's raw markdown: the message is named by the id the
+ *  thread was given ([`MessageView::id`]), and the copy itself is the
+ *  shell's side effect, never the view's.
+ */
+{ type: "CopyMessage"; data: {
+	message_id: string,
+} } | { type: "DismissNotice"; data: {
+	id: number,
+} } | 
+/**
+ *  Answer the foreground chat's pending dialog, named by [`DialogView`]'s
+ *  `id`. An id that is no longer pending answers nothing, so a second click
+ *  on the same dialog never reaches the child twice.
+ */
+{ type: "AnswerDialog"; data: {
+	id: string,
+	answer: DialogAnswer,
+} } | 
+/**
+ *  Open the thread of one delegated helper (T7b-2). The id is the one
+ *  [`HelperRowView::id`] carried, and the reducer only selects a helper of
+ *  the foreground chat: an id that names no task changes nothing.
+ */
+{ type: "SelectHelper"; data: {
+	helper_id: string,
+} } | 
+/**
+ *  Back from a helper's thread to the helpers list: the same intent the
+ *  iced panel's Back sends (`crates/ui/src/app.rs`).
+ */
+{ type: "CloseHelper" } | 
+/**
+ *  Stop the RUNNING helper whose thread is open (helper-stop S2): one helper,
+ *  never the chat. The id is the one [`HelperRowView::id`] carried, and the
+ *  reducer only stops a helper of the foreground chat that is running and is
+ *  that chat's own: any other id changes nothing and asks nothing of the
+ *  child.
+ */
+{ type: "StopHelper"; data: {
+	helper_id: string,
+} } | 
+/**
+ *  Ask the child what models it offers: what the chip's dropdown shows
+ *  (0.1.11). The answer travels back on
+ *  [`ViewState::model_chip`].
+ */
+{ type: "RequestModels" } | 
+/**
+ *  Make a model the session's model (RPC `set_model`). The chip updates
+ *  from the reply's Model object, never from the choice alone.
+ */
+{ type: "SelectModel"; data: {
+	provider: string,
+	model_id: string,
+} } | 
+/**  Set the session's thinking level (RPC `set_thinking_level`). */
+{ type: "SelectThinkingLevel"; data: {
+	level: string,
+} } | 
+/**
+ *  Re-read THIS chat's own profile configuration (profiles-editor T2b-2,
+ *  L11): the profiles, their fallback chains and the pin of that chat's
+ *  worktree, asked of that chat's OWN child, which is the only one that knows
+ *  them. The Profile tab sends it when it opens and when it asks again.
+ *  Nothing is written, and a read that reached no store leaves the view as it
+ *  was. The answer travels back on [`ViewState::chat_profile`], for that chat
+ *  alone.
+ */
+{ type: "RefreshChatProfile"; data: {
+	chat_id: string,
+} } | 
+/**
+ *  Save ONE profile's orchestration mode, the way the terminal does: the
+ *  value `profiles.json` stores under `workflow.<profile>.orchestratorMode`,
+ *  which EVERY chat using that profile reads, never this chat alone (L20,
+ *  L22).
+ * 
+ *  The write is the whole `profiles` document as this chat's own child read
+ *  it, with only that profile's entry changed, preconditioned on the read's
+ *  `writeTargets[global].writeRevision` (S2, S3), and it is followed by a
+ *  fresh read of that chat's configuration. A write that did not happen - a
+ *  stale token, a document the owner refuses, an apply in flight, a child
+ *  that does not answer - changes nothing and leaves
+ *  [`ChatProfileView::save_failed`] set, which the tab says in one short
+ *  line and clears on the next successful read.
+ */
+{ type: "SaveChatProfileMode"; data: {
+	chat_id: string,
+	/**  The profiles store's own key for the profile (the one this chat uses). */
+	profile: string,
+	/**  The mode to store. `organic` is stored as the ABSENCE of the entry. */
+	mode: OrchestratorModeView,
+} } | 
+/**
+ *  Save ONE fallback chain of the used profile, the way the terminal edits
+ *  `profile-fallbacks.json` (profiles-editor T5, S2, S3, L30-3): the chain of
+ *  one agent, or the profile-wide `*` one, stored under
+ *  `profiles.<profile>.<agent>`. Every chat using that profile reads it, never
+ *  this chat alone.
+ * 
+ *  The write is the whole `profile_fallbacks` document as this chat's own
+ *  child read it, with only that chain replaced, preconditioned on THAT
+ *  store's `writeTargets[global].writeRevision` (S2, S3), and it is followed
+ *  by a fresh read of that chat's configuration. The chain is checked against
+ *  the owner's own rules before anything is sent (at most eight steps, a model
+ *  per step, no model twice, never empty); a write that did not happen - a
+ *  stale token, a document the owner refuses, an apply in flight, a child that
+ *  does not answer - changes nothing and leaves
+ *  [`ChatProfileView::chain_failed`] set, which the tab says in one short line
+ *  and clears on the next successful read.
+ */
+{ type: "SaveChatProfileChain"; data: {
+	chat_id: string,
+	/**  The profiles store's own key for the profile (the one this chat uses). */
+	profile: string,
+	/**  The chain's own key: an agent's name, or `*` for the profile-wide one. */
+	agent: string,
+	/**
+	 *  The chain as the user built it, in the order gentle-pi would move
+	 *  through it. An empty list is a page bug, not a way to delete a chain:
+	 *  the owner keeps no empty chain, so the shell refuses it too.
+	 */
+	steps: ChatProfileStepView_Serialize[],
 } } | 
 /**
  *  Re-read the provider names and re-run one `auth check` per provider
