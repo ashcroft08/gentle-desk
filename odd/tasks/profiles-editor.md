@@ -576,4 +576,19 @@ es valor de producto".
   Gentleman-Programming/gentle-shell#3321 (CLOSED, status:approved) - publishing ours would
   be a duplicate; the session-profile-read half overlaps #2716/#2742, so nothing new was
   filed and the maintainer may comment there instead.
+- L30 (maintainer, 2026-11-17, the T3b/T5 rulings, paraphrased from the session's Q&A):
+  (1) "Make default" in the tab USES the channel's own apply (`apply_profile` mode
+  default) - it writes the store's `active` and claims the global routing, exactly as
+  the terminal's screen does; (2) the channel's confirmation dialog text (diff + ask)
+  is SHOWN AS-IS, in the language the child writes it (today Spanish), never translated
+  - it is the child's own text, like the terminal's; (3) T5 fallback-chain editing is
+  LIKE THE TERMINAL: per profile, per agent, plus the profile-wide `*` - all editable
+  (the store `profile_fallbacks` is exactly per-profile/per-agent chains, and the
+  terminal edits the whole file). Copy pass in native Spanish remains a polish task.
+  Order: T3b next.
+- L31 (maintainer, 2026-11-17, verbatim "ya probe todo bien", after a real-window run of
+  main through #200): the T3-mode switch, the Settings rail of 7 and the composed footers
+  SEEN WORKING in the real window. NOT covered by that look: T3b's apply buttons and
+  confirmation dialog (built after the run, branch feat/profile-apply) - they still owe
+  their own real-window look before their PR merges.
 
