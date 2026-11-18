@@ -9,6 +9,7 @@ mod pump_seam;
 use pump_seam::{assistant_message, assistant_turn, errored_turn, event_at, open_stored};
 
 use gentle_app::{ChatId, Input, Intent};
+use gentle_core::chat::TOOL_PAYLOAD_MAX_BYTES;
 use gentle_core::rpc::{AssistantMessageEvent, RpcEvent, RpcMessage};
 use gentle_desk_lib::bridge::AppStateHolder;
 use gentle_desk_lib::contract::{
@@ -37,6 +38,51 @@ fn id_of(item: &ChatItemView) -> &str {
         ChatItemView::Thinking(thinking) => &thinking.id,
         ChatItemView::Tool(tool) => &tool.id,
     }
+}
+
+/// One event of `chat`'s child with NO clock at all: the path a fixture without
+/// timestamps takes, where no row may invent a duration it has no evidence for.
+fn untimed(chat: &ChatId, event: RpcEvent) -> Converted {
+    Converted::Input(Input::ChatEvent {
+        chat: chat.clone(),
+        event,
+    })
+}
+
+/// The assistant message a turn opens with, carrying no content yet.
+fn message_start_event() -> RpcEvent {
+    RpcEvent::MessageStart(RpcMessage {
+        role: "assistant".to_owned(),
+        raw: json!({"role": "assistant", "content": []}),
+    })
+}
+
+/// The ONE tool row of a view, as the card reads it.
+fn only_tool(view: &ViewState) -> &ToolCallItemView {
+    let rows: Vec<&ToolCallItemView> = view
+        .items
+        .iter()
+        .filter_map(|item| match item {
+            ChatItemView::Tool(tool) => Some(tool),
+            ChatItemView::Message(_) | ChatItemView::Thinking(_) => None,
+        })
+        .collect();
+    assert_eq!(rows.len(), 1, "one tool call in the thread");
+    rows[0]
+}
+
+/// The ONE reasoning row of a view, as the card reads it.
+fn only_thinking(view: &ViewState) -> &ThinkingItemView {
+    let rows: Vec<&ThinkingItemView> = view
+        .items
+        .iter()
+        .filter_map(|item| match item {
+            ChatItemView::Thinking(thinking) => Some(thinking),
+            ChatItemView::Message(_) | ChatItemView::Tool(_) => None,
+        })
+        .collect();
+    assert_eq!(rows.len(), 1, "one reasoning block in the thread");
+    rows[0]
 }
 
 /// The message of one closed turn, as the web side receives it.
@@ -294,6 +340,314 @@ fn a_tool_item_travels_with_its_kind_and_its_untyped_payloads() {
                 "dropped": false,
             }
         })
+    );
+}
+
+/// The view in the MIDDLE of a tool call, before its end arrives: the card draws
+/// "Running", its body shows the output the last update reported, and there is
+/// neither a result nor a duration to draw yet (chat-transcript T2a, S3).
+#[test]
+fn a_tool_call_seen_while_running_carries_its_running_output_and_no_result() {
+    let (holder, chat) = open_stored();
+    let update = |text: &str, at: u64| {
+        event_at(
+            &chat,
+            RpcEvent::ToolExecutionUpdate {
+                tool_call_id: "call_1".to_owned(),
+                tool_name: "bash".to_owned(),
+                args: None,
+                partial_result: Some(json!({"content": [{"type": "text", "text": text}]})),
+            },
+            at,
+        )
+    };
+
+    let view = fold_turn(
+        &holder,
+        vec![
+            event_at(&chat, message_start_event(), 1_000),
+            event_at(
+                &chat,
+                RpcEvent::ToolExecutionStart {
+                    tool_call_id: "call_1".to_owned(),
+                    tool_name: "bash".to_owned(),
+                    args: Some(json!({"command": "ls"})),
+                },
+                1_300,
+            ),
+            update("a\n", 1_350),
+            update("a\nb\n", 1_400),
+        ],
+    );
+
+    assert_eq!(
+        *only_tool(&view),
+        ToolCallItemView {
+            id: "tool-call_1".to_owned(),
+            tool_name: "bash".to_owned(),
+            args: Some(json!({"command": "ls"})),
+            // The LAST update's output: a running call shows the tail of what it
+            // has produced so far, not the first line it printed.
+            partial_result: Some(json!({"content": [{"type": "text", "text": "a\nb\n"}]})),
+            // Nothing has ended, so there is no result and no duration to draw:
+            // a duration here would be a claim about a call still running.
+            result: None,
+            is_error: false,
+            running: true,
+            duration_ms: None,
+            truncated: false,
+            dropped: false,
+        },
+        "the running call is the card's row, carrying what the child last reported"
+    );
+}
+
+/// A tool output longer than the core keeps reaches the card marked as CUT, and
+/// a call the child failed reaches it marked as a failure: the two marks a card
+/// words differently (chat-transcript T2a, L4, L14).
+#[test]
+fn a_tool_output_cut_to_the_bound_says_it_was_cut_and_carries_the_failure_mark() {
+    let (holder, chat) = open_stored();
+    let long = "x".repeat(TOOL_PAYLOAD_MAX_BYTES * 4);
+
+    let view = fold_turn(
+        &holder,
+        vec![
+            event_at(&chat, message_start_event(), 1_000),
+            event_at(
+                &chat,
+                RpcEvent::ToolExecutionStart {
+                    tool_call_id: "call_1".to_owned(),
+                    tool_name: "bash".to_owned(),
+                    args: Some(json!({"command": "cat big.log"})),
+                },
+                1_300,
+            ),
+            event_at(
+                &chat,
+                RpcEvent::ToolExecutionEnd {
+                    tool_call_id: "call_1".to_owned(),
+                    tool_name: "bash".to_owned(),
+                    result: Some(json!({"content": [{"type": "text", "text": long}]})),
+                    is_error: true,
+                },
+                1_500,
+            ),
+        ],
+    );
+
+    let tool = only_tool(&view);
+    assert_eq!(
+        (tool.truncated, tool.dropped, tool.is_error),
+        (true, false, true),
+        "the output was cut short, no field was lost, and the child failed the call"
+    );
+    assert!(!tool.running, "the execution ended");
+    assert_eq!(tool.duration_ms, Some(200.0), "1500 - 1300");
+
+    // What it kept is the head of that output, cut to the bound the card folds at.
+    let kept = tool
+        .result
+        .as_ref()
+        .and_then(|result| result.get("content"))
+        .and_then(|content| content.get(0))
+        .and_then(|block| block.get("text"))
+        .and_then(serde_json::Value::as_str)
+        .expect("the text the row kept");
+    assert_eq!(
+        kept.len(),
+        TOOL_PAYLOAD_MAX_BYTES,
+        "the row keeps the bound, not the whole output"
+    );
+    assert!(kept.chars().all(|character| character == 'x'));
+}
+
+/// Cutting an object's KEY to the bound can make it land on another key of the
+/// same object, and a JSON object keeps one value per key: the field is LOST,
+/// which `truncated` cannot say, so the row carries `dropped` too
+/// (chat-transcript L10, T2a).
+#[test]
+fn a_cut_key_that_collides_says_a_field_of_the_payload_was_dropped() {
+    let (holder, chat) = open_stored();
+    // The two keys differ only AFTER the bound, so cutting each one to it makes
+    // them the same string.
+    let prefix = "k".repeat(TOOL_PAYLOAD_MAX_BYTES);
+    let mut fields = serde_json::Map::new();
+    fields.insert(
+        format!("{prefix}-first"),
+        json!("the value the payload keeps"),
+    );
+    fields.insert(
+        format!("{prefix}-second"),
+        json!("the value that would overwrite it"),
+    );
+
+    let view = fold_turn(
+        &holder,
+        vec![
+            event_at(&chat, message_start_event(), 1_000),
+            event_at(
+                &chat,
+                RpcEvent::ToolExecutionStart {
+                    tool_call_id: "call_1".to_owned(),
+                    tool_name: "bash".to_owned(),
+                    args: Some(json!({"command": "env"})),
+                },
+                1_300,
+            ),
+            event_at(
+                &chat,
+                RpcEvent::ToolExecutionEnd {
+                    tool_call_id: "call_1".to_owned(),
+                    tool_name: "bash".to_owned(),
+                    result: Some(serde_json::Value::Object(fields)),
+                    is_error: false,
+                },
+                1_500,
+            ),
+        ],
+    );
+
+    let tool = only_tool(&view);
+    assert_eq!(
+        (tool.dropped, tool.truncated),
+        (true, true),
+        "a field of the payload was lost to the cut, and the keys were shortened too"
+    );
+
+    let kept = tool
+        .result
+        .as_ref()
+        .and_then(serde_json::Value::as_object)
+        .expect("the result is an object");
+    assert_eq!(
+        kept.len(),
+        1,
+        "one key, one field: the colliding field is the loss"
+    );
+    assert!(
+        kept.keys().all(|key| key.len() == TOOL_PAYLOAD_MAX_BYTES),
+        "the key the row kept is cut to the bound: {:?}",
+        kept.keys().collect::<Vec<&String>>()
+    );
+    assert!(!tool.is_error, "this call did not fail");
+}
+
+/// The reasoning row the card draws WHILE the model is still thinking: the row
+/// is open, its text grows with each delta, and with no clock supplied there is
+/// no duration to show (chat-transcript T2a, S3).
+#[test]
+fn a_thinking_row_streams_while_its_text_grows_and_invents_no_duration() {
+    let (holder, chat) = open_stored();
+
+    let view = fold_turn(
+        &holder,
+        vec![
+            untimed(&chat, message_start_event()),
+            untimed(
+                &chat,
+                RpcEvent::MessageUpdate(AssistantMessageEvent::ThinkingStart { content_index: 0 }),
+            ),
+            untimed(
+                &chat,
+                RpcEvent::MessageUpdate(AssistantMessageEvent::ThinkingDelta {
+                    content_index: 0,
+                    delta: "Let me".to_owned(),
+                }),
+            ),
+        ],
+    );
+    assert_eq!(
+        *only_thinking(&view),
+        ThinkingItemView {
+            id: "think-0".to_owned(),
+            text: "Let me".to_owned(),
+            streaming: true,
+            duration_ms: None,
+        },
+        "the block is open while its text is still arriving"
+    );
+
+    // The next delta grows the SAME row: one block, never a row per delta.
+    let view = fold_turn(
+        &holder,
+        vec![untimed(
+            &chat,
+            RpcEvent::MessageUpdate(AssistantMessageEvent::ThinkingDelta {
+                content_index: 0,
+                delta: " look.".to_owned(),
+            }),
+        )],
+    );
+    assert_eq!(
+        *only_thinking(&view),
+        ThinkingItemView {
+            id: "think-0".to_owned(),
+            text: "Let me look.".to_owned(),
+            streaming: true,
+            duration_ms: None,
+        },
+        "the row keeps growing, and no clock means no duration to claim"
+    );
+}
+
+/// The same row with the child's clock: while it runs there is still no
+/// duration (its end stamp has not arrived), and once it closes the card has
+/// "Thought 0.2s" to draw (chat-transcript T2a, S3).
+#[test]
+fn a_thinking_row_with_a_clock_reports_its_duration_once_it_closes() {
+    let (holder, chat) = open_stored();
+
+    let view = fold_turn(
+        &holder,
+        vec![
+            event_at(&chat, message_start_event(), 1_000),
+            event_at(
+                &chat,
+                RpcEvent::MessageUpdate(AssistantMessageEvent::ThinkingStart { content_index: 0 }),
+                1_000,
+            ),
+            event_at(
+                &chat,
+                RpcEvent::MessageUpdate(AssistantMessageEvent::ThinkingDelta {
+                    content_index: 0,
+                    delta: "Let me look.".to_owned(),
+                }),
+                1_100,
+            ),
+        ],
+    );
+    assert_eq!(
+        *only_thinking(&view),
+        ThinkingItemView {
+            id: "think-0".to_owned(),
+            text: "Let me look.".to_owned(),
+            streaming: true,
+            duration_ms: None,
+        },
+        "a start stamp alone is not a duration: the block is still running"
+    );
+
+    let view = fold_turn(
+        &holder,
+        vec![event_at(
+            &chat,
+            RpcEvent::MessageUpdate(AssistantMessageEvent::ThinkingEnd {
+                content_index: 0,
+                content: "Let me look.".to_owned(),
+            }),
+            1_200,
+        )],
+    );
+    assert_eq!(
+        *only_thinking(&view),
+        ThinkingItemView {
+            id: "think-0".to_owned(),
+            text: "Let me look.".to_owned(),
+            streaming: false,
+            duration_ms: Some(200.0),
+        },
+        "1200 - 1000: the block's own two stamps, and the row is closed"
     );
 }
 
