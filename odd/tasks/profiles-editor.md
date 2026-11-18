@@ -618,4 +618,8 @@ es valor de producto".
   maintainer's window held the exe), fmt/clippy clean, vitest 816/816, svelte-check/eslint
   clean, bindings regenerated. The re-look of the apply buttons + dialog + answer line is
   owed in a fresh window.
+- L34 (maintainer, 2026-11-17, verbatim "ahora si se vio lo que dices, ahora si podemos
+  mergear", after the second real-window look on run9): the apply buttons, the child's
+  verbatim answer line and the confirmation flow SEEN WORKING in the real window. T3b's
+  real-window look is SATISFIED; #201 is cleared for merge by the maintainer.
 
