@@ -338,6 +338,31 @@ pub enum UiIntent {
         /// the owner keeps no empty chain, so the shell refuses it too.
         steps: Vec<ChatProfileStepView>,
     },
+    /// Write ONE pin layer of this chat's WORKTREE, the way the terminal pins a
+    /// profile (profiles-editor T6, S2, S3): the `pins` store's `data` for that
+    /// layer, exactly `{source, profile}`, where a `null` profile CLEARS the
+    /// layer.
+    ///
+    /// The pin is per LAYER and per worktree, never per profile: `local` is the
+    /// clone-wide file in the Git common dir, `repo` the committable one of this
+    /// chat's worktree. The write is preconditioned on THAT layer's own
+    /// `writeTargets[].writeRevision` (S3), it is followed by a fresh read of that
+    /// chat's configuration, and it writes nothing of the other layer - the
+    /// channel's pin payload names one file, so there is no document to rebuild.
+    ///
+    /// A name the profiles store does not define, a stale token, an apply in
+    /// flight, a chat with no resolvable worktree and a child that does not
+    /// answer all change nothing and leave [`ChatProfileView::pin_failed`] set,
+    /// which the tab says in one short line and clears on the next successful
+    /// read.
+    SaveChatProfilePin {
+        chat_id: String,
+        /// The layer to write: `local` or `repo`, and nothing else. Anything
+        /// else is a page bug and is dropped, so no request leaves for it.
+        source: String,
+        /// A profile name the store defines, or `null` to clear that layer.
+        profile: Option<String>,
+    },
     /// Re-read the provider names and re-run one `auth check` per provider
     /// (0.1.12, T3). The answer travels back on [`ViewState::auth`].
     RefreshAuth,
@@ -545,8 +570,8 @@ pub struct ChatProfileDefinitionView {
 /// names (`desktop-rpc.md:211-234`).
 ///
 /// A layer that holds a VALID profile another layer outranks is not reported by
-/// that value at all, so it is not drawn here either: the tab shows the winner
-/// and the two broken lists, and invents no third mark.
+/// that value at all, so it carries no mark: the tab shows the winner and the two
+/// broken lists, and invents no third mark.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "snake_case")]
 pub enum ChatProfilePinMarkView {
@@ -558,15 +583,49 @@ pub enum ChatProfilePinMarkView {
     Invalid,
 }
 
+/// The state of ONE pin FILE, as the `pins` store's own `layers[]` reports it
+/// (`desktop-rpc.md:196-234`). It is per file and independent of what the file
+/// amounts to: a layer can read `ok` and still be outranked.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum ChatProfilePinStatusView {
+    /// The file exists and holds a pin the owner could read.
+    Ok,
+    /// No file of that layer exists.
+    Missing,
+    /// The file exists and is not a pin.
+    Invalid,
+}
+
 /// One pin layer: the file it lives in, the profile it names, and what became of
 /// it.
+///
+/// Everything an EDITOR needs is here too (profiles-editor T6): the file's own
+/// state, whether a valid pin in it is merely outranked (and so not reported at
+/// all), and whether a write may replace it - which is what tells the tab to draw
+/// a picker instead of a value.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
 pub struct ChatProfilePinLayerView {
     /// `local` or `repo`: the file the pin is kept in.
     pub source: String,
-    /// The profile the layer names, `None` when it names none.
+    /// The state of that FILE, from the store's `layers[]`.
+    pub status: ChatProfilePinStatusView,
+    /// The profile the layer names, `None` when it names none - and `None` for a
+    /// layer whose valid pin another layer outranks, whose content is not
+    /// reported by the value at all.
     pub profile: Option<String>,
-    pub mark: ChatProfilePinMarkView,
+    /// What the value makes of this layer, `None` when it does not name it: a
+    /// valid pin another layer outranks carries no mark.
+    pub mark: Option<ChatProfilePinMarkView>,
+    /// Whether this layer reads `ok` and the value does not name it, i.e. a
+    /// VALID pin here is outranked by another layer (`desktop-rpc.md:211-234`).
+    /// Its content is then UNKNOWN to this client, and the editor must not claim
+    /// to know it.
+    pub outranked: bool,
+    /// Whether a write may replace this layer's file: its `writeTargets` entry is
+    /// present, which outside a resolvable Git worktree it is not
+    /// (`desktop-rpc.md:273`). Only a writable layer is editable.
+    pub writable: bool,
 }
 
 /// What the `pins` store answered for THIS chat's own worktree: the pins belong
@@ -577,8 +636,10 @@ pub struct ChatProfilePinsView {
     pub resolved: bool,
     /// The layer that decides here, when one does.
     pub winner: Option<ChatProfilePinLayerView>,
-    /// Every layer the answer names, each with its own mark: the winner first,
-    /// then the stale ones, then the ones that are not a pin at all.
+    /// Every layer the answer reports, one per pin FILE this worktree has (the
+    /// store's `layers[]`), each with its own mark, its own state and whether it
+    /// may be written: the winner first, then the stale ones, then the ones that
+    /// are not a pin at all, and a layer the value does not name last.
     pub layers: Vec<ChatProfilePinLayerView>,
     /// The owner's own code for why nothing resolved; `worktree_unresolved`
     /// today.
@@ -708,6 +769,16 @@ pub struct ChatProfileView {
     /// that worked, and never set by the read itself. A chain save holds the SAME
     /// one-save slot as the mode switch, so [`Self::saving`] disables both.
     pub chain_failed: bool,
+    /// Whether the last attempt to write ONE pin layer FAILED, and nothing was
+    /// written (profiles-editor T6): a stale `expectedRevision`, a name the
+    /// profiles store does not define, no resolvable Git worktree, a child that
+    /// did not answer, a method it does not advertise. It is the PARALLEL of
+    /// [`Self::save_failed`] and [`Self::chain_failed`] - one notice per control,
+    /// never one for every write - and its lifecycle is the same: cleared by the
+    /// next successful read, by a save that worked, and never set by the read
+    /// itself. A pin save holds the SAME one-save slot as the mode switch and the
+    /// chain editor, so [`Self::saving`] disables all three.
+    pub pin_failed: bool,
 }
 
 /// What one "Open in terminal" button asks the shell to do (0.1.12, S1, S2,

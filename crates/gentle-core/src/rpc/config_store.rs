@@ -271,6 +271,20 @@ impl PinSource {
             Self::Repo => "repo",
         }
     }
+
+    /// The [`WriteTargetName`] this layer's file is (`desktop-rpc.md:246-262`):
+    /// `local` is the clone-wide file in the Git common dir, `repo` the
+    /// committable one of this worktree.
+    ///
+    /// It is the one place the layer/target correspondence is written down, so a
+    /// pin write can never be preconditioned on the OTHER layer's token - which
+    /// would answer `revision_conflict` for ever, on a file nobody touched.
+    pub fn write_target(&self) -> WriteTargetName {
+        match self {
+            Self::Local => WriteTargetName::Local,
+            Self::Repo => WriteTargetName::Repo,
+        }
+    }
 }
 
 /// One file layer of a store, as `layers[]` reports it.
@@ -847,6 +861,58 @@ fn fallback_step_json(step: &FallbackStep) -> Value {
         object.insert("thinking".to_owned(), Value::String(thinking.clone()));
     }
     Value::Object(object)
+}
+
+/// Why one pin is not a pin the owner would keep.
+///
+/// The owner's own rules decide these (`desktop-rpc.md:382`): `profile` must be a
+/// name the profiles store defines, or the literal `null`; a missing, empty or
+/// non-string one is `invalid_data`. The type already makes `source` one of
+/// `local`/`repo`, and whether the name is DEFINED is the owner's check against
+/// the store it holds - a local guess at that would be a guess about another
+/// file.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PinInvalid {
+    /// No name at all: a pin needs a profile, and an empty one is not a profile.
+    BlankProfile,
+}
+
+impl fmt::Display for PinInvalid {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::BlankProfile => write!(f, "a pin needs a profile name, or null to clear it"),
+        }
+    }
+}
+
+impl std::error::Error for PinInvalid {}
+
+/// Whether `profile` is a pin the owner's own rules could accept: a name, or the
+/// literal `None` that clears the layer.
+pub fn validate_pin(profile: Option<&str>) -> Result<(), PinInvalid> {
+    match profile {
+        None => Ok(()),
+        Some(name) if name.trim().is_empty() => Err(PinInvalid::BlankProfile),
+        Some(_) => Ok(()),
+    }
+}
+
+/// The `pins` store's `data` for ONE layer: exactly `{source, profile}`, with
+/// `null` clearing that layer (`desktop-rpc.md:322-372`).
+///
+/// This store is the one whose `data` is a LAYER and not a whole document, so
+/// there is nothing to take verbatim and nothing of the other layer to preserve:
+/// the request names one file, and the owner leaves the other one exactly as it
+/// is. That is also why exactly two keys are accepted - an extra member is
+/// `invalid_data` - and this builder can produce no third.
+///
+/// A name the owner's rules would refuse never becomes a payload
+/// ([`validate_pin`]): an `invalid_data` is never this app's fault. Whether the
+/// name is one the profiles store DEFINES stays the owner's own check, because
+/// this module holds no profiles store to ask.
+pub fn pin_data(source: PinSource, profile: Option<&str>) -> Result<Value, PinInvalid> {
+    validate_pin(profile)?;
+    Ok(json!({ "source": source.as_str(), "profile": profile }))
 }
 
 /// Reads one store's `value` into the type that store carries.

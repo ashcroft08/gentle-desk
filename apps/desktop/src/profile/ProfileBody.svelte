@@ -7,7 +7,9 @@
   //
   // The chains of the profile this chat USES are EDITABLE (profiles-editor T5,
   // L30-3) and every other profile keeps the read-only drawing: only `editable`
-  // names a profile whose chains may be written from here.
+  // names a profile whose chains may be written from here. The pin group is
+  // edited too (T6): a pin belongs to this chat's WORKTREE, not to a profile, so
+  // every layer the worktree offers a write target for is drawn as an editor.
   //
   // A store that did not answer is marked WHERE ITS CONTENT WOULD BE (a profile
   // list, the chains of a profile, the pin layers) instead of being drawn as an
@@ -29,18 +31,24 @@
     editable = null,
     saving = false,
     chainFailed = false,
+    pinFailed = false,
     onSaveChain,
+    onSavePin,
   }: {
     view: ChatProfile
     copy: ProfileCopy
     /** The profile whose chains this tab may edit: the one the chat USES. */
     editable?: string | null
-    /** A chain save is in flight for this chat. */
+    /** A save is in flight for this chat: every editor is disabled. */
     saving?: boolean
     /** The last chain save did not happen, and nothing was written. */
     chainFailed?: boolean
+    /** The last pin save did not happen, and nothing was written (T6). */
+    pinFailed?: boolean
     /** Saves one chain's steps in the profile the chat uses. */
     onSaveChain?: (agent: string, steps: Step[]) => void
+    /** Writes one pin layer of this chat's worktree (T6). */
+    onSavePin?: (source: string, profile: string | null) => void
   } = $props()
 
   const profilesRead = $derived(storeRead(view, 'profiles'))
@@ -60,6 +68,9 @@
 
   /** The pin group's id: the one group that is not a profile. */
   const PIN_GROUP = 'profile-group-pin'
+
+  /** The profile names the pin picker offers: every profile the store defines. */
+  const defined = $derived(profilesRead ? view.profiles.map((profile) => profile.name) : [])
 
   /** The id of one profile's group, in the order the store reports them. */
   function groupId(index: number): string {
@@ -128,7 +139,15 @@
     panelId={PIN_GROUP}
     onToggle={() => toggle(PIN_GROUP)}
   >
-    <ProfilePins pins={view.pins} read={pinsRead} {copy} />
+    <ProfilePins
+      pins={view.pins}
+      read={pinsRead}
+      {copy}
+      defined={defined}
+      {saving}
+      failed={pinFailed}
+      onSave={onSavePin}
+    />
   </ProfileGroup>
 </div>
 

@@ -20,7 +20,7 @@ use gentle_desk_lib::bridge::AppStateHolder;
 use gentle_desk_lib::contract::UiIntent;
 use gentle_desk_lib::effects;
 use gentle_desk_lib::settings::FileRead;
-use gentle_runtime::chat_runtime::{ChatConfigRead, StoreRead};
+use gentle_runtime::chat_runtime::{ChatConfigRead, PinsRead, StoreRead};
 
 /// The channel's own documented frames: the profiles, the fallback chains and the
 /// pins, quoted from `desktop-rpc.md` in that fixture.
@@ -48,6 +48,36 @@ fn typed<T>(
     StoreRead::Read(of(parsed).expect("the value of the store that was asked for"))
 }
 
+/// The `pins` answer of a worktree: the documented value and layers, plus the two
+/// write targets the store offers inside a resolvable worktree
+/// (`desktop-rpc.md:246-273`, which the fixture's frame does not print).
+fn pins_frame() -> serde_json::Value {
+    let mut answer = frames()["pins_value"].clone();
+    answer["writeTargets"] = serde_json::json!([
+        {
+            "target": "local",
+            "status": "ok",
+            "writeRevision": "sha256:1b1f0d6e9a3c47f2b8d5e0a7c4f19b62",
+        },
+        {
+            "target": "repo",
+            "status": "ok",
+            "writeRevision": "sha256:2c2a1e7f0b4d49381a6e5c2f9d7b30a4",
+        },
+    ]);
+    answer
+}
+
+/// One `pins` answer, typed the way the runtime types it.
+fn pins_of(answer: &serde_json::Value) -> StoreRead<PinsRead> {
+    let projection =
+        config_store::parse_config_projection(answer).expect("a documented pins projection");
+    let Some(StoreValue::Pins(value)) = projection.value.clone() else {
+        panic!("the pins store answered a pins value");
+    };
+    StoreRead::Read(PinsRead::of(value, &projection))
+}
+
 /// The documented read: all three stores answered, each from its own frame.
 fn documented() -> ChatConfigRead {
     let frames = frames();
@@ -68,14 +98,7 @@ fn documented() -> ChatConfigRead {
                 _ => None,
             },
         ),
-        pins: typed(
-            &frames["pins_value"]["value"],
-            StoreId::Pins,
-            |value| match value {
-                StoreValue::Pins(pins) => Some(pins),
-                _ => None,
-            },
-        ),
+        pins: pins_of(&pins_frame()),
     }
 }
 

@@ -31,8 +31,8 @@ pub use events::Converted;
 pub use execute::Outcome;
 pub use open::request_after_open;
 pub use profile::{
-    ChainWriteResult, ChatChainWrite, ChatConfigRead, ChatModeWrite, ChatProfileApply,
-    ModeWriteResult, StoreRead,
+    ChainWriteResult, ChatChainWrite, ChatConfigRead, ChatModeWrite, ChatPinWrite,
+    ChatProfileApply, ModeWriteResult, PinLayerState, PinSlot, PinWriteResult, PinsRead, StoreRead,
 };
 pub use rekey::session_file_of;
 

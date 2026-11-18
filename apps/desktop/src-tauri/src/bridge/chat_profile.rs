@@ -34,12 +34,14 @@ use std::path::{Component, Path, PathBuf};
 use gentle_app::{ChatCommand, ChatId};
 use gentle_core::i18n::Language;
 use gentle_core::rpc::config_store::{
-    FallbacksDocument, OrchestratorMode, PinLayer, PinsValue, ProfilesDocument, SetConfigOutcome,
+    FallbacksDocument, OrchestratorMode, PinLayer, PinSource, PinsValue, ProfilesDocument,
+    SetConfigOutcome,
 };
 use gentle_core::rpc::profile_apply::ApplyProfileOutcome;
 use gentle_core::rpc::NoAnswer;
 use gentle_runtime::chat_runtime::{
-    ChainWriteResult, ChatConfigRead, ChatProfileApply, ModeWriteResult, StoreRead,
+    ChainWriteResult, ChatConfigRead, ChatProfileApply, ModeWriteResult, PinSlot, PinWriteResult,
+    PinsRead, StoreRead,
 };
 use gentle_runtime::session_profile::last_session_profile;
 
@@ -48,8 +50,8 @@ use crate::contract::{
     ApplyModeView, ChatProfileAgentView, ChatProfileApplyAnswerView,
     ChatProfileApplyConfirmationView, ChatProfileApplyNoticeView, ChatProfileAvailabilityView,
     ChatProfileChainView, ChatProfileDefinitionView, ChatProfilePinLayerView,
-    ChatProfilePinMarkView, ChatProfilePinsView, ChatProfileStepView, ChatProfileStoresView,
-    ChatProfileView, OrchestratorModeView, ViewState,
+    ChatProfilePinMarkView, ChatProfilePinStatusView, ChatProfilePinsView, ChatProfileStepView,
+    ChatProfileStoresView, ChatProfileView, OrchestratorModeView, ViewState,
 };
 use crate::settings::FileRead;
 
@@ -89,6 +91,7 @@ pub fn compose(chat: &ChatId, read: &ChatConfigRead, session: Option<&str>) -> C
         apply_answer: None,
         apply_confirmation: None,
         chain_failed: false,
+        pin_failed: false,
     }
 }
 
@@ -127,6 +130,9 @@ pub(super) struct ProfileWork {
     /// The chain editor's own notice: the parallel slot to `failed`, so a chain
     /// write that did not happen never lights the mode switch's line (T5).
     pub(super) chain_failed: bool,
+    /// The pin editor's own notice: the third parallel slot, so a pin write that
+    /// did not happen never lights the mode switch's or a chain's line (T6).
+    pub(super) pin_failed: bool,
 }
 
 /// Which profile work a per-chat command does, and so which of its chat's two
@@ -148,9 +154,9 @@ impl ChatWork {
     pub(crate) fn of(command: &ChatCommand) -> Option<Self> {
         match command {
             ChatCommand::ReadChatProfile { .. } => Some(Self::Read),
-            ChatCommand::SetChatProfileMode { .. } | ChatCommand::SetChatProfileChain { .. } => {
-                Some(Self::Save)
-            }
+            ChatCommand::SetChatProfileMode { .. }
+            | ChatCommand::SetChatProfileChain { .. }
+            | ChatCommand::SetChatProfilePin { .. } => Some(Self::Save),
             ChatCommand::ApplyChatProfile { .. } => Some(Self::Apply),
             _ => None,
         }
@@ -326,28 +332,87 @@ fn chains(fallbacks: Option<&FallbacksDocument>, profile: &str) -> Vec<ChatProfi
         .collect()
 }
 
-/// The pins value as the page draws it: the winner first, then the layers that
-/// name a profile the store dropped, then the ones that are no pin at all.
-fn pins_view(pins: &PinsValue) -> ChatProfilePinsView {
-    let mut layers: Vec<ChatProfilePinLayerView> = Vec::new();
-    if let Some(winner) = &pins.winner {
-        layers.push(layer(winner, ChatProfilePinMarkView::Winner));
-    }
-    for stale in &pins.stale {
-        layers.push(layer(stale, ChatProfilePinMarkView::Stale));
-    }
-    for invalid in &pins.invalid {
-        layers.push(layer(invalid, ChatProfilePinMarkView::Invalid));
+/// The pins answer as the page draws it: one row per pin FILE this worktree has,
+/// with the mark the value gives it, the state of its file, and whether a write
+/// may replace it (profiles-editor T6).
+///
+/// The rows come from the store's own `layers[]`, so a layer whose valid pin
+/// another one OUTRANKS is drawn too - unmarked, and [`outranked`] - even though
+/// the value does not name it: that is the row an editor needs, and claiming to
+/// know its pin would be a guess. The winner first, then the stale ones, then the
+/// ones that are not a pin at all, then the unreported ones, so the read-only
+/// drawing keeps the order it always had.
+fn pins_view(pins: &PinsRead) -> ChatProfilePinsView {
+    let mut rows: Vec<ChatProfilePinLayerView> = Vec::new();
+    let marked = |mark: ChatProfilePinMarkView| -> Vec<ChatProfilePinLayerView> {
+        named_layers(&pins.value, mark)
+            .into_iter()
+            .map(|(source, profile)| row(pins, source, Some(mark), profile))
+            .collect()
+    };
+    rows.extend(marked(ChatProfilePinMarkView::Winner));
+    rows.extend(marked(ChatProfilePinMarkView::Stale));
+    rows.extend(marked(ChatProfilePinMarkView::Invalid));
+    for layer in &pins.layers {
+        if rows.iter().any(|row| row.source == layer.source.as_str()) {
+            continue;
+        }
+        rows.push(row(pins, layer.source, None, None));
     }
     ChatProfilePinsView {
-        resolved: pins.resolved,
-        winner: pins
-            .winner
-            .as_ref()
-            .map(|winner| layer(winner, ChatProfilePinMarkView::Winner)),
-        layers,
-        reason: pins.reason.clone(),
-        worktree_unresolved: pins.worktree_unresolved(),
+        resolved: pins.value.resolved,
+        winner: pins.value.winner.as_ref().map(|winner| {
+            row(
+                pins,
+                winner.source,
+                Some(ChatProfilePinMarkView::Winner),
+                winner.profile.clone(),
+            )
+        }),
+        layers: rows,
+        reason: pins.value.reason.clone(),
+        worktree_unresolved: pins.value.worktree_unresolved(),
+    }
+}
+
+/// The layers the `pins` VALUE names under one mark - the winner, the stale ones,
+/// the ones that are not a pin at all - as the layer and the profile it holds.
+fn named_layers(
+    pins: &PinsValue,
+    mark: ChatProfilePinMarkView,
+) -> Vec<(PinSource, Option<String>)> {
+    let of = |pin: &PinLayer| (pin.source, pin.profile.clone());
+    match mark {
+        ChatProfilePinMarkView::Winner => pins.winner.iter().map(of).collect(),
+        ChatProfilePinMarkView::Stale => pins.stale.iter().map(of).collect(),
+        ChatProfilePinMarkView::Invalid => pins.invalid.iter().map(of).collect(),
+    }
+}
+
+/// One row of the pins drawing: the layer, the mark the value gives it (`None`
+/// for a layer it does not name), and the profile it holds as far as the value
+/// says.
+fn row(
+    pins: &PinsRead,
+    source: PinSource,
+    mark: Option<ChatProfilePinMarkView>,
+    profile: Option<String>,
+) -> ChatProfilePinLayerView {
+    let status = match pins.layer(source).map(|layer| layer.status) {
+        Some(gentle_core::rpc::LayerStatus::Missing) => ChatProfilePinStatusView::Missing,
+        Some(gentle_core::rpc::LayerStatus::Invalid) => ChatProfilePinStatusView::Invalid,
+        // A layer the store did not report has no file to speak of, and one that
+        // read `ok` holds a readable pin.
+        Some(gentle_core::rpc::LayerStatus::Ok) => ChatProfilePinStatusView::Ok,
+        None => ChatProfilePinStatusView::Missing,
+    };
+    ChatProfilePinLayerView {
+        source: source.as_str().to_owned(),
+        status,
+        profile,
+        mark,
+        outranked: mark.is_none() && pins.slot(source) == PinSlot::Unreported,
+        writable: pins.writable(source),
     }
 }
 
@@ -408,15 +473,6 @@ fn answer_of(result: &ApplyProfileOutcome) -> Option<ChatProfileApplyAnswerView>
     (!notes.is_empty()).then_some(ChatProfileApplyAnswerView { notes })
 }
 
-/// One pin layer, as the store named it and the page draws it.
-fn layer(pin: &PinLayer, mark: ChatProfilePinMarkView) -> ChatProfilePinLayerView {
-    ChatProfilePinLayerView {
-        source: pin.source.as_str().to_owned(),
-        profile: pin.profile.clone(),
-        mark,
-    }
-}
-
 impl AppStateHolder {
     /// Installs the session-file seam of this run, once, at startup: the reader
     /// and the sessions store it may read from. The same kind of step as the
@@ -465,6 +521,7 @@ impl AppStateHolder {
                 if reached {
                     state.failed = false;
                     state.chain_failed = false;
+                    state.pin_failed = false;
                     state.notice = None;
                     // The child's own answer to an apply that RAN goes with the
                     // notice: the next successful read is the truth the tab
@@ -568,6 +625,58 @@ impl AppStateHolder {
             let state = held.entry(chat.as_str().to_owned()).or_default();
             state.saving = false;
             state.chain_failed = !result.saved();
+        }
+        if reached_a_store(read) {
+            let view = self.compose_view(chat, read);
+            self.install_chat_profile(view);
+        }
+        Some(self.view())
+    }
+
+    /// Records that an attempt to write ONE pin layer of `chat`'s worktree could
+    /// not even START (profiles-editor T6, the same liveness hole of L17(a)): the
+    /// worker thread its command runs on could not be created, so the write never
+    /// ran and will never answer.
+    ///
+    /// It is [`Self::note_chat_pin`] with the failure a child that did not answer
+    /// leaves: nothing was written, the picker is usable again, and one short line
+    /// says the pin could not be saved. A chat that closed meanwhile is dropped
+    /// with its state.
+    pub fn note_chat_pin_unstarted(&self, chat: &ChatId) -> Option<ViewState> {
+        self.note_chat_pin(
+            chat,
+            &PinWriteResult::failed(SetConfigOutcome::NoAnswer(NoAnswer::NotConnected)),
+            &ChatConfigRead::unasked(),
+        )
+    }
+
+    /// Records what one attempt to write ONE pin layer came to, with the
+    /// configuration the attempt re-read, and answers the slice to push
+    /// (profiles-editor T6, S2, S3).
+    ///
+    /// The same lifecycle as [`Self::note_chat_chain`]: the re-read is installed
+    /// exactly as a plain read installs it (a read that reached no store leaves
+    /// what the tab drew standing, L11-4), the save slot comes free either way, and
+    /// the attempt's own answer - whether the pin could not be saved - travels in
+    /// the pin editor's own notice, never in the switch's or a chain's. A chat that
+    /// closed while the write ran is dropped with its state.
+    pub fn note_chat_pin(
+        &self,
+        chat: &ChatId,
+        result: &PinWriteResult,
+        read: &ChatConfigRead,
+    ) -> Option<ViewState> {
+        if !self.is_open(chat) {
+            lock(&self.profile_work).remove(chat.as_str());
+            return None;
+        }
+        // One lock, one entry: the save's own answer, and nothing about a read
+        // that may be in flight at the same time (L18).
+        {
+            let mut held = lock(&self.profile_work);
+            let state = held.entry(chat.as_str().to_owned()).or_default();
+            state.saving = false;
+            state.pin_failed = !result.saved();
         }
         if reached_a_store(read) {
             let view = self.compose_view(chat, read);
@@ -775,6 +884,7 @@ impl AppStateHolder {
         view.apply_answer = state.answer;
         view.apply_confirmation = state.confirmation;
         view.chain_failed = state.chain_failed;
+        view.pin_failed = state.pin_failed;
         Some(view)
     }
 
@@ -804,12 +914,12 @@ mod tests {
     use gentle_app::ChatId;
     use gentle_core::i18n::Language;
     use gentle_core::rpc::config_store::{self, GetConfigOutcome, StoreId, StoreValue};
-    use gentle_runtime::chat_runtime::{ChatConfigRead, StoreRead};
+    use gentle_runtime::chat_runtime::{ChatConfigRead, PinsRead, StoreRead};
 
     use super::{compose, lock, view};
     use crate::contract::{
         ChatProfileAvailabilityView, ChatProfilePinLayerView, ChatProfilePinMarkView,
-        ChatProfileView, OrchestratorModeView,
+        ChatProfilePinStatusView, ChatProfileView, OrchestratorModeView,
     };
     use crate::settings::FileRead;
 
@@ -848,6 +958,38 @@ mod tests {
         StoreRead::Read(of(parsed).expect("the value of the store that was asked for"))
     }
 
+    /// The `pins` answer: the documented value, the two pin files this worktree
+    /// has and the two write targets it offers (the fixture's `pins_value` frame is
+    /// quoted from `desktop-rpc.md:219-234`, which prints the value and the layers
+    /// but not the targets of `:246-273`).
+    fn pins_frame() -> serde_json::Value {
+        let mut answer = frames()["pins_value"].clone();
+        answer["writeTargets"] = serde_json::json!([
+            {
+                "target": "local",
+                "status": "ok",
+                "writeRevision": "sha256:1b1f0d6e9a3c47f2b8d5e0a7c4f19b62",
+            },
+            {
+                "target": "repo",
+                "status": "ok",
+                "writeRevision": "sha256:2c2a1e7f0b4d49381a6e5c2f9d7b30a4",
+            },
+        ]);
+        answer
+    }
+
+    /// One `pins` answer, typed the way the runtime types it: its value plus the
+    /// two lists a pin write needs.
+    fn pins_read(answer: &serde_json::Value) -> StoreRead<PinsRead> {
+        let projection =
+            config_store::parse_config_projection(answer).expect("a documented pins projection");
+        let Some(StoreValue::Pins(value)) = projection.value.clone() else {
+            panic!("the pins store answered a pins value");
+        };
+        StoreRead::Read(PinsRead::of(value, &projection))
+    }
+
     /// The documented read: all three stores answered, each from its own frame.
     fn documented() -> ChatConfigRead {
         let frames = frames();
@@ -868,14 +1010,7 @@ mod tests {
                     _ => None,
                 },
             ),
-            pins: typed(
-                &frames["pins_value"]["value"],
-                StoreId::Pins,
-                |value| match value {
-                    StoreValue::Pins(pins) => Some(pins),
-                    _ => None,
-                },
-            ),
+            pins: pins_read(&pins_frame()),
         }
     }
 
@@ -1153,14 +1288,20 @@ mod tests {
     #[test]
     fn a_worktree_that_cannot_be_resolved_is_carried_as_its_own_code() {
         let unresolvable: serde_json::Value = serde_json::from_str(
-            r#"{"resolved": false, "reason": "worktree_unresolved", "invalid": [], "stale": []}"#,
+            r#"{
+                "store": "pins",
+                "scope": "local+repo",
+                "readOnly": false,
+                "status": "invalid",
+                "revision": "sha256:0d19c0b7f0a94c29d5c33a0b1c9e6d21",
+                "value": {"resolved": false, "reason": "worktree_unresolved", "invalid": [], "stale": []},
+                "layers": [],
+                "writeTargets": []
+            }"#,
         )
-        .expect("the no-worktree value of the pins store");
+        .expect("the no-worktree answer of the pins store");
         let read = ChatConfigRead {
-            pins: typed(&unresolvable, StoreId::Pins, |value| match value {
-                StoreValue::Pins(pins) => Some(pins),
-                _ => None,
-            }),
+            pins: pins_read(&unresolvable),
             ..documented()
         };
 
@@ -1187,8 +1328,11 @@ mod tests {
             pins.winner,
             Some(ChatProfilePinLayerView {
                 source: "repo".to_owned(),
+                status: ChatProfilePinStatusView::Ok,
                 profile: Some("team".to_owned()),
-                mark: ChatProfilePinMarkView::Winner,
+                mark: Some(ChatProfilePinMarkView::Winner),
+                outranked: false,
+                writable: true,
             })
         );
         assert_eq!(
@@ -1196,18 +1340,113 @@ mod tests {
             vec![
                 ChatProfilePinLayerView {
                     source: "repo".to_owned(),
+                    status: ChatProfilePinStatusView::Ok,
                     profile: Some("team".to_owned()),
-                    mark: ChatProfilePinMarkView::Winner,
+                    mark: Some(ChatProfilePinMarkView::Winner),
+                    outranked: false,
+                    writable: true,
                 },
                 ChatProfilePinLayerView {
                     source: "local".to_owned(),
+                    status: ChatProfilePinStatusView::Ok,
                     profile: Some("retired".to_owned()),
-                    mark: ChatProfilePinMarkView::Stale,
+                    mark: Some(ChatProfilePinMarkView::Stale),
+                    outranked: false,
+                    writable: true,
                 },
             ],
             "the winner and the layer that names a profile the store dropped"
         );
         assert!(!pins.worktree_unresolved);
+    }
+
+    /// One `pins` answer whose two files hold `local` and `repo`, with the value
+    /// the owner computes for them.
+    fn pins_answer(local: bool, repo: bool, value: serde_json::Value) -> serde_json::Value {
+        serde_json::json!({
+            "store": "pins",
+            "scope": "local+repo",
+            "readOnly": false,
+            "status": "ok",
+            "revision": "sha256:pins",
+            "value": value,
+            "layers": [
+                {"source": "local", "status": if local { "ok" } else { "missing" }},
+                {"source": "repo", "status": if repo { "ok" } else { "missing" }},
+            ],
+            "writeTargets": [
+                {"target": "local", "status": "ok", "writeRevision": "sha256:pin-local"},
+                {"target": "repo", "status": "ok", "writeRevision": "sha256:pin-repo"},
+            ],
+        })
+    }
+
+    #[test]
+    fn a_layer_with_no_pin_is_a_row_the_editor_can_fill() {
+        let answer = pins_answer(
+            false,
+            true,
+            serde_json::json!({
+                "resolved": true,
+                "winner": {"source": "repo", "profile": "team"},
+                "invalid": [],
+                "stale": [],
+            }),
+        );
+        let read = ChatConfigRead {
+            pins: pins_read(&answer),
+            ..documented()
+        };
+
+        let pins = view_of(&read, None).pins.expect("the pins store answered");
+
+        let local = pins
+            .layers
+            .iter()
+            .find(|layer| layer.source == "local")
+            .expect("a layer with no file is still a row: it is where a pin may be written");
+        assert_eq!(local.status, ChatProfilePinStatusView::Missing);
+        assert_eq!(local.profile, None, "no file holds no profile");
+        assert_eq!(local.mark, None);
+        assert!(!local.outranked);
+        assert!(local.writable, "its write target is offered here");
+    }
+
+    #[test]
+    fn a_valid_layer_another_one_outranks_is_drawn_but_claims_no_pin() {
+        let answer = pins_answer(
+            true,
+            true,
+            serde_json::json!({
+                "resolved": true,
+                "winner": {"source": "repo", "profile": "team"},
+                "invalid": [],
+                "stale": [],
+            }),
+        );
+        let read = ChatConfigRead {
+            pins: pins_read(&answer),
+            ..documented()
+        };
+
+        let pins = view_of(&read, None).pins.expect("the pins store answered");
+
+        let local = pins
+            .layers
+            .iter()
+            .find(|layer| layer.source == "local")
+            .expect("the outranked layer is a row too");
+        assert_eq!(local.status, ChatProfilePinStatusView::Ok);
+        assert_eq!(
+            local.profile, None,
+            "the value does not report it, so the tab may not name it"
+        );
+        assert_eq!(local.mark, None, "and it carries no mark");
+        assert!(
+            local.outranked,
+            "the tab says the pin is not reported, instead of claiming it has none"
+        );
+        assert!(local.writable);
     }
 
     #[test]

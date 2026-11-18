@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/svelte'
 import type { ChatProfileView_Serialize as ChatProfile } from '../contract/bindings'
 import { setLanguage } from '../i18n/language.svelte'
-import { chatProfile } from '../test-support/chat-profile'
+import { chatProfile, pinLayer, pins } from '../test-support/chat-profile'
 import { resetTauriMock, setHandler } from '../test-support/tauri-mock'
 import ProfilePanel from './ProfilePanel.svelte'
 import { profileCopy } from './copy'
@@ -53,8 +53,14 @@ describe('the pins of this chat', () => {
 
     const pin = bodyOf(group(/^Pin/))
     expect(within(pin).getByText(copy.pinRepo)).toBeTruthy()
-    expect(within(pin).getByText('fast')).toBeTruthy()
     expect(within(pin).getByText(copy.pinWinner)).toBeTruthy()
+    // The layer a write may replace is an EDITOR (T6): its picker holds the pin
+    // the store reports, so the profile is drawn inside a control, not as text.
+    const repo = within(pin).getByRole('combobox', {
+      name: copy.pinPick(copy.pinRepo),
+    }) as HTMLSelectElement
+    expect(repo.value).toBe('fast')
+    expect(repo.disabled).toBe(false)
   })
 
   it('marks the layers that name a gone profile or are not a pin at all', async () => {
@@ -64,8 +70,8 @@ describe('the pins of this chat', () => {
           resolved: false,
           winner: null,
           layers: [
-            { source: 'repo', profile: 'gone', mark: 'stale' },
-            { source: 'local', profile: null, mark: 'invalid' },
+            pinLayer({ source: 'repo', profile: 'gone', mark: 'stale' }),
+            pinLayer({ source: 'local', status: 'invalid', mark: 'invalid' }),
           ],
           reason: 'stale',
           worktree_unresolved: false,
@@ -78,7 +84,31 @@ describe('the pins of this chat', () => {
     const pin = bodyOf(group(/^Pin/))
     expect(within(pin).getByText(copy.pinStale)).toBeTruthy()
     expect(within(pin).getByText(copy.pinInvalid)).toBeTruthy()
-    expect(within(pin).getByText(copy.pinNone)).toBeTruthy()
+    // The local layer is not a pin at all, so its picker holds no pin - the
+    // editor's own word for the clear, drawn from the option it starts on.
+    const local = within(pin).getByRole('combobox', {
+      name: copy.pinPick(copy.pinLocal),
+    }) as HTMLSelectElement
+    expect(local.value).toBe('')
+    expect(within(local).getByText(copy.pinNoPin)).toBeTruthy()
+  })
+
+  it('keeps the read-only drawing for a layer this worktree offers no target for', async () => {
+    draw({
+      view: chatProfile({
+        pins: pins('fast', {
+          winner: pinLayer({ source: 'repo', profile: 'fast', mark: 'winner', writable: false }),
+          layers: [pinLayer({ source: 'repo', profile: 'fast', mark: 'winner', writable: false })],
+        }),
+      }),
+    })
+
+    await fireEvent.click(group(/^Pin/))
+
+    const pin = bodyOf(group(/^Pin/))
+    expect(within(pin).getByText('fast')).toBeTruthy()
+    expect(within(pin).queryAllByRole('combobox')).toHaveLength(0)
+    expect(within(pin).queryByRole('button', { name: /^Save/ })).toBeNull()
   })
 
   it('draws a chat with no worktree as pins need a Git workspace, with no pin and no error', async () => {

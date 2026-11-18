@@ -11,7 +11,7 @@ use gentle_app::{ChatCommand, ChatId};
 use gentle_backend::chat_host::Opened;
 use gentle_desk_lib::effects::ChatExecutor;
 use gentle_runtime::chat_runtime::{
-    ChainWriteResult, ChatConfigRead, ChatProfileApply, ModeWriteResult, Outcome,
+    ChainWriteResult, ChatConfigRead, ChatProfileApply, ModeWriteResult, Outcome, PinWriteResult,
 };
 
 /// A stored session, as the sidebar names one: by its path, before any chat of
@@ -46,6 +46,9 @@ pub enum Answer {
     /// One profile's fallback chain was saved (or not) and this is the
     /// configuration the attempt re-read (profiles-editor T5).
     ChatChain(Box<ChainWriteResult>, Box<ChatConfigRead>),
+    /// ONE pin layer of that chat's worktree was written (or not) and this is the
+    /// configuration the attempt re-read (profiles-editor T6).
+    ChatPin(Box<PinWriteResult>, Box<ChatConfigRead>),
     /// The user's Close chat stopped that chat's child, as the host reports it
     /// (profiles-editor T2b-3).
     Closed,
@@ -108,6 +111,13 @@ impl Answer {
             }
             (Self::ChatChain(result, read), ChatCommand::SetChatProfileChain { .. }) => {
                 Outcome::ChatChain {
+                    chat,
+                    result: (**result).clone(),
+                    read: read.clone(),
+                }
+            }
+            (Self::ChatPin(result, read), ChatCommand::SetChatProfilePin { .. }) => {
+                Outcome::ChatPin {
                     chat,
                     result: (**result).clone(),
                     read: read.clone(),

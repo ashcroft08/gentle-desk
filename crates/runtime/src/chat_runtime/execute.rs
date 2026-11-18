@@ -7,7 +7,10 @@ use gentle_backend::chat_host::Opened;
 use gentle_core::i18n::{messages, Language};
 use gentle_core::rpc::RpcCommand;
 
-use super::{ChainWriteResult, ChatConfigRead, ChatProfileApply, ChatRuntime, ModeWriteResult};
+use super::{
+    ChainWriteResult, ChatConfigRead, ChatProfileApply, ChatRuntime, ModeWriteResult,
+    PinWriteResult,
+};
 
 /// What running a [`ChatCommand`] came to. Plain data: a failure is a message
 /// for the shell to show, never a panic and never fatal for the whole app.
@@ -88,6 +91,19 @@ pub enum Outcome {
         /// store does not record, a chain the owner's rules refuse, or the typed
         /// reason nothing was written.
         result: ChainWriteResult,
+        /// Boxed for the same reason as [`Outcome::ChatProfile`]'s read.
+        read: Box<ChatConfigRead>,
+    },
+    /// ONE pin layer of this chat's worktree was written over that chat's own
+    /// child, or it was not and this is why (profiles-editor T6, S2, S3). The
+    /// write is followed by the same three reads a plain read makes, so the page
+    /// draws the store's truth instead of what it hoped for.
+    ChatPin {
+        chat: ChatId,
+        /// What the attempt came to: saved, already the layer's pin, a name or a
+        /// layer a request may never carry, or the typed reason nothing was
+        /// written.
+        result: PinWriteResult,
         /// Boxed for the same reason as [`Outcome::ChatProfile`]'s read.
         read: Box<ChatConfigRead>,
     },
@@ -211,6 +227,23 @@ impl ChatRuntime {
             } => {
                 let write = self.save_chat_profile_chain(&chat, &profile, &agent, &steps);
                 Outcome::ChatChain {
+                    chat,
+                    result: write.result,
+                    read: Box::new(write.read),
+                }
+            }
+            // ONE pin layer of this chat's worktree, over the desktop channel
+            // into that chat's own child, and then the same read a plain read
+            // makes (profiles-editor T6, S2, S3). Blocking on the channel's
+            // deadline under the chat's one client, so the caller runs it off the
+            // window's thread.
+            ChatCommand::SetChatProfilePin {
+                chat,
+                source,
+                profile,
+            } => {
+                let write = self.save_chat_profile_pin(&chat, source, profile.as_deref());
+                Outcome::ChatPin {
                     chat,
                     result: write.result,
                     read: Box::new(write.read),
