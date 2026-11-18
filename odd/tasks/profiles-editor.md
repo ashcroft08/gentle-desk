@@ -142,7 +142,7 @@ es valor de producto".
       routing.
 - [ ] T4 model + thinking per agent (reuses the 0.1.11 model catalog).
 - [ ] T5 fallback-chain editing (<=8 steps, no repeated model, `*` default).
-- [ ] T6 the pin (local/repo, null clears; read on open since it is not watched).
+- [x] T6 the pin (local/repo, null clears; read on open since it is not watched) - 124d49b on feat/profile-pin; L43.
 - [ ] T7 (close) battery, real-window check, roadmap note, version.
 
 ## Log
@@ -629,4 +629,17 @@ es valor de producto".
   had declined, the maintainer chose the kill switch: `gentle-ai review mode disable
   --scope clone` (RDD OFF in this clone until re-enabled; global stays on). The stage-2
   branch pushed; the merge to main remains the maintainer's gate.
+- L43 (parent, 2026-11-18): T6 DELIVERED on feat/profile-pin (124d49b, from origin/main
+  06bcc0c which carries #205's chains): the pin is EDITABLE one layer at a time over the
+  chat's own child - pure-core validate_pin/pin_data/PinSource::write_target (the layer's
+  OWN writeRevision token, not the global one), runtime PinsRead (layers, targets,
+  Pinned/Stale/Invalid/Empty/Unreported slots) + save_chat_profile_pin, the same SAVE slot
+  shared with mode/chain, pin_failed as the third parallel notice, PinEditor web component
+  (picker of the store's profiles + "no pin", one Save per layer, unchanged choice never
+  sends, no Git workspace keeps the read-only box). RED at four layers (rule-level REDs
+  re-observed by reverting key decisions); cargo workspace 1670/1670, bindings guard green,
+  fmt/clippy clean, vitest 874/874, svelte-check/eslint clean. NOT seen rendered; the
+  approved real-child probe of the pins store is still pending (first-time write on a
+  missing file, changed:false clears, the exact wordings); an outranked valid layer starts
+  its picker on "not shown" (no silent removal of a pin this client cannot see).
 
