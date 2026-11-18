@@ -586,4 +586,9 @@ es valor de producto".
   (the store `profile_fallbacks` is exactly per-profile/per-agent chains, and the
   terminal edits the whole file). Copy pass in native Spanish remains a polish task.
   Order: T3b next.
+- L31 (maintainer, 2026-11-17, verbatim "ya probe todo bien", after a real-window run of
+  main through #200): the T3-mode switch, the Settings rail of 7 and the composed footers
+  SEEN WORKING in the real window. NOT covered by that look: T3b's apply buttons and
+  confirmation dialog (built after the run, branch feat/profile-apply) - they still owe
+  their own real-window look before their PR merges.
 
