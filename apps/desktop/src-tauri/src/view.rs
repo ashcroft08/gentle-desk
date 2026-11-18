@@ -35,11 +35,13 @@ pub(crate) fn messages(state: &AppState, images: &Images) -> Vec<MessageView> {
     };
     let sent = images.sent(chat.as_str());
     // The transcript keeps thinking and tool rows too; a message is what this
-    // slice pushes, so it is the text projection that travels (L5).
-    let thread = thread.messages();
-    let start = thread.len().saturating_sub(MESSAGES_PUSHED);
-    thread[start..]
-        .iter()
+    // slice pushes, so it is the text projection that travels (L5). The window
+    // is cut inside the borrowed rows - count, then skip - so the cost is the
+    // rows that travel and never a second copy of the whole thread (R4-001).
+    let dropped = thread.text_items().count().saturating_sub(MESSAGES_PUSHED);
+    thread
+        .text_items()
+        .skip(dropped)
         .map(|message| MessageView {
             // Cloned, never moved: the state keeps its own copy of every id,
             // text and error string.

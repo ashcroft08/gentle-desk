@@ -5,7 +5,8 @@
 //! field it should not touch fails here too.
 
 use gentle_core::chat::{
-    reduce_chat, reduce_chat_at, ChatItem, ChatMessage, ChatRole, ChatState, Dialog,
+    reduce_chat, reduce_chat_at, ChatItem, ChatMessage, ChatRole, ChatState, Dialog, ToolPayload,
+    TOOL_PAYLOAD_MAX_BYTES,
 };
 use gentle_core::i18n::Language;
 use gentle_core::rpc::{
@@ -192,6 +193,81 @@ mod assistant_messages {
                 ..ChatState::default()
             }
         );
+    }
+
+    /// R2-001 (also R4-002): a message's text is ONE row, wherever it sits.
+    /// Once a tool call has been made, the text the same message says next must
+    /// still land in that row instead of being dropped for not being last.
+    #[test]
+    fn text_that_arrives_after_a_tool_call_lands_in_the_same_message() {
+        let state = reducer_run(vec![
+            assistant_start(),
+            text_delta("Looking. "),
+            update(AssistantMessageEvent::ToolcallStart {
+                content_index: 1,
+                id: "call_1".to_owned(),
+                tool_name: "bash".to_owned(),
+            }),
+            text_delta("Found it."),
+            text_delta(" Done."),
+        ]);
+        assert_eq!(
+            state.items,
+            vec![
+                ChatItem::Text(assistant("msg-0", "Looking. Found it. Done.", true)),
+                ChatItem::Tool {
+                    id: "tool-call_1".to_owned(),
+                    tool_call_id: "call_1".to_owned(),
+                    tool_name: "bash".to_owned(),
+                    args: None,
+                    partial_result: None,
+                    result: None,
+                    is_error: false,
+                    running: false,
+                    started_at_ms: None,
+                    ended_at_ms: None,
+                    duration_ms: None,
+                },
+            ]
+        );
+        assert_eq!(state.activity, 0, "nothing was dropped, so nothing counts");
+    }
+
+    /// R3-002: an authoritative end whose content has no text leaves no empty
+    /// message, even when a tool row sits after the bubble: the row is dropped
+    /// wherever it is, not only when it is trailing.
+    #[test]
+    fn message_end_drops_an_empty_bubble_a_tool_row_follows() {
+        let state = reducer_run(vec![
+            assistant_start(),
+            text_delta("Looking."),
+            update(AssistantMessageEvent::ToolcallStart {
+                content_index: 1,
+                id: "call_1".to_owned(),
+                tool_name: "bash".to_owned(),
+            }),
+            assistant_end(json!([
+                {"type": "toolCall", "id": "call_1", "name": "bash", "arguments": {}}
+            ])),
+        ]);
+        assert_eq!(
+            state.items,
+            vec![ChatItem::Tool {
+                id: "tool-call_1".to_owned(),
+                tool_call_id: "call_1".to_owned(),
+                tool_name: "bash".to_owned(),
+                args: None,
+                partial_result: None,
+                result: None,
+                is_error: false,
+                running: false,
+                started_at_ms: None,
+                ended_at_ms: None,
+                duration_ms: None,
+            }],
+            "the empty bubble leaks into the thread"
+        );
+        assert!(state.messages().is_empty(), "got {:?}", state.messages());
     }
 
     #[test]
@@ -607,14 +683,13 @@ mod transcript {
                     id: "tool-call_abc123".to_owned(),
                     tool_call_id: "call_abc123".to_owned(),
                     tool_name: "bash".to_owned(),
-                    args: Some(json!({"command": "cat README.md"})),
-                    partial_result: Some(json!({
-                        "content": [{"type": "text", "text": "# Gentle Shell\n"}],
-                        "details": {}
-                    })),
-                    result: Some(json!({
+                    args: Some(ToolPayload::new(&json!({"command": "cat README.md"}))),
+                    // The running output the fixture also sent is gone: the
+                    // result supersedes it, and a call keeps one output (R1).
+                    partial_result: None,
+                    result: Some(ToolPayload::new(&json!({
                         "content": [{"type": "text", "text": "# Gentle Shell\n"}]
-                    })),
+                    }))),
                     is_error: false,
                     running: false,
                     started_at_ms: None,
@@ -771,7 +846,8 @@ mod transcript {
     }
 
     /// The "Done 0.2s" of a tool card: the execution's own start and end, and
-    /// the two payloads the child sent while it ran.
+    /// the output it ended with - the running output it also reported is gone,
+    /// because the result supersedes it (R1).
     #[test]
     fn a_tool_execution_records_its_start_its_end_and_its_duration() {
         let state = reducer_run_at(vec![
@@ -824,9 +900,11 @@ mod transcript {
                 id: "tool-call_1".to_owned(),
                 tool_call_id: "call_1".to_owned(),
                 tool_name: "bash".to_owned(),
-                args: Some(json!({"command": "ls"})),
-                partial_result: Some(json!({"content": [{"type": "text", "text": "a\n"}]})),
-                result: Some(json!({"content": [{"type": "text", "text": "a\nb\n"}]})),
+                args: Some(ToolPayload::new(&json!({"command": "ls"}))),
+                partial_result: None,
+                result: Some(ToolPayload::new(
+                    &json!({"content": [{"type": "text", "text": "a\nb\n"}]})
+                )),
                 is_error: false,
                 running: false,
                 started_at_ms: Some(5_000),
@@ -953,6 +1031,47 @@ mod transcript {
             ]
         );
     }
+    /// One lookup decides where an execution lands: the row the model's own
+    /// `toolcall_start` already opened is filled in, never opened twice.
+    #[test]
+    fn a_tool_execution_fills_the_row_the_model_announced() {
+        let state = reducer_run(vec![
+            assistant_start(),
+            update(AssistantMessageEvent::ToolcallStart {
+                content_index: 0,
+                id: "call_1".to_owned(),
+                tool_name: "bash".to_owned(),
+            }),
+            RpcEvent::ToolExecutionStart {
+                tool_call_id: "call_1".to_owned(),
+                tool_name: "bash".to_owned(),
+                args: Some(json!({"command": "ls"})),
+            },
+        ]);
+        assert_eq!(
+            state.items.len(),
+            2,
+            "one tool row and the open bubble: {:?}",
+            state.items
+        );
+        assert_eq!(
+            state.items[0],
+            ChatItem::Tool {
+                id: "tool-call_1".to_owned(),
+                tool_call_id: "call_1".to_owned(),
+                tool_name: "bash".to_owned(),
+                args: Some(ToolPayload::new(&json!({"command": "ls"}))),
+                partial_result: None,
+                result: None,
+                is_error: false,
+                running: true,
+                started_at_ms: None,
+                ended_at_ms: None,
+                duration_ms: None,
+            }
+        );
+    }
+
     /// Text the child said before a tool call stays where it was said, and
     /// `message_end` closes it from there: a tool row after it must not leave the
     /// bubble streaming forever.
@@ -989,6 +1108,149 @@ mod transcript {
                     duration_ms: None,
                 },
             ]
+        );
+    }
+}
+
+/// R1: a tool row keeps its arguments and its result for the life of the chat,
+/// so each string of a payload is bounded, the row says when one was cut, and
+/// the running output goes as soon as the result that supersedes it arrives.
+mod tool_payloads {
+    use super::*;
+
+    /// A tool call the model announced, whose execution ended with `result`.
+    fn executed(args: Value, partial: Option<Value>, result: Value) -> ChatState {
+        reducer_run(vec![
+            assistant_start(),
+            update(AssistantMessageEvent::ToolcallStart {
+                content_index: 0,
+                id: "call_1".to_owned(),
+                tool_name: "bash".to_owned(),
+            }),
+            RpcEvent::ToolExecutionStart {
+                tool_call_id: "call_1".to_owned(),
+                tool_name: "bash".to_owned(),
+                args: Some(args),
+            },
+            RpcEvent::ToolExecutionUpdate {
+                tool_call_id: "call_1".to_owned(),
+                tool_name: "bash".to_owned(),
+                args: None,
+                partial_result: partial,
+            },
+            RpcEvent::ToolExecutionEnd {
+                tool_call_id: "call_1".to_owned(),
+                tool_name: "bash".to_owned(),
+                result: Some(result),
+                is_error: false,
+            },
+        ])
+    }
+
+    /// The output text of a tool row's result payload.
+    fn output(state: &ChatState) -> (&str, bool) {
+        let ChatItem::Tool { result, .. } = &state.items[0] else {
+            panic!("no tool row: {:?}", state.items)
+        };
+        let payload = result.as_ref().expect("the result the tool ended with");
+        let text = payload.value["content"][0]["text"]
+            .as_str()
+            .expect("the output text");
+        (text, payload.truncated)
+    }
+
+    /// A large output is cut at the documented bound and the row says so, so a
+    /// card can report the cut instead of presenting the head as the whole.
+    #[test]
+    fn a_large_tool_output_is_cut_to_the_bound_and_the_row_says_so() {
+        let long = "x".repeat(TOOL_PAYLOAD_MAX_BYTES * 4);
+        let state = executed(
+            json!({"command": "cat big.log"}),
+            None,
+            json!({"content": [{"type": "text", "text": long}]}),
+        );
+        let (kept, truncated) = output(&state);
+        assert!(
+            truncated,
+            "a cut payload must be flagged, not presented whole"
+        );
+        assert_eq!(kept.len(), TOOL_PAYLOAD_MAX_BYTES, "cut to the bound");
+        assert!(kept.chars().all(|c| c == 'x'));
+        assert!(
+            state.items[0].payload_truncated(),
+            "the row says a payload was cut: {:?}",
+            state.items[0]
+        );
+    }
+
+    /// The bound is where it says it is: a string at it is kept whole, and a
+    /// short argument is never flagged.
+    #[test]
+    fn a_payload_string_at_the_bound_is_kept_whole() {
+        let exact = "y".repeat(TOOL_PAYLOAD_MAX_BYTES);
+        let state = executed(
+            json!({"command": "cat exact.log"}),
+            None,
+            json!({"content": [{"type": "text", "text": exact}]}),
+        );
+        let (kept, truncated) = output(&state);
+        assert!(!truncated);
+        assert_eq!(kept.len(), TOOL_PAYLOAD_MAX_BYTES);
+        let ChatItem::Tool { args, .. } = &state.items[0] else {
+            panic!("no tool row")
+        };
+        assert_eq!(
+            args.as_ref()
+                .map(|payload| (&payload.value, payload.truncated)),
+            Some((&json!({"command": "cat exact.log"}), false))
+        );
+        assert!(!state.items[0].payload_truncated());
+    }
+
+    /// A cut lands on a character boundary: half a character is not text.
+    #[test]
+    fn a_cut_payload_lands_on_a_character_boundary() {
+        // `a` shifted the multi-byte characters by one, so the bound falls in
+        // the middle of one of them.
+        let long = format!("a{}", "é".repeat(TOOL_PAYLOAD_MAX_BYTES));
+        let state = executed(
+            json!({}),
+            None,
+            json!({"content": [{"type": "text", "text": long}]}),
+        );
+        let (kept, truncated) = output(&state);
+        assert!(truncated);
+        assert!(kept.len() < TOOL_PAYLOAD_MAX_BYTES);
+        assert!(kept.starts_with('a'));
+        assert!(kept.chars().all(|c| c == 'a' || c == 'é'));
+    }
+
+    /// The output so far is redundant once the result arrives: the call keeps
+    /// the one output that is final, and no second copy of it besides.
+    #[test]
+    fn the_running_output_is_dropped_once_the_result_arrives() {
+        let state = executed(
+            json!({"command": "ls"}),
+            Some(json!({"content": [{"type": "text", "text": "a\n"}]})),
+            json!({"content": [{"type": "text", "text": "a\nb\n"}]}),
+        );
+        assert_eq!(
+            state.items.first(),
+            Some(&ChatItem::Tool {
+                id: "tool-call_1".to_owned(),
+                tool_call_id: "call_1".to_owned(),
+                tool_name: "bash".to_owned(),
+                args: Some(ToolPayload::new(&json!({"command": "ls"}))),
+                partial_result: None,
+                result: Some(ToolPayload::new(
+                    &json!({"content": [{"type": "text", "text": "a\nb\n"}]})
+                )),
+                is_error: false,
+                running: false,
+                started_at_ms: None,
+                ended_at_ms: None,
+                duration_ms: None,
+            })
         );
     }
 }
@@ -1202,7 +1464,7 @@ mod fixtures {
                 tool_name: "bash".to_owned(),
                 // `toolcall_end` carried the arguments; this fixture's
                 // tool_execution events carry neither args nor a result.
-                args: Some(json!({"command": "ls"})),
+                args: Some(ToolPayload::new(&json!({"command": "ls"}))),
                 partial_result: None,
                 result: None,
                 is_error: false,

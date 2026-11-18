@@ -37,6 +37,71 @@ pub struct ChatMessage {
     pub error: Option<String>,
 }
 
+/// The most bytes of any one string a tool row keeps.
+///
+/// A tool's output is the child's own text and can be megabytes - a `read` of a
+/// large file, a whole test log - and the transcript keeps it for the life of
+/// the chat. 8 KiB is about two hundred lines: enough for the collapsed body a
+/// card draws and its "N earlier lines" head, small enough that a chat of
+/// hundreds of calls stays a chat. A string longer than this is cut, and the
+/// payload says so, so a card reports the cut instead of presenting the head as
+/// the whole output.
+pub const TOOL_PAYLOAD_MAX_BYTES: usize = 8 * 1024;
+
+/// One payload of a tool call - its arguments or the output it produced - kept
+/// as the child's own untyped JSON, because each tool's shape is its own, and
+/// bounded ([`TOOL_PAYLOAD_MAX_BYTES`]).
+///
+/// Constructing one is the only way a payload enters a row, so the bound cannot
+/// be forgotten at a call site.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ToolPayload {
+    /// The JSON the child sent, with no single string longer than
+    /// [`TOOL_PAYLOAD_MAX_BYTES`].
+    pub value: Value,
+    /// True when a string of it was cut to fit. The row is not lying about what
+    /// it holds: what it holds is the head of a longer payload.
+    pub truncated: bool,
+}
+
+impl ToolPayload {
+    /// Keeps `value`, cutting its long strings and flagging the cut.
+    pub fn new(value: &Value) -> Self {
+        let mut value = value.clone();
+        let truncated = cut_strings(&mut value);
+        Self { value, truncated }
+    }
+}
+
+/// Cuts every string of `value` to [`TOOL_PAYLOAD_MAX_BYTES`] and answers
+/// whether any of them was cut.
+fn cut_strings(value: &mut Value) -> bool {
+    match value {
+        Value::String(text) => cut_string(text),
+        Value::Array(items) => items
+            .iter_mut()
+            .fold(false, |cut, item| cut | cut_strings(item)),
+        Value::Object(fields) => fields
+            .values_mut()
+            .fold(false, |cut, item| cut | cut_strings(item)),
+        Value::Null | Value::Bool(_) | Value::Number(_) => false,
+    }
+}
+
+/// Cuts one string to the bound, on a character boundary: half a character is
+/// not text.
+fn cut_string(text: &mut String) -> bool {
+    if text.len() <= TOOL_PAYLOAD_MAX_BYTES {
+        return false;
+    }
+    let mut end = TOOL_PAYLOAD_MAX_BYTES;
+    while !text.is_char_boundary(end) {
+        end -= 1;
+    }
+    text.truncate(end);
+    true
+}
+
 /// One row of the open thread, in the order the child produced it.
 ///
 /// This is the ONE transcript (`odd/tasks/chat-transcript.md`, L4): what a
@@ -65,7 +130,8 @@ pub enum ChatItem {
     /// One tool call: the `toolcall_*` events announce it, the
     /// `tool_execution_*` events carry the arguments, the output so far and the
     /// result it ended with. Every payload is the child's own JSON and stays
-    /// untyped here, because each tool's shape is its own.
+    /// untyped here, because each tool's shape is its own; each is a
+    /// [`ToolPayload`], which bounds what one call can cost the chat.
     Tool {
         /// `tool-<toolCallId>`.
         id: String,
@@ -73,11 +139,13 @@ pub enum ChatItem {
         tool_call_id: String,
         tool_name: String,
         /// The call's arguments as the child sent them.
-        args: Option<Value>,
-        /// The output the tool had produced at its last update.
-        partial_result: Option<Value>,
+        args: Option<ToolPayload>,
+        /// The output the tool had produced at its last update, dropped as soon
+        /// as the `result` that supersedes it arrives: one call keeps one
+        /// output.
+        partial_result: Option<ToolPayload>,
         /// The result the tool ended with.
-        result: Option<Value>,
+        result: Option<ToolPayload>,
         /// The child's own verdict on the result.
         is_error: bool,
         /// True between `tool_execution_start` and `tool_execution_end`: the
@@ -96,6 +164,23 @@ impl ChatItem {
         match self {
             Self::Text(message) => &message.id,
             Self::Thinking { id, .. } | Self::Tool { id, .. } => id,
+        }
+    }
+
+    /// True when a tool row had to cut a payload it keeps: the card says the
+    /// output was cut instead of drawing the head as the whole of it.
+    pub fn payload_truncated(&self) -> bool {
+        match self {
+            Self::Tool {
+                args,
+                partial_result,
+                result,
+                ..
+            } => [args, partial_result, result]
+                .into_iter()
+                .flatten()
+                .any(|payload| payload.truncated),
+            Self::Text(_) | Self::Thinking { .. } => false,
         }
     }
 }

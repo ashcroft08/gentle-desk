@@ -12,4 +12,6 @@ mod state;
 
 pub use history::messages_from_history;
 pub use reducer::{reduce_chat, reduce_chat_at};
-pub use state::{ChatItem, ChatMessage, ChatRole, ChatState, Dialog};
+pub use state::{
+    ChatItem, ChatMessage, ChatRole, ChatState, Dialog, ToolPayload, TOOL_PAYLOAD_MAX_BYTES,
+};

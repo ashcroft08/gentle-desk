@@ -149,3 +149,37 @@ turn)"), and any gpui-kit widget.
   Known untested edge, recorded instead of hidden: a `toolcall_end` with no id
   falls back to the last tool row without args or result - pi always sends the id,
   so no fixture covers it.
+- L7 (2026-11-18, native review of T1 and its follow-up): lineage
+  `review-9b802d5d79d4e84f`, tier medium, 27 paths, 1637 original lines, correction
+  budget 200, **four lenses** (risk, resilience, readability, reliability),
+  **APPROVED and its acknowledgement burned**. Eleven non-blocking advisories, and
+  four of them were real defects in this model, so all six fixable ones were fixed
+  in a follow-up commit rather than left "for later":
+  - **R1** (risk, WARNING): a tool row kept every call's full `args`,
+    `partial_result` and `result` for the chat's whole life; the old reducer kept
+    none. Now `ToolPayload` is the only way a payload enters a row, every string is
+    cut at `TOOL_PAYLOAD_MAX_BYTES` = 8 KiB on a character boundary and says it was
+    cut, and `partial_result` is dropped the moment `result` arrives. This
+    **supersedes L6 decision (3)**: both are no longer kept.
+  - **R2-001 + R4-002** (readability + resilience, WARNING): `append_text` only
+    appended to the last row, so text arriving after a tool call was dropped
+    silently and unaccounted. It now appends to the OPEN assistant row, the same
+    lookup `message_end` uses.
+  - **R4-001** (resilience, WARNING): the desktop projection cloned the whole
+    transcript on every refresh before slicing the pushed window. It now cuts the
+    window inside the borrowed `text_items()` iterator: O(pushed) instead of
+    O(chat).
+  - **R3-002** (reliability, WARNING): an assistant row that the authoritative
+    `message_end` left empty survived unless it was trailing, leaking into
+    `messages()`. It is now dropped wherever it sits.
+  - **R2-002 / R2-003** (readability, SUGGESTION): six `else { return; }` arms that
+    could not execute were replaced by one total match per accessor, and
+    `start_tool_execution` now makes ONE lookup instead of the same query twice
+    around a push.
+  Receipts: `cargo test --workspace` **1695 passed, 0 failed** (7 new tests),
+  `cargo check --workspace` clean. Two findings honestly had no observable RED and
+  are reported as structural instead of dressed up as a failing test.
+  OPEN, for T2 to settle: the 8 KiB bound is per retained string, not per row - a
+  payload of many long strings is bounded per element but not in aggregate. Also
+  accepted with its mitigation: `var(--settings-chrome)` only resolves inside
+  `.dlg.settings`, and the declaration-level test pins both sides (R4-004).
