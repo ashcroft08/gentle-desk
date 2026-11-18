@@ -58,7 +58,7 @@ const ENGLISH = {
   modeNotSaved: 'The mode could not be saved. Nothing was written.',
   chainNote: 'Saved in the profile "team", the chains every chat with that profile uses.',
   footer:
-    "From this tab: the profile's orchestration mode, its fallback chains, and applying it here or as the default.",
+    "From this tab: the profile's orchestration mode, its fallback chains, the pin of this chat's worktree, and applying it here or as the default.",
   editInTerminal: 'Edit in terminal',
   editNote:
     'Opens the shell: type /gentle:profiles there to edit, create and switch profiles - this tab edits the used profile’s mode and chains, and applies it.',
@@ -109,7 +109,7 @@ const SPANISH = {
   modeNotSaved: 'No se pudo guardar el modo. No se escribió nada.',
   chainNote: 'Se guarda en el perfil "team", las cadenas que usan todos los chats con ese perfil.',
   footer:
-    'Desde esta pestaña: el modo de orquestación del perfil, sus cadenas de respaldo, y aplicarlo aquí o como predeterminado.',
+    'Desde esta pestaña: el modo de orquestación del perfil, sus cadenas de respaldo, el perfil fijado de este espacio de trabajo, y aplicarlo aquí o como predeterminado.',
   editInTerminal: 'Editar en la terminal',
   editNote:
     'Abre la shell: escribe /gentle:profiles allí para editar, crear y cambiar de perfil - esta pestaña edita el modo y las cadenas del perfil en uso, y lo aplica.',

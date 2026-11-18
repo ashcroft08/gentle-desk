@@ -22,7 +22,7 @@ use gentle_app::{ChatCommand, ChatId, Input};
 use gentle_backend::chat_host::Opened;
 use gentle_runtime::chat_runtime::{
     request_after_open, ChainWriteResult, ChatConfigRead, ChatProfileApply, ModeWriteResult,
-    Outcome,
+    Outcome, PinWriteResult,
 };
 
 mod runtime;
@@ -64,6 +64,11 @@ pub struct Ran {
     /// Shell-owned like the two above: whether the chain write failed is a state
     /// of the tab's own, not the reducer's.
     pub chat_chain: Vec<(ChatId, ChainWriteResult, ChatConfigRead)>,
+    /// Every PIN-layer save one run answered, with the chat it belongs to and the
+    /// profile configuration the save re-read (profiles-editor T6). Shell-owned
+    /// like the three above: whether the pin write failed is a state of the tab's
+    /// own, not the reducer's.
+    pub chat_pin: Vec<(ChatId, PinWriteResult, ChatConfigRead)>,
     /// A fresh child's start only proved its process was created, which takes
     /// milliseconds while the child takes seconds to speak. Its opening phase
     /// therefore ends with the chat's own first event, and the caller arms
@@ -141,6 +146,11 @@ fn run_into(command: ChatCommand, executor: &dyn ChatExecutor, ran: &mut Ran) {
         // (profiles-editor T5): the same shell-owned shape as the mode's, kept
         // apart so the chain editor's notice never lights the mode switch's.
         Outcome::ChatChain { chat, result, read } => ran.chat_chain.push((chat, result, *read)),
+        // One pin layer of the chat's worktree was written, or it was not and the
+        // result says why (profiles-editor T6): the same shell-owned shape as the
+        // chain's, kept apart so the pin editor's notice never lights another
+        // control's.
+        Outcome::ChatPin { chat, result, read } => ran.chat_pin.push((chat, result, *read)),
     }
 }
 

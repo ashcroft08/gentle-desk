@@ -23,7 +23,8 @@ use gentle_backend::home::{with_home_flag, HomeChoice, HomeEnv};
 use gentle_backend::launcher::{self, LauncherEnv};
 use gentle_core::i18n::{messages, Language};
 use gentle_runtime::chat_runtime::{
-    ChatChainWrite, ChatConfigRead, ChatModeWrite, ChatProfileApply, ChatRuntime, Outcome,
+    ChatChainWrite, ChatConfigRead, ChatModeWrite, ChatPinWrite, ChatProfileApply, ChatRuntime,
+    Outcome,
 };
 
 use super::ChatExecutor;
@@ -185,6 +186,7 @@ impl ChatExecutor for RuntimeExecutor {
             | ChatCommand::SetChatProfileMode { .. }
             | ChatCommand::ApplyChatProfile { .. }
             | ChatCommand::SetChatProfileChain { .. }
+            | ChatCommand::SetChatProfilePin { .. }
             | ChatCommand::SetWorking { .. } => None,
         };
         // The chat's attached images are merged in HERE, beside the folder and
@@ -220,6 +222,10 @@ impl ChatExecutor for RuntimeExecutor {
                 // written, and the page hears the same not-connected reason
                 // (profiles-editor T5).
                 ChatCommand::SetChatProfileChain { chat, .. } => unasked_chain(chat),
+                // Nor is there a child whose worktree a pin could be written to:
+                // nothing is written, and the page hears the same reason
+                // (profiles-editor T6).
+                ChatCommand::SetChatProfilePin { chat, .. } => unasked_pin(chat),
                 // There is no host, so there is nothing to protect from and
                 // nothing to reap: the mark has no reader in this run.
                 ChatCommand::SetWorking { chat, working } => Outcome::Working { chat, working },
@@ -285,6 +291,9 @@ fn refuse(language: Language, command: ChatCommand) -> Outcome {
         // Nor does a chain write: it is the same store family, the same answer
         // (profiles-editor T5).
         ChatCommand::SetChatProfileChain { chat, .. } => unasked_chain(chat),
+        // Nor a pin write: the child whose worktree it would touch is going away
+        // (profiles-editor T6).
+        ChatCommand::SetChatProfilePin { chat, .. } => unasked_pin(chat),
         // No host is left to mark, and the run that would have read the mark is
         // the one being torn down.
         ChatCommand::SetWorking { chat, working } => Outcome::Working { chat, working },
@@ -316,6 +325,17 @@ fn unasked_apply(chat: gentle_app::ChatId) -> Outcome {
 fn unasked_chain(chat: gentle_app::ChatId) -> Outcome {
     let write = ChatChainWrite::unasked();
     Outcome::ChatChain {
+        chat,
+        result: write.result,
+        read: Box::new(write.read),
+    }
+}
+
+/// The pin write a run with no host - or a window that is closing - answers: no
+/// child to ask, so nothing was written and nothing was read (T6).
+fn unasked_pin(chat: gentle_app::ChatId) -> Outcome {
+    let write = ChatPinWrite::unasked();
+    Outcome::ChatPin {
         chat,
         result: write.result,
         read: Box::new(write.read),

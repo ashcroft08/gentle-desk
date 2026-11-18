@@ -77,6 +77,7 @@ pub fn to_intent(state: &gentle_app::AppState, intent: UiIntent) -> Option<gentl
         | UiIntent::SaveChatProfileMode { .. }
         | UiIntent::ApplyChatProfile { .. }
         | UiIntent::SaveChatProfileChain { .. }
+        | UiIntent::SaveChatProfilePin { .. }
         | UiIntent::RefreshAuth
         | UiIntent::CheckUpdates
         | UiIntent::RefreshUsage => return None,
@@ -148,6 +149,16 @@ pub(crate) fn chain_steps(
             thinking: step.thinking.clone(),
         })
         .collect()
+}
+
+/// The pin layer the page asked to write, or `None` for a string that names no
+/// layer at all (profiles-editor T6).
+///
+/// The channel names exactly two (`local`, `repo`, `desktop-rpc.md:322-345`), so
+/// anything else is a page bug and is DROPPED rather than guessed at: no request
+/// leaves for a layer that does not exist, and no default is inferred.
+pub(crate) fn pin_source_of(source: &str) -> Option<gentle_core::rpc::config_store::PinSource> {
+    gentle_core::rpc::config_store::PinSource::parse(source)
 }
 
 /// The app's chat for an id the web side sent back.

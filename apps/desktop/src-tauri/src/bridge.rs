@@ -325,6 +325,32 @@ impl AppStateHolder {
             }
             return (self.view(), vec![command]);
         }
+        // Writing ONE pin layer of the chat's worktree (profiles-editor T6, S2,
+        // S3) is the same kind of per-chat command and takes the SAME save slot
+        // (L18): a pin save, a chain save and a mode save of one chat can never be
+        // in flight together, and a second ask is dropped with the slice as it
+        // stands. A layer string that names neither `local` nor `repo` is a page
+        // bug: no command is built for it at all.
+        if let UiIntent::SaveChatProfilePin {
+            chat_id,
+            source,
+            profile,
+        } = &intent
+        {
+            let Some(source) = crate::intent::pin_source_of(source) else {
+                return (self.view(), Vec::new());
+            };
+            let chat = crate::intent::chat_for(&state, chat_id);
+            let command = gentle_app::ChatCommand::SetChatProfilePin {
+                chat,
+                source,
+                profile: profile.clone(),
+            };
+            if !self.begin_chat_command(&command) {
+                return (self.view(), Vec::new());
+            }
+            return (self.view(), vec![command]);
+        }
         match crate::intent::to_intent(&state, intent) {
             Some(intent) => self.apply(gentle_app::Input::Intent(intent)),
             // Every intent has an answer: the reducer's, or the config's above.

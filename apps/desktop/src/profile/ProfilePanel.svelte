@@ -4,11 +4,11 @@
   // The Profile tab of one chat (profiles-editor T2c, T3-mode, T3b, T5, artboard
   // 06-profile-tab.html): which profile this chat runs and in whose scope, the
   // profiles the store defines, the pins of this chat's own worktree - and what it
-  // WRITES for the used profile: its orchestration mode (the Organic / Full
-  // delegation switch, T3-mode), its fallback chains (T5: an agent's own and the
-  // profile-wide `*`), and the terminal's other two outcomes, `Use in this chat`
-  // and `Make default` (T3b). The model pickers are T4: not drawn here, not even
-  // disabled.
+  // WRITES: the used profile's orchestration mode (the Organic / Full delegation
+  // switch, T3-mode), its fallback chains (T5: an agent's own and the profile-wide
+  // `*`), the pin of THIS chat's worktree (T6, one layer at a time), and the
+  // terminal's other two outcomes, `Use in this chat` and `Make default` (T3b).
+  // The model pickers are T4: not drawn here, not even disabled.
   //
   // `Make default` is the channel's own GLOBAL apply, and gentle-pi asks before it
   // writes: its confirmation is drawn verbatim, in the child's own words, with
@@ -30,7 +30,7 @@
   // panes' (`settings/files-changed.ts`): one read at a time, one queued, and
   // nothing at all once the tab closes - a follow-up queued while a read was in
   // flight is dropped with it. A chat with no id asks for nothing.
-  import { dispatchIntent, openTerminal } from '../bridge'
+  import { dispatchIntent } from '../bridge'
   import type {
     ChatProfileApplyConfirmationView as Confirmation,
     ChatProfileStepView_Serialize as Step,
@@ -41,6 +41,7 @@
   import { coalesced, type CoalescedRead } from '../settings/files-changed'
   import ProfileBody from './ProfileBody.svelte'
   import ProfileConfirm from './ProfileConfirm.svelte'
+  import ProfileFooter from './ProfileFooter.svelte'
   import ProfileHead from './ProfileHead.svelte'
   import ProfileNotice from './ProfileNotice.svelte'
   import ProfileRoutes from './ProfileRoutes.svelte'
@@ -74,9 +75,6 @@
 
   /** This open tab's read, so Try again and a window focus share one path. */
   let read: CoalescedRead | null = null
-
-  /** What the terminal said when it could not open, or `null` (T2d). */
-  let terminalError = $state<string | null>(null)
 
   /**
    * The chat this tab reads, as a VALUE. The parent hands `chatId` down off an
@@ -151,6 +149,22 @@
   }
 
   /**
+   * Writes ONE pin layer of this chat's WORKTREE (profiles-editor T6): the chat
+   * the tab is about, the layer the user chose (`local` or `repo`) and the
+   * profile that layer should hold, or `null` to clear it. The pin belongs to the
+   * worktree, not to the used profile. The picker already refuses an unchanged
+   * choice and a name the store does not define; this guard keeps a keyboard or a
+   * second click from going around a save in flight.
+   */
+  function savePin(source: string, profile: string | null): void {
+    if (chat === null || view === null || view.saving) return
+    void dispatchIntent({
+      type: 'SaveChatProfilePin',
+      data: { chat_id: chat, source, profile },
+    })
+  }
+
+  /**
    * Saves ONE chain of the used profile (profiles-editor T5, L30-3): the chat the
    * tab is about, the profile THIS chat uses, the chain's own key (an agent's
    * name or `*`) and the steps the editor built. The editor already refuses an
@@ -171,16 +185,6 @@
    * component that draws it owns the accept/cancel flow.
    */
   const confirmation = $derived<Confirmation | null>(view?.apply_confirmation ?? null)
-
-  /**
-   * The footer's one action: the shell's own profiles screen in a terminal
-   * window, the way the Settings pane opened it. Nothing of this tab is written
-   * and nothing is sent: Rust resolves the launcher, and a refusal - no launcher,
-   * no console - is the one line drawn under the button.
-   */
-  async function edit(): Promise<void> {
-    terminalError = await openTerminal('Profiles')
-  }
 </script>
 
 <div class="pv">
@@ -227,11 +231,13 @@
           editable={used?.name ?? null}
           saving={view.saving}
           chainFailed={view.chain_failed}
+          pinFailed={view.pin_failed}
           onSaveChain={saveChain}
+          onSavePin={savePin}
         />
       {/key}
       <!-- The footer line says what this tab writes: the profile's mode and its
-           two apply outcomes (T3-mode, T3b). -->
+           two apply outcomes (T3-mode, T3b), and the pin below (T6). -->
       <p class="foot-line">{copy.footer}</p>
     {/if}
 
@@ -240,16 +246,10 @@
          nothing while there is no dialog. -->
     <ProfileConfirm chatId={chat} {confirmation} copy={copy.apply} />
 
-    <!-- The footer, in every state (T2d, L21-L22): this tab writes the used
-         profile's mode and applies it (T3b), but every profile EDIT is still the
-         terminal's, which is the way to create or change one. -->
-    <div class="foot">
-      <button class="btn" type="button" onclick={() => void edit()}>{copy.editInTerminal}</button>
-      <p class="note">{copy.editNote}</p>
-      {#if terminalError !== null}
-        <p class="quiet" role="status">{terminalError}</p>
-      {/if}
-    </div>
+    <!-- The footer, in every state (T2d, L21-L22): this tab writes the profile's
+         mode, its chains and this worktree's pin, and applies it (T3b, T5, T6),
+         but every profile EDIT is still the terminal's. -->
+    <ProfileFooter {copy} />
   </div>
 </div>
 
@@ -283,13 +283,6 @@
     line-height: 1.5;
   }
 
-  .foot {
-    max-width: var(--chat-max);
-    margin: 16px auto 8px;
-    color: var(--faint);
-    font-size: 11.5px;
-  }
-
   /* The line e892d5d drew in the footer before the terminal action joined it:
      what this tab saves, in the footer's own quiet weight. */
   .foot-line {
@@ -299,10 +292,4 @@
     font-size: 11.5px;
   }
 
-  .note {
-    margin: 8px 0 0;
-    color: var(--muted);
-    font-size: 11.5px;
-    line-height: 1.5;
-  }
 </style>

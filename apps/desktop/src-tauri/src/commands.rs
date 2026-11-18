@@ -1034,6 +1034,12 @@ pub fn fold_spawn_failure(
         gentle_app::ChatCommand::SetChatProfileChain { chat, .. } => {
             holder.note_chat_chain_unstarted(chat)
         }
+        // A pin write that never ran owes the page the same answer: nothing was
+        // written, the picker is usable again, and one short line says so
+        // (profiles-editor T6).
+        gentle_app::ChatCommand::SetChatProfilePin { chat, .. } => {
+            holder.note_chat_pin_unstarted(chat)
+        }
         // Every other command has already answered the web side with the slice
         // its intent folded, and none of them is a slice the failure changes.
         _ => None,
@@ -1081,6 +1087,14 @@ fn fold_and_push(holder: &Arc<AppStateHolder>, emit: &Emit, ran: Ran) {
     // configuration the attempt re-read.
     for (chat, result, read) in ran.chat_chain {
         if let Some(view) = holder.note_chat_chain(&chat, &result, &read) {
+            push(emit, view);
+        }
+    }
+    // One pin layer was written, or it was not (profiles-editor T6): the same
+    // answer as a chain save's, in the pin editor's own notice, with the
+    // configuration the attempt re-read.
+    for (chat, result, read) in ran.chat_pin {
+        if let Some(view) = holder.note_chat_pin(&chat, &result, &read) {
             push(emit, view);
         }
     }

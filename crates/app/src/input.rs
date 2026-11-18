@@ -264,6 +264,24 @@ pub enum ChatCommand {
         /// The chain as the user built it, in order.
         steps: Vec<gentle_core::rpc::config_store::FallbackStep>,
     },
+    /// Write ONE pin layer of that chat's WORKTREE, over that chat's own child
+    /// (profiles-editor T6, S2, S3): `{source, profile}` for the `pins` store,
+    /// where `profile: None` clears that layer and the other layer's file is
+    /// untouched by construction.
+    ///
+    /// The pin belongs to a folder, not to a profile: the layer is `local`
+    /// (clone-wide, Git common dir) or `repo` (per worktree), and the write is
+    /// preconditioned on THAT layer's own `writeRevision` - `pins` has one file
+    /// per layer, so the other layer's token would conflict for ever. A chat
+    /// with no resolvable worktree offers no layer to write and nothing is sent.
+    /// It is followed by the same read `ReadChatProfile` makes, so the tab draws
+    /// the store's truth.
+    SetChatProfilePin {
+        chat: ChatId,
+        source: gentle_core::rpc::config_store::PinSource,
+        /// A profile name the store defines, or `None` to clear the layer.
+        profile: Option<String>,
+    },
     /// Tell the host whether that chat is running a turn. The reducer owns the
     /// mark (it is the one that reads `agent_start` / `agent_end`), so this is
     /// how the host's protection rules learn it: a working chat is never the
@@ -283,6 +301,7 @@ impl ChatCommand {
             Self::SetChatProfileMode { chat, .. } => chat,
             Self::ApplyChatProfile { chat, .. } => chat,
             Self::SetChatProfileChain { chat, .. } => chat,
+            Self::SetChatProfilePin { chat, .. } => chat,
             Self::SetWorking { chat, .. } => chat,
         }
     }

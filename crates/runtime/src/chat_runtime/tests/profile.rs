@@ -234,10 +234,29 @@ fn each_store_is_typed_from_its_documented_answer() {
     let StoreRead::Read(pins) = read.pins else {
         panic!("pins: {:?}", read.pins);
     };
-    assert!(pins.resolved);
-    let winner = pins.winner.expect("a resolved pin has a winner");
+    assert!(pins.value.resolved);
+    let winner = pins
+        .value
+        .winner
+        .clone()
+        .expect("a resolved pin has a winner");
     assert_eq!(winner.source.as_str(), "repo");
     assert_eq!(winner.profile.as_deref(), Some("team"));
+    assert_eq!(
+        pins.slot(gentle_core::rpc::config_store::PinSource::Repo),
+        crate::chat_runtime::PinSlot::Pinned("team".to_owned()),
+        "the layer that decides here, and the pin it holds"
+    );
+    assert_eq!(
+        pins.layers.len(),
+        2,
+        "both pin files the worktree has, so a pin may be edited per layer (T6)"
+    );
+    assert!(
+        pins.writable(gentle_core::rpc::config_store::PinSource::Local)
+            && pins.writable(gentle_core::rpc::config_store::PinSource::Repo),
+        "both layers offer a write target inside a resolvable worktree"
+    );
 }
 
 #[test]

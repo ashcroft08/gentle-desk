@@ -20,30 +20,41 @@
 //! marked [`StoreRead::Skipped`] and never asked: a stalled child holds the mutex
 //! for one deadline, not three.
 //!
-//! The TWO writes this module makes are per-profile and go through the same
-//! store shape. One saves a profile's orchestration mode (profiles-editor
-//! T3-mode, S2, S3): a `set_config` of the whole `profiles` document exactly as
-//! the chat's own `get_config` sent it, with only `workflow.<profile>` changed.
-//! The other saves ONE agent's fallback chain, or the profile-wide `*` one
-//! (profiles-editor T5, L30-3): a `set_config` of the whole `profile_fallbacks`
-//! document, with only `profiles.<profile>.<agent>` replaced. Both are
-//! preconditioned on their own store's `writeTargets[global].writeRevision`,
-//! both are followed by the same three reads, and both write nothing when the
-//! owner refuses or the answer never comes - reported with the owner's typed
-//! reason so the page can say the change was not saved.
+//! The THREE writes this module makes go through the same store shape, and two of
+//! them are whole documents. One saves a profile's orchestration mode
+//! (profiles-editor T3-mode, S2, S3): a `set_config` of the whole `profiles`
+//! document exactly as the chat's own `get_config` sent it, with only
+//! `workflow.<profile>` changed. The second saves ONE agent's fallback chain, or
+//! the profile-wide `*` one (profiles-editor T5, L30-3): a `set_config` of the
+//! whole `profile_fallbacks` document, with only `profiles.<profile>.<agent>`
+//! replaced. Both are preconditioned on their own store's
+//! `writeTargets[global].writeRevision`.
+//!
+//! The third writes ONE pin layer of this chat's worktree (profiles-editor T6):
+//! `pins` is the one store whose payload is a LAYER - exactly `{source, profile}`,
+//! with `null` clearing it - so there is no document to rebuild and the other
+//! layer's file is untouched by construction. Its precondition is THAT layer's own
+//! `writeTargets` entry, because `pins` has one file per layer and the other
+//! layer's token would conflict for ever (`desktop-rpc.md:246-273`).
+//!
+//! All three are followed by the same three reads, and all three write nothing
+//! when the owner refuses or the answer never comes - reported with the owner's
+//! typed reason so the page can say the change was not saved.
 
 use gentle_app::ChatId;
 use gentle_backend::chat_host::HostDesktopChannel;
 use gentle_core::rpc::config_store::{
-    read_config_verbatim, validate_chain, with_profile_chain, with_profile_mode, write_config,
-    ChainInvalid, ConfigProjection, FallbackStep, FallbacksDocument, GetConfigOutcome,
-    OrchestratorMode, PinsValue, ProfilesDocument, SetConfigOutcome, StoreId, WritableStore,
-    WriteTargetName,
+    pin_data, read_config_verbatim, validate_chain, validate_pin, with_profile_chain,
+    with_profile_mode, write_config, ChainInvalid, ConfigProjection, FallbackStep,
+    FallbacksDocument, GetConfigOutcome, OrchestratorMode, PinInvalid, PinSource, PinsValue,
+    ProfilesDocument, SetConfigOutcome, StoreId, WritableStore, WriteTargetName,
 };
 use gentle_core::rpc::profile_apply::{
     apply_profile, ApplyMode, ApplyProfileOutcome, ConfirmationToken,
 };
-use gentle_core::rpc::{AnswerError, DesktopClient, NoAnswer, StoreValue, WriteRevision};
+use gentle_core::rpc::{
+    AnswerError, DesktopClient, LayerStatus, NoAnswer, StoreValue, WriteRevision,
+};
 
 use super::ChatRuntime;
 
@@ -58,8 +69,9 @@ pub struct ChatConfigRead {
     pub profiles: StoreRead<ProfilesDocument>,
     /// The `profile_fallbacks` store: the chains per profile and agent.
     pub fallbacks: StoreRead<FallbacksDocument>,
-    /// The `pins` store, as this chat's own worktree resolves it.
-    pub pins: StoreRead<PinsValue>,
+    /// The `pins` store: what the layers amount to, which pin files this chat's
+    /// worktree has, and which of them a write may replace.
+    pub pins: StoreRead<PinsRead>,
 }
 
 impl ChatConfigRead {
@@ -92,6 +104,159 @@ pub enum StoreRead<T> {
     /// Never asked: an earlier store got no answer at all, so asking this one
     /// could only wait out another deadline under the same client.
     Skipped,
+}
+
+/// What the `pins` store answered for THIS chat's worktree (profiles-editor T6):
+/// what the layers amount to (`value`), which pin FILES the worktree has
+/// (`layers[]`, one per file the store read), and which of them a write may
+/// replace (that layer's `writeTargets[]` entry).
+///
+/// The two lists are the projection's own and are not part of `value`, because a
+/// write needs them and the value does not carry them: `pins` reports one
+/// `writeRevision` PER LAYER (`desktop-rpc.md:246-273`), and a layer outside a
+/// resolvable Git worktree offers neither a file nor a token.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct PinsRead {
+    /// What the pin layers amount to, as the owner evaluates them.
+    pub value: PinsValue,
+    /// One row per pin file, in the store's own order: `local`, then `repo`.
+    pub layers: Vec<PinLayerState>,
+    /// The layers a write may replace, from `writeTargets[].target`.
+    pub targets: Vec<WriteTargetName>,
+}
+
+impl PinsRead {
+    /// The read `projection` reports: its `value`, the pin files it found
+    /// (`layers[]`) and the layers a write may replace (`writeTargets[]`).
+    ///
+    /// `value` is the projection's own typed value, passed in because the
+    /// projection keeps it typed by store: a caller that already has the
+    /// [`PinsValue`] does not parse it twice.
+    pub fn of(value: PinsValue, projection: &ConfigProjection) -> Self {
+        let layers = projection
+            .layers
+            .iter()
+            .filter_map(|layer| {
+                let source = match layer.source {
+                    gentle_core::rpc::LayerSource::Local => PinSource::Local,
+                    gentle_core::rpc::LayerSource::Repo => PinSource::Repo,
+                    // `pins` never has a global or project layer; an answer that
+                    // named one is not a pin file and is not drawn as one.
+                    _ => return None,
+                };
+                Some(PinLayerState {
+                    source,
+                    status: layer.status,
+                })
+            })
+            .collect();
+        let targets = projection
+            .write_targets
+            .iter()
+            .map(|target| target.target)
+            .collect();
+        Self {
+            value,
+            layers,
+            targets,
+        }
+    }
+
+    /// What `source` holds, as far as the owner's `value` reports it.
+    ///
+    /// The value names the layer that WINS, the layers that name a profile the
+    /// profiles store dropped, and the ones that are not a pin at all. A VALID
+    /// layer another one outranks is not named anywhere
+    /// (`desktop-rpc.md:211-234`), which is [`PinSlot::Unreported`] and never a
+    /// guess.
+    pub fn slot(&self, source: PinSource) -> PinSlot {
+        if let Some(winner) = &self.value.winner {
+            if winner.source == source {
+                return match &winner.profile {
+                    Some(profile) => PinSlot::Pinned(profile.clone()),
+                    None => PinSlot::Invalid,
+                };
+            }
+        }
+        for stale in &self.value.stale {
+            if stale.source == source {
+                return match &stale.profile {
+                    Some(profile) => PinSlot::Stale(profile.clone()),
+                    None => PinSlot::Invalid,
+                };
+            }
+        }
+        if self
+            .value
+            .invalid
+            .iter()
+            .any(|layer| layer.source == source)
+        {
+            return PinSlot::Invalid;
+        }
+        match self.layer(source).map(|layer| layer.status) {
+            // A file that is not there holds no pin, and so does one whose bytes
+            // are not a pin at all: nothing takes effect from it.
+            Some(LayerStatus::Missing) | Some(LayerStatus::Invalid) | None => PinSlot::Empty,
+            // The file reads `ok` and the value does not name it: a valid pin
+            // another layer outranks, whose content this client is not told.
+            Some(LayerStatus::Ok) => PinSlot::Unreported,
+        }
+    }
+
+    /// The row the store reported for `source`, when it reported one.
+    pub fn layer(&self, source: PinSource) -> Option<&PinLayerState> {
+        self.layers.iter().find(|layer| layer.source == source)
+    }
+
+    /// Whether a write may replace `source`'s file: its `writeTargets` entry is
+    /// present, which outside a resolvable Git worktree it is not
+    /// (`desktop-rpc.md:273`).
+    pub fn writable(&self, source: PinSource) -> bool {
+        self.targets.contains(&source.write_target())
+    }
+}
+
+/// One pin FILE this chat's worktree has, and the owner reported (`layers[]`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PinLayerState {
+    pub source: PinSource,
+    pub status: LayerStatus,
+}
+
+/// What one pin layer holds, as far as the owner's `value` says.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PinSlot {
+    /// No pin takes effect from this layer: its file is missing, or it is not a
+    /// pin at all.
+    Empty,
+    /// This layer holds `profile`, and it is the layer that decides here.
+    Pinned(String),
+    /// This layer names a profile the profiles store no longer defines.
+    Stale(String),
+    /// This layer's file is not a pin at all.
+    Invalid,
+    /// This layer's file reads `ok` and the `value` does not name it: a valid
+    /// pin another layer outranks, whose content is not reported.
+    Unreported,
+}
+
+impl PinSlot {
+    /// Whether the layer already holds exactly `profile` (`None` clearing it), so
+    /// a write would change nothing.
+    ///
+    /// Only what the owner's own report PROVES counts: the layer that wins, and
+    /// the file that is not there. A layer whose content is not reported, or a
+    /// broken one, is written to rather than guessed at - an explicit write
+    /// replaces a broken pin, which the channel documents as a valid operation
+    /// (`desktop-rpc.md:372`).
+    fn holds(&self, profile: Option<&str>) -> bool {
+        match (self, profile) {
+            (Self::Empty, None) => true,
+            (Self::Pinned(held), Some(profile)) => held == profile,
+            _ => false,
+        }
+    }
 }
 
 /// What one attempt to APPLY a profile came to, with the configuration re-read
@@ -282,6 +447,55 @@ impl ChatRuntime {
         let read = reads.the_three();
         ChatChainWrite { result, read }
     }
+
+    /// Saves ONE pin layer of this chat's worktree over `chat`'s own child, and
+    /// then re-reads that chat's profile configuration exactly as
+    /// [`Self::read_chat_profile`] does (profiles-editor T6, S2, S3).
+    ///
+    /// The write is a `set_config` of the `pins` store naming ONE layer and what
+    /// it should hold - `{source, profile}`, with `null` clearing that layer - and
+    /// it is preconditioned on THAT layer's own `writeTargets[].writeRevision`.
+    /// `pins` has two targets, one per file, so the other layer's token would
+    /// answer `revision_conflict` for ever on a file nobody touched; the layer and
+    /// its target are one thing here ([`PinSource::write_target`]).
+    ///
+    /// Unlike the two document stores there is nothing to take verbatim: the
+    /// payload IS one layer, so the other layer's file is untouched by
+    /// construction (`desktop-rpc.md:322-345`).
+    ///
+    /// Three things are refused HERE, before a request exists: a blank profile
+    /// ([`validate_pin`]), a layer this worktree offers no target for (no
+    /// resolvable Git worktree, `config_unavailable` at the owner), and a pin the
+    /// layer already holds. Every failure the owner words itself - a stale token,
+    /// a name the profiles store dropped, an apply in flight, a child that does not
+    /// answer or does not advertise the method - writes nothing more and is
+    /// reported as [`PinWriteResult::Failed`].
+    ///
+    /// Blocking, for the same reason and under the same one-deadline bound as
+    /// the read: the caller runs it off the window's thread.
+    pub fn save_chat_profile_pin(
+        &self,
+        chat: &ChatId,
+        source: PinSource,
+        profile: Option<&str>,
+    ) -> ChatPinWrite {
+        let Some(client) = self.desktop_client(chat) else {
+            return ChatPinWrite::unasked();
+        };
+        // ONE exchange with this chat at a time, read and write in the same
+        // hold: the token this read reports is the one the write sends, and the
+        // chat's single request counter numbers both.
+        let mut client = super::lock(&client);
+        let mut reads = Reads {
+            client: &mut client,
+            stopped: false,
+        };
+        let result = reads.write_profile_pin(source, profile);
+        // Whatever came of the attempt, the tab draws the store's truth, and the
+        // read is the SAME one a plain read makes (S6: never a broken pane).
+        let read = reads.the_three();
+        ChatPinWrite { result, read }
+    }
 }
 
 /// What saving one profile's orchestration mode came to (profiles-editor
@@ -404,6 +618,66 @@ impl ChainWriteResult {
     }
 }
 
+/// What saving ONE pin layer came to (profiles-editor T6), with the chat's
+/// profile configuration re-read after the attempt.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ChatPinWrite {
+    pub result: PinWriteResult,
+    /// The three stores read again after the attempt, exactly as a plain read
+    /// reads them. A failure writes nothing more, and this is still the truth
+    /// the tab draws.
+    pub read: ChatConfigRead,
+}
+
+impl ChatPinWrite {
+    /// Nothing was asked, because the chat has no child to ask: every store is
+    /// the not-connected reason, the same state [`ChatConfigRead::unasked`]
+    /// describes.
+    pub fn unasked() -> Self {
+        Self {
+            result: PinWriteResult::failed(SetConfigOutcome::NoAnswer(NoAnswer::NotConnected)),
+            read: ChatConfigRead::unasked(),
+        }
+    }
+}
+
+/// What one pin save came to, in the terms the page draws: saved, already the
+/// layer's pin (nothing to say), a name or a layer a request may never carry, or
+/// the typed reason the write did not happen.
+#[derive(Debug, Clone, PartialEq)]
+pub enum PinWriteResult {
+    /// The owner accepted the layer and stored it (or found it identical).
+    Saved,
+    /// The layer already holds exactly this pin, so nothing was written at all.
+    Unchanged,
+    /// A pin the owner's own rules would refuse, caught before the request
+    /// existed: a blank profile. Nothing was sent.
+    Invalid(PinInvalid),
+    /// This chat's worktree offers no file for that layer (no resolvable Git
+    /// worktree), so no pin write is accepted: nothing was sent.
+    Unavailable,
+    /// Nothing was written, and this is the typed reason the owner (or the
+    /// channel) gave: `revision_conflict`, `invalid_data`, `config_unavailable`,
+    /// `profile_apply_busy`, an unsupported method, or no answer at all.
+    ///
+    /// Boxed: a typed reason is far larger than the other variants, and every
+    /// result would pay for it.
+    Failed(Box<SetConfigOutcome>),
+}
+
+impl PinWriteResult {
+    /// The typed reason nothing was written.
+    pub fn failed(outcome: SetConfigOutcome) -> Self {
+        Self::Failed(Box::new(outcome))
+    }
+
+    /// Whether the tab may treat the drawn pin as the stored one: a save the
+    /// owner accepted, or one it did not need to make.
+    pub fn saved(&self) -> bool {
+        matches!(self, Self::Saved | Self::Unchanged)
+    }
+}
+
 /// The three reads, one after another, over the chat's one client.
 struct Reads<'a> {
     client: &'a mut DesktopClient<HostDesktopChannel>,
@@ -423,14 +697,31 @@ impl Reads<'_> {
             StoreValue::Fallbacks(document) => Some(document.clone()),
             _ => None,
         });
-        let pins = self.read(StoreId::Pins, |value| match value {
-            StoreValue::Pins(pins) => Some(pins.clone()),
-            _ => None,
-        });
+        let pins = self.pins();
         ChatConfigRead {
             profiles,
             fallbacks,
             pins,
+        }
+    }
+
+    /// The `pins` store, read with the two lists a pin WRITE needs and the value
+    /// alone does not carry: the pin files this worktree has and the layers a
+    /// write may replace ([`PinsRead`]).
+    fn pins(&mut self) -> StoreRead<PinsRead> {
+        match self.ask(StoreId::Pins) {
+            Asked::Skipped => StoreRead::Skipped,
+            Asked::Answered(outcome) => StoreRead::Unread(outcome),
+            Asked::Projection { projection, .. } => {
+                match projection.value.as_ref() {
+                    Some(StoreValue::Pins(value)) => {
+                        StoreRead::Read(PinsRead::of(value.clone(), &projection))
+                    }
+                    _ => StoreRead::Unread(GetConfigOutcome::UnexpectedAnswer(
+                        AnswerError::WrongType { field: "value" },
+                    )),
+                }
+            }
         }
     }
 
@@ -586,6 +877,61 @@ impl Reads<'_> {
         ) {
             SetConfigOutcome::Written(_) => ChainWriteResult::Saved,
             failure => ChainWriteResult::failed(failure),
+        }
+    }
+
+    /// The attempt of one pin save (profiles-editor T6): the `pins` read that
+    /// carries this worktree's write target and ITS token, the owner's own rules
+    /// checked locally, and the `set_config` that follows - or the typed reason no
+    /// write was made.
+    fn write_profile_pin(&mut self, source: PinSource, profile: Option<&str>) -> PinWriteResult {
+        // The owner's own rule, BEFORE a request exists: a blank profile is
+        // `invalid_data`, so it never leaves the app. Whether the name is one the
+        // profiles store DEFINES stays the owner's check - it holds that store,
+        // and this read does not.
+        if let Err(refused) = validate_pin(profile) {
+            return PinWriteResult::Invalid(refused);
+        }
+        let (projection, pins) = match self.ask(StoreId::Pins) {
+            Asked::Projection { projection, .. } => {
+                let Some(StoreValue::Pins(value)) = projection.value.as_ref() else {
+                    return PinWriteResult::failed(SetConfigOutcome::UnexpectedAnswer(
+                        AnswerError::WrongType { field: "value" },
+                    ));
+                };
+                let pins = PinsRead::of(value.clone(), &projection);
+                (projection, pins)
+            }
+            Asked::Answered(outcome) => return PinWriteResult::failed(as_set_config(outcome)),
+            // The first store of a chat's own pin save is never skipped: nothing
+            // was asked before it.
+            Asked::Skipped => {
+                return PinWriteResult::failed(SetConfigOutcome::NoAnswer(NoAnswer::NotConnected));
+            }
+        };
+        // No working directory in a resolvable worktree means no truthful pin
+        // file (`desktop-rpc.md:273`): a request would only be answered
+        // `config_unavailable`, so it is not made.
+        if !pins.writable(source) {
+            return PinWriteResult::Unavailable;
+        }
+        // The pin the layer already holds is not written again (the answer would
+        // be a no-op, and the page has nothing to say).
+        if pins.slot(source).holds(profile) {
+            return PinWriteResult::Unchanged;
+        }
+        let data = match pin_data(source, profile) {
+            Ok(data) => data,
+            Err(refused) => return PinWriteResult::Invalid(refused),
+        };
+        // S3: the token is THIS layer's write target's, re-read per write, and a
+        // read that offers none cannot write that layer.
+        let Some(expected) = projection.write_revision(source.write_target()) else {
+            return PinWriteResult::Unavailable;
+        };
+        match write_config(self.client, WritableStore::Pins, data, expected) {
+            SetConfigOutcome::Written(_) => PinWriteResult::Saved,
+            failure => PinWriteResult::failed(failure),
         }
     }
 
