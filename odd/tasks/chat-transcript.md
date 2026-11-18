@@ -86,3 +86,18 @@ turn)"), and any gpui-kit widget.
   draws three shapes today (`apps/desktop/src/thread/Message.svelte`).
 - L3 (2026-11-18, ruling): T1 ships without UI so the contract can be reviewed on
   its own; T2 and T3 are one row shape each, so a review never has to hold both.
+- L4 (2026-11-18, T1 shape ruled before writing code): `ChatState.items: Vec<ChatItem>`
+  becomes the ONE ordered transcript and the single source of truth, with
+  `ChatItem::{Text(ChatMessage), Thinking{..}, Tool{..}}`; `ChatMessage` stays as
+  the text variant so its ids (`msg-<n>`) and its tests keep their meaning, while
+  thinking and tools get `think-<n>` and `tool-<toolCallId>`. The web is NOT
+  touched in T1: `apps/desktop/src-tauri/src/contract.rs` keeps its
+  `messages: Vec<MessageView>` field, but built by a DERIVED projection of `items`
+  (text variants only) so there is never a second truth - T2 switches the web to
+  `items` and deletes that projection. Durations: the reducer already takes
+  `now_ms` (today only helper bookkeeping uses it), so a thinking block and a tool
+  call record their start and end and expose `duration_ms`, which is `None` when
+  the caller supplies no clock (the `prompt-turn.jsonl` fixture carries no
+  timestamps; a test that wants the card's "Done 0.2s" passes `now_ms`). Per-item
+  drawing notions (icon, language chip, collapsed body) never enter the core: they
+  are T2's.
