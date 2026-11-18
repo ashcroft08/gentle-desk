@@ -56,9 +56,12 @@ const ENGLISH = {
   storeMissing: 'The pins store could not be read.',
   modeNote: 'Saved in the profile "team", the setting every chat with that profile uses.',
   modeNotSaved: 'The mode could not be saved. Nothing was written.',
+  chainNote: 'Saved in the profile "team", the chains every chat with that profile uses.',
+  footer:
+    "From this tab: the profile's orchestration mode, its fallback chains, and applying it here or as the default.",
   editInTerminal: 'Edit in terminal',
   editNote:
-    'Opens the shell: type /gentle:profiles there to edit, create and switch profiles - this tab reads them and applies one, it does not edit them.',
+    'Opens the shell: type /gentle:profiles there to edit, create and switch profiles - this tab edits the used profile’s mode and chains, and applies it.',
 }
 
 /** The same words in the app's neutral Spanish. */
@@ -104,9 +107,12 @@ const SPANISH = {
   storeMissing: 'No se pudo leer el almacén de fijados.',
   modeNote: 'Se guarda en el perfil "team", el ajuste que usan todos los chats con ese perfil.',
   modeNotSaved: 'No se pudo guardar el modo. No se escribió nada.',
+  chainNote: 'Se guarda en el perfil "team", las cadenas que usan todos los chats con ese perfil.',
+  footer:
+    'Desde esta pestaña: el modo de orquestación del perfil, sus cadenas de respaldo, y aplicarlo aquí o como predeterminado.',
   editInTerminal: 'Editar en la terminal',
   editNote:
-    'Abre la shell: escribe /gentle:profiles allí para editar, crear y cambiar de perfil - esta pestaña los lee y aplica uno, no los edita.',
+    'Abre la shell: escribe /gentle:profiles allí para editar, crear y cambiar de perfil - esta pestaña edita el modo y las cadenas del perfil en uso, y lo aplica.',
 }
 
 /** The one word both languages spell the same on purpose (`Local` is Spanish too). */
@@ -156,6 +162,8 @@ function words(language: 'en' | 'es'): typeof ENGLISH {
     storeMissing: copy.storeMissing('pins'),
     modeNote: copy.modeNote('team'),
     modeNotSaved: copy.modeNotSaved,
+    chainNote: copy.chainNote('team'),
+    footer: copy.footer,
     editInTerminal: copy.editInTerminal,
     editNote: copy.editNote,
   }

@@ -10,7 +10,9 @@ use std::sync::Mutex;
 use gentle_app::{ChatCommand, ChatId};
 use gentle_backend::chat_host::Opened;
 use gentle_desk_lib::effects::ChatExecutor;
-use gentle_runtime::chat_runtime::{ChatConfigRead, ChatProfileApply, ModeWriteResult, Outcome};
+use gentle_runtime::chat_runtime::{
+    ChainWriteResult, ChatConfigRead, ChatProfileApply, ModeWriteResult, Outcome,
+};
 
 /// A stored session, as the sidebar names one: by its path, before any chat of
 /// it exists. The app builds the chat id from it.
@@ -41,6 +43,9 @@ pub enum Answer {
     /// One saved profile was applied over that chat's own child, or the answer is
     /// the screen's dialog / a typed refusal (profiles-editor T3b).
     ChatApply(Box<ChatProfileApply>),
+    /// One profile's fallback chain was saved (or not) and this is the
+    /// configuration the attempt re-read (profiles-editor T5).
+    ChatChain(Box<ChainWriteResult>, Box<ChatConfigRead>),
     /// The user's Close chat stopped that chat's child, as the host reports it
     /// (profiles-editor T2b-3).
     Closed,
@@ -99,6 +104,13 @@ impl Answer {
                 Outcome::ChatApply {
                     chat,
                     attempt: attempt.clone(),
+                }
+            }
+            (Self::ChatChain(result, read), ChatCommand::SetChatProfileChain { .. }) => {
+                Outcome::ChatChain {
+                    chat,
+                    result: (**result).clone(),
+                    read: read.clone(),
                 }
             }
             (Self::Closed, ChatCommand::CloseProcess { .. }) => Outcome::Closed { chat },
