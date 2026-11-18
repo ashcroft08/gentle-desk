@@ -287,3 +287,16 @@ turn)"), and any gpui-kit widget.
   request, always behind a warning; day to day use `cargo test -p <crate>`, `-j 2` and
   `CARGO_BUILD_JOBS=2`, and the single web test file instead of the suite. Slower, and
   the machine stays usable - the right trade.
+- L13 (2026-11-18, the allocation bound, and the memory findings it collected):
+  lineage `review-9740c9a8caabb1e4` (reliability), **APPROVED and its
+  acknowledgement burned**. Context: a review of the CARD artboard candidate found
+  the bound was cosmetic - `String::truncate` keeps the allocation, so a 4 MB
+  output cut to 8 KiB still held 4 MB for the chat's life. That is fixed and pinned
+  by a test that asserts `capacity()`, not only `len()`.
+  Two advisories stay OPEN and belong to T2, where the card decides how much output
+  it shows: (a) `ToolPayload::new` clones the whole value before cutting it, so the
+  PEAK allocation during capture is a full copy of one tool result - a transient
+  spike, not a retained one; (b) there is still no aggregate cap - a result made of
+  many small strings is bounded per string and unbounded in total. Both are one
+  decision: a per-row budget (count and bytes) that the card also relies on to
+  decide what to fold. Recorded, not deferred silently.
