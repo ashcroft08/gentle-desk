@@ -591,4 +591,10 @@ es valor de producto".
   rendered; the real-window look and any real-child probe are the maintainer's. Empty
   chains cannot be created here (the owner refuses them; the terminal remains where a
   chainless profile gets its first chain).
+- L36 (parent, 2026-11-17): the T5a native review (lineage review-5287fcc224fa785b, high
+  tier, risk+reliability) APPROVED and acknowledged, with two non-blocking advisories for
+  the next slice: (a) the edited chain's steps are rebuilt with only model+thinking, so a
+  future member inside a step would be dropped (other chains keep theirs); (b)
+  chain-draft's sameChain compares raw thinking text, so whitespace-only thinking can
+  dispatch a no-op save. Pushed and PR opened against feat/profile-apply (#201 pending).
 
