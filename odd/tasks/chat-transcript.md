@@ -183,3 +183,22 @@ turn)"), and any gpui-kit widget.
   payload of many long strings is bounded per element but not in aggregate. Also
   accepted with its mitigation: `var(--settings-chrome)` only resolves inside
   `.dlg.settings`, and the declaration-level test pins both sides (R4-004).
+- L8 (2026-11-18, the finding T1 carried twice and finally lost its receipt to):
+  the native review of the L7 fix **escalated and stopped** - state `escalated`,
+  transition `stop` with `native_stop_required`, cause `unknown_causality`,
+  finding **R3-001**. No acknowledgement and no receipt: that lineage is terminal.
+  The escalation was right. R3-001 was the "known untested edge" of L6: a
+  `toolcall_end` with no id fell back to the last tool row with neither args nor
+  result, so with two calls in flight the ending arguments of one could be written
+  onto the other's row - inventing an attribution and presenting it as fact.
+  Ruling, and this **supersedes the L6 edge note**: an event that names no tool
+  call never touches a row it cannot identify. The fallback and the name-matching
+  wrapper are gone; `tool_at` and `tool_row_mut` take a required `&str`, so a
+  missing id cannot even reach the lookup, and the one wire path that can omit an
+  id (`AssistantMessageEvent::ToolcallEnd`) is guarded and only counts. Proven by
+  a test with two rows in flight and an id-less end: neither row changes and
+  `activity` is 1. No heuristic replaced the guess, on purpose.
+  Receipts: `cargo test --workspace` **1696 passed, 0 failed, 1 ignored**,
+  `cargo check --workspace` clean. `cargo fmt --check` is red on the base as well
+  (pre-existing drift in files this slice never touches); it was not reformatted to
+  avoid drive-by churn.

@@ -283,7 +283,7 @@ struct ToolRow<'a> {
 fn open_tool_call(state: &mut ChatState, tool_call_id: &str, tool_name: &str) {
     // The execution may have opened the row already, and two rows for one call
     // would be two truths about it.
-    if tool_at(&state.items, Some(tool_call_id)).is_some() {
+    if tool_at(&state.items, tool_call_id).is_some() {
         return;
     }
     push_row(state, tool_row(tool_call_id, tool_name, None, false, None));
@@ -291,10 +291,13 @@ fn open_tool_call(state: &mut ChatState, tool_call_id: &str, tool_name: &str) {
 
 /// Fills in the arguments the model finished streaming (`toolcall_end`).
 fn finish_tool_call(state: &mut ChatState, tool_call: &Value) {
-    let Some(row) = tool_row_mut(
-        &mut state.items,
-        tool_call.get("id").and_then(Value::as_str),
-    ) else {
+    // The model's `toolcall_end` is the one event that may carry no call id, so
+    // the guard lives here: without an id there is no row this event can be
+    // shown to mean, and the event only counts (R3-001).
+    let Some(tool_call_id) = tool_call.get("id").and_then(Value::as_str) else {
+        return bump(state);
+    };
+    let Some(row) = tool_row_mut(&mut state.items, tool_call_id) else {
         return bump(state);
     };
     if let Some(name) = tool_call.get("name").and_then(Value::as_str) {
@@ -305,43 +308,30 @@ fn finish_tool_call(state: &mut ChatState, tool_call: &Value) {
     }
 }
 
-/// The tool row an event names: by the child's call id when the event carries
-/// one, and otherwise the last row nothing has described yet.
+/// The tool row an event names: the one whose call id is the id the event
+/// carries.
 ///
-/// The `None` case is the recorded untested edge
-/// (`odd/tasks/chat-transcript.md`, L6): a `toolcall_end` with no id falls back
-/// to the row the block that just ended opened, because pi always sends the id.
-fn tool_at(items: &[ChatItem], tool_call_id: Option<&str>) -> Option<usize> {
+/// An event that names no tool call must NEVER touch a row it cannot identify
+/// (R3-001). Such an event reaches no row and only counts, exactly as an event
+/// naming an unknown id does. There is no name matching, no "the only
+/// candidate" special case and no "the last row nothing has described yet"
+/// fallback: two calls in flight make any such guess wrong, and a wrong
+/// attribution is written into the transcript as fact. The lookup therefore
+/// takes an id it was given, rather than an id it might have to infer.
+fn tool_at(items: &[ChatItem], tool_call_id: &str) -> Option<usize> {
     items.iter().rposition(|item| match item {
         ChatItem::Tool {
-            tool_call_id: row,
-            args,
-            result,
-            ..
-        } => names_call(tool_call_id, row, args.as_ref(), result.as_ref()),
+            tool_call_id: row, ..
+        } => row.as_str() == tool_call_id,
         ChatItem::Text(_) | ChatItem::Thinking { .. } => false,
     })
-}
-
-/// Does this tool row answer the id the event names? With no id in the event,
-/// only a row nothing has described yet can be the one meant.
-fn names_call(
-    tool_call_id: Option<&str>,
-    row: &str,
-    args: Option<&ToolPayload>,
-    result: Option<&ToolPayload>,
-) -> bool {
-    match tool_call_id {
-        Some(id) => row == id,
-        None => args.is_none() && result.is_none(),
-    }
 }
 
 /// [`tool_at`]'s row, mutable, so an event writes its own fields instead of
 /// destructuring the enum at every site. Its `None` arm is the real answer for
 /// every row that is not a tool row and for every row the event does not name
 /// (R2-002).
-fn tool_row_mut<'a>(items: &'a mut [ChatItem], tool_call_id: Option<&str>) -> Option<ToolRow<'a>> {
+fn tool_row_mut<'a>(items: &'a mut [ChatItem], tool_call_id: &str) -> Option<ToolRow<'a>> {
     items.iter_mut().rev().find_map(|item| {
         let ChatItem::Tool {
             tool_call_id: row,
@@ -359,7 +349,8 @@ fn tool_row_mut<'a>(items: &'a mut [ChatItem], tool_call_id: Option<&str>) -> Op
         else {
             return None;
         };
-        if !names_call(tool_call_id, row, args.as_ref(), result.as_ref()) {
+        // Same rule as `tool_at`: only the row the event's id names is it.
+        if row.as_str() != tool_call_id {
             return None;
         }
         Some(ToolRow {
@@ -387,7 +378,7 @@ fn start_tool_execution(
     // One lookup decides where the execution lands (R2-003): the row the model
     // already announced, or - when no row names the call yet - the row pushed
     // below, which is created already carrying what the execution knows.
-    if let Some(row) = tool_row_mut(&mut state.items, Some(tool_call_id)) {
+    if let Some(row) = tool_row_mut(&mut state.items, tool_call_id) {
         *row.tool_name = tool_name.to_owned();
         if args.is_some() {
             *row.args = args;
@@ -405,7 +396,7 @@ fn update_tool_execution(
     args: Option<&Value>,
     partial_result: Option<&Value>,
 ) {
-    let Some(row) = tool_row_mut(&mut state.items, Some(tool_call_id)) else {
+    let Some(row) = tool_row_mut(&mut state.items, tool_call_id) else {
         return bump(state);
     };
     if let Some(args) = args {
@@ -423,7 +414,7 @@ fn end_tool_execution(
     is_error: bool,
     now_ms: Option<u64>,
 ) {
-    let Some(row) = tool_row_mut(&mut state.items, Some(tool_call_id)) else {
+    let Some(row) = tool_row_mut(&mut state.items, tool_call_id) else {
         return bump(state);
     };
     if let Some(result) = result {

@@ -1031,6 +1031,59 @@ mod transcript {
             ]
         );
     }
+    /// An event that names no tool call must never touch a row it cannot
+    /// identify (R3-001): with two calls in flight, the ending arguments of one
+    /// could be written onto the other call's row, and the transcript would
+    /// present a wrong attribution as fact. The row it means is unknown, so it
+    /// reaches no row and only counts, exactly as an unknown id does.
+    #[test]
+    fn a_toolcall_end_with_no_id_touches_neither_of_the_calls_in_flight() {
+        let announced = |id: &str, name: &str| ChatItem::Tool {
+            id: format!("tool-{id}"),
+            tool_call_id: id.to_owned(),
+            tool_name: name.to_owned(),
+            args: None,
+            partial_result: None,
+            result: None,
+            is_error: false,
+            running: false,
+            started_at_ms: None,
+            ended_at_ms: None,
+            duration_ms: None,
+        };
+        let state = reducer_run(vec![
+            assistant_start(),
+            update(AssistantMessageEvent::ToolcallStart {
+                content_index: 0,
+                id: "call_1".to_owned(),
+                tool_name: "bash".to_owned(),
+            }),
+            update(AssistantMessageEvent::ToolcallStart {
+                content_index: 1,
+                id: "call_2".to_owned(),
+                tool_name: "read".to_owned(),
+            }),
+            update(AssistantMessageEvent::ToolcallEnd {
+                content_index: 1,
+                tool_call: json!({"name": "read", "arguments": {"path": "a.txt"}}),
+            }),
+        ]);
+        assert_eq!(
+            state.items,
+            vec![
+                announced("call_1", "bash"),
+                announced("call_2", "read"),
+                ChatItem::Text(assistant("msg-0", "", true)),
+            ],
+            "neither call in flight may gain the arguments of an unnamed event"
+        );
+        assert_eq!(
+            state.activity, 1,
+            "the event lands in no row, so it counts: {:?}",
+            state.items
+        );
+    }
+
     /// One lookup decides where an execution lands: the row the model's own
     /// `toolcall_start` already opened is filled in, never opened twice.
     #[test]
