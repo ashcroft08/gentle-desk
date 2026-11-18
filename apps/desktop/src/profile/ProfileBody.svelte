@@ -1,14 +1,21 @@
 <script lang="ts">
-  // The body of the Profile tab, read-only (06-profile-tab.html): one accordion
+  // The body of the Profile tab (06-profile-tab.html): one accordion
   // group per profile the store defines - its agents, its fallback chains - and one
   // for the pin of this chat's worktree. ONE group is open at a time, as the
   // artboard draws it, and the profile this chat RUNS opens by itself so the view
   // never starts empty-handed.
   //
+  // The chains of the profile this chat USES are EDITABLE (profiles-editor T5,
+  // L30-3) and every other profile keeps the read-only drawing: only `editable`
+  // names a profile whose chains may be written from here.
+  //
   // A store that did not answer is marked WHERE ITS CONTENT WOULD BE (a profile
   // list, the chains of a profile, the pin layers) instead of being drawn as an
   // empty one: nothing here can tell "this store is empty" from "nobody asked".
-  import type { ChatProfileView_Serialize as ChatProfile } from '../contract/bindings'
+  import type {
+    ChatProfileStepView_Serialize as Step,
+    ChatProfileView_Serialize as ChatProfile,
+  } from '../contract/bindings'
   import { pinLayerName, profileSummary, type ProfileCopy } from './copy'
   import { storeRead, usedName } from './rules'
   import ProfileAgents from './ProfileAgents.svelte'
@@ -16,7 +23,25 @@
   import ProfileGroup from './ProfileGroup.svelte'
   import ProfilePins from './ProfilePins.svelte'
 
-  let { view, copy }: { view: ChatProfile; copy: ProfileCopy } = $props()
+  let {
+    view,
+    copy,
+    editable = null,
+    saving = false,
+    chainFailed = false,
+    onSaveChain,
+  }: {
+    view: ChatProfile
+    copy: ProfileCopy
+    /** The profile whose chains this tab may edit: the one the chat USES. */
+    editable?: string | null
+    /** A chain save is in flight for this chat. */
+    saving?: boolean
+    /** The last chain save did not happen, and nothing was written. */
+    chainFailed?: boolean
+    /** Saves one chain's steps in the profile the chat uses. */
+    onSaveChain?: (agent: string, steps: Step[]) => void
+  } = $props()
 
   const profilesRead = $derived(storeRead(view, 'profiles'))
   const fallbacksRead = $derived(storeRead(view, 'fallbacks'))
@@ -79,7 +104,19 @@
       >
         <ProfileAgents agents={profile.agents} {copy} />
         <h4 class="sub">{copy.chainTitle}</h4>
-        <ProfileChains chains={profile.chains} read={fallbacksRead} {copy} />
+        {#if profile.name === editable && onSaveChain !== undefined}
+          <ProfileChains
+            chains={profile.chains}
+            profile={profile.name}
+            read={fallbacksRead}
+            {copy}
+            {saving}
+            failed={chainFailed}
+            onSave={onSaveChain}
+          />
+        {:else}
+          <ProfileChains chains={profile.chains} read={fallbacksRead} {copy} />
+        {/if}
       </ProfileGroup>
     {/each}
   {/if}

@@ -21,7 +21,8 @@ use std::time::Duration;
 use gentle_app::{ChatCommand, ChatId, Input};
 use gentle_backend::chat_host::Opened;
 use gentle_runtime::chat_runtime::{
-    request_after_open, ChatConfigRead, ChatProfileApply, ModeWriteResult, Outcome,
+    request_after_open, ChainWriteResult, ChatConfigRead, ChatProfileApply, ModeWriteResult,
+    Outcome,
 };
 
 mod runtime;
@@ -58,6 +59,11 @@ pub struct Ran {
     /// attempt that ran together with the configuration it re-read. Shell-owned
     /// like the two above: the reducer knows nothing about a profile.
     pub chat_apply: Vec<(ChatId, ChatProfileApply)>,
+    /// Every fallback-chain save one run answered, with the chat it belongs to and
+    /// the profile configuration the save re-read (profiles-editor T5).
+    /// Shell-owned like the two above: whether the chain write failed is a state
+    /// of the tab's own, not the reducer's.
+    pub chat_chain: Vec<(ChatId, ChainWriteResult, ChatConfigRead)>,
     /// A fresh child's start only proved its process was created, which takes
     /// milliseconds while the child takes seconds to speak. Its opening phase
     /// therefore ends with the chat's own first event, and the caller arms
@@ -131,6 +137,10 @@ fn run_into(command: ChatCommand, executor: &dyn ChatExecutor, ran: &mut Ran) {
         // or a typed refusal (profiles-editor T3b): the shell's own state, kept
         // whole so the page can draw the dialog verbatim and the notice.
         Outcome::ChatApply { chat, attempt } => ran.chat_apply.push((chat, *attempt)),
+        // One fallback chain was saved, or it was not and the result says why
+        // (profiles-editor T5): the same shell-owned shape as the mode's, kept
+        // apart so the chain editor's notice never lights the mode switch's.
+        Outcome::ChatChain { chat, result, read } => ran.chat_chain.push((chat, result, *read)),
     }
 }
 

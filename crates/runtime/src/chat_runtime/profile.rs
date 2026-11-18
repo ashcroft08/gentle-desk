@@ -20,25 +20,30 @@
 //! marked [`StoreRead::Skipped`] and never asked: a stalled child holds the mutex
 //! for one deadline, not three.
 //!
-//! The ONE write this module makes is a profile's orchestration mode
-//! (profiles-editor T3-mode, S2, S3): a `set_config` of the whole `profiles`
-//! document exactly as the chat's own `get_config` sent it, with only
-//! `workflow.<profile>` changed, preconditioned on the read's own
-//! `writeTargets[global].writeRevision`, and followed by the same three reads. A
-//! write that did not happen writes nothing more and is reported as
-//! [`ModeWriteResult::Failed`] with the owner's typed reason.
+//! The TWO writes this module makes are per-profile and go through the same
+//! store shape. One saves a profile's orchestration mode (profiles-editor
+//! T3-mode, S2, S3): a `set_config` of the whole `profiles` document exactly as
+//! the chat's own `get_config` sent it, with only `workflow.<profile>` changed.
+//! The other saves ONE agent's fallback chain, or the profile-wide `*` one
+//! (profiles-editor T5, L30-3): a `set_config` of the whole `profile_fallbacks`
+//! document, with only `profiles.<profile>.<agent>` replaced. Both are
+//! preconditioned on their own store's `writeTargets[global].writeRevision`,
+//! both are followed by the same three reads, and both write nothing when the
+//! owner refuses or the answer never comes - reported with the owner's typed
+//! reason so the page can say the change was not saved.
 
 use gentle_app::ChatId;
 use gentle_backend::chat_host::HostDesktopChannel;
 use gentle_core::rpc::config_store::{
-    read_config_verbatim, with_profile_mode, write_config, ConfigProjection, FallbacksDocument,
-    GetConfigOutcome, OrchestratorMode, PinsValue, ProfilesDocument, SetConfigOutcome, StoreId,
-    WritableStore, WriteTargetName,
+    read_config_verbatim, validate_chain, with_profile_chain, with_profile_mode, write_config,
+    ChainInvalid, ConfigProjection, FallbackStep, FallbacksDocument, GetConfigOutcome,
+    OrchestratorMode, PinsValue, ProfilesDocument, SetConfigOutcome, StoreId, WritableStore,
+    WriteTargetName,
 };
 use gentle_core::rpc::profile_apply::{
     apply_profile, ApplyMode, ApplyProfileOutcome, ConfirmationToken,
 };
-use gentle_core::rpc::{AnswerError, DesktopClient, NoAnswer, StoreValue};
+use gentle_core::rpc::{AnswerError, DesktopClient, NoAnswer, StoreValue, WriteRevision};
 
 use super::ChatRuntime;
 
@@ -231,6 +236,52 @@ impl ChatRuntime {
         };
         ChatProfileApply { result, read }
     }
+
+    /// Saves ONE chain of one profile - an agent's, or the profile-wide `*` -
+    /// over `chat`'s own child, and then re-reads that chat's profile
+    /// configuration exactly as [`Self::read_chat_profile`] does (profiles-editor
+    /// T5, S2, S3, L30-3).
+    ///
+    /// The write is a `set_config` of the WHOLE `profile_fallbacks` document, as
+    /// that child's own `get_config` sent it
+    /// ([`with_profile_chain`](gentle_core::rpc::config_store::with_profile_chain)
+    /// replaces one chain of it), preconditioned on THAT store's
+    /// `writeTargets[global]` `writeRevision` - never on the store's `revision`,
+    /// and never on another store's token.
+    ///
+    /// The chain is checked before anything is sent
+    /// ([`validate_chain`](gentle_core::rpc::config_store::validate_chain)): at
+    /// most eight steps, a model per step, no model twice, no empty chain - the
+    /// rules the owner's own normalizer enforces, so an `invalid_data` is never
+    /// this app's fault. A profile the store records no chain for, an agent key it
+    /// does not have, and a chain it already holds write nothing.
+    ///
+    /// Blocking, for the same reason and under the same one-deadline bound as
+    /// the read: the caller runs it off the window's thread.
+    pub fn save_chat_profile_chain(
+        &self,
+        chat: &ChatId,
+        profile: &str,
+        agent: &str,
+        steps: &[FallbackStep],
+    ) -> ChatChainWrite {
+        let Some(client) = self.desktop_client(chat) else {
+            return ChatChainWrite::unasked();
+        };
+        // ONE exchange with this chat at a time, read and write in the same
+        // hold: the token this read reports is the one the write sends, and the
+        // chat's single request counter numbers both.
+        let mut client = super::lock(&client);
+        let mut reads = Reads {
+            client: &mut client,
+            stopped: false,
+        };
+        let result = reads.write_profile_chain(profile, agent, steps);
+        // Whatever came of the attempt, the tab draws the store's truth, and the
+        // read is the SAME one a plain read makes (S6: never a broken pane).
+        let read = reads.the_three();
+        ChatChainWrite { result, read }
+    }
 }
 
 /// What saving one profile's orchestration mode came to (profiles-editor
@@ -283,6 +334,70 @@ impl ModeWriteResult {
     }
 
     /// Whether the tab may treat the chosen mode as the stored one: a save the
+    /// owner accepted, or one it did not need to make.
+    pub fn saved(&self) -> bool {
+        matches!(self, Self::Saved | Self::Unchanged)
+    }
+}
+
+/// What saving one profile's fallback chain came to (profiles-editor T5), with
+/// the chat's profile configuration re-read after the attempt.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ChatChainWrite {
+    pub result: ChainWriteResult,
+    /// The three stores read again after the attempt, exactly as a plain read
+    /// reads them. A failure writes nothing more, and this is still the truth
+    /// the tab draws.
+    pub read: ChatConfigRead,
+}
+
+impl ChatChainWrite {
+    /// Nothing was asked, because the chat has no child to ask: every store is
+    /// the not-connected reason, the same state [`ChatConfigRead::unasked`]
+    /// describes.
+    pub fn unasked() -> Self {
+        Self {
+            result: ChainWriteResult::failed(SetConfigOutcome::NoAnswer(NoAnswer::NotConnected)),
+            read: ChatConfigRead::unasked(),
+        }
+    }
+}
+
+/// What one chain save came to, in the terms the page draws: saved, already the
+/// stored chain, a chain or profile the store does not record, a chain the
+/// owner's own rules refuse (so nothing was even sent), or the typed reason the
+/// write did not happen.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ChainWriteResult {
+    /// The owner accepted the document and stored it (or found it identical).
+    Saved,
+    /// The store already records exactly this chain, so nothing was written.
+    Unchanged,
+    /// `value.profiles` has no key for that profile: the fallbacks store records
+    /// no chain of its, and nothing was written.
+    UnknownProfile,
+    /// The profile exists and has no chain under that agent key (nor under `*`
+    /// when that is the key): nothing was written, and no chain was invented.
+    UnknownChain,
+    /// A chain the owner's normalizer would refuse, caught before the request
+    /// existed: nothing was sent at all.
+    Invalid(ChainInvalid),
+    /// Nothing was written, and this is the typed reason the owner (or the
+    /// channel) gave: `revision_conflict`, `invalid_data`, `profile_apply_busy`,
+    /// an unsupported method, or no answer at all.
+    ///
+    /// Boxed: a typed reason is far larger than the other variants, and every
+    /// result would pay for it.
+    Failed(Box<SetConfigOutcome>),
+}
+
+impl ChainWriteResult {
+    /// The typed reason nothing was written.
+    pub fn failed(outcome: SetConfigOutcome) -> Self {
+        Self::Failed(Box::new(outcome))
+    }
+
+    /// Whether the tab may treat the drawn chain as the stored one: a save the
     /// owner accepted, or one it did not need to make.
     pub fn saved(&self) -> bool {
         matches!(self, Self::Saved | Self::Unchanged)
@@ -390,16 +505,87 @@ impl Reads<'_> {
         };
         // S3: the token is the write target's, re-read per store per write, and
         // a read that offers none cannot write this store.
-        let Some(expected) = projection.write_revision(WriteTargetName::Global) else {
-            return ModeWriteResult::failed(SetConfigOutcome::UnexpectedAnswer(
-                AnswerError::MissingField {
-                    field: "writeRevision",
-                },
-            ));
+        let expected = match expected_revision(&projection) {
+            Ok(expected) => expected,
+            Err(failure) => return ModeWriteResult::failed(*failure),
         };
-        match write_config(self.client, WritableStore::Profiles, data, expected) {
+        match write_config(self.client, WritableStore::Profiles, data, &expected) {
             SetConfigOutcome::Written(_) => ModeWriteResult::Saved,
             failure => ModeWriteResult::failed(failure),
+        }
+    }
+
+    /// The attempt of one chain save (profiles-editor T5): the `profile_fallbacks`
+    /// read that carries the document and ITS token, the owner's own rules
+    /// checked locally, and the `set_config` that follows - or the typed reason no
+    /// write was made.
+    fn write_profile_chain(
+        &mut self,
+        profile: &str,
+        agent: &str,
+        steps: &[FallbackStep],
+    ) -> ChainWriteResult {
+        let (projection, verbatim) = match self.ask(StoreId::ProfileFallbacks) {
+            Asked::Projection {
+                projection,
+                verbatim,
+            } => (projection, verbatim),
+            Asked::Answered(outcome) => return ChainWriteResult::failed(as_set_config(outcome)),
+            // The first store of a chat's own chain save is never skipped: nothing
+            // was asked before it.
+            Asked::Skipped => {
+                return ChainWriteResult::failed(SetConfigOutcome::NoAnswer(
+                    NoAnswer::NotConnected,
+                ));
+            }
+        };
+        let Some(StoreValue::Fallbacks(document)) = projection.value.as_ref() else {
+            return ChainWriteResult::failed(SetConfigOutcome::UnexpectedAnswer(
+                AnswerError::WrongType { field: "value" },
+            ));
+        };
+        // A profile or an agent key the store does not record is not something to
+        // add here: the write replaces a chain that EXISTS (the view only offers
+        // those, and the terminal is where a new one is created).
+        let Some(chains) = document.profiles.get(profile) else {
+            return ChainWriteResult::UnknownProfile;
+        };
+        let Some(stored) = chains.get(agent) else {
+            return ChainWriteResult::UnknownChain;
+        };
+        // The owner's own rules, BEFORE a request exists: a chain it would refuse
+        // is never sent, so an `invalid_data` is never this app's fault.
+        if let Err(refused) = validate_chain(steps) {
+            return ChainWriteResult::Invalid(refused);
+        }
+        // The chain the store already holds is not written again (the answer
+        // would be a no-op, and the page has nothing to say).
+        if stored.as_slice() == steps {
+            return ChainWriteResult::Unchanged;
+        }
+        // The document the owner sent, never the typed reading of it: the typed
+        // half drops every member this contract does not model, and `data` is the
+        // COMPLETE content of the store (S2).
+        let Some(verbatim) = verbatim.as_ref() else {
+            return ChainWriteResult::failed(SetConfigOutcome::UnexpectedAnswer(
+                AnswerError::MissingField { field: "value" },
+            ));
+        };
+        let Some(data) = with_profile_chain(verbatim, profile, agent, steps) else {
+            return ChainWriteResult::UnknownChain;
+        };
+        let expected = match expected_revision(&projection) {
+            Ok(expected) => expected,
+            Err(failure) => return ChainWriteResult::failed(*failure),
+        };
+        match write_config(
+            self.client,
+            WritableStore::ProfileFallbacks,
+            data,
+            &expected,
+        ) {
+            SetConfigOutcome::Written(_) => ChainWriteResult::Saved,
+            failure => ChainWriteResult::failed(failure),
         }
     }
 
@@ -431,6 +617,27 @@ impl Reads<'_> {
             }
         }
     }
+}
+
+/// The token a write to the store `projection` names must carry as
+/// `expectedRevision`: that store's OWN `writeTargets[global]`, re-read per store
+/// per write (S3). A read that offers none is a store this client cannot write.
+///
+/// The refusal is boxed because a typed `SetConfigOutcome` is far larger than the
+/// token, and this result travels on the same stack as the read it was taken from.
+fn expected_revision(
+    projection: &ConfigProjection,
+) -> Result<WriteRevision, Box<SetConfigOutcome>> {
+    projection
+        .write_revision(WriteTargetName::Global)
+        .cloned()
+        .ok_or_else(|| {
+            Box::new(SetConfigOutcome::UnexpectedAnswer(
+                AnswerError::MissingField {
+                    field: "writeRevision",
+                },
+            ))
+        })
 }
 
 /// What one store's `get_config` came to.
