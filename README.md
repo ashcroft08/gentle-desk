@@ -73,13 +73,11 @@ The app needs `gentle-shell` on the machine. If it is missing, the app says so a
 
 Drag saved image files (png, jpg, jpeg, webp, gif; up to 8 and 64 MB per message) onto the message box. Each one shows a thumbnail you can remove before sending, the sent message keeps the thumbnails, and the model receives the picture itself, not only its path. A screenshot that is only on the clipboard cannot be pasted: save it as a file first, like in the terminal.
 
-### Settings, in six sections
+### Settings, in seven sections
 
-The gear at the bottom of the sidebar opens Settings: **Appearance** (the theme), **Shell home** (which pi this window runs on), **Updates**, **Profiles**, **Account**, and **About** (the name and the version this run runs as). The arrow keys walk the rail.
+The gear at the bottom of the sidebar opens Settings: **Appearance** (the theme), **Shell home** (which pi this window runs on), **Updates**, **Account**, **Usage** (the subscription numbers), **Language** (the app's own words), and **About** (the name and the version this run runs as). The arrow keys walk the rail.
 
-<img width="100%" src="docs/assets/screenshots/settings-profiles.png" alt="The Settings dialog open over a chat: a rail of six sections on the left, and the Profiles section on the right with a Profile and Agents pair of tabs, the Orchestrator mode switch on Organic, a card naming the active profile with its orchestrator and fallback models, and an Edit in terminal button">
-
-**Profiles** is read-only. It draws the orchestrator-mode switch for the chats opened from now on (Organic or Full delegation, never stored), the active profile with its orchestrator and fallback routes, and an Agents tab with one row per agent, its model and its effort. Profiles are created, edited and switched in the shell, so the pane's one button opens a terminal there.
+**Profiles are not a section.** They live in each chat's own Profile tab: a settings section made them look global, and a profile is what that chat runs. The tab names the profile the chat uses, and edits the used profile's orchestration mode, its fallback chains and the pin of the chat's worktree; it also applies the profile, here or as the default for new chats. Creating a profile and adding agents are still the shell's (`/gentle:profiles`), and the tab's one button opens it there.
 
 <img width="100%" src="docs/assets/screenshots/settings-account.png" alt="The Account section of the Settings dialog: one row naming the provider commandcode, tagged Signed in (not checkable), with Open shell to sign in or out and Check again buttons under it">
 
@@ -89,7 +87,7 @@ The gear at the bottom of the sidebar opens Settings: **Appearance** (the theme)
 
 **Updates** checks once when the app opens and again only when you ask it to. It compares pi against the npm registry and shows the versions this machine runs; when something is behind, Update runs the shell's own update in a terminal window and stays dead until every chat is closed.
 
-The buttons that open a shell - Edit in terminal, Open shell to sign in or out, Update - use **Windows Terminal** when it is installed.
+The buttons that open a shell - Edit in terminal in the chat's Profile tab, Open shell to sign in or out, Update - use **Windows Terminal** when it is installed.
 
 ### How full the chat is
 

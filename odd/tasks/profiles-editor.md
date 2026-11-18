@@ -143,7 +143,7 @@ es valor de producto".
 - [ ] T4 model + thinking per agent (reuses the 0.1.11 model catalog).
 - [ ] T5 fallback-chain editing (<=8 steps, no repeated model, `*` default).
 - [x] T6 the pin (local/repo, null clears; read on open since it is not watched) - 124d49b on feat/profile-pin; L43.
-- [ ] T7 (close) battery, real-window check, roadmap note, version.
+- [x] T7 (close) battery, roadmap note, README fix, version 0.6.0 - L44.
 
 ## Log
 
@@ -642,4 +642,35 @@ es valor de producto".
   approved real-child probe of the pins store is still pending (first-time write on a
   missing file, changed:false clears, the exact wordings); an outranked valid layer starts
   its picker on "not shown" (no silent removal of a pin this client cannot see).
+- L44 (parent, 2026-11-18): T7 (THE CLOSE) on feat/profiles-editor-close, cut from
+  origin/main 13bb4a3 (which carries #192-#206, the whole editor), two commits:
+  (a) docs(odd) - this record, the roadmap's step 3 marked SHIPPED 2026-11-18 (what the
+  chat's Profile tab owns now and what stays terminal-only: creating a profile, adding
+  agents, re-routing a running chat) plus its queue line, and README's stale
+  Settings > Profiles paragraph; the section now says seven sections (Usage and
+  Language were missing from its list too), states that profiles are not a section and
+  live in each chat's Profile tab, and the "buttons that open a shell" line names Edit
+  in terminal as the tab's; the `settings-profiles.png` reference went with the pane
+  (the file stays on disk - deleting it is not this task's), README still names no
+  Profile-tab screenshot because none exists yet.
+  (b) chore(release): 0.6.0 - tauri.conf.json, the app crate's Cargo.toml, package.json
+  and the workspace Cargo.lock (`cargo update -p gentle-desk-app`), exactly the four
+  files 0.5.0's carrier commit touched; package-lock.json has sat at 0.1.1 since 0.1.1
+  and 0.5.0 did not touch it either, so it is left alone again. NOTE: the handoff listed
+  `apps/desktop/src-tauri/Cargo.lock`, which does not exist; this workspace has one lock
+  at the repo root, which is the file the 0.5.0 commit bumped and the one the command
+  edits.
+  BATTERY, `-j 2`, TMP/TEMP and CARGO_TARGET_DIR outside the worktree
+  (C:/Users/josep/dev/tmp-build): `cargo test --workspace` 1670 passed / 0 failed / 1
+  ignored (every suite and doc-test result ok); `GENTLE_DESK_REGEN_BINDINGS=1 cargo test
+  -p gentle-desk-app --test contract_bindings` 1/1 and no drift in the committed
+  bindings; `cargo fmt --check` clean; `cargo clippy --workspace --all-targets -- -D
+  warnings` clean; `npx vitest run` 874/874 over 130 files; `npm run check` 0 errors and
+  0 warnings; `npx eslint src` clean. OWED, all of it the maintainer's: the real-window
+  look of everything the record never saw rendered - T3b's apply buttons, its
+  confirmation dialog and the answer line (owed since L31, re-fixed in L33), T5a's two
+  chain editors (#205) and T6's pin editor (#206) - and the approved real-child probe of
+  the pins store (L43). The release itself (tag, installers, the roadmap's version-plan
+  entry) is the maintainer's gate as before. RDD stays OFF in this clone per L42, so
+  these two docs/manifest commits carry no native review.
 

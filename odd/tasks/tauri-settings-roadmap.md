@@ -78,6 +78,18 @@ calendar one. Version numbers never repeat or go down (updater compares them).
      because `set_config` writes through gentle-pi's own writers and `writeRevision`
      rejects the write when the file changed underneath. Model pickers reuse the
      0.1.11 model catalog.
+     SHIPPED 2026-11-18 (the slices #192-#206, all on main; 0.6.0 is the carrier bump,
+     the tag is the maintainer's): the editor lives in each chat's Profile tab, over
+     that chat's own child. It draws
+     the profile the chat uses, the used profile's Orchestrator and Fallback pairs,
+     its orchestration-mode switch (written into `profiles.json`'s `workflow` through
+     `set_config`, never into a spawn variable), its fallback chains edited the way
+     the terminal edits them (per agent, plus the profile-wide `*`) and the pin of
+     the chat's worktree, one layer at a time. Apply has the terminal's two outcomes,
+     Use in this chat and Make default, the second with the channel's own
+     confirmation shown verbatim. Still the terminal's job, by decision: creating a
+     profile, adding agents to it, and re-routing a chat that is already running
+     (chats keep the routing they started with). See odd/tasks/profiles-editor.md.
   4. **Subagents and jobs per chat**: `list_subagents`/`cancel_subagent` and
      `list_jobs`/`cancel_job`, plus the `rate_limit` event. Capability the desk does
      not have at all today.
@@ -121,7 +133,8 @@ two-column — SHIPPED-ON-BRANCH 2026-11-16 (feat/chat-chrome-helpers, PR #175, 
 release; odd/tasks/chat-chrome-helpers.md), (2) the desktop RPC channel below — its
 step 2, live Settings by file watching, SHIPPED-ON-BRANCH 2026-11-16
 (feat/rpc-settings-sync, odd/tasks/rpc-settings-sync.md); step 3, the profiles and
-pins editor, is next on the channel,
+pins editor, SHIPPED 2026-11-18 (0.6.0); step 4, subagents and jobs per
+chat, is next on the channel,
 (3) stopping a helper (next section).
 built or started; this records the decision and the measurements so it is not
 re-argued.
