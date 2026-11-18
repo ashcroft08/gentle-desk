@@ -605,4 +605,17 @@ es valor de producto".
   `ok:false {code, message}`. (e) The apply moved `active` only implicitly (the profile
   was already active; writeRevision unchanged because 0 agents changed) - a re-read
   after applied is still the source of truth.
+- L33 (maintainer + parent, 2026-11-17, verbatim "al dar clic en Make default, no aparece
+  nada", the real-window look of T3b): the click RAN (the used profile already matched the
+  global routing, so the channel applied WITHOUT a dialog, per the probe's "not every
+  apply asks") and the child's `applied` notes were dropped before the view was built -
+  no feedback at all. FIXED on the branch's second commit (9661383): a NEW
+  ChatProfileApplyAnswerView (`ChatProfileView.apply_answer`, a PARALLEL slot to
+  apply_notice) carries the child's notes verbatim (multi-line kept, no wrapper word -
+  the notes are the child's voice, like the dialog); `not_applied` draws its short notice
+  AND the notes; the next read that reaches a store clears it, one lifecycle. RED observed
+  (4 Rust + 4 web failing), GREEN; cargo workspace green (separate CARGO_TARGET_DIR: the
+  maintainer's window held the exe), fmt/clippy clean, vitest 816/816, svelte-check/eslint
+  clean, bindings regenerated. The re-look of the apply buttons + dialog + answer line is
+  owed in a fresh window.
 
