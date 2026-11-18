@@ -234,12 +234,20 @@ export function textOf(value: unknown, keys: readonly string[] = TEXT_KEYS): str
     return json(value)
   }
   if (isRecord(value)) {
+    // A key whose value IS a string settles the question even when it is blank: an
+    // all-blank payload has no text, so it renders as an empty body - NOT as its
+    // own JSON, which would put `{"output":""}` on the card (review regression of
+    // R3-001, found by the targeted validator).
+    let sawString = false
     for (const key of keys) {
       const text = value[key]
+      if (typeof text !== 'string') continue
+      sawString = true
       // An EMPTY string is not the payload's text: taking it would hand back a
       // blank body while a later key held the real one (native review R3-001).
-      if (typeof text === 'string' && text.trim() !== '') return text
+      if (text.trim() !== '') return text
     }
+    if (sawString) return ''
   }
   return json(value)
 }

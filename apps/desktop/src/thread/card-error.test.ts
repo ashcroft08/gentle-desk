@@ -45,3 +45,19 @@ describe('a failed call names its reason', () => {
     expect(lines.startsWith('rows')).toBe(true)
   })
 })
+
+describe('a payload with no text at all', () => {
+  it('renders as an empty body, never as its own JSON', () => {
+    // The targeted validator caught this: skipping the blank keys fell through to
+    // `json(value)`, so a payload of blank strings put `{"output":""}` on the card.
+    expect(textOf({ output: '' })).toBe('')
+    expect(textOf({ output: '', stderr: '   ' })).toBe('')
+  })
+
+  it('a failed call with blanks shows no error line and no body', () => {
+    const body = toolBody({ is_error: true, result: { output: '', stderr: '' } })
+
+    expect(body.error).toBeNull()
+    expect(body.lines).toEqual([])
+  })
+})
