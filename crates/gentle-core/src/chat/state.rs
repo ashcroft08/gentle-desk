@@ -361,6 +361,19 @@ impl ChatState {
         tail.into_iter()
     }
 
+    /// The last `limit` rows of the transcript in order, whatever their kind.
+    ///
+    /// The cost is the window itself: `items` is a slice, so the rows are reached
+    /// from the END and the transcript's head is never touched. Nothing is filtered
+    /// here (unlike `last_text_items`), so there is no `skip` over a filtered
+    /// iterator - the shape that made that accessor walk the whole transcript
+    /// (R3-002).
+    pub fn last_items(&self, limit: usize) -> impl Iterator<Item = &ChatItem> + '_ {
+        let mut tail: Vec<&ChatItem> = self.items.iter().rev().take(limit).collect();
+        tail.reverse();
+        tail.into_iter()
+    }
+
     /// The derived text projection of the transcript, oldest first: exactly the
     /// messages a state held when `messages` was a field of its own (L5).
     ///

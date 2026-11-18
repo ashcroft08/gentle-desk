@@ -99,6 +99,8 @@ fn the_view_state_slice_has_no_invented_fields() {
             // No chat was started, so the Updates pane's gate is free (S4).
             open_chats: 0,
             messages: Vec::new(),
+            // No chat is open, so the transcript holds no row either.
+            items: Vec::new(),
             notices: Vec::new(),
             // No chat is open, so no extension is waiting for an answer.
             dialog: None,

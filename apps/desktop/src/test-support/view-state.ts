@@ -34,6 +34,8 @@ export function viewState(overrides: Partial<ViewState_Serialize> = {}): ViewSta
     // No chat open: the Updates pane's gate is free (S4).
     open_chats: 0,
     messages: [],
+    // No chat open, so the transcript holds no row either.
+    items: [],
     notices: [],
     dialog: null,
     helpers: null,

@@ -118,6 +118,7 @@ pub fn view_state(state: &AppState, sessions_revision: u32, shell: ShellParts<'_
         // Updates pane's chats-closed gate reads exactly this (0.1.12, S4).
         open_chats: u32::try_from(state.chats.len()).unwrap_or(u32::MAX),
         messages: view::messages(state, images),
+        items: view::items(state, images),
         notices: state.notices.iter().map(NoticeView::of).collect(),
         dialog: dialogs::dialog(state),
         helpers: helpers_view,

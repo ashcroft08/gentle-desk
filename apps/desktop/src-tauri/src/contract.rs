@@ -1139,6 +1139,98 @@ pub struct MessageView {
     pub images: Vec<ImageView>,
 }
 
+/// One row of the foreground chat's transcript, in the order the child produced
+/// it: the text messages, the reasoning blocks and the tool calls the core keeps
+/// as ONE ordered list (chat-transcript T2a, L4, S3).
+///
+/// It is a list of rows and not a tree, and every variant carries the id a keyed
+/// view keys the row by. The text variant carries exactly the [`MessageView`]
+/// this same push puts in [`ViewState::messages`], built by the same rule, so the
+/// field the web reads today and the ordered list can never disagree about a row
+/// they both carry while T2 moves the web from one to the other.
+///
+/// A tool's arguments and output stay the child's own untyped JSON: each tool's
+/// shape is its own, and how to show a command or an output is the card's
+/// decision, never this contract's.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+#[serde(tag = "kind", content = "data")]
+pub enum ChatItemView {
+    /// A text row: a prompt or a reply, exactly as [`MessageView`] carries it.
+    Message(MessageView),
+    /// A reasoning block, drawn as a collapsible row of its own.
+    Thinking(ThinkingItemView),
+    /// One tool call, drawn as one card.
+    Tool(ToolCallItemView),
+}
+
+/// One reasoning block of the transcript: its text, whether it is still
+/// arriving, and how long it ran when the child's clock was known.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+pub struct ThinkingItemView {
+    /// `think-<n>` in the chat's own scheme: the key a list keys the row by.
+    pub id: String,
+    /// The reasoning text the child wrote.
+    pub text: String,
+    /// True between the block's start and its end: the row is open while it is,
+    /// because the text is still growing.
+    pub streaming: bool,
+    /// How long the block ran, in milliseconds, from its own start and end
+    /// stamps. `None` when either stamp is missing (the `prompt-turn` fixture
+    /// carries no timestamps), because a row never invents the duration it has
+    /// no evidence for.
+    ///
+    /// An `f64` rather than the core's `u64` because the generated bindings
+    /// refuse a 64-bit integer on the wire - a `number` could lose precision -
+    /// and every real millisecond count is exact in a double.
+    pub duration_ms: Option<f64>,
+}
+
+/// One tool call of the transcript, as its card draws it: the tool's own name,
+/// the arguments it was given, the output it had produced while running, the
+/// result it ended with, how it stands, and the two marks that say a payload did
+/// not arrive whole.
+///
+/// The three payloads are the child's JSON, untyped and NOT flattened into text:
+/// how to show a command, an output or an argument is the card's decision. Each
+/// of them is `null` when the call carried none, which the generated bindings
+/// state as `unknown` - the wire carries the JSON value itself, and `null` is a
+/// value of it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+pub struct ToolCallItemView {
+    /// `tool-<toolCallId>`: the key a list keys the row by.
+    pub id: String,
+    /// The tool's own name ("bash", "read", ...), as the child sent it.
+    pub tool_name: String,
+    /// The arguments the call was made with, when it carried any.
+    #[specta(type = specta_typescript::Unknown)]
+    pub args: Option<serde_json::Value>,
+    /// The output the tool had produced at its last update, dropped the moment
+    /// the `result` that supersedes it arrives: one call keeps one output, so
+    /// this is what a RUNNING call has to show and `null` once it ends.
+    #[specta(type = specta_typescript::Unknown)]
+    pub partial_result: Option<serde_json::Value>,
+    /// The result the tool ended with, `null` until it ends.
+    #[specta(type = specta_typescript::Unknown)]
+    pub result: Option<serde_json::Value>,
+    /// The child's own verdict on the result: the card's failure mark.
+    pub is_error: bool,
+    /// True between the execution's start and its end: the card's "Running"
+    /// instead of its "Done".
+    pub running: bool,
+    /// How long the execution ran, in milliseconds, from its own two stamps;
+    /// `None` while it runs and when the clock was not supplied. A `f64` for the
+    /// reason [`ThinkingItemView::duration_ms`] gives.
+    pub duration_ms: Option<f64>,
+    /// True when a payload of this call had a string longer than the core keeps
+    /// and was cut to the bound: the card says the output was cut short instead
+    /// of drawing the head as the whole of it.
+    pub truncated: bool,
+    /// True when a FIELD of a payload was lost - cutting one of an object's keys
+    /// made it collide with another - which [`truncated`](Self::truncated)
+    /// cannot say: the card words the two losses differently.
+    pub dropped: bool,
+}
+
 /// The first blocking dialog the foreground chat's extension is waiting on,
 /// flattened for display: exactly the fields the iced shell draws
 /// (`crates/ui/src/view/dialog.rs`), never a `crates/gentle-core` type.
@@ -1427,6 +1519,18 @@ pub struct ViewState {
     /// [`MESSAGES_PUSHED`](crate::view::MESSAGES_PUSHED) of them and never a
     /// whole long session.
     pub messages: Vec<MessageView>,
+    /// The foreground chat's transcript, oldest row first: every row the chat
+    /// keeps - the text messages, the reasoning blocks and the tool calls - in
+    /// the order the child produced them (chat-transcript T2a, L4).
+    ///
+    /// It is the tail, and the SAME limit [`messages`](Self::messages) uses:
+    /// the last [`MESSAGES_PUSHED`](crate::view::MESSAGES_PUSHED) rows of ANY
+    /// kind, so a chat of hundreds of tool calls pushes a bounded list and the
+    /// payloads the core keeps cannot turn one refresh into megabytes. A text
+    /// row that both lists carry is the same row: `messages` is this list's text
+    /// rows out of one builder, which is what lets the web move from the one to
+    /// the other without the two disagreeing on the way.
+    pub items: Vec<ChatItemView>,
     pub notices: Vec<NoticeView>,
     /// The foreground chat's first pending blocking dialog, if an extension is
     /// waiting for an answer. `None` when no chat is foreground or nothing is

@@ -232,6 +232,69 @@ export type ChatBadge = {
 };
 
 /**
+ *  One row of the foreground chat's transcript, in the order the child produced
+ *  it: the text messages, the reasoning blocks and the tool calls the core keeps
+ *  as ONE ordered list (chat-transcript T2a, L4, S3).
+ * 
+ *  It is a list of rows and not a tree, and every variant carries the id a keyed
+ *  view keys the row by. The text variant carries exactly the [`MessageView`]
+ *  this same push puts in [`ViewState::messages`], built by the same rule, so the
+ *  field the web reads today and the ordered list can never disagree about a row
+ *  they both carry while T2 moves the web from one to the other.
+ * 
+ *  A tool's arguments and output stay the child's own untyped JSON: each tool's
+ *  shape is its own, and how to show a command or an output is the card's
+ *  decision, never this contract's.
+ */
+export type ChatItemView = ChatItemView_Serialize | ChatItemView_Deserialize;
+
+/**
+ *  One row of the foreground chat's transcript, in the order the child produced
+ *  it: the text messages, the reasoning blocks and the tool calls the core keeps
+ *  as ONE ordered list (chat-transcript T2a, L4, S3).
+ * 
+ *  It is a list of rows and not a tree, and every variant carries the id a keyed
+ *  view keys the row by. The text variant carries exactly the [`MessageView`]
+ *  this same push puts in [`ViewState::messages`], built by the same rule, so the
+ *  field the web reads today and the ordered list can never disagree about a row
+ *  they both carry while T2 moves the web from one to the other.
+ * 
+ *  A tool's arguments and output stay the child's own untyped JSON: each tool's
+ *  shape is its own, and how to show a command or an output is the card's
+ *  decision, never this contract's.
+ */
+export type ChatItemView_Deserialize = 
+/**  A text row: a prompt or a reply, exactly as [`MessageView`] carries it. */
+{ kind: "Message"; data: MessageView_Deserialize } | 
+/**  A reasoning block, drawn as a collapsible row of its own. */
+{ kind: "Thinking"; data: ThinkingItemView_Deserialize } | 
+/**  One tool call, drawn as one card. */
+{ kind: "Tool"; data: ToolCallItemView_Deserialize };
+
+/**
+ *  One row of the foreground chat's transcript, in the order the child produced
+ *  it: the text messages, the reasoning blocks and the tool calls the core keeps
+ *  as ONE ordered list (chat-transcript T2a, L4, S3).
+ * 
+ *  It is a list of rows and not a tree, and every variant carries the id a keyed
+ *  view keys the row by. The text variant carries exactly the [`MessageView`]
+ *  this same push puts in [`ViewState::messages`], built by the same rule, so the
+ *  field the web reads today and the ordered list can never disagree about a row
+ *  they both carry while T2 moves the web from one to the other.
+ * 
+ *  A tool's arguments and output stay the child's own untyped JSON: each tool's
+ *  shape is its own, and how to show a command or an output is the card's
+ *  decision, never this contract's.
+ */
+export type ChatItemView_Serialize = 
+/**  A text row: a prompt or a reply, exactly as [`MessageView`] carries it. */
+{ kind: "Message"; data: MessageView_Serialize } | 
+/**  A reasoning block, drawn as a collapsible row of its own. */
+{ kind: "Thinking"; data: ThinkingItemView_Serialize } | 
+/**  One tool call, drawn as one card. */
+{ kind: "Tool"; data: ToolCallItemView_Serialize };
+
+/**
  *  One agent of one profile, as the chat's Profile tab draws it (profiles-editor
  *  T2b-2, S1): the key the store names the agent by and the route it stores.
  *  Every route member is optional because the file allows a partial row, and a
@@ -1798,6 +1861,188 @@ export type ThemeView =
 "system" | "dark" | "Gentle" | "Gentleman-Cute" | "Gentleman-Sexy" | "light";
 
 /**
+ *  One reasoning block of the transcript: its text, whether it is still
+ *  arriving, and how long it ran when the child's clock was known.
+ */
+export type ThinkingItemView = ThinkingItemView_Serialize | ThinkingItemView_Deserialize;
+
+/**
+ *  One reasoning block of the transcript: its text, whether it is still
+ *  arriving, and how long it ran when the child's clock was known.
+ */
+export type ThinkingItemView_Deserialize = {
+	/**  `think-<n>` in the chat's own scheme: the key a list keys the row by. */
+	id: string,
+	/**  The reasoning text the child wrote. */
+	text: string,
+	/**
+	 *  True between the block's start and its end: the row is open while it is,
+	 *  because the text is still growing.
+	 */
+	streaming: boolean,
+	/**
+	 *  How long the block ran, in milliseconds, from its own start and end
+	 *  stamps. `None` when either stamp is missing (the `prompt-turn` fixture
+	 *  carries no timestamps), because a row never invents the duration it has
+	 *  no evidence for.
+	 * 
+	 *  An `f64` rather than the core's `u64` because the generated bindings
+	 *  refuse a 64-bit integer on the wire - a `number` could lose precision -
+	 *  and every real millisecond count is exact in a double.
+	 */
+	duration_ms?: number | null,
+};
+
+/**
+ *  One reasoning block of the transcript: its text, whether it is still
+ *  arriving, and how long it ran when the child's clock was known.
+ */
+export type ThinkingItemView_Serialize = {
+	/**  `think-<n>` in the chat's own scheme: the key a list keys the row by. */
+	id: string,
+	/**  The reasoning text the child wrote. */
+	text: string,
+	/**
+	 *  True between the block's start and its end: the row is open while it is,
+	 *  because the text is still growing.
+	 */
+	streaming: boolean,
+	/**
+	 *  How long the block ran, in milliseconds, from its own start and end
+	 *  stamps. `None` when either stamp is missing (the `prompt-turn` fixture
+	 *  carries no timestamps), because a row never invents the duration it has
+	 *  no evidence for.
+	 * 
+	 *  An `f64` rather than the core's `u64` because the generated bindings
+	 *  refuse a 64-bit integer on the wire - a `number` could lose precision -
+	 *  and every real millisecond count is exact in a double.
+	 */
+	duration_ms: number | null,
+};
+
+/**
+ *  One tool call of the transcript, as its card draws it: the tool's own name,
+ *  the arguments it was given, the output it had produced while running, the
+ *  result it ended with, how it stands, and the two marks that say a payload did
+ *  not arrive whole.
+ * 
+ *  The three payloads are the child's JSON, untyped and NOT flattened into text:
+ *  how to show a command, an output or an argument is the card's decision. Each
+ *  of them is `null` when the call carried none, which the generated bindings
+ *  state as `unknown` - the wire carries the JSON value itself, and `null` is a
+ *  value of it.
+ */
+export type ToolCallItemView = ToolCallItemView_Serialize | ToolCallItemView_Deserialize;
+
+/**
+ *  One tool call of the transcript, as its card draws it: the tool's own name,
+ *  the arguments it was given, the output it had produced while running, the
+ *  result it ended with, how it stands, and the two marks that say a payload did
+ *  not arrive whole.
+ * 
+ *  The three payloads are the child's JSON, untyped and NOT flattened into text:
+ *  how to show a command, an output or an argument is the card's decision. Each
+ *  of them is `null` when the call carried none, which the generated bindings
+ *  state as `unknown` - the wire carries the JSON value itself, and `null` is a
+ *  value of it.
+ */
+export type ToolCallItemView_Deserialize = {
+	/**  `tool-<toolCallId>`: the key a list keys the row by. */
+	id: string,
+	/**  The tool's own name ("bash", "read", ...), as the child sent it. */
+	tool_name: string,
+	/**  The arguments the call was made with, when it carried any. */
+	args?: unknown,
+	/**
+	 *  The output the tool had produced at its last update, dropped the moment
+	 *  the `result` that supersedes it arrives: one call keeps one output, so
+	 *  this is what a RUNNING call has to show and `null` once it ends.
+	 */
+	partial_result?: unknown,
+	/**  The result the tool ended with, `null` until it ends. */
+	result?: unknown,
+	/**  The child's own verdict on the result: the card's failure mark. */
+	is_error: boolean,
+	/**
+	 *  True between the execution's start and its end: the card's "Running"
+	 *  instead of its "Done".
+	 */
+	running: boolean,
+	/**
+	 *  How long the execution ran, in milliseconds, from its own two stamps;
+	 *  `None` while it runs and when the clock was not supplied. A `f64` for the
+	 *  reason [`ThinkingItemView::duration_ms`] gives.
+	 */
+	duration_ms?: number | null,
+	/**
+	 *  True when a payload of this call had a string longer than the core keeps
+	 *  and was cut to the bound: the card says the output was cut short instead
+	 *  of drawing the head as the whole of it.
+	 */
+	truncated: boolean,
+	/**
+	 *  True when a FIELD of a payload was lost - cutting one of an object's keys
+	 *  made it collide with another - which [`truncated`](Self::truncated)
+	 *  cannot say: the card words the two losses differently.
+	 */
+	dropped: boolean,
+};
+
+/**
+ *  One tool call of the transcript, as its card draws it: the tool's own name,
+ *  the arguments it was given, the output it had produced while running, the
+ *  result it ended with, how it stands, and the two marks that say a payload did
+ *  not arrive whole.
+ * 
+ *  The three payloads are the child's JSON, untyped and NOT flattened into text:
+ *  how to show a command, an output or an argument is the card's decision. Each
+ *  of them is `null` when the call carried none, which the generated bindings
+ *  state as `unknown` - the wire carries the JSON value itself, and `null` is a
+ *  value of it.
+ */
+export type ToolCallItemView_Serialize = {
+	/**  `tool-<toolCallId>`: the key a list keys the row by. */
+	id: string,
+	/**  The tool's own name ("bash", "read", ...), as the child sent it. */
+	tool_name: string,
+	/**  The arguments the call was made with, when it carried any. */
+	args: unknown,
+	/**
+	 *  The output the tool had produced at its last update, dropped the moment
+	 *  the `result` that supersedes it arrives: one call keeps one output, so
+	 *  this is what a RUNNING call has to show and `null` once it ends.
+	 */
+	partial_result: unknown,
+	/**  The result the tool ended with, `null` until it ends. */
+	result: unknown,
+	/**  The child's own verdict on the result: the card's failure mark. */
+	is_error: boolean,
+	/**
+	 *  True between the execution's start and its end: the card's "Running"
+	 *  instead of its "Done".
+	 */
+	running: boolean,
+	/**
+	 *  How long the execution ran, in milliseconds, from its own two stamps;
+	 *  `None` while it runs and when the clock was not supplied. A `f64` for the
+	 *  reason [`ThinkingItemView::duration_ms`] gives.
+	 */
+	duration_ms: number | null,
+	/**
+	 *  True when a payload of this call had a string longer than the core keeps
+	 *  and was cut to the bound: the card says the output was cut short instead
+	 *  of drawing the head as the whole of it.
+	 */
+	truncated: boolean,
+	/**
+	 *  True when a FIELD of a payload was lost - cutting one of an object's keys
+	 *  made it collide with another - which [`truncated`](Self::truncated)
+	 *  cannot say: the card words the two losses differently.
+	 */
+	dropped: boolean,
+};
+
+/**
  *  How one tool call of a helper's thread stands. The two booleans the helper
  *  state carries are folded into these three by
  *  [`gentle_runtime::helper_text::format::tool_status`]; the WORD each state is
@@ -2741,6 +2986,20 @@ export type ViewState_Deserialize = {
 	 *  whole long session.
 	 */
 	messages: MessageView_Deserialize[],
+	/**
+	 *  The foreground chat's transcript, oldest row first: every row the chat
+	 *  keeps - the text messages, the reasoning blocks and the tool calls - in
+	 *  the order the child produced them (chat-transcript T2a, L4).
+	 * 
+	 *  It is the tail, and the SAME limit [`messages`](Self::messages) uses:
+	 *  the last [`MESSAGES_PUSHED`](crate::view::MESSAGES_PUSHED) rows of ANY
+	 *  kind, so a chat of hundreds of tool calls pushes a bounded list and the
+	 *  payloads the core keeps cannot turn one refresh into megabytes. A text
+	 *  row that both lists carry is the same row: `messages` is this list's text
+	 *  rows out of one builder, which is what lets the web move from the one to
+	 *  the other without the two disagreeing on the way.
+	 */
+	items: ChatItemView_Deserialize[],
 	notices: NoticeView_Deserialize[],
 	/**
 	 *  The foreground chat's first pending blocking dialog, if an extension is
@@ -2956,6 +3215,20 @@ export type ViewState_Serialize = {
 	 *  whole long session.
 	 */
 	messages: MessageView_Serialize[],
+	/**
+	 *  The foreground chat's transcript, oldest row first: every row the chat
+	 *  keeps - the text messages, the reasoning blocks and the tool calls - in
+	 *  the order the child produced them (chat-transcript T2a, L4).
+	 * 
+	 *  It is the tail, and the SAME limit [`messages`](Self::messages) uses:
+	 *  the last [`MESSAGES_PUSHED`](crate::view::MESSAGES_PUSHED) rows of ANY
+	 *  kind, so a chat of hundreds of tool calls pushes a bounded list and the
+	 *  payloads the core keeps cannot turn one refresh into megabytes. A text
+	 *  row that both lists carry is the same row: `messages` is this list's text
+	 *  rows out of one builder, which is what lets the web move from the one to
+	 *  the other without the two disagreeing on the way.
+	 */
+	items: ChatItemView_Serialize[],
 	notices: NoticeView_Serialize[],
 	/**
 	 *  The foreground chat's first pending blocking dialog, if an extension is
