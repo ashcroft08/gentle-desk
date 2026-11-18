@@ -625,4 +625,8 @@ es valor de producto".
   history). Delivery PR to main next; the T5a content was reviewed twice
   (review-5287fcc224fa785b, review-9da71667ed3c5004) and its delivery range fits the
   budget.
+- L42 (maintainer, 2026-11-17): with the delivery gate demanding a review the maintainer
+  had declined, the maintainer chose the kill switch: `gentle-ai review mode disable
+  --scope clone` (RDD OFF in this clone until re-enabled; global stays on). The stage-2
+  branch pushed; the merge to main remains the maintainer's gate.
 
