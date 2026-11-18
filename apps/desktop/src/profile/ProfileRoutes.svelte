@@ -9,6 +9,7 @@
   // A pair the profile does not record - no `orchestrator` agent, no chain - is
   // drawn as NOTHING, never as a guess.
   import type {
+    ChatProfileApplyAnswerView,
     ChatProfileApplyNoticeView,
     ChatProfileDefinitionView_Serialize as ProfileDefinition,
     OrchestratorModeView,
@@ -25,6 +26,7 @@
     saveFailed = false,
     applying = false,
     applyNotice = null,
+    applyAnswer = null,
     onSave,
     onApply,
   }: {
@@ -38,6 +40,8 @@
     applying?: boolean
     /** The last apply wrote nothing: its own short line says why. */
     applyNotice?: ChatProfileApplyNoticeView | null
+    /** The last apply RAN: the child's own notes, verbatim (T3b, L32). */
+    applyAnswer?: ChatProfileApplyAnswerView | null
     /** Ask the shell to save this mode in the profile. */
     onSave?: (mode: OrchestratorModeView) => void
     /** Ask the shell to apply this profile: this chat, or the global default. */
@@ -73,9 +77,16 @@
   <ProfileMode {profile} {copy} {saving} {saveFailed} {onSave} />
 
   <!-- The terminal's other two outcomes for THIS profile (T3b): one button each,
-       and a line that names the scope each one touches. -->
+       a line that names the scope each one touches, and the child's own answer
+       when the attempt ran. -->
   <div class="applied">
-    <ProfileApply copy={copy.apply} {applying} notice={applyNotice} {onApply} />
+    <ProfileApply
+      copy={copy.apply}
+      {applying}
+      notice={applyNotice}
+      answer={applyAnswer}
+      {onApply}
+    />
   </div>
 </section>
 

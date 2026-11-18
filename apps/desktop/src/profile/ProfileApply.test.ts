@@ -13,7 +13,8 @@
 //   intent, not even from a keyboard or a synthetic click.
 //
 // The child's own dialog, its Accept and Cancel, and the line each failure leaves
-// are `ProfileConfirm.test.ts`.
+// are `ProfileConfirm.test.ts`. The child's own ANSWER to an apply that ran is the
+// last block here (`applied` and `not_applied` both said what they did).
 import '../test-support/dom-env'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/svelte'
@@ -151,5 +152,62 @@ describe('the two apply outcomes', () => {
 
     expect(button(profileCopy('es').apply.useInChat)).toBeTruthy()
     expect(button(profileCopy('es').apply.makeDefault)).toBeTruthy()
+  })
+})
+
+// The child's own answer to an apply that RAN, verbatim (profiles-editor T3b, L32):
+// `Make default` on a profile that already is the default applied, said what it
+// did and the tab drew NOTHING, so the user could not tell anything had happened.
+const ANSWER = [
+  'el Gentleman applied profile "team" — 0 agents updated.\nNew routing takes effect on the next subagent launch.\nOrchestrator set to anthropic/claude-sonnet-4 in settings.json.',
+  'anthropic/claude-sonnet-4 is not in the model catalog; this session keeps its current model.',
+]
+
+/**
+ * One note as the tab drew it, compared with the child's text UNTOUCHED: the
+ * default matcher collapses whitespace, which would hide a lost line break.
+ */
+function drawnNote(text: string): HTMLElement {
+  return screen.getByText(text, { normalizer: (drawn) => drawn })
+}
+
+describe("the child's own answer to an apply that ran", () => {
+  it('draws every note of it, verbatim, with no word of our own around it', () => {
+    draw({ view: chatProfile({ apply_answer: { notes: ANSWER } }) })
+
+    for (const note of ANSWER) {
+      const drawn = drawnNote(note)
+      expect(drawn.textContent).toBe(note)
+    }
+  })
+
+  it('keeps the lines the child wrote inside one note', () => {
+    draw({ view: chatProfile({ apply_answer: { notes: [ANSWER[0]] } }) })
+
+    expect(drawnNote(ANSWER[0]).textContent?.split('\n')).toHaveLength(3)
+  })
+
+  it("draws the child's own words in Spanish too: they are not the app's to translate", () => {
+    setLanguage('es')
+
+    draw({ view: chatProfile({ apply_answer: { notes: ANSWER } }) })
+
+    expect(drawnNote(ANSWER[0])).toBeTruthy()
+    expect(drawnNote(ANSWER[1])).toBeTruthy()
+  })
+
+  it('stops drawing it as soon as a view does not carry it', async () => {
+    const drawn = draw({ view: chatProfile({ apply_answer: { notes: ANSWER } }) })
+    expect(drawnNote(ANSWER[0])).toBeTruthy()
+
+    await drawn.rerender({ chatId: 'foreground_chat', view: chatProfile(), active: true })
+
+    expect(screen.queryByText(ANSWER[0], { normalizer: (drawn) => drawn })).toBeNull()
+  })
+
+  it('draws nothing at all when the answer carries no notes', () => {
+    draw({ view: chatProfile({ apply_answer: null }) })
+
+    expect(screen.queryByRole('status')).toBeNull()
   })
 })

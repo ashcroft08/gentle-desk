@@ -9,7 +9,9 @@
 // What is NOT here: the channel's own confirmation. Its title and message are
 // the child's text, in the child's language, and are drawn exactly as they
 // arrive (L30 ruling 2); only the two buttons and the line that says whose dialog
-// it is are ours.
+// it is are ours. Nor are the NOTES of an apply that ran: they are the child's own
+// answer, in its own voice, and the tab draws them verbatim with no wrapper word to
+// translate (T3b, L32).
 import type {
   ChatProfileApplyNoticeView,
   LanguageView,
