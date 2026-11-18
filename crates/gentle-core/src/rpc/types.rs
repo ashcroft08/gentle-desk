@@ -208,17 +208,27 @@ pub enum RpcEvent {
     MessageStart(RpcMessage),
     MessageEnd(RpcMessage),
     MessageUpdate(AssistantMessageEvent),
+    /// The child started running a tool call. `args` is the tool's own arguments
+    /// object, exactly as the child sent it (it is not typed per tool).
     ToolExecutionStart {
         tool_call_id: String,
         tool_name: String,
+        args: Option<Value>,
     },
+    /// Output the tool has produced so far. `partial_result` is the child's own
+    /// content list, so a card can draw the tail of a long run before it ends.
     ToolExecutionUpdate {
         tool_call_id: String,
         tool_name: String,
+        args: Option<Value>,
+        partial_result: Option<Value>,
     },
+    /// The tool finished. `result` is the content list it ended with; `is_error`
+    /// is the child's own verdict on it.
     ToolExecutionEnd {
         tool_call_id: String,
         tool_name: String,
+        result: Option<Value>,
         is_error: bool,
     },
     UiRequest(UiRequest),
