@@ -135,13 +135,13 @@ es valor de producto".
       `get_config`, `revision_conflict` -> re-read and ask, `invalid_data` ->
       show and keep the draft, `profile_apply_busy` -> wait/retry copy, whole
       document replacement.
-- [ ] T3b (S4, S8, S9) apply: `apply_profile` mode `session` (this chat, the
+- [x] T3b (S4, S8, S9) apply: `apply_profile` mode `session` (this chat, the
       terminal's "Use in this session") and `default` with the
       `confirmation_required` round trip, the `unknown_profile` and
       `profile_apply_busy` answers, and the copy that says live chats keep their
       routing.
 - [ ] T4 model + thinking per agent (reuses the 0.1.11 model catalog).
-- [ ] T5 fallback-chain editing (<=8 steps, no repeated model, `*` default).
+- [x] T5 fallback-chain editing (<=8 steps, no repeated model, `*` default).
 - [ ] T6 the pin (local/repo, null clears; read on open since it is not watched).
 - [ ] T7 (close) battery, real-window check, roadmap note, version.
 
@@ -618,4 +618,22 @@ es valor de producto".
   maintainer's window held the exe), fmt/clippy clean, vitest 816/816, svelte-check/eslint
   clean, bindings regenerated. The re-look of the apply buttons + dialog + answer line is
   owed in a fresh window.
+- L37 (parent, 2026-11-17): T5a COMPOSED onto the T3b tip (the earlier stack error: the
+  slice was built from main, not from feat/profile-apply; PR #202 was closed and the
+  composed branch feat/profile-chain-editor carries ONE commit, df213cc, over 686c83f).
+  The union keeps BOTH slices whole: ProfileWork = applying/notice/answer/confirmation +
+  chain_failed; ChatWork = one save (mode|chain) + one apply per chat; the single
+  read-clear block clears failed/chain_failed/notice/answer, never the pending dialog;
+  bindings regenerated; footer/editNote composed (mode + chains + apply). Checks: cargo
+  workspace green, bindings guard green, fmt/clippy clean, vitest 841/841,
+  svelte-check/eslint clean, apply 21 + chain 21. The prior lineage review-5287fcc224fa785b
+  reviewed the T5a content as authored; the composition itself is same-content re-stacking,
+  and the native assess over it is the parent's next read.
+- L38 (parent, 2026-11-17): the COMPOSED T5a's native review (lineage
+  review-9da71667ed3c5004, high tier, risk+reliability) APPROVED and acknowledged, one new
+  non-blocking advisory: ChainEditor's re-seed effect replaces the user's draft when the
+  store's chain changes under it (another chat's save answering, or a terminal edit
+  re-read) - unsaved typed steps lost without notice; the same-content push test is pinned,
+  a changed-chain one is not. PR: feat/profile-chain-editor -> #201's base, superseding
+  #202.
 

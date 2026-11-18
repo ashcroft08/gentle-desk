@@ -702,6 +702,18 @@ export type ChatProfileView_Deserialize = {
 	 *  cancelling sends nothing at all.
 	 */
 	apply_confirmation?: ChatProfileApplyConfirmationView | null,
+	/**
+	 *  Whether the last attempt to save ONE of this profile's fallback chains
+	 *  FAILED, and nothing was written (profiles-editor T5, L30-3): a stale
+	 *  `expectedRevision`, a document the owner refuses, an apply in flight, a
+	 *  child that did not answer, a chain the owner's own rules refuse, or a
+	 *  profile/chain key the store does not record. It is the PARALLEL of
+	 *  [`Self::save_failed`] - one notice per control, never one for both - and
+	 *  its lifecycle is the same: cleared by the next successful read, by a save
+	 *  that worked, and never set by the read itself. A chain save holds the SAME
+	 *  one-save slot as the mode switch, so [`Self::saving`] disables both.
+	 */
+	chain_failed: boolean,
 };
 
 /**
@@ -810,6 +822,18 @@ export type ChatProfileView_Serialize = {
 	 *  cancelling sends nothing at all.
 	 */
 	apply_confirmation: ChatProfileApplyConfirmationView | null,
+	/**
+	 *  Whether the last attempt to save ONE of this profile's fallback chains
+	 *  FAILED, and nothing was written (profiles-editor T5, L30-3): a stale
+	 *  `expectedRevision`, a document the owner refuses, an apply in flight, a
+	 *  child that did not answer, a chain the owner's own rules refuse, or a
+	 *  profile/chain key the store does not record. It is the PARALLEL of
+	 *  [`Self::save_failed`] - one notice per control, never one for both - and
+	 *  its lifecycle is the same: cleared by the next successful read, by a save
+	 *  that worked, and never set by the read itself. A chain save holds the SAME
+	 *  one-save slot as the mode switch, so [`Self::saving`] disables both.
+	 */
+	chain_failed: boolean,
 };
 
 /**
@@ -1904,6 +1928,37 @@ export type UiIntent_Deserialize = { type: "SendPrompt"; data: {
 	confirmation?: string | null,
 } } | 
 /**
+ *  Save ONE fallback chain of the used profile, the way the terminal edits
+ *  `profile-fallbacks.json` (profiles-editor T5, S2, S3, L30-3): the chain of
+ *  one agent, or the profile-wide `*` one, stored under
+ *  `profiles.<profile>.<agent>`. Every chat using that profile reads it, never
+ *  this chat alone.
+ * 
+ *  The write is the whole `profile_fallbacks` document as this chat's own
+ *  child read it, with only that chain replaced, preconditioned on THAT
+ *  store's `writeTargets[global].writeRevision` (S2, S3), and it is followed
+ *  by a fresh read of that chat's configuration. The chain is checked against
+ *  the owner's own rules before anything is sent (at most eight steps, a model
+ *  per step, no model twice, never empty); a write that did not happen - a
+ *  stale token, a document the owner refuses, an apply in flight, a child that
+ *  does not answer - changes nothing and leaves
+ *  [`ChatProfileView::chain_failed`] set, which the tab says in one short line
+ *  and clears on the next successful read.
+ */
+{ type: "SaveChatProfileChain"; data: {
+	chat_id: string,
+	/**  The profiles store's own key for the profile (the one this chat uses). */
+	profile: string,
+	/**  The chain's own key: an agent's name, or `*` for the profile-wide one. */
+	agent: string,
+	/**
+	 *  The chain as the user built it, in the order gentle-pi would move
+	 *  through it. An empty list is a page bug, not a way to delete a chain:
+	 *  the owner keeps no empty chain, so the shell refuses it too.
+	 */
+	steps: ChatProfileStepView_Deserialize[],
+} } | 
+/**
  *  Re-read the provider names and re-run one `auth check` per provider
  *  (0.1.12, T3). The answer travels back on [`ViewState::auth`].
  */
@@ -2138,6 +2193,37 @@ export type UiIntent_Serialize = { type: "SendPrompt"; data: {
 	 *  dialog (with a fresh token) answers instead of writing.
 	 */
 	confirmation: string | null,
+} } | 
+/**
+ *  Save ONE fallback chain of the used profile, the way the terminal edits
+ *  `profile-fallbacks.json` (profiles-editor T5, S2, S3, L30-3): the chain of
+ *  one agent, or the profile-wide `*` one, stored under
+ *  `profiles.<profile>.<agent>`. Every chat using that profile reads it, never
+ *  this chat alone.
+ * 
+ *  The write is the whole `profile_fallbacks` document as this chat's own
+ *  child read it, with only that chain replaced, preconditioned on THAT
+ *  store's `writeTargets[global].writeRevision` (S2, S3), and it is followed
+ *  by a fresh read of that chat's configuration. The chain is checked against
+ *  the owner's own rules before anything is sent (at most eight steps, a model
+ *  per step, no model twice, never empty); a write that did not happen - a
+ *  stale token, a document the owner refuses, an apply in flight, a child that
+ *  does not answer - changes nothing and leaves
+ *  [`ChatProfileView::chain_failed`] set, which the tab says in one short line
+ *  and clears on the next successful read.
+ */
+{ type: "SaveChatProfileChain"; data: {
+	chat_id: string,
+	/**  The profiles store's own key for the profile (the one this chat uses). */
+	profile: string,
+	/**  The chain's own key: an agent's name, or `*` for the profile-wide one. */
+	agent: string,
+	/**
+	 *  The chain as the user built it, in the order gentle-pi would move
+	 *  through it. An empty list is a page bug, not a way to delete a chain:
+	 *  the owner keeps no empty chain, so the shell refuses it too.
+	 */
+	steps: ChatProfileStepView_Serialize[],
 } } | 
 /**
  *  Re-read the provider names and re-run one `auth check` per provider

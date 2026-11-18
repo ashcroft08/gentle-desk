@@ -111,8 +111,12 @@ describe('the profiles listed read-only', () => {
     expect(within(team).getByText('standard')).toBeTruthy()
     // The `*` chain is the profile-wide one, and it says so.
     expect(within(team).getByText(copy.profileWide)).toBeTruthy()
-    // The worker's model, and the same model as the chain's second step.
-    expect(within(team).getAllByText('openai/gpt-5-codex')).toHaveLength(2)
+    // The worker's model, and the same model as the chain's second step - which is
+    // an EDITABLE field for the profile this chat uses (T5), so it is a value.
+    expect(within(team).getAllByText('openai/gpt-5-codex')).toHaveLength(1)
+    expect(
+      (within(team).getByRole('textbox', { name: copy.chainModel(2) }) as HTMLInputElement).value,
+    ).toBe('openai/gpt-5-codex')
 
     // One group open at a time: opening `fast` closes `team`.
     await fireEvent.click(group(/^fast/))
@@ -134,16 +138,44 @@ describe('the profiles listed read-only', () => {
   })
 
 
-  it('draws the mode switch and the two apply outcomes, and no editing control', () => {
+  it('draws the mode switch, the chain editors and the two apply outcomes, and nothing else that edits', () => {
     draw()
 
-    // The profile's mode (T3-mode) and its two apply outcomes (T3b) are the only
-    // things that write; the editor itself is T3+.
-    for (const name of [/^Edit$/, /^Save$/, /^Clear$/]) {
+    // The profile's mode (T3-mode), its chains (T5) and its two apply outcomes
+    // (T3b) are the only things that write for the used profile; the profile
+    // editor itself is T3, so no control of it is drawn.
+    for (const name of [/^Edit$/, /^Clear$/]) {
       expect(screen.queryByRole('button', { name }), String(name)).toBeNull()
     }
     expect(screen.queryByRole('combobox')).toBeNull()
-    expect(screen.queryByRole('textbox')).toBeNull()
+    // Every text field on screen is one of the chain editor's own (T5), and the
+    // only Save is that editor's, one per chain of the used profile: the tab
+    // draws no other input and no other write, disabled or not.
+    const chainFields = [1, 2].flatMap((n) => [copy.chainModel(n), copy.chainThinking(n)])
+    const fields = screen.getAllByRole('textbox').map((field) => field.getAttribute('aria-label'))
+    expect(fields.length).toBeGreaterThan(0)
+    for (const label of fields) expect(chainFields).toContain(label)
+    expect(screen.getAllByRole('button', { name: copy.chainSave })).toHaveLength(1)
+    expect(screen.getByRole('radiogroup')).toBeTruthy()
+    expect(screen.getByRole('button', { name: copy.apply.useInChat })).toBeTruthy()
+    expect(screen.getByRole('button', { name: copy.apply.makeDefault })).toBeTruthy()
+    expect(screen.getByText(copy.footer)).toBeTruthy()
+  })
+
+  it('draws no edit control for a profile this chat does not use', async () => {
+    draw()
+
+    // The used profile's group is the only one that may be written (T5): opening
+    // another one draws the same read-only list the whole tab drew before it.
+    await fireEvent.click(group(/^fast/))
+
+    const fast = bodyOf(group(/^fast/))
+    expect(within(fast).queryByRole('textbox')).toBeNull()
+    for (const name of [/^Save$/, /^Cancel$/, /^Edit$/, /^Use in this chat$/, /^Make default$/]) {
+      expect(within(fast).queryByRole('button', { name }), String(name)).toBeNull()
+    }
+    expect(within(fast).queryByRole('combobox')).toBeNull()
+    // The one control outside the chains is still the used profile's mode switch.
     expect(screen.getByRole('radiogroup')).toBeTruthy()
     expect(screen.getByRole('button', { name: copy.apply.useInChat })).toBeTruthy()
     expect(screen.getByRole('button', { name: copy.apply.makeDefault })).toBeTruthy()

@@ -1,19 +1,22 @@
 <script lang="ts">
-  // The Profile tab of one chat (profiles-editor T2c, T3-mode, artboard
+  // The Profile tab of one chat (profiles-editor T2c, T3-mode, T5, artboard
   // 06-profile-tab.html): which profile this chat runs and in whose scope, the
-  // profiles the store defines, the pins of this chat's own worktree - and the
-  // things it WRITES for the used profile: its orchestration mode (the Organic /
-  // Full delegation switch, saved through the shell in the profile itself) and the
-  // terminal's other two outcomes, `Use in this chat` and `Make default`
-  // (profiles-editor T3b). The model pickers and the fallback editor are T4 and
-  // T5: neither is drawn here, not even disabled.
+  // The Profile tab of one chat (profiles-editor T2c, T3-mode, T3b, T5, artboard
+  // 06-profile-tab.html): which profile this chat runs and in whose scope, the
+  // profiles the store defines, the pins of this chat's own worktree - and what it
+  // WRITES for the used profile: its orchestration mode (the Organic / Full
+  // delegation switch, T3-mode), its fallback chains (T5: an agent's own and the
+  // profile-wide `*`), and the terminal's other two outcomes, `Use in this chat`
+  // and `Make default` (T3b). The model pickers are T4: not drawn here, not even
+  // disabled.
   //
   // `Make default` is the channel's own GLOBAL apply, and gentle-pi asks before it
   // writes: its confirmation is drawn verbatim, in the child's own words, with
   // Accept (resend the same profile and mode with its token) and Cancel (send
   // nothing at all). An apply that wrote nothing says so in one short line and
   // never claims a live chat changed its routing (S9, L30); an apply that RAN says
-  // what it did in the child's own notes, drawn verbatim (T3b, L32).
+  // what it did in the child's own notes, drawn verbatim (T3b, L32). A mode or a
+  // chain that could not be saved says that too, one notice per control (T5).
   //
   // The one action it does offer is the terminal (T2d, L21-L22): Settings > Profiles
   // is gone, so the profiles screen the terminal already edits is opened from this
@@ -30,6 +33,7 @@
   import { dispatchIntent, openTerminal } from '../bridge'
   import type {
     ChatProfileApplyConfirmationView as Confirmation,
+    ChatProfileStepView_Serialize as Step,
     ChatProfileView_Serialize as ChatProfile,
     OrchestratorModeView,
   } from '../contract/bindings'
@@ -147,6 +151,21 @@
   }
 
   /**
+   * Saves ONE chain of the used profile (profiles-editor T5, L30-3): the chat the
+   * tab is about, the profile THIS chat uses, the chain's own key (an agent's
+   * name or `*`) and the steps the editor built. The editor already refuses an
+   * unchanged draft and a chain the owner would reject; this guard keeps a
+   * keyboard or a second click from going around a save in flight.
+   */
+  function saveChain(agent: string, steps: Step[]): void {
+    if (chat === null || used === null || view === null || view.saving) return
+    void dispatchIntent({
+      type: 'SaveChatProfileChain',
+      data: { chat_id: chat, profile: used.name, agent, steps },
+    })
+  }
+
+  /**
    * The child's own dialog, as the last answer carried it (L30 ruling 2). Its
    * text is drawn exactly as it arrived: this tab never translates it, and the
    * component that draws it owns the accept/cancel flow.
@@ -202,7 +221,14 @@
             onApply={applyProfile}
           />
         {/if}
-        <ProfileBody {view} {copy} />
+        <ProfileBody
+          {view}
+          {copy}
+          editable={used?.name ?? null}
+          saving={view.saving}
+          chainFailed={view.chain_failed}
+          onSaveChain={saveChain}
+        />
       {/key}
       <!-- The footer line says what this tab writes: the profile's mode and its
            two apply outcomes (T3-mode, T3b). -->

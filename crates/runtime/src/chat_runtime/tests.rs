@@ -12,6 +12,7 @@ use super::{ChatRuntime, Converted, Outcome};
 
 mod apply;
 mod calls;
+mod chain;
 mod fake;
 mod folder;
 mod mark;

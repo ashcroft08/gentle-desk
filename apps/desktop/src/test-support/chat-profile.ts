@@ -80,10 +80,11 @@ export function chatProfile(over: Partial<ChatProfile> = {}): ChatProfile {
       worktree_unresolved: false,
     },
     stores: { profiles: 'read', fallbacks: 'read', pins: 'read' },
-    // Nothing is being saved and nothing failed: the switch is drawn enabled and
-    // the tab says nothing about a save (profiles-editor T3-mode).
+    // Nothing is being saved and nothing failed: the switch and the chain editor
+    // are drawn enabled and the tab says nothing about a save (T3-mode, T5).
     saving: false,
     save_failed: false,
+    chain_failed: false,
     // Nor is anything being applied, nothing failed to apply, no answer of the
     // child's is on screen, and no dialog is waiting for the human
     // (profiles-editor T3b).

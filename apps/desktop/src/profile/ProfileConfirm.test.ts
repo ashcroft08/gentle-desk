@@ -15,7 +15,7 @@
 // The two buttons that start the flow are `ProfileApply.test.ts`.
 import '../test-support/dom-env'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/svelte'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/svelte'
 import { tick } from 'svelte'
 import { writable } from 'svelte/store'
 import type { ChatProfileView_Serialize as ChatProfile } from '../contract/bindings'
@@ -86,6 +86,15 @@ function asking(over: Partial<NonNullable<ChatProfile['apply_confirmation']>> = 
   }
 }
 
+/**
+ * One of the DIALOG's own two buttons. The query stays inside the child's own
+ * dialog because the used profile's chain editors draw a Save and a Cancel of
+ * their own (profiles-editor T5), and the two rules are about the dialog's.
+ */
+function inDialog(name: string): HTMLElement {
+  return within(screen.getByRole('alertdialog')).getByRole('button', { name })
+}
+
 describe("the child's own confirmation", () => {
   it('is drawn exactly as it arrived, with Accept and Cancel', () => {
     const shown = asking()
@@ -94,8 +103,8 @@ describe("the child's own confirmation", () => {
     const dialog = screen.getByRole('alertdialog')
     expect(dialog.textContent).toContain(shown.title)
     expect(dialog.textContent).toContain(shown.message)
-    expect(screen.getByRole('button', { name: copy.confirmAccept })).toBeTruthy()
-    expect(screen.getByRole('button', { name: copy.confirmCancel })).toBeTruthy()
+    expect(inDialog(copy.confirmAccept)).toBeTruthy()
+    expect(inDialog(copy.confirmCancel)).toBeTruthy()
   })
 
   it("never translates the child's text: a Spanish answer stays Spanish", () => {
@@ -124,7 +133,7 @@ describe("the child's own confirmation", () => {
   it('cancelling sends nothing at all and the dialog goes away', async () => {
     draw(chatProfile({ apply_confirmation: asking() }))
 
-    await fireEvent.click(screen.getByRole('button', { name: copy.confirmCancel }))
+    await fireEvent.click(inDialog(copy.confirmCancel))
     await tick()
 
     expect(applies()).toEqual([])
@@ -187,7 +196,7 @@ describe('a state push', () => {
     await tick()
     expect(screen.getByRole('alertdialog')).toBeTruthy()
 
-    await fireEvent.click(screen.getByRole('button', { name: copy.confirmCancel }))
+    await fireEvent.click(inDialog(copy.confirmCancel))
     await tick()
     expect(screen.queryByRole('alertdialog')).toBeNull()
 
@@ -208,7 +217,11 @@ describe('a state push', () => {
 
   it('asks again when the child answers with a NEW token', async () => {
     const source = host(chatProfile({ apply_confirmation: asking({ token: 'first' }) }))
-    await fireEvent.click(await screen.findByRole('button', { name: copy.confirmCancel }))
+    await fireEvent.click(
+      within(await screen.findByRole('alertdialog')).getByRole('button', {
+        name: copy.confirmCancel,
+      }),
+    )
     await tick()
     expect(screen.queryByRole('alertdialog')).toBeNull()
 
