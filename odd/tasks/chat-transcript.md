@@ -333,3 +333,25 @@ turn)"), and any gpui-kit widget.
   total-line count, and says "cut at the bound", because `truncated` is a boolean;
   (d) the footer shows the number the child measured or none - no ticking clock,
   because a ticking number would be one nothing measured.
+- L16 (2026-11-18, the card's review ended blocked, and the CRITICAL it found is
+  fixed and tested): lineage `review-f2fa447e582d2c50` found **R3-001 CRITICAL** -
+  a failed tool call showed the progress it printed instead of the reason it failed,
+  and a payload whose first field was blank rendered no reason at all. Fixed in
+  `d7e5a1e`, and the targeted validator CONFIRMED the fix (`original_criteria.passed:
+  true`). It then rejected the same correction for a regression I introduced: an
+  all-blank payload fell through to JSON. Fixed in `347fa5c`. A second refuter round
+  found a third, real case - `{ output: '', error: { message: ... } }` hid the
+  structured error - fixed in the amended `13`-diff-line correction (the frozen
+  budget was 13, and it fit exactly). The validator then REFUSED to produce a
+  verdict: "the immutable candidate could not be inspected and this check omits the
+  typed inspection field", with `no verdict produced and the correction attempt not
+  consumed`. The contract says a validator that cannot inspect the frozen trees
+  produced no verdict, so nothing was resent and nothing was fabricated: the lineage
+  is BLOCKED awaiting a human decision on validator access, not on the code.
+  What stands, verified: `npx vitest run --maxWorkers=2 src/thread` **112 passed**.
+  The three states a card can be in - done, running, failed - all render, and a
+  failure now shows its REASON first with the progress folded under it.
+  Process note for whoever picks this up: three lineages ended without a receipt
+  today (unknown causality, lens-context budget, validator access). The code kept
+  getting better each time; the receipt machinery did not keep up. Review the
+  remaining slice ONCE, at the end, with one lens.
