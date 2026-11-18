@@ -34,8 +34,11 @@ pub(crate) fn messages(state: &AppState, images: &Images) -> Vec<MessageView> {
         return Vec::new();
     };
     let sent = images.sent(chat.as_str());
-    let start = thread.messages.len().saturating_sub(MESSAGES_PUSHED);
-    thread.messages[start..]
+    // The transcript keeps thinking and tool rows too; a message is what this
+    // slice pushes, so it is the text projection that travels (L5).
+    let thread = thread.messages();
+    let start = thread.len().saturating_sub(MESSAGES_PUSHED);
+    thread[start..]
         .iter()
         .map(|message| MessageView {
             // Cloned, never moved: the state keeps its own copy of every id,

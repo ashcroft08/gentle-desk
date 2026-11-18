@@ -57,8 +57,7 @@ fn single_chat(mut state: AppState, intent: Intent) -> (AppState, Vec<Command>) 
         Intent::CopyMessage(id) => {
             let commands = state
                 .chat
-                .messages
-                .iter()
+                .text_items()
                 .find(|message| message.id == id)
                 .map(|message| Command::CopyToClipboard(message.text.clone()))
                 .into_iter()

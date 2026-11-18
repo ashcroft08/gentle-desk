@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use gentle_core::chat::{ChatMessage, ChatRole, ChatState};
+use gentle_core::chat::{ChatRole, ChatState};
 use gentle_core::i18n::Language;
 
 use crate::chats::{ChatActivity, ChatId, Chats};
@@ -169,13 +169,8 @@ impl AppState {
 ///
 /// Ids stay contiguous — `msg-<index>` — the same scheme the reducer uses when it
 /// opens and closes an assistant message, so the whole thread keeps one id space
-/// whichever chat it belongs to.
+/// whichever chat it belongs to. The row itself is the chat state's to build, so
+/// the scheme lives in one place (`ChatState::push_message`).
 pub(crate) fn push_user_message(state: &mut ChatState, text: &str) {
-    state.messages.push(ChatMessage {
-        id: format!("msg-{}", state.messages.len()),
-        role: ChatRole::User,
-        text: text.to_owned(),
-        streaming: false,
-        error: None,
-    });
+    state.push_message(ChatRole::User, text.to_owned(), false);
 }

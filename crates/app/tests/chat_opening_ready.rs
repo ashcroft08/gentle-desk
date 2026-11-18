@@ -83,7 +83,7 @@ fn a_prompt_is_refused_while_opening_and_accepted_after_the_first_event() {
             .chats
             .state(&chat("a"))
             .expect("chat a")
-            .messages
+            .messages()
             .is_empty(),
         "the prompt is not appended while the child is coming up"
     );
@@ -106,7 +106,7 @@ fn a_prompt_is_refused_while_opening_and_accepted_after_the_first_event() {
             .chats
             .state(&chat("a"))
             .expect("chat a")
-            .messages
+            .messages()
             .len(),
         1
     );

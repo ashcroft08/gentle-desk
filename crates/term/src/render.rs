@@ -35,8 +35,7 @@ impl Renderer {
     pub fn render(&mut self, state: &ChatState) -> Vec<Out> {
         let mut out = Vec::new();
         let Some(message) = state
-            .messages
-            .iter()
+            .text_items()
             .rev()
             .find(|m| m.role == ChatRole::Assistant)
         else {

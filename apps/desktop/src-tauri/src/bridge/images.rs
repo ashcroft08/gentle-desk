@@ -52,7 +52,7 @@ impl AppStateHolder {
             let app = lock(&self.app);
             app.chats
                 .state(chat)
-                .and_then(|thread| thread.messages.last())
+                .and_then(|thread| thread.text_items().next_back())
                 .map(|message| message.id.clone())
         };
         if let Some(message) = message {

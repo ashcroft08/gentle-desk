@@ -221,11 +221,8 @@ fn the_history_of_a_stored_chat_fills_its_own_thread() {
         ],
     );
 
-    let texts: Vec<_> = state
-        .chats
-        .state(&chat("a"))
-        .expect("chat a")
-        .messages
+    let thread = state.chats.state(&chat("a")).expect("chat a").messages();
+    let texts: Vec<_> = thread
         .iter()
         .map(|message| (message.role, message.text.as_str()))
         .collect();
@@ -240,7 +237,7 @@ fn the_history_of_a_stored_chat_fills_its_own_thread() {
         state
             .chats
             .state(&chat("b"))
-            .is_none_or(|b| b.messages.is_empty()),
+            .is_none_or(|b| b.messages().is_empty()),
         "the history belongs to one chat"
     );
 }

@@ -75,7 +75,7 @@ impl Chats {
                 match (response.command.as_str(), &response.outcome) {
                     ("get_messages", Ok(data)) => {
                         let entry = self.entries.entry(chat.clone()).or_default();
-                        entry.state.messages = messages_from_history(language, data);
+                        entry.state.replace_messages(messages_from_history(language, data));
                     }
                     // A reply without a reading (an older child, a failure)
                     // changes nothing: the chip keeps what it knew.

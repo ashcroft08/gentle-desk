@@ -4,7 +4,9 @@
 //! Every test asserts the whole observable state, so a rule that leaks into a
 //! field it should not touch fails here too.
 
-use gentle_core::chat::{reduce_chat, ChatMessage, ChatRole, ChatState, Dialog};
+use gentle_core::chat::{
+    reduce_chat, reduce_chat_at, ChatItem, ChatMessage, ChatRole, ChatState, Dialog,
+};
 use gentle_core::i18n::Language;
 use gentle_core::rpc::{
     decode_line, AssistantMessageEvent, Decoded, RpcEvent, RpcMessage, RpcResponse, UiRequest,
@@ -68,11 +70,42 @@ fn user(id: &str, text: &str) -> ChatMessage {
 }
 
 fn reducer_run(events: Vec<RpcEvent>) -> ChatState {
+    reducer_run_from(ChatState::default(), events)
+}
+
+/// Folds `events` into `state`, with no clock: the state a fixture replays to.
+fn reducer_run_from(state: ChatState, events: Vec<RpcEvent>) -> ChatState {
     events
         .into_iter()
-        .fold(ChatState::default(), |state, event| {
+        .fold(state, |state, event| {
             reduce_chat(Language::En, state, &event)
         })
+}
+
+/// Folds `events` with the wall-clock time each one arrived at, which is how a
+/// card gets its "Done 0.2s".
+fn reducer_run_at(events: Vec<(RpcEvent, Option<u64>)>) -> ChatState {
+    events
+        .into_iter()
+        .fold(ChatState::default(), |state, (event, now_ms)| {
+            reduce_chat_at(Language::En, state, &event, now_ms)
+        })
+}
+
+/// The transcript a state that holds only text has: the text items, in order.
+fn texts(messages: Vec<ChatMessage>) -> Vec<ChatItem> {
+    messages.into_iter().map(ChatItem::Text).collect()
+}
+
+/// Replays a recorded fixture through the real decoder and the real fold.
+fn replay(raw: &str) -> ChatState {
+    raw.lines().filter(|line| !line.trim().is_empty()).fold(
+        ChatState::default(),
+        |state, line| match decode_line(line) {
+            Decoded::Event(event) => reduce_chat(Language::En, state, &event),
+            Decoded::Unknown(raw) => panic!("fixture line decoded as unknown: {raw}"),
+        },
+    )
 }
 
 mod working {
@@ -122,12 +155,12 @@ mod assistant_messages {
     use super::*;
 
     #[test]
-    fn message_start_for_an_assistant_message_opens_an_empty_streaming_message() {
+    fn message_start_for_an_assistant_message_opens_an_empty_streaming_text_item() {
         let state = reduce_chat(Language::En, ChatState::default(), &assistant_start());
         assert_eq!(
             state,
             ChatState {
-                messages: vec![assistant("msg-0", "", true)],
+                items: texts(vec![assistant("msg-0", "", true)]),
                 ..ChatState::default()
             }
         );
@@ -155,7 +188,7 @@ mod assistant_messages {
         assert_eq!(
             state,
             ChatState {
-                messages: vec![assistant("msg-0", "Hello world", true)],
+                items: texts(vec![assistant("msg-0", "Hello world", true)]),
                 ..ChatState::default()
             }
         );
@@ -172,14 +205,14 @@ mod assistant_messages {
     #[test]
     fn text_delta_does_not_append_to_a_user_message() {
         let state = ChatState {
-            messages: vec![user("msg-0", "hi")],
+            items: texts(vec![user("msg-0", "hi")]),
             ..ChatState::default()
         };
         let state = reduce_chat(Language::En, state, &text_delta("orphaned"));
         assert_eq!(
             state,
             ChatState {
-                messages: vec![user("msg-0", "hi")],
+                items: texts(vec![user("msg-0", "hi")]),
                 ..ChatState::default()
             }
         );
@@ -197,7 +230,7 @@ mod assistant_messages {
         assert_eq!(
             state,
             ChatState {
-                messages: vec![assistant("msg-0", "Hello world", false)],
+                items: texts(vec![assistant("msg-0", "Hello world", false)]),
                 ..ChatState::default()
             }
         );
@@ -213,14 +246,14 @@ mod assistant_messages {
         assert_eq!(
             state,
             ChatState {
-                messages: vec![assistant("msg-0", "kept", false)],
+                items: texts(vec![assistant("msg-0", "kept", false)]),
                 ..ChatState::default()
             }
         );
     }
 
     #[test]
-    fn a_tool_only_assistant_message_stays_present_while_streaming() {
+    fn a_tool_only_assistant_message_keeps_its_empty_text_bubble_while_streaming() {
         let state = reducer_run(vec![
             assistant_start(),
             update(AssistantMessageEvent::ToolcallStart {
@@ -232,8 +265,25 @@ mod assistant_messages {
         assert_eq!(
             state,
             ChatState {
-                messages: vec![assistant("msg-0", "", true)],
-                activity: 1,
+                // The tool call takes the place the empty bubble held: the
+                // bubble is still the end of the transcript, because nothing
+                // has been said in it yet.
+                items: vec![
+                    ChatItem::Tool {
+                        id: "tool-call_1".to_owned(),
+                        tool_call_id: "call_1".to_owned(),
+                        tool_name: "bash".to_owned(),
+                        args: None,
+                        partial_result: None,
+                        result: None,
+                        is_error: false,
+                        running: false,
+                        started_at_ms: None,
+                        ended_at_ms: None,
+                        duration_ms: None,
+                    },
+                    ChatItem::Text(assistant("msg-0", "", true)),
+                ],
                 ..ChatState::default()
             }
         );
@@ -256,8 +306,10 @@ mod assistant_messages {
                 {"type": "toolCall", "id": "call_1", "name": "bash", "arguments": {}}
             ])),
         ]);
-        assert!(state.messages.is_empty(), "got {:?}", state.messages);
-        assert_eq!(state.activity, 2);
+        // The turn said nothing, so its empty bubble goes; the tool call it
+        // made is the transcript.
+        assert_eq!(state.items.len(), 1, "got {:?}", state.items);
+        assert!(state.messages().is_empty(), "got {:?}", state.messages());
     }
 
     #[test]
@@ -266,7 +318,7 @@ mod assistant_messages {
             assistant_start(),
             assistant_end(json!([{"type": "text", "text": "   "}])),
         ]);
-        assert!(state.messages.is_empty(), "got {:?}", state.messages);
+        assert!(state.items.is_empty(), "got {:?}", state.items);
     }
 
     #[test]
@@ -276,32 +328,32 @@ mod assistant_messages {
             text_delta("  \n\t"),
             assistant_end_without_content(),
         ]);
-        assert!(state.messages.is_empty(), "got {:?}", state.messages);
+        assert!(state.items.is_empty(), "got {:?}", state.items);
     }
 
     #[test]
     fn a_dropped_message_frees_its_id_so_the_next_message_stays_contiguous() {
         let mut state = ChatState {
-            messages: vec![user("msg-0", "hi")],
+            items: texts(vec![user("msg-0", "hi")]),
             ..ChatState::default()
         };
         state = reduce_chat(Language::En, state, &assistant_start());
-        assert_eq!(state.messages[1].id, "msg-1");
+        assert_eq!(state.messages()[1].id, "msg-1");
 
         state = reduce_chat(Language::En, state, &assistant_end(json!([])));
-        assert_eq!(state.messages, vec![user("msg-0", "hi")]);
+        assert_eq!(state.items, texts(vec![user("msg-0", "hi")]));
 
         state = reduce_chat(Language::En, state, &assistant_start());
-        assert_eq!(state.messages.len(), 2);
-        assert_eq!(state.messages[1].id, "msg-1");
-        assert_eq!(state.messages[1].text, "");
-        assert!(state.messages[1].streaming);
+        assert_eq!(state.messages().len(), 2);
+        assert_eq!(state.messages()[1].id, "msg-1");
+        assert_eq!(state.messages()[1].text, "");
+        assert!(state.messages()[1].streaming);
     }
 
     #[test]
     fn message_end_for_a_non_assistant_message_is_a_no_op() {
         let before = ChatState {
-            messages: vec![assistant("msg-0", "text", true)],
+            items: texts(vec![assistant("msg-0", "text", true)]),
             ..ChatState::default()
         };
         let event = RpcEvent::MessageEnd(RpcMessage {
@@ -314,7 +366,7 @@ mod assistant_messages {
     #[test]
     fn message_end_with_no_open_assistant_message_is_a_no_op() {
         let before = ChatState {
-            messages: vec![user("msg-0", "hi")],
+            items: texts(vec![user("msg-0", "hi")]),
             ..ChatState::default()
         };
         assert_eq!(
@@ -328,27 +380,164 @@ mod assistant_messages {
     }
 }
 
+/// The counter every thinking / toolcall / tool_execution event used to add to
+/// now only counts what the transcript does not keep (L4): an event that lands
+/// in an item is drawn from the item, so counting it too would be a second
+/// truth.
 mod activity {
     use super::*;
 
     fn before() -> ChatState {
         ChatState {
-            messages: vec![assistant("msg-0", "", true)],
+            items: texts(vec![assistant("msg-0", "", true)]),
             ..ChatState::default()
         }
     }
 
+    fn assert_does_not_bump(before: &ChatState, event: RpcEvent) {
+        let after = reduce_chat(Language::En, before.clone(), &event);
+        assert_eq!(after.activity, before.activity, "{event:?}");
+    }
+
     fn assert_bumps(before: &ChatState, event: RpcEvent) {
         let after = reduce_chat(Language::En, before.clone(), &event);
-        assert_eq!(after.activity, before.activity + 1);
-        assert_eq!(after.messages, before.messages);
+        assert_eq!(after.activity, before.activity + 1, "{event:?}");
+        assert_eq!(after.items, before.items, "{event:?}");
     }
 
     #[test]
-    fn thinking_and_toolcall_deltas_each_add_one() {
+    fn the_thinking_events_that_reach_the_transcript_do_not_add_to_activity() {
+        let before = before();
+        let after_start = reduce_chat(
+            Language::En,
+            before,
+            &update(AssistantMessageEvent::ThinkingStart { content_index: 0 }),
+        );
+        assert_eq!(after_start.activity, 0);
+        let after_delta = reduce_chat(
+            Language::En,
+            after_start,
+            &update(AssistantMessageEvent::ThinkingDelta {
+                content_index: 0,
+                delta: "...".to_owned(),
+            }),
+        );
+        assert_eq!(after_delta.activity, 0);
+        let after_end = reduce_chat(
+            Language::En,
+            after_delta,
+            &update(AssistantMessageEvent::ThinkingEnd {
+                content_index: 0,
+                content: "...".to_owned(),
+            }),
+        );
+        assert_eq!(after_end.activity, 0);
+    }
+
+    #[test]
+    fn the_toolcall_events_that_reach_a_tool_item_do_not_add_to_activity() {
+        let before = before();
+        let after_start = reduce_chat(
+            Language::En,
+            before,
+            &update(AssistantMessageEvent::ToolcallStart {
+                content_index: 1,
+                id: "call_1".to_owned(),
+                tool_name: "bash".to_owned(),
+            }),
+        );
+        assert_eq!(after_start.activity, 0);
+        let after_end = reduce_chat(
+            Language::En,
+            after_start,
+            &update(AssistantMessageEvent::ToolcallEnd {
+                content_index: 1,
+                tool_call: json!({"id": "call_1", "name": "bash", "arguments": {"command": "ls"}}),
+            }),
+        );
+        assert_eq!(after_end.activity, 0);
+        assert!(
+            matches!(after_end.items.first(), Some(ChatItem::Tool { .. })),
+            "the arguments landed in the tool item: {:?}",
+            after_end.items
+        );
+    }
+
+    /// The arguments arrive as text that the tool item has no place for (the
+    /// item keeps the object `toolcall_end`/`tool_execution_start` carries), so
+    /// a toolcall delta is still only counted, exactly as it was before L4.
+    #[test]
+    fn a_toolcall_delta_lands_nowhere_and_still_adds_one() {
+        let before = before();
+        assert_bumps(
+            &before,
+            update(AssistantMessageEvent::ToolcallDelta {
+                content_index: 1,
+                delta: "{}".to_owned(),
+            }),
+        );
+    }
+
+    #[test]
+    fn tool_execution_events_that_reach_a_tool_item_do_not_add_to_activity() {
+        let before = before();
+        let started = reduce_chat(
+            Language::En,
+            before,
+            &RpcEvent::ToolExecutionStart {
+                tool_call_id: "call_1".to_owned(),
+                tool_name: "bash".to_owned(),
+                args: Some(json!({"command": "ls"})),
+            },
+        );
+        assert_eq!(started.activity, 0);
+        let updated = reduce_chat(
+            Language::En,
+            started,
+            &RpcEvent::ToolExecutionUpdate {
+                tool_call_id: "call_1".to_owned(),
+                tool_name: "bash".to_owned(),
+                args: None,
+                partial_result: Some(json!({"content": [{"type": "text", "text": "a\n"}]})),
+            },
+        );
+        assert_eq!(updated.activity, 0);
+        let ended = reduce_chat(
+            Language::En,
+            updated,
+            &RpcEvent::ToolExecutionEnd {
+                tool_call_id: "call_1".to_owned(),
+                tool_name: "bash".to_owned(),
+                result: Some(json!({"content": [{"type": "text", "text": "a\n"}]})),
+                is_error: false,
+            },
+        );
+        assert_eq!(ended.activity, 0);
+        assert_eq!(ended.items.len(), 2, "the tool item, then the bubble");
+    }
+
+    /// An event naming a tool call the transcript never heard of still only
+    /// counts: nothing is invented for it.
+    #[test]
+    fn a_tool_execution_end_for_an_unknown_call_still_adds_one() {
+        let before = before();
+        assert_bumps(
+            &before,
+            RpcEvent::ToolExecutionEnd {
+                tool_call_id: "call_gone".to_owned(),
+                tool_name: "bash".to_owned(),
+                result: Some(json!({})),
+                is_error: false,
+            },
+        );
+    }
+
+    /// A reasoning delta or end with no open block reaches no row, so it keeps
+    /// counting exactly as it did before the transcript kept thinking.
+    #[test]
+    fn thinking_events_with_no_open_block_still_add_one() {
         let before = before();
         for event in [
-            AssistantMessageEvent::ThinkingStart { content_index: 0 },
             AssistantMessageEvent::ThinkingDelta {
                 content_index: 0,
                 delta: "...".to_owned(),
@@ -357,49 +546,9 @@ mod activity {
                 content_index: 0,
                 content: "...".to_owned(),
             },
-            AssistantMessageEvent::ToolcallStart {
-                content_index: 1,
-                id: "call_1".to_owned(),
-                tool_name: "bash".to_owned(),
-            },
-            AssistantMessageEvent::ToolcallDelta {
-                content_index: 1,
-                delta: "{}".to_owned(),
-            },
-            AssistantMessageEvent::ToolcallEnd {
-                content_index: 1,
-                tool_call: json!({}),
-            },
         ] {
             assert_bumps(&before, update(event));
         }
-    }
-
-    #[test]
-    fn tool_execution_events_each_add_one() {
-        let before = before();
-        assert_bumps(
-            &before,
-            RpcEvent::ToolExecutionStart {
-                tool_call_id: "call_1".to_owned(),
-                tool_name: "bash".to_owned(),
-            },
-        );
-        assert_bumps(
-            &before,
-            RpcEvent::ToolExecutionUpdate {
-                tool_call_id: "call_1".to_owned(),
-                tool_name: "bash".to_owned(),
-            },
-        );
-        assert_bumps(
-            &before,
-            RpcEvent::ToolExecutionEnd {
-                tool_call_id: "call_1".to_owned(),
-                tool_name: "bash".to_owned(),
-                is_error: false,
-            },
-        );
     }
 
     #[test]
@@ -412,37 +561,442 @@ mod activity {
                 content: "done".to_owned(),
             },
         ] {
-            assert_eq!(
-                reduce_chat(Language::En, before.clone(), &update(event)),
-                before
-            );
+            assert_does_not_bump(&before, update(event));
+        }
+        assert_eq!(
+            reduce_chat(
+                Language::En,
+                before.clone(),
+                &update(AssistantMessageEvent::TextStart { content_index: 0 })
+            ),
+            before
+        );
+    }
+}
+
+/// The one ordered transcript (L4): the thinking, the tool calls and the text
+/// in the order the child produced them, each row carrying what its own card is
+/// drawn from. `ChatItem::Text` keeps the message shape and its ids, so nothing
+/// that only knows messages has to learn a new one.
+mod transcript {
+    use super::*;
+
+    /// A thinking block the child finished, with no clock to time it by.
+    fn thought(id: &str, text: &str) -> ChatItem {
+        ChatItem::Thinking {
+            id: id.to_owned(),
+            text: text.to_owned(),
+            streaming: false,
+            started_at_ms: None,
+            ended_at_ms: None,
+            duration_ms: None,
         }
     }
 
+    /// The turn `fixtures/prompt-turn.jsonl` records, now that nothing about it
+    /// is thrown away: the thinking, the tool call with its command AND its
+    /// result, and the final text, in the order the child sent them.
     #[test]
-    fn activity_accumulates_across_events() {
-        let state = reducer_run(vec![
-            RpcEvent::ToolExecutionStart {
-                tool_call_id: "call_1".to_owned(),
-                tool_name: "bash".to_owned(),
-            },
-            RpcEvent::ToolExecutionEnd {
-                tool_call_id: "call_1".to_owned(),
-                tool_name: "bash".to_owned(),
-                is_error: true,
-            },
-            update(AssistantMessageEvent::ThinkingStart { content_index: 0 }),
+    fn a_prompt_turn_keeps_the_thinking_the_tool_call_and_the_final_text_in_order() {
+        let state = replay(include_str!("fixtures/prompt-turn.jsonl"));
+        assert_eq!(
+            state.items,
+            vec![
+                thought("think-0", "Let me check the file first."),
+                ChatItem::Tool {
+                    id: "tool-call_abc123".to_owned(),
+                    tool_call_id: "call_abc123".to_owned(),
+                    tool_name: "bash".to_owned(),
+                    args: Some(json!({"command": "cat README.md"})),
+                    partial_result: Some(json!({
+                        "content": [{"type": "text", "text": "# Gentle Shell\n"}],
+                        "details": {}
+                    })),
+                    result: Some(json!({
+                        "content": [{"type": "text", "text": "# Gentle Shell\n"}]
+                    })),
+                    is_error: false,
+                    running: false,
+                    started_at_ms: None,
+                    ended_at_ms: None,
+                    duration_ms: None,
+                },
+                ChatItem::Text(assistant(
+                    "msg-0",
+                    "The README describes Gentle Shell.",
+                    false
+                )),
+            ]
+        );
+        // A reader that only knows messages still sees exactly the text.
+        assert_eq!(
+            state.messages(),
+            vec![assistant(
+                "msg-0",
+                "The README describes Gentle Shell.",
+                false
+            )]
+        );
+        // One id scheme per shape, all of them deterministic (L4).
+        assert_eq!(
+            state.items.iter().map(ChatItem::id).collect::<Vec<_>>(),
+            vec!["think-0", "tool-call_abc123", "msg-0"]
+        );
+        assert!(!state.working);
+        assert!(state.pending_dialogs.is_empty());
+        assert_eq!(state.last_error, None);
+        // The toolcall delta's arguments text lands in no item (the tool item
+        // keeps the object), so it is the one event the fixture still counts.
+        assert_eq!(state.activity, 1);
+    }
+
+    /// The projection the three readers of the old `messages` field take is
+    /// exactly the text rows, in order, with the ids they always had: thinking
+    /// and tool rows never shift an id.
+    #[test]
+    fn the_text_projection_holds_exactly_the_messages_the_state_used_to_keep() {
+        let mut state = ChatState::default();
+        state.push_message(ChatRole::User, "hola".to_owned(), false);
+        state = reducer_run_from(
+            state,
+            vec![
+                assistant_start(),
+                update(AssistantMessageEvent::ThinkingStart { content_index: 0 }),
+                update(AssistantMessageEvent::ThinkingEnd {
+                    content_index: 0,
+                    content: "mulling it over".to_owned(),
+                }),
+                update(AssistantMessageEvent::ToolcallStart {
+                    content_index: 1,
+                    id: "call_1".to_owned(),
+                    tool_name: "bash".to_owned(),
+                }),
+                text_delta("Hola."),
+                assistant_end(json!([{"type": "text", "text": "Hola."}])),
+            ],
+        );
+        assert_eq!(state.items.len(), 4, "got {:?}", state.items);
+        assert_eq!(
+            state.messages(),
+            vec![user("msg-0", "hola"), assistant("msg-1", "Hola.", false)]
+        );
+    }
+
+    /// A message the shell appends takes the next text id, whatever rows the
+    /// transcript already holds.
+    #[test]
+    fn a_message_pushed_by_the_shell_takes_the_next_text_id() {
+        let mut state = ChatState {
+            items: texts(vec![user("msg-0", "hola")]),
+            ..ChatState::default()
+        };
+        state.items.push(thought("think-0", "hmm"));
+        state.push_message(ChatRole::User, "otra".to_owned(), false);
+        assert_eq!(
+            state.messages(),
+            vec![user("msg-0", "hola"), user("msg-1", "otra")]
+        );
+    }
+
+    /// A reopened session's history replaces the whole transcript: it is text,
+    /// and its ids are the ones `messages_from_history` assigned.
+    #[test]
+    fn a_history_reply_replaces_the_whole_transcript() {
+        let mut state = ChatState::default();
+        state.items.push(thought("think-0", "gone"));
+        state.replace_messages(vec![
+            user("msg-0", "stored"),
+            assistant("msg-1", "kept", false),
         ]);
-        assert_eq!(state.activity, 3);
-        assert!(state.messages.is_empty());
+        assert_eq!(
+            state.items,
+            texts(vec![user("msg-0", "stored"), assistant("msg-1", "kept", false)])
+        );
+    }
+
+    /// A thinking block records when it started, when it ended and how long it
+    /// took: the "Thought 1.2s" T3 draws.
+    #[test]
+    fn a_thinking_block_records_its_start_its_end_and_its_duration() {
+        let state = reducer_run_at(vec![
+            (assistant_start(), Some(1_000)),
+            (
+                update(AssistantMessageEvent::ThinkingStart { content_index: 0 }),
+                Some(1_000),
+            ),
+            (
+                update(AssistantMessageEvent::ThinkingDelta {
+                    content_index: 0,
+                    delta: "Let me look.".to_owned(),
+                }),
+                Some(1_100),
+            ),
+            (
+                update(AssistantMessageEvent::ThinkingEnd {
+                    content_index: 0,
+                    content: "Let me look.".to_owned(),
+                }),
+                Some(1_200),
+            ),
+        ]);
+        assert_eq!(
+            state.items,
+            vec![
+                ChatItem::Thinking {
+                    id: "think-0".to_owned(),
+                    text: "Let me look.".to_owned(),
+                    streaming: false,
+                    started_at_ms: Some(1_000),
+                    ended_at_ms: Some(1_200),
+                    duration_ms: Some(200),
+                },
+                ChatItem::Text(assistant("msg-0", "", true)),
+            ]
+        );
+    }
+
+    /// No clock, no duration: `prompt-turn.jsonl` carries no timestamps, and a
+    /// card must not invent the "Done 0.2s" it has no evidence for.
+    #[test]
+    fn with_no_clock_a_thinking_block_records_no_time() {
+        let state = reducer_run(vec![
+            assistant_start(),
+            update(AssistantMessageEvent::ThinkingStart { content_index: 0 }),
+            update(AssistantMessageEvent::ThinkingEnd {
+                content_index: 0,
+                content: "Let me look.".to_owned(),
+            }),
+        ]);
+        assert_eq!(state.items[0], thought("think-0", "Let me look."));
+    }
+
+    /// The "Done 0.2s" of a tool card: the execution's own start and end, and
+    /// the two payloads the child sent while it ran.
+    #[test]
+    fn a_tool_execution_records_its_start_its_end_and_its_duration() {
+        let state = reducer_run_at(vec![
+            (assistant_start(), Some(5_000)),
+            (
+                update(AssistantMessageEvent::ToolcallStart {
+                    content_index: 0,
+                    id: "call_1".to_owned(),
+                    tool_name: "bash".to_owned(),
+                }),
+                Some(5_000),
+            ),
+            (
+                update(AssistantMessageEvent::ToolcallEnd {
+                    content_index: 0,
+                    tool_call: json!({"id": "call_1", "name": "bash", "arguments": {"command": "ls"}}),
+                }),
+                Some(5_000),
+            ),
+            (
+                RpcEvent::ToolExecutionStart {
+                    tool_call_id: "call_1".to_owned(),
+                    tool_name: "bash".to_owned(),
+                    args: Some(json!({"command": "ls"})),
+                },
+                Some(5_000),
+            ),
+            (
+                RpcEvent::ToolExecutionUpdate {
+                    tool_call_id: "call_1".to_owned(),
+                    tool_name: "bash".to_owned(),
+                    args: None,
+                    partial_result: Some(json!({"content": [{"type": "text", "text": "a\n"}]})),
+                },
+                Some(5_100),
+            ),
+            (
+                RpcEvent::ToolExecutionEnd {
+                    tool_call_id: "call_1".to_owned(),
+                    tool_name: "bash".to_owned(),
+                    result: Some(json!({"content": [{"type": "text", "text": "a\nb\n"}]})),
+                    is_error: false,
+                },
+                Some(5_200),
+            ),
+        ]);
+        assert_eq!(
+            state.items.first(),
+            Some(&ChatItem::Tool {
+                id: "tool-call_1".to_owned(),
+                tool_call_id: "call_1".to_owned(),
+                tool_name: "bash".to_owned(),
+                args: Some(json!({"command": "ls"})),
+                partial_result: Some(json!({"content": [{"type": "text", "text": "a\n"}]})),
+                result: Some(json!({"content": [{"type": "text", "text": "a\nb\n"}]})),
+                is_error: false,
+                running: false,
+                started_at_ms: Some(5_000),
+                ended_at_ms: Some(5_200),
+                duration_ms: Some(200),
+            })
+        );
+    }
+
+    /// The "Running 4.0s" of the same card: started, not ended, no duration to
+    /// claim yet.
+    #[test]
+    fn a_tool_call_that_has_not_ended_is_still_running_with_no_duration() {
+        let state = reducer_run_at(vec![
+            (assistant_start(), Some(9_000)),
+            (
+                RpcEvent::ToolExecutionStart {
+                    tool_call_id: "call_1".to_owned(),
+                    tool_name: "bash".to_owned(),
+                    args: Some(json!({"command": "sleep 4"})),
+                },
+                Some(9_000),
+            ),
+        ]);
+        match &state.items[0] {
+            ChatItem::Tool {
+                running,
+                started_at_ms,
+                ended_at_ms,
+                duration_ms,
+                result,
+                ..
+            } => {
+                assert!(running);
+                assert_eq!(*started_at_ms, Some(9_000));
+                assert_eq!(*ended_at_ms, None);
+                assert_eq!(*duration_ms, None);
+                assert_eq!(*result, None);
+            }
+            other => panic!("unexpected {other:?}"),
+        }
+    }
+
+    /// The bubble `message_start` opens is empty, so it says nothing about where
+    /// it belongs: the thinking and the tool call of the same message take its
+    /// place, and the text that follows stays last.
+    #[test]
+    fn thinking_and_tool_calls_take_the_place_of_the_empty_bubble() {
+        let state = reducer_run(vec![
+            assistant_start(),
+            update(AssistantMessageEvent::ThinkingStart { content_index: 0 }),
+            update(AssistantMessageEvent::ThinkingEnd {
+                content_index: 0,
+                content: "hmm".to_owned(),
+            }),
+            update(AssistantMessageEvent::ToolcallStart {
+                content_index: 1,
+                id: "call_1".to_owned(),
+                tool_name: "bash".to_owned(),
+            }),
+            text_delta("done"),
+        ]);
+        assert_eq!(state.items.len(), 3, "got {:?}", state.items);
+        assert_eq!(state.items[0], thought("think-0", "hmm"));
+        assert!(matches!(state.items[1], ChatItem::Tool { .. }));
+        assert_eq!(state.items[2], ChatItem::Text(assistant("msg-0", "done", true)));
+    }
+
+    /// Each reasoning block of a turn is its own row, and the ids count them.
+    #[test]
+    fn a_second_reasoning_block_gets_the_next_id() {
+        let state = reducer_run(vec![
+            assistant_start(),
+            update(AssistantMessageEvent::ThinkingStart { content_index: 0 }),
+            update(AssistantMessageEvent::ThinkingEnd {
+                content_index: 0,
+                content: "first".to_owned(),
+            }),
+            update(AssistantMessageEvent::ThinkingStart { content_index: 1 }),
+            update(AssistantMessageEvent::ThinkingEnd {
+                content_index: 1,
+                content: "second".to_owned(),
+            }),
+        ]);
+        assert_eq!(
+            state.items,
+            vec![
+                thought("think-0", "first"),
+                thought("think-1", "second"),
+                ChatItem::Text(assistant("msg-0", "", true)),
+            ]
+        );
+    }
+
+    /// Text that arrived before a tool call keeps its place: the bubble has
+    /// something to say by then, so the tool call goes after it.
+    #[test]
+    fn text_that_arrived_before_a_tool_call_keeps_its_place() {        let state = reducer_run(vec![
+            assistant_start(),
+            text_delta("Looking."),
+            update(AssistantMessageEvent::ToolcallStart {
+                content_index: 1,
+                id: "call_1".to_owned(),
+                tool_name: "bash".to_owned(),
+            }),
+        ]);
+        assert_eq!(
+            state.items,
+            vec![
+                ChatItem::Text(assistant("msg-0", "Looking.", true)),
+                ChatItem::Tool {
+                    id: "tool-call_1".to_owned(),
+                    tool_call_id: "call_1".to_owned(),
+                    tool_name: "bash".to_owned(),
+                    args: None,
+                    partial_result: None,
+                    result: None,
+                    is_error: false,
+                    running: false,
+                    started_at_ms: None,
+                    ended_at_ms: None,
+                    duration_ms: None,
+                },
+            ]
+        );
+    }
+    /// Text the child said before a tool call stays where it was said, and
+    /// `message_end` closes it from there: a tool row after it must not leave the
+    /// bubble streaming forever.
+    #[test]
+    fn message_end_closes_text_that_a_tool_call_followed() {
+        let state = reducer_run(vec![
+            assistant_start(),
+            text_delta("Let me look."),
+            update(AssistantMessageEvent::ToolcallStart {
+                content_index: 1,
+                id: "call_1".to_owned(),
+                tool_name: "bash".to_owned(),
+            }),
+            assistant_end(json!([
+                {"type": "text", "text": "Let me look."},
+                {"type": "toolCall", "id": "call_1", "name": "bash", "arguments": {"command": "ls"}}
+            ])),
+        ]);
+        assert_eq!(
+            state.items,
+            vec![
+                ChatItem::Text(assistant("msg-0", "Let me look.", false)),
+                ChatItem::Tool {
+                    id: "tool-call_1".to_owned(),
+                    tool_call_id: "call_1".to_owned(),
+                    tool_name: "bash".to_owned(),
+                    args: None,
+                    partial_result: None,
+                    result: None,
+                    is_error: false,
+                    running: false,
+                    started_at_ms: None,
+                    ended_at_ms: None,
+                    duration_ms: None,
+                },
+            ]
+        );
     }
 }
 
 mod dialogs {
     use super::*;
 
-    fn select() -> UiRequest {
-        UiRequest::Select {
+    fn select() -> UiRequest {        UiRequest::Select {
             id: "dlg-1".to_owned(),
             title: "Allow?".to_owned(),
             options: vec!["Allow".to_owned(), "Block".to_owned()],
@@ -583,7 +1137,7 @@ mod errors_and_unhandled_events {
     #[test]
     fn extension_error_sets_last_error_and_touches_nothing_else() {
         let before = ChatState {
-            messages: vec![assistant("msg-0", "", true)],
+            items: texts(vec![assistant("msg-0", "", true)]),
             working: true,
             activity: 4,
             ..ChatState::default()
@@ -600,7 +1154,7 @@ mod errors_and_unhandled_events {
         assert_eq!(
             state,
             ChatState {
-                messages: vec![assistant("msg-0", "", true)],
+                items: texts(vec![assistant("msg-0", "", true)]),
                 working: true,
                 activity: 4,
                 last_error: Some(ERROR.to_owned()),
@@ -612,7 +1166,7 @@ mod errors_and_unhandled_events {
     #[test]
     fn turn_events_and_command_responses_are_no_ops() {
         let before = ChatState {
-            messages: vec![assistant("msg-0", "hi", false)],
+            items: texts(vec![assistant("msg-0", "hi", false)]),
             working: true,
             activity: 2,
             ..ChatState::default()
@@ -637,43 +1191,33 @@ mod errors_and_unhandled_events {
 mod fixtures {
     use super::*;
 
-    fn replay(raw: &str) -> ChatState {
-        raw.lines().filter(|line| !line.trim().is_empty()).fold(
-            ChatState::default(),
-            |state, line| match decode_line(line) {
-                Decoded::Event(event) => reduce_chat(Language::En, state, &event),
-                Decoded::Unknown(raw) => panic!("fixture line decoded as unknown: {raw}"),
-            },
-        )
-    }
-
     #[test]
-    fn a_prompt_turn_with_thinking_a_tool_call_and_streamed_text_ends_with_only_the_final_text() {
-        let state = replay(include_str!("fixtures/prompt-turn.jsonl"));
-        assert_eq!(
-            state.messages,
-            vec![assistant(
-                "msg-0",
-                "The README describes Gentle Shell.",
-                false
-            )]
-        );
-        assert!(!state.working);
-        assert!(state.pending_dialogs.is_empty());
-        assert_eq!(state.last_error, None);
-        // 3 thinking + 3 toolcall + 3 tool_execution events.
-        assert_eq!(state.activity, 9);
-    }
-
-    #[test]
-    fn a_turn_whose_assistant_message_only_calls_a_tool_leaves_no_empty_message() {
+    fn a_turn_whose_assistant_message_only_calls_a_tool_keeps_the_tool_call_and_no_empty_message() {
         let state = replay(include_str!("fixtures/tool-only-message.jsonl"));
-        assert!(state.messages.is_empty(), "got {:?}", state.messages);
+        assert_eq!(
+            state.items,
+            vec![ChatItem::Tool {
+                id: "tool-call_1".to_owned(),
+                tool_call_id: "call_1".to_owned(),
+                tool_name: "bash".to_owned(),
+                // `toolcall_end` carried the arguments; this fixture's
+                // tool_execution events carry neither args nor a result.
+                args: Some(json!({"command": "ls"})),
+                partial_result: None,
+                result: None,
+                is_error: false,
+                running: false,
+                started_at_ms: None,
+                ended_at_ms: None,
+                duration_ms: None,
+            }]
+        );
+        assert!(state.messages().is_empty(), "got {:?}", state.messages());
         assert!(!state.working);
         assert!(state.pending_dialogs.is_empty());
         assert_eq!(state.last_error, None);
-        // 3 toolcall + 2 tool_execution events.
-        assert_eq!(state.activity, 5);
+        // One toolcall delta lands in no item, so it is the whole count.
+        assert_eq!(state.activity, 1);
     }
 
     #[test]
@@ -688,7 +1232,10 @@ mod fixtures {
                 options: vec!["Allow".to_owned(), "Block".to_owned()],
             }]
         );
-        assert_eq!(state.messages, vec![assistant("msg-0", "", true)]);
+        assert_eq!(
+            state.items,
+            texts(vec![assistant("msg-0", "", true)])
+        );
         assert_eq!(state.activity, 0);
         assert_eq!(state.last_error, None);
     }
@@ -701,7 +1248,7 @@ mod fixtures {
             Some("Cannot read properties of undefined (reading 'foo')".to_owned())
         );
         assert!(!state.working);
-        assert!(state.messages.is_empty());
+        assert!(state.items.is_empty());
         assert!(state.pending_dialogs.is_empty());
     }
 }
@@ -731,7 +1278,7 @@ mod model_errors {
         ]);
         let mut expected = assistant("msg-0", "Fable 5.1 requires usage credits.", false);
         expected.error = Some("Claude quota exceeded — rate limit".to_owned());
-        assert_eq!(state.messages, vec![expected]);
+        assert_eq!(state.messages(), vec![expected]);
     }
 
     #[test]
@@ -739,7 +1286,7 @@ mod model_errors {
         let state = reducer_run(vec![assistant_start(), failed_end(json!([]))]);
         let mut expected = assistant("msg-0", "", false);
         expected.error = Some("Claude quota exceeded — rate limit".to_owned());
-        assert_eq!(state.messages, vec![expected]);
+        assert_eq!(state.messages(), vec![expected]);
     }
 
     #[test]
@@ -749,7 +1296,7 @@ mod model_errors {
             raw: json!({"role": "assistant", "content": [{"type": "text", "text": "hi"}], "stopReason": "stop"}),
         });
         let state = reducer_run(vec![assistant_start(), end]);
-        assert_eq!(state.messages, vec![assistant("msg-0", "hi", false)]);
+        assert_eq!(state.messages(), vec![assistant("msg-0", "hi", false)]);
     }
 
     #[test]
@@ -760,7 +1307,7 @@ mod model_errors {
         });
         let state = reducer_run(vec![assistant_start(), end]);
         assert_eq!(
-            state.messages[0].error.as_deref(),
+            state.messages()[0].error.as_deref(),
             Some("unknown model error")
         );
     }
@@ -777,7 +1324,7 @@ mod model_errors {
         let opened = reduce_chat(Language::Es, ChatState::default(), &assistant_start());
         let state = reduce_chat(Language::Es, opened, &end);
         assert_eq!(
-            state.messages[0].error.as_deref(),
+            state.messages()[0].error.as_deref(),
             Some("error desconocido del modelo")
         );
     }

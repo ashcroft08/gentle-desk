@@ -110,14 +110,14 @@ fn a_prompt_goes_to_the_foreground_chat_only() {
     );
     assert_eq!(effects.commands, Vec::new(), "not the single-chat command");
     let sent = state.chats.state(&chat("b")).expect("chat b");
-    assert_eq!(sent.messages.len(), 1);
-    assert_eq!(sent.messages[0].text, "hola");
-    assert_eq!(sent.messages[0].id, "msg-0");
+    assert_eq!(sent.messages().len(), 1);
+    assert_eq!(sent.messages()[0].text, "hola");
+    assert_eq!(sent.messages()[0].id, "msg-0");
     assert!(
         state
             .chats
             .state(&chat("a"))
-            .is_none_or(|a| a.messages.is_empty()),
+            .is_none_or(|a| a.messages().is_empty()),
         "the chat the user left receives nothing"
     );
 }
@@ -136,7 +136,7 @@ fn a_prompt_is_refused_while_that_chat_is_working() {
     let (state, effects) = step(state, Input::Intent(Intent::SendPrompt("otra".into())));
 
     assert_eq!(effects.chat_commands, Vec::new());
-    let messages = &state.chats.state(&chat("a")).expect("chat a").messages;
+    let messages = &state.chats.state(&chat("a")).expect("chat a").messages();
     assert!(messages.is_empty());
 }
 
@@ -151,7 +151,7 @@ fn a_blank_prompt_does_nothing() {
         .chats
         .state(&chat("a"))
         .expect("chat a")
-        .messages
+        .messages()
         .is_empty());
 }
 
@@ -170,7 +170,7 @@ fn with_no_foreground_chat_the_single_chat_path_still_answers() {
             message: "hola".into()
         })]
     );
-    assert_eq!(state.chat.messages.len(), 1);
+    assert_eq!(state.chat.messages().len(), 1);
     assert!(state.chats.is_empty());
 }
 

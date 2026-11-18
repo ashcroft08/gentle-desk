@@ -55,7 +55,7 @@ turn)"), and any gpui-kit widget.
 
 ## Tasks
 
-- [ ] T1 (S1, S5) core: model transcript items and stop discarding. Add a typed
+- [x] T1 (S1, S5) core: model transcript items and stop discarding. Add a typed
   item (tool call with name, args, result, `isError`, start/end time and duration;
   thinking with its text and duration) beside the existing text item, fold the
   `tool_execution_*` and `thinking_*` events into it instead of the activity
@@ -126,3 +126,26 @@ turn)"), and any gpui-kit widget.
   pure method on `ChatState` in `crates/gentle-core/src/chat/`, called from
   `view.rs`, so `MessageView` and `apps/desktop/src/contract/bindings.ts` stay
   byte-identical and the web needs no change and no regeneration.
+- L6 (2026-11-18, T1 done): the slice landed as 23 files, 1271 insertions and 251
+  deletions, in two commits: the RPC decode, then the one-transcript model with
+  its readers. Receipts from `cargo test --workspace`: **126 targets, 1688 passed,
+  0 failed**; `cargo check --workspace` clean; `cargo test -p gentle-core` 308
+  passed; `cargo test -p gentle-app` 240 passed. The web was not touched and the
+  bindings drift guard proves `bindings.ts` is byte-identical.
+  REDs seen, in order: `E0559` (the three `ToolExecution*` variants had no
+  `args`/`partial_result`/`result` field), then `E0432`/`E0560`/`E0599` (no
+  `ChatItem`, no `items`, no `messages()`), then `E0615` at 28 sites when the app
+  tests still read the removed field. GREEN after each.
+  Decisions this document did not settle, now pinned by tests and doc comments:
+  (1) `activity` counts only the events that land in NO row, so the prompt-turn
+  fixture's activity is 1 rather than 9; (2) `message_start`'s empty bubble is
+  never displaced while empty, so streaming text stays the last row; (3) a tool
+  row's timings are the EXECUTION's (`tool_execution_start` -> `end`), and both
+  `partial_result` and `result` are kept; (4) `message_end` closes the streaming
+  text row wherever it sits, so text said before a tool call stops streaming;
+  (5) rows are created only by `toolcall_start`/`tool_execution_start`, and an
+  update or end naming an unknown call only counts; (6) history still loads as
+  text, converted in one place by `replace_messages`.
+  Known untested edge, recorded instead of hidden: a `toolcall_end` with no id
+  falls back to the last tool row without args or result - pi always sends the id,
+  so no fixture covers it.
