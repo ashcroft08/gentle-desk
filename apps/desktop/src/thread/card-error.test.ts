@@ -61,3 +61,10 @@ describe('a payload with no text at all', () => {
     expect(body.lines).toEqual([])
   })
 })
+describe('a payload with blank text AND other data', () => {
+  it('keeps the data instead of hiding it behind an empty body', () => {
+    // R3-001 round 3: a blank `output` must not mask a structured error.
+    expect(textOf({ output: '', error: { message: 'permission denied' } })).toContain('denied')
+    expect(textOf({ output: '', exitCode: 1 })).toContain('exitCode')
+  })
+})

@@ -247,7 +247,11 @@ export function textOf(value: unknown, keys: readonly string[] = TEXT_KEYS): str
       // blank body while a later key held the real one (native review R3-001).
       if (text.trim() !== '') return text
     }
-    if (sawString) return ''
+    // Only a payload whose EVERY value is blank has no text at all; anything else
+    // keeps its JSON, which may hold the only reason a call failed (R3-001, round 3:
+    // `{ output: '', error: { message: 'denied' } }` must still say "denied").
+    if (sawString && Object.values(value).every((v) => typeof v === 'string' && v.trim() === ''))
+      return ''
   }
   return json(value)
 }
