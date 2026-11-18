@@ -273,6 +273,32 @@ impl AppStateHolder {
             }
             return (self.view(), vec![command]);
         }
+        // Applying a profile (profiles-editor T3b, S4, S8, S9) is the same kind
+        // of per-chat command: the chat's own child is the only one that can bind
+        // the profile to THIS chat (`session`) or run the channel's global apply
+        // (`default`, which may answer its own confirmation first). The command
+        // takes the chat's apply slot, so one apply at a time is in flight - the
+        // same cap the read and the mode save keep (L18, L29) - and the slice this
+        // answers with already says `applying`, which is what disables the buttons.
+        if let UiIntent::ApplyChatProfile {
+            chat_id,
+            profile,
+            mode,
+            confirmation,
+        } = &intent
+        {
+            let chat = crate::intent::chat_for(&state, chat_id);
+            let command = gentle_app::ChatCommand::ApplyChatProfile {
+                chat,
+                profile: profile.clone(),
+                mode: crate::intent::apply_mode_of(*mode),
+                confirmation: crate::intent::token_of(confirmation.as_deref()),
+            };
+            if !self.begin_chat_command(&command) {
+                return (self.view(), Vec::new());
+            }
+            return (self.view(), vec![command]);
+        }
         match crate::intent::to_intent(&state, intent) {
             Some(intent) => self.apply(gentle_app::Input::Intent(intent)),
             // Every intent has an answer: the reducer's, or the config's above.

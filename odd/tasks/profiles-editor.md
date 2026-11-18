@@ -576,4 +576,46 @@ es valor de producto".
   Gentleman-Programming/gentle-shell#3321 (CLOSED, status:approved) - publishing ours would
   be a duplicate; the session-profile-read half overlaps #2716/#2742, so nothing new was
   filed and the maintainer may comment there instead.
+- L30 (maintainer, 2026-11-17, the T3b/T5 rulings, paraphrased from the session's Q&A):
+  (1) "Make default" in the tab USES the channel's own apply (`apply_profile` mode
+  default) - it writes the store's `active` and claims the global routing, exactly as
+  the terminal's screen does; (2) the channel's confirmation dialog text (diff + ask)
+  is SHOWN AS-IS, in the language the child writes it (today Spanish), never translated
+  - it is the child's own text, like the terminal's; (3) T5 fallback-chain editing is
+  LIKE THE TERMINAL: per profile, per agent, plus the profile-wide `*` - all editable
+  (the store `profile_fallbacks` is exactly per-profile/per-agent chains, and the
+  terminal edits the whole file). Copy pass in native Spanish remains a polish task.
+  Order: T3b next.
+- L31 (maintainer, 2026-11-17, verbatim "ya probe todo bien", after a real-window run of
+  main through #200): the T3-mode switch, the Settings rail of 7 and the composed footers
+  SEEN WORKING in the real window. NOT covered by that look: T3b's apply buttons and
+  confirmation dialog (built after the run, branch feat/profile-apply) - they still owe
+  their own real-window look before their PR merges.
+- L32 (parent, 2026-11-17): the APPROVED T3b probe ran against a real child (7 s; temp
+  home+config deleted, script deleted, output kept at C:/Users/josep/dev/probe-t3b/out.log).
+  (a) The default apply DOES ask: `confirmation_required` with the child's own ENGLISH
+  title ("Apply orchestrator-only profile?") and a detailed message naming the files it
+  will rewrite - the app shows it verbatim, as ruled in L30. (b) The token round trip
+  WORKS: the same request plus the token answered `applied` with the child's notes.
+  (c) RESENDING THE SAME TOKEN APPLIED AGAIN (second `applied`, idempotent "0 agents
+  updated" re-materialization; active/writeRevision unchanged) - the doc's "stale token
+  re-asks" is about CONTENT changes, not replay: a replay of the same confirm is safe
+  and idempotent. The app-side rule stands (the dialog is closed after an answer, so the
+  web cannot replay it; a NEW token asks again). (d) `unknown_profile` = typed
+  `ok:false {code, message}`. (e) The apply moved `active` only implicitly (the profile
+  was already active; writeRevision unchanged because 0 agents changed) - a re-read
+  after applied is still the source of truth.
+- L33 (maintainer + parent, 2026-11-17, verbatim "al dar clic en Make default, no aparece
+  nada", the real-window look of T3b): the click RAN (the used profile already matched the
+  global routing, so the channel applied WITHOUT a dialog, per the probe's "not every
+  apply asks") and the child's `applied` notes were dropped before the view was built -
+  no feedback at all. FIXED on the branch's second commit (9661383): a NEW
+  ChatProfileApplyAnswerView (`ChatProfileView.apply_answer`, a PARALLEL slot to
+  apply_notice) carries the child's notes verbatim (multi-line kept, no wrapper word -
+  the notes are the child's voice, like the dialog); `not_applied` draws its short notice
+  AND the notes; the next read that reaches a store clears it, one lifecycle. RED observed
+  (4 Rust + 4 web failing), GREEN; cargo workspace green (separate CARGO_TARGET_DIR: the
+  maintainer's window held the exe), fmt/clippy clean, vitest 816/816, svelte-check/eslint
+  clean, bindings regenerated. The re-look of the apply buttons + dialog + answer line is
+  owed in a fresh window.
 

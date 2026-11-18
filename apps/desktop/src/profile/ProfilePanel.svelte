@@ -1,11 +1,19 @@
 <script lang="ts">
   // The Profile tab of one chat (profiles-editor T2c, T3-mode, artboard
   // 06-profile-tab.html): which profile this chat runs and in whose scope, the
-  // profiles the store defines, the pins of this chat's own worktree - and the one
-  // thing it WRITES, the used profile's orchestration mode (the Organic / Full
-  // delegation switch, saved through the shell in the profile itself). Save, Use
-  // in this chat, Make default, the model pickers and the fallback editor are T3
-  // and T3b: none of them is drawn here, not even disabled.
+  // profiles the store defines, the pins of this chat's own worktree - and the
+  // things it WRITES for the used profile: its orchestration mode (the Organic /
+  // Full delegation switch, saved through the shell in the profile itself) and the
+  // terminal's other two outcomes, `Use in this chat` and `Make default`
+  // (profiles-editor T3b). The model pickers and the fallback editor are T4 and
+  // T5: neither is drawn here, not even disabled.
+  //
+  // `Make default` is the channel's own GLOBAL apply, and gentle-pi asks before it
+  // writes: its confirmation is drawn verbatim, in the child's own words, with
+  // Accept (resend the same profile and mode with its token) and Cancel (send
+  // nothing at all). An apply that wrote nothing says so in one short line and
+  // never claims a live chat changed its routing (S9, L30); an apply that RAN says
+  // what it did in the child's own notes, drawn verbatim (T3b, L32).
   //
   // The one action it does offer is the terminal (T2d, L21-L22): Settings > Profiles
   // is gone, so the profiles screen the terminal already edits is opened from this
@@ -21,12 +29,14 @@
   // flight is dropped with it. A chat with no id asks for nothing.
   import { dispatchIntent, openTerminal } from '../bridge'
   import type {
+    ChatProfileApplyConfirmationView as Confirmation,
     ChatProfileView_Serialize as ChatProfile,
     OrchestratorModeView,
   } from '../contract/bindings'
   import { language } from '../i18n/language.svelte'
   import { coalesced, type CoalescedRead } from '../settings/files-changed'
   import ProfileBody from './ProfileBody.svelte'
+  import ProfileConfirm from './ProfileConfirm.svelte'
   import ProfileHead from './ProfileHead.svelte'
   import ProfileNotice from './ProfileNotice.svelte'
   import ProfileRoutes from './ProfileRoutes.svelte'
@@ -123,6 +133,27 @@
   }
 
   /**
+   * Applies the used profile (profiles-editor T3b): `session` binds it to this
+   * chat's own child, `default` runs the channel's own global apply, which may
+   * answer its own confirmation first. The profile is the one this chat USES, and
+   * nothing is sent while an apply is in flight - the buttons draw that disabled.
+   */
+  function applyProfile(mode: 'session' | 'default'): void {
+    if (chat === null || used === null || view?.applying === true) return
+    void dispatchIntent({
+      type: 'ApplyChatProfile',
+      data: { chat_id: chat, profile: used.name, mode, confirmation: null },
+    })
+  }
+
+  /**
+   * The child's own dialog, as the last answer carried it (L30 ruling 2). Its
+   * text is drawn exactly as it arrived: this tab never translates it, and the
+   * component that draws it owns the accept/cancel flow.
+   */
+  const confirmation = $derived<Confirmation | null>(view?.apply_confirmation ?? null)
+
+  /**
    * The footer's one action: the shell's own profiles screen in a terminal
    * window, the way the Settings pane opened it. Nothing of this tab is written
    * and nothing is sent: Rust resolves the launcher, and a refusal - no launcher,
@@ -164,20 +195,28 @@
             {copy}
             saving={view.saving}
             saveFailed={view.save_failed}
+            applying={view.applying}
+            applyNotice={view.apply_notice}
+            applyAnswer={view.apply_answer}
             onSave={saveMode}
+            onApply={applyProfile}
           />
         {/if}
         <ProfileBody {view} {copy} />
       {/key}
-      <!-- The footer line says what this slice saves: the profile's mode, and
-           nothing else yet. The three outcomes of the artboard's footer arrive
-           with T3b. -->
+      <!-- The footer line says what this tab writes: the profile's mode and its
+           two apply outcomes (T3-mode, T3b). -->
       <p class="foot-line">{copy.footer}</p>
     {/if}
 
-    <!-- The footer, in every state (T2d, L21-L22): the tab saves the used
-         profile's mode and nothing else, so the way to edit, create or switch a
-         profile is the terminal the Settings pane used to open. -->
+    <!-- The channel's own question, over the panel, in its own words (T3b, L30
+         ruling 2): its title, its message, and the app's two buttons. It draws
+         nothing while there is no dialog. -->
+    <ProfileConfirm chatId={chat} {confirmation} copy={copy.apply} />
+
+    <!-- The footer, in every state (T2d, L21-L22): this tab writes the used
+         profile's mode and applies it (T3b), but every profile EDIT is still the
+         terminal's, which is the way to create or change one. -->
     <div class="foot">
       <button class="btn" type="button" onclick={() => void edit()}>{copy.editInTerminal}</button>
       <p class="note">{copy.editNote}</p>

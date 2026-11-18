@@ -1023,6 +1023,11 @@ pub fn fold_spawn_failure(
         gentle_app::ChatCommand::SetChatProfileMode { chat, .. } => {
             holder.note_chat_mode_unstarted(chat)
         }
+        // An apply that never started applied nothing: both buttons come back
+        // and one short line says why (profiles-editor T3b, L17(a)).
+        gentle_app::ChatCommand::ApplyChatProfile { chat, .. } => {
+            holder.note_chat_apply_unstarted(chat)
+        }
         // Every other command has already answered the web side with the slice
         // its intent folded, and none of them is a slice the failure changes.
         _ => None,
@@ -1053,6 +1058,15 @@ fn fold_and_push(holder: &Arc<AppStateHolder>, emit: &Emit, ran: Ran) {
     // and installs the configuration the attempt re-read.
     for (chat, result, read) in ran.chat_mode {
         if let Some(view) = holder.note_chat_mode(&chat, &result, &read) {
+            push(emit, view);
+        }
+    }
+    // One saved profile was applied, or the child is asking its own question, or
+    // the answer wrote nothing and says why (profiles-editor T3b): the buttons
+    // come back, the dialog is drawn verbatim, and an attempt that ran installs
+    // the configuration it re-read.
+    for (chat, attempt) in ran.chat_apply {
+        if let Some(view) = holder.note_chat_apply(&chat, &attempt) {
             push(emit, view);
         }
     }

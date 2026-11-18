@@ -22,7 +22,8 @@ use gentle_core::rpc::config_store::{self, OrchestratorMode, StoreId, StoreValue
 use gentle_desk_lib::bridge::AppStateHolder;
 use gentle_desk_lib::commands::{fold_spawn_failure, Emit};
 use gentle_desk_lib::contract::{
-    ChatProfileAvailabilityView, ChatProfileView, OrchestratorModeView, UiIntent, ViewState,
+    ApplyModeView, ChatProfileApplyNoticeView, ChatProfileAvailabilityView, ChatProfileView,
+    OrchestratorModeView, UiIntent, ViewState,
 };
 use gentle_runtime::chat_runtime::{ChatConfigRead, StoreRead};
 
@@ -107,6 +108,15 @@ fn mode_command(chat: &ChatId) -> ChatCommand {
     }
 }
 
+fn apply_command(chat: &ChatId) -> ChatCommand {
+    ChatCommand::ApplyChatProfile {
+        chat: chat.clone(),
+        profile: "team".to_owned(),
+        mode: gentle_core::rpc::profile_apply::ApplyMode::Session,
+        confirmation: None,
+    }
+}
+
 #[test]
 fn a_profile_read_that_could_not_start_answers_the_web() {
     let (holder, chat) = open_stored();
@@ -175,6 +185,43 @@ fn a_mode_save_that_could_not_start_reenables_the_switch_and_says_so() {
 }
 
 #[test]
+fn an_apply_that_could_not_start_reenables_the_buttons_and_says_so() {
+    let (holder, chat) = drawn();
+    let (_, commands) = holder.dispatch_commands(UiIntent::ApplyChatProfile {
+        chat_id: chat.as_str().to_owned(),
+        profile: "team".to_owned(),
+        mode: ApplyModeView::Session,
+        confirmation: None,
+    });
+    assert!(
+        holder.view().chat_profile.expect("the view").applying,
+        "the intent disabled both buttons before the apply was started"
+    );
+    let (emit, pushed) = recorder();
+
+    fold_spawn_failure(&holder, &emit, &commands[0]);
+
+    let view = pushed_profile(&pushed);
+    assert!(
+        !view.applying,
+        "the click is answered: both buttons may be used again"
+    );
+    assert_eq!(
+        view.apply_notice,
+        Some(ChatProfileApplyNoticeView::NoAnswer),
+        "and nothing was applied, in one short line the tab draws"
+    );
+    assert_eq!(
+        view.profiles
+            .iter()
+            .map(|profile| profile.name.as_str())
+            .collect::<Vec<_>>(),
+        ["team"],
+        "an apply that never started re-read nothing, so what the tab drew stays"
+    );
+}
+
+#[test]
 fn the_next_read_that_answers_replaces_the_failed_one() {
     let (holder, chat) = open_stored();
     let (emit, _pushed) = recorder();
@@ -208,6 +255,7 @@ fn a_command_for_a_closed_chat_folds_nothing() {
 
     fold_spawn_failure(&holder, &emit, &read_command(&chat));
     fold_spawn_failure(&holder, &emit, &mode_command(&chat));
+    fold_spawn_failure(&holder, &emit, &apply_command(&chat));
 
     assert!(
         lock(&pushed).is_empty(),

@@ -134,17 +134,19 @@ describe('the profiles listed read-only', () => {
   })
 
 
-  it('draws only the mode switch, and no other edit control', () => {
-
+  it('draws the mode switch and the two apply outcomes, and no editing control', () => {
     draw()
 
-    for (const name of [/^Edit$/, /^Save$/, /^Use in this chat$/, /^Make default$/, /^Clear$/]) {
+    // The profile's mode (T3-mode) and its two apply outcomes (T3b) are the only
+    // things that write; the editor itself is T3+.
+    for (const name of [/^Edit$/, /^Save$/, /^Clear$/]) {
       expect(screen.queryByRole('button', { name }), String(name)).toBeNull()
     }
     expect(screen.queryByRole('combobox')).toBeNull()
     expect(screen.queryByRole('textbox')).toBeNull()
-    // The one thing that writes is the used profile's orchestration mode (T3-mode).
     expect(screen.getByRole('radiogroup')).toBeTruthy()
+    expect(screen.getByRole('button', { name: copy.apply.useInChat })).toBeTruthy()
+    expect(screen.getByRole('button', { name: copy.apply.makeDefault })).toBeTruthy()
     expect(screen.getByText(copy.footer)).toBeTruthy()
   })
 

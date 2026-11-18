@@ -75,6 +75,7 @@ pub fn to_intent(state: &gentle_app::AppState, intent: UiIntent) -> Option<gentl
         // with a command of its own (`AppStateHolder::dispatch_commands`).
         UiIntent::RefreshChatProfile { .. }
         | UiIntent::SaveChatProfileMode { .. }
+        | UiIntent::ApplyChatProfile { .. }
         | UiIntent::RefreshAuth
         | UiIntent::CheckUpdates
         | UiIntent::RefreshUsage => return None,
@@ -104,6 +105,32 @@ pub(crate) fn mode_of(
             gentle_core::rpc::config_store::OrchestratorMode::FullDelegation
         }
     }
+}
+
+/// The apply mode the contract names, as the channel spells it (`session`,
+/// `default`): the two enums carry the same values, so no request translates the
+/// mode it asks for (profiles-editor T3b).
+pub(crate) fn apply_mode_of(
+    mode: crate::contract::ApplyModeView,
+) -> gentle_core::rpc::profile_apply::ApplyMode {
+    use crate::contract::ApplyModeView;
+    match mode {
+        ApplyModeView::Session => gentle_core::rpc::profile_apply::ApplyMode::Session,
+        ApplyModeView::Default => gentle_core::rpc::profile_apply::ApplyMode::Default,
+    }
+}
+
+/// The confirmation token of what the page showed, or `None` when the string is
+/// no token at all (empty, or longer than the channel's own 128 characters).
+///
+/// A string that is not a token is DROPPED rather than sent: the apply is then
+/// asked again without one, which is exactly the rule that an answer other than
+/// what was shown re-asks with a fresh token and never writes (profiles-editor
+/// T3b, L30).
+pub(crate) fn token_of(
+    confirmation: Option<&str>,
+) -> Option<gentle_core::rpc::profile_apply::ConfirmationToken> {
+    confirmation.and_then(gentle_core::rpc::profile_apply::ConfirmationToken::parse)
 }
 
 /// The app's chat for an id the web side sent back.
