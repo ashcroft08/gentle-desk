@@ -91,6 +91,16 @@ const COMMAND_KEYS = ['command', 'cmd', 'script', 'input']
 /** The keys a payload keeps its own text under, in the order they are tried. */
 const TEXT_KEYS = ['output', 'stdout', 'stderr', 'text', 'content', 'message', 'error']
 
+/**
+ * The same keys for a FAILED call, tried error-first.
+ *
+ * A failure's reason lives in `stderr` or `error` far more often than in the
+ * progress it printed to `output`/`stdout` first: reading the normal order would
+ * put the tool's progress line where the reason belongs, which is the one line a
+ * card promises never to lose (native review R3-001).
+ */
+const ERROR_KEYS = ['error', 'stderr', 'message', 'output', 'stdout', 'text', 'content']
+
 /** The segments of a tool's name, lowercased, each non-alphanumeric a separator. */
 function segments(name: string): string[] {
   return name
@@ -187,16 +197,31 @@ export function toolBody(
   tool: Pick<ToolCall, 'result' | 'partial_result' | 'is_error'>,
 ): ToolBody {
   const payload = tool.result ?? tool.partial_result ?? null
-  const lines = textOf(payload).split('\n')
+  const normal = splitLines(textOf(payload))
+  if (!tool.is_error) return { error: null, lines: normal }
+  // A failure is read error-first, so the REASON becomes the error line and never
+  // the progress the tool happened to print first (native review R3-001). The
+  // progress is not thrown away: it stays folded under the reason.
+  const failure = splitLines(textOf(payload, ERROR_KEYS))
+  const [first, ...rest] = failure.length > 0 ? failure : normal
+  if (first === undefined) return { error: null, lines: [] }
+  const kept = failure.length > 0 ? rest : []
+  // Only appended when the two reads disagree, which is exactly the case where the
+  // error lives in another field than the output.
+  const tail = failure.length > 0 && failure.join('\n') !== normal.join('\n') ? normal : []
+  return { error: first, lines: [...kept, ...tail] }
+}
+
+/** A payload's text as lines, with the tool's own final newline dropped. */
+function splitLines(text: string): string[] {
+  const lines = text.split('\n')
   // A tool's own final newline is not an empty last line.
   if (lines.length > 0 && lines[lines.length - 1] === '') lines.pop()
-  if (!tool.is_error || lines.length === 0) return { error: null, lines }
-  const [error, ...rest] = lines
-  return { error, lines: rest }
+  return lines
 }
 
 /** The text of a payload: its own, or its JSON when it carries none. */
-export function textOf(value: unknown): string {
+export function textOf(value: unknown, keys: readonly string[] = TEXT_KEYS): string {
   if (value === null || value === undefined) return ''
   if (typeof value === 'string') return value
   if (typeof value === 'number' || typeof value === 'boolean') return String(value)
@@ -209,9 +234,11 @@ export function textOf(value: unknown): string {
     return json(value)
   }
   if (isRecord(value)) {
-    for (const key of TEXT_KEYS) {
+    for (const key of keys) {
       const text = value[key]
-      if (typeof text === 'string') return text
+      // An EMPTY string is not the payload's text: taking it would hand back a
+      // blank body while a later key held the real one (native review R3-001).
+      if (typeof text === 'string' && text.trim() !== '') return text
     }
   }
   return json(value)
