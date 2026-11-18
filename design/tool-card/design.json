@@ -1,0 +1,14 @@
+{
+  "title": "Tool-call cards - the chat reads like gentle-shell-gpui's",
+  "brief": "The maintainer asked for the chat of Gentleman-Programming/gentle-shell-gpui on gentle-desk's own components: a tool call is ONE quiet card (icon + tool name + language chip, the command in monospace, the output folded behind an honest count, and a footer with the state and the elapsed time), and reasoning is a SEPARATE collapsible row with its own duration. Nothing here changes the stack or the theme: every colour is a system token, so the six themes work. The card also shows the two truths the other app cannot: when the payload was cut at the bound, and when a field was dropped by that cut - our core knows both, so the card says so instead of lying.",
+  "feature": "odd/tasks/chat-transcript.md",
+  "artboards": [
+    {
+      "file": "01-quiet-cards.html",
+      "title": "A - Quiet cards in the thread",
+      "tradeoff": "One card per tool call, collapsed to the command plus a folded output; the state and the time live in a footer chip, never in a sentence. Reasoning is a one-line row with a duration badge, expandable in place, styled as text (not a card) so it never competes with the tool call. Cost: the output is not visible until the reader asks for it, which is the point - but it means a failure needs its first line shown, so the error label is the first line of the output.",
+      "width": 900,
+      "height": 1180
+    }
+  ]
+}
