@@ -167,10 +167,13 @@ impl AppState {
 
 /// Appends what the user typed as their side of the thread.
 ///
-/// Ids stay contiguous — `msg-<index>` — the same scheme the reducer uses when it
-/// opens and closes an assistant message, so the whole thread keeps one id space
-/// whichever chat it belongs to. The row itself is the chat state's to build, so
-/// the scheme lives in one place (`ChatState::push_message`).
+/// Ids are identity and are NEVER reused — `msg-<n>` from a monotonic counter, the
+/// same scheme the reducer uses when it opens and closes an assistant message, so
+/// the whole thread keeps one id space whichever chat it belongs to. A dropped row
+/// leaves a GAP: contiguous ids are not promised, because handing a living id out
+/// again is exactly the collision this counter exists to prevent. The row itself is
+/// the chat state's to build, so the scheme lives in one place
+/// (`ChatState::push_message`).
 pub(crate) fn push_user_message(state: &mut ChatState, text: &str) {
     state.push_message(ChatRole::User, text.to_owned(), false);
 }

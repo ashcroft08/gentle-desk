@@ -451,11 +451,10 @@ fn close_assistant_message(
     };
 
     // A message that only carried thinking/toolCall parts has nothing to show,
-    // so its bubble is dropped wherever it sits (R3-002): a tool row after it
-    // does not make it a message, and leaving it would leak an empty message
-    // into `messages()`. It is the last text row, so dropping it frees the
-    // highest `msg-<n>` id for the next assistant message: ids stay contiguous,
-    // with no gap and no second bookkeeping.
+    // so its bubble is dropped wherever it sits (R3-002), and the `msg-<n>` it
+    // held becomes a gap in the numbering: ids are identity and are never
+    // reused (R3-1), so the next message takes the counter's next value instead
+    // of the freed one.
     // The thinking and the tool calls it produced stay: they are rows of their
     // own.
     if empty {

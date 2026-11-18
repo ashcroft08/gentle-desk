@@ -228,3 +228,32 @@ turn)"), and any gpui-kit widget.
   Two honest gaps, not hidden: the 50-row window is pinned at core level only (no
   app-level test folds 51 turns through `view::messages`), and `cargo fmt --check`
   was not run this round.
+- L10 (2026-11-18, the model is FROZEN after this): lineage `review-5bea1dcb76ad5699`,
+  lenses risk + reliability, **APPROVED and its acknowledgement burned**. Two real
+  defects came back and both are fixed here; the other two advisories are the
+  already-recorded payload issues (no aggregate cap, key collision), and the key
+  collision is closed by this same commit:
+  - **R3-1** (correctness): `push_message` derived the next text id from the current
+    COUNT of text rows, so a row dropped from the MIDDLE made the count fall behind
+    and the next push reused a living id - duplicate ids break `copy_message` and UI
+    keying. **This supersedes the old pinned behaviour** (`a_dropped_message_frees_its_id_...`
+    asserted the reuse that is the bug). Now ids are identity: `ChatState::next_text_id`
+    is a monotonic counter, `push_message` takes from it and increments,
+    `replace_messages` resumes it after the highest id a reload kept, and a dropped
+    row leaves a gap. Contiguity is no longer promised anywhere.
+  - **R3-2 / R1-002** (silent field loss): two oversized object keys cut to the same
+    bound collided and one field was overwritten while the row only said
+    `truncated: true`. `ToolPayload` now carries a distinct `dropped` flag (and
+    `ChatItem::payload_dropped()`), so a card can word the two losses differently -
+    "output cut short" vs "a field was dropped". Not serialised, so no wire change.
+  Receipts: `cargo test --workspace` **1702 passed, 0 failed**,
+  `gentle-desk-app` 532, `cargo check --workspace` clean.
+  Reported and NOT fixed, on purpose: thinking ids are still `think-<count of thinking
+  rows>`, latent only because a thinking row is never dropped today; and a stale
+  comment in `crates/app/src/state.rs` that still promised contiguous ids - fixed in
+  this same commit because a comment that lies is worse than no comment.
+  FREEZE: from here the transcript model takes no more advisory work. A finding is
+  fixed only if it is a red defect; everything else goes to the backlog until the card
+  (T2) walks over it. Reason, recorded: four review passes produced 4, 1, 3 and 2 real
+  findings, all inside the same reducer - quality was rising, but each pass found less,
+  and the remaining risk is on the screen, not in this file.

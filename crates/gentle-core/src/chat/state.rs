@@ -1,7 +1,7 @@
 //! Chat state produced by folding decoded RPC events.
 //!
 //! Pure data: no I/O, no clocks, no id generation beyond the deterministic
-//! `msg-<index>`, `think-<index>` and `tool-<toolCallId>` schemes. The `ui`
+//! `msg-<n>`, `think-<index>` and `tool-<toolCallId>` schemes. The `ui`
 //! layer renders this and the `app` layer feeds it lines read from
 //! `gentle-shell --mode rpc`.
 
@@ -23,9 +23,11 @@ pub enum ChatRole {
 /// One rendered message of the open thread.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ChatMessage {
-    /// `msg-<how many text rows came before it>`, so ids stay contiguous over
-    /// the text: a dropped message frees its id for the next one, and a thinking
-    /// or tool row never shifts it.
+    /// `msg-<n>`, where `<n>` comes from [`ChatState::next_text_id`]: an id is
+    /// the row's identity, so it is never reused. A message that was dropped
+    /// leaves a GAP in the numbering, which is correct - ids are unique for the
+    /// life of the chat, contiguous or not, and a thinking or tool row never
+    /// shifts one.
     pub id: String,
     pub role: ChatRole,
     /// Accumulated text while streaming, the authoritative text once closed.
@@ -63,41 +65,88 @@ pub struct ToolPayload {
     /// True when a string of it was cut to fit. The row is not lying about what
     /// it holds: what it holds is the head of a longer payload.
     pub truncated: bool,
+    /// True when a FIELD of it was lost, which [`truncated`](Self::truncated)
+    /// does not say.
+    ///
+    /// Cutting an object's key to the bound can make it land on another key of
+    /// the same object, and a JSON object holds one value per key: the field
+    /// already kept stays and the one that would overwrite it cannot be kept.
+    /// That is a loss, not a shortening, so it gets its own flag - a card can
+    /// then tell the user something was DROPPED instead of only that something
+    /// was cut short (R3-2).
+    pub dropped: bool,
 }
 
 impl ToolPayload {
-    /// Keeps `value`, cutting its long strings and flagging the cut.
+    /// Keeps `value`, cutting its long strings and flagging what the cut cost.
     pub fn new(value: &Value) -> Self {
         let mut value = value.clone();
-        let truncated = cut_strings(&mut value);
-        Self { value, truncated }
+        let cut = cut_strings(&mut value);
+        Self {
+            value,
+            truncated: cut.truncated,
+            dropped: cut.dropped,
+        }
     }
 }
 
-/// Cuts every string of `value` to [`TOOL_PAYLOAD_MAX_BYTES`] and answers
-/// whether any of them was cut.
-fn cut_strings(value: &mut Value) -> bool {
+/// What cutting a value cost: strings shortened, or a field lost.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+struct Cut {
+    /// Some string was longer than the bound and was shortened.
+    truncated: bool,
+    /// Cutting a KEY made it land on a key the same object already holds, so
+    /// one of the two fields could not be kept.
+    dropped: bool,
+}
+
+impl Cut {
+    /// Everything both cuts cost.
+    fn or(self, other: Self) -> Self {
+        Self {
+            truncated: self.truncated || other.truncated,
+            dropped: self.dropped || other.dropped,
+        }
+    }
+}
+
+/// Cuts every string of `value` to [`TOOL_PAYLOAD_MAX_BYTES`] and answers what
+/// that cost.
+fn cut_strings(value: &mut Value) -> Cut {
     match value {
-        Value::String(text) => cut_string(text),
+        Value::String(text) => Cut {
+            truncated: cut_string(text),
+            dropped: false,
+        },
         Value::Array(items) => items
             .iter_mut()
-            .fold(false, |cut, item| cut | cut_strings(item)),
+            .map(cut_strings)
+            .fold(Cut::default(), Cut::or),
         Value::Object(fields) => {
             // An object's KEY is a string the payload retains just as its values
             // are: walking only the values let a payload keep a key of any size
             // and still report `truncated: false`, which is the bypass the bound
             // exists to prevent (R3-001). Drained and refilled, so a cut key
             // lands where the whole one was.
-            let mut cut = false;
+            let mut cut = Cut::default();
             let entries: Vec<(String, Value)> = std::mem::take(fields).into_iter().collect();
             for (mut key, mut item) in entries {
-                cut |= cut_string(&mut key);
-                cut |= cut_strings(&mut item);
+                cut.truncated |= cut_string(&mut key);
+                cut = cut.or(cut_strings(&mut item));
+                // Two keys that differ only past the bound cut to the same
+                // string. A map keeps one value per key, so keeping the field
+                // already there means the colliding one is lost - and a loss
+                // is recorded rather than hidden behind `truncated`, which
+                // already means "a string was cut" (R3-2).
+                if fields.contains_key(&key) {
+                    cut.dropped = true;
+                    continue;
+                }
                 fields.insert(key, item);
             }
             cut
         }
-        Value::Null | Value::Bool(_) | Value::Number(_) => false,
+        Value::Null | Value::Bool(_) | Value::Number(_) => Cut::default(),
     }
 }
 
@@ -196,6 +245,26 @@ impl ChatItem {
             Self::Text(_) | Self::Thinking { .. } => false,
         }
     }
+
+    /// True when a tool row LOST a field of a payload: cutting one of an
+    /// object's keys made it collide with another, so the payload could not keep
+    /// both. The card says a field was dropped, which
+    /// [`payload_truncated`](Self::payload_truncated) cannot say - that one only
+    /// reports a shortened string (R3-2).
+    pub fn payload_dropped(&self) -> bool {
+        match self {
+            Self::Tool {
+                args,
+                partial_result,
+                result,
+                ..
+            } => [args, partial_result, result]
+                .into_iter()
+                .flatten()
+                .any(|payload| payload.dropped),
+            Self::Text(_) | Self::Thinking { .. } => false,
+        }
+    }
 }
 
 /// A blocking extension dialog waiting for an answer.
@@ -233,6 +302,16 @@ pub enum Dialog {
 pub struct ChatState {
     /// The thread, oldest row first: the ONE transcript.
     pub items: Vec<ChatItem>,
+    /// The next `msg-<n>` number to hand out.
+    ///
+    /// Ids are identity, so they are never reused: this is a monotonic counter,
+    /// not a count of the text rows. Counting them fell behind the moment the
+    /// reducer dropped an empty assistant row from the MIDDLE of the transcript,
+    /// and the next push then reused an id a later row still held, which breaks
+    /// every id-based lookup and every keyed view (R3-1). Gaps after a dropped
+    /// row are therefore expected, and a message pushed by hand into `items`
+    /// must keep this counter ahead of it.
+    pub next_text_id: u64,
     /// Driven by `agent_start` / `agent_end` / `agent_settled`.
     pub working: bool,
     /// Blocking extension dialogs in arrival order, oldest first.
@@ -287,11 +366,17 @@ impl ChatState {
         self.text_items().cloned().collect()
     }
 
-    /// Appends a text row at the end of the transcript with the next contiguous
+    /// Appends a text row at the end of the transcript with the next
     /// `msg-<n>` id: the user's own side of the thread.
+    ///
+    /// The id comes from [`next_text_id`](Self::next_text_id), never from the
+    /// rows already there: a dropped message leaves a gap instead of freeing its
+    /// id for reuse (R3-1).
     pub fn push_message(&mut self, role: ChatRole, text: String, streaming: bool) {
+        let id = format!("msg-{}", self.next_text_id);
+        self.next_text_id += 1;
         self.items.push(ChatItem::Text(ChatMessage {
-            id: format!("msg-{}", self.text_items().count()),
+            id,
             role,
             text,
             streaming,
@@ -301,7 +386,21 @@ impl ChatState {
 
     /// Replaces the whole transcript with these text rows: a reopened session's
     /// history, whose ids `messages_from_history` already assigned.
+    ///
+    /// The counter resumes after the highest id the history kept, so a message
+    /// pushed afterwards cannot reuse one of them; a history with no
+    /// `msg-<n>` id at all leaves it at the number of rows it installed.
     pub fn replace_messages(&mut self, messages: Vec<ChatMessage>) {
+        self.next_text_id = messages
+            .iter()
+            .filter_map(|message| text_id_number(&message.id))
+            .max()
+            .map_or(messages.len() as u64, |highest| highest + 1);
         self.items = messages.into_iter().map(ChatItem::Text).collect();
     }
+}
+
+/// The `<n>` of a `msg-<n>` id, when it has that shape.
+fn text_id_number(id: &str) -> Option<u64> {
+    id.strip_prefix("msg-")?.parse().ok()
 }

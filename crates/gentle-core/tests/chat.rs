@@ -162,6 +162,9 @@ mod assistant_messages {
             state,
             ChatState {
                 items: texts(vec![assistant("msg-0", "", true)]),
+                // The id `message_start` took came from the counter, which is
+                // now ahead of it: ids are never handed out twice (R3-1).
+                next_text_id: 1,
                 ..ChatState::default()
             }
         );
@@ -190,6 +193,7 @@ mod assistant_messages {
             state,
             ChatState {
                 items: texts(vec![assistant("msg-0", "Hello world", true)]),
+                next_text_id: 1,
                 ..ChatState::default()
             }
         );
@@ -307,6 +311,7 @@ mod assistant_messages {
             state,
             ChatState {
                 items: texts(vec![assistant("msg-0", "Hello world", false)]),
+                next_text_id: 1,
                 ..ChatState::default()
             }
         );
@@ -323,6 +328,7 @@ mod assistant_messages {
             state,
             ChatState {
                 items: texts(vec![assistant("msg-0", "kept", false)]),
+                next_text_id: 1,
                 ..ChatState::default()
             }
         );
@@ -360,6 +366,7 @@ mod assistant_messages {
                     },
                     ChatItem::Text(assistant("msg-0", "", true)),
                 ],
+                next_text_id: 1,
                 ..ChatState::default()
             }
         );
@@ -407,12 +414,15 @@ mod assistant_messages {
         assert!(state.items.is_empty(), "got {:?}", state.items);
     }
 
+    /// R3-1: an id is the row's identity, so it is never reused. The message
+    /// that finalizes empty is dropped and the `msg-<n>` it held becomes a GAP;
+    /// the next message takes the counter's next value. This deliberately
+    /// supersedes the pinned `a_dropped_message_frees_its_id_...`, which
+    /// asserted the reuse that is the bug.
     #[test]
-    fn a_dropped_message_frees_its_id_so_the_next_message_stays_contiguous() {
-        let mut state = ChatState {
-            items: texts(vec![user("msg-0", "hi")]),
-            ..ChatState::default()
-        };
+    fn a_dropped_message_leaves_a_gap_and_does_not_free_its_id() {
+        let mut state = ChatState::default();
+        state.push_message(ChatRole::User, "hi".to_owned(), false);
         state = reduce_chat(Language::En, state, &assistant_start());
         assert_eq!(state.messages()[1].id, "msg-1");
 
@@ -421,9 +431,45 @@ mod assistant_messages {
 
         state = reduce_chat(Language::En, state, &assistant_start());
         assert_eq!(state.messages().len(), 2);
-        assert_eq!(state.messages()[1].id, "msg-1");
+        assert_eq!(
+            state
+                .messages()
+                .iter()
+                .map(|message| message.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["msg-0", "msg-2"],
+            "the dropped message's id is a gap, not a free slot"
+        );
         assert_eq!(state.messages()[1].text, "");
         assert!(state.messages()[1].streaming);
+    }
+
+    /// R3-1: ids are unique for the chat's life, gaps included. Counting the
+    /// text rows to number the next one fell behind the moment a drop removed
+    /// a row from the MIDDLE of the transcript, and the next push reused an id
+    /// a later row still holds - which breaks every id-based lookup and every
+    /// keyed view of the thread.
+    #[test]
+    fn a_drop_from_the_middle_of_the_transcript_cannot_reuse_a_living_id() {
+        let mut state = ChatState::default();
+        // The bubble `message_start` opens is still open when the user's side
+        // of the next prompt is pushed after it.
+        state = reduce_chat(Language::En, state, &assistant_start());
+        state.push_message(ChatRole::User, "hi".to_owned(), false);
+        // The turn said nothing, so its empty bubble goes from the middle.
+        state = reduce_chat(Language::En, state, &assistant_end(json!([])));
+        assert_eq!(state.messages(), vec![user("msg-1", "hi")]);
+
+        state = reduce_chat(Language::En, state, &assistant_start());
+        let messages = state.messages();
+        let ids: Vec<&str> = messages.iter().map(|message| message.id.as_str()).collect();
+        assert_eq!(
+            ids,
+            vec!["msg-1", "msg-2"],
+            "the id the drop freed is not handed out again: {ids:?}"
+        );
+        let unique: std::collections::BTreeSet<&str> = ids.iter().copied().collect();
+        assert_eq!(unique.len(), ids.len(), "two rows share an id: {ids:?}");
     }
 
     #[test]
@@ -761,10 +807,8 @@ mod transcript {
     /// transcript already holds.
     #[test]
     fn a_message_pushed_by_the_shell_takes_the_next_text_id() {
-        let mut state = ChatState {
-            items: texts(vec![user("msg-0", "hola")]),
-            ..ChatState::default()
-        };
+        let mut state = ChatState::default();
+        state.push_message(ChatRole::User, "hola".to_owned(), false);
         state.items.push(thought("think-0", "hmm"));
         state.push_message(ChatRole::User, "otra".to_owned(), false);
         assert_eq!(
@@ -786,6 +830,31 @@ mod transcript {
         assert_eq!(
             state.items,
             texts(vec![user("msg-0", "stored"), assistant("msg-1", "kept", false)])
+        );
+    }
+
+    /// R3-1: the id counter resumes after the highest id the history kept, so a
+    /// message pushed after a reopened session cannot take an id the history
+    /// already shows: ids stay unique across the reload.
+    #[test]
+    fn a_history_reply_leaves_the_id_counter_after_the_ids_it_kept() {
+        let mut state = ChatState::default();
+        state = reducer_run_from(state, vec![assistant_start()]);
+        assert_eq!(state.next_text_id, 1, "the first message took `msg-0`");
+
+        state.replace_messages(vec![
+            user("msg-0", "stored"),
+            assistant("msg-1", "kept", false),
+        ]);
+        state.push_message(ChatRole::User, "otra".to_owned(), false);
+        assert_eq!(
+            state
+                .messages()
+                .iter()
+                .map(|message| message.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["msg-0", "msg-1", "msg-2"],
+            "the pushed message follows the history instead of reusing its ids"
         );
     }
 
@@ -1354,6 +1423,77 @@ mod tool_payloads {
             state.items[0].payload_truncated(),
             "the row says a payload was cut: {:?}",
             state.items[0]
+        );
+    }
+
+    /// R3-2 (the recorded R1-002 advisory is the same root cause): cutting an
+    /// object's KEY to the bound can make it land on another key of the same
+    /// object, and a JSON object keeps one value per key. Losing a FIELD is not
+    /// the same as shortening a string, so the payload says so separately: a
+    /// card must be able to tell the user something was dropped, not merely
+    /// that something was shortened.
+    #[test]
+    fn a_cut_key_that_collides_with_another_cut_key_reports_the_dropped_field() {
+        // The two keys differ only AFTER the bound, so cutting each one to it
+        // makes them the same string.
+        let prefix = "k".repeat(TOOL_PAYLOAD_MAX_BYTES);
+        let mut fields = serde_json::Map::new();
+        fields.insert(format!("{prefix}-first"), json!("the value the payload keeps"));
+        fields.insert(
+            format!("{prefix}-second"),
+            json!("the value that would overwrite it"),
+        );
+        let state = executed(json!({"command": "env"}), None, Value::Object(fields));
+        let ChatItem::Tool { result, .. } = &state.items[0] else {
+            panic!("no tool row: {:?}", state.items)
+        };
+        let payload = result.as_ref().expect("the result the tool ended with");
+        assert!(
+            payload.truncated,
+            "the keys were cut, so the payload is not the whole of what came"
+        );
+        assert!(
+            payload.dropped,
+            "a field was lost to the cut; `truncated` alone says only that something was shortened"
+        );
+        let kept = payload.value.as_object().expect("an object");
+        assert_eq!(kept.len(), 1, "one key, one field: {:?}", payload.value);
+        assert_eq!(
+            kept.get(prefix.as_str()),
+            Some(&json!("the value the payload keeps")),
+            "the field already kept stays; the colliding one is the loss"
+        );
+        assert!(
+            state.items[0].payload_dropped(),
+            "the row says a field was dropped: {:?}",
+            state.items[0]
+        );
+        assert!(
+            state.items[0].payload_truncated(),
+            "the shortening is still reported too: {:?}",
+            state.items[0]
+        );
+    }
+
+    /// The two losses stay distinguishable: a payload whose strings were only
+    /// shortened kept every field, and its row must not claim one is missing.
+    #[test]
+    fn a_shortened_string_drops_no_field() {
+        let long = "x".repeat(TOOL_PAYLOAD_MAX_BYTES * 2);
+        let state = executed(
+            json!({"command": "cat big.log"}),
+            None,
+            json!({"content": [{"type": "text", "text": long}]}),
+        );
+        let ChatItem::Tool { result, .. } = &state.items[0] else {
+            panic!("no tool row: {:?}", state.items)
+        };
+        let payload = result.as_ref().expect("the result the tool ended with");
+        assert!(payload.truncated);
+        assert!(!payload.dropped, "nothing was lost, only shortened");
+        assert!(
+            !state.items[0].payload_dropped(),
+            "the row claims a loss that did not happen"
         );
     }
 
