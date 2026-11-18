@@ -591,4 +591,18 @@ es valor de producto".
   SEEN WORKING in the real window. NOT covered by that look: T3b's apply buttons and
   confirmation dialog (built after the run, branch feat/profile-apply) - they still owe
   their own real-window look before their PR merges.
+- L32 (parent, 2026-11-17): the APPROVED T3b probe ran against a real child (7 s; temp
+  home+config deleted, script deleted, output kept at C:/Users/josep/dev/probe-t3b/out.log).
+  (a) The default apply DOES ask: `confirmation_required` with the child's own ENGLISH
+  title ("Apply orchestrator-only profile?") and a detailed message naming the files it
+  will rewrite - the app shows it verbatim, as ruled in L30. (b) The token round trip
+  WORKS: the same request plus the token answered `applied` with the child's notes.
+  (c) RESENDING THE SAME TOKEN APPLIED AGAIN (second `applied`, idempotent "0 agents
+  updated" re-materialization; active/writeRevision unchanged) - the doc's "stale token
+  re-asks" is about CONTENT changes, not replay: a replay of the same confirm is safe
+  and idempotent. The app-side rule stands (the dialog is closed after an answer, so the
+  web cannot replay it; a NEW token asks again). (d) `unknown_profile` = typed
+  `ok:false {code, message}`. (e) The apply moved `active` only implicitly (the profile
+  was already active; writeRevision unchanged because 0 agents changed) - a re-read
+  after applied is still the source of truth.
 
