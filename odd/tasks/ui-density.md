@@ -86,3 +86,20 @@ Three offenders, with the cheapest structural fix for each:
 - L6 (2026-11-18, T2 done): `components/StatusLine.svelte` and its test are gone.
   Confirmed dead first - the only importer was `StatusLine.test.ts` - and the
   `.status` rule stays because `helpers/HelperThreadItem.svelte:47` uses it.
+- L7 (2026-11-18, native review of T1+T2): lineage `review-344bb3bb3e46fb0b`,
+  tier medium, 8 paths, 380 original lines, correction budget 190, lenses
+  readability + reliability, **APPROVED and its acknowledgement burned**. Four
+  non-blocking advisories, all acted on anyway because two of them said the new
+  test proved less than it claimed:
+  - **R3-001** (reliability): the bound assertion accepted any `100vh`, so the fix
+    would not have been proved. Now it requires `calc(100vh - var(--settings-chrome))`.
+  - **R3-002** (reliability): `min-height: 0;` could be satisfied by the CSS
+    COMMENT, because the helper read the rule's raw text. The helper now strips
+    comments and returns declarations only; proved by removing the declaration and
+    watching the test fail, then restoring it.
+  - **R2-1** (readability): the selector match is now spacing-tolerant, so
+    reformatting `app.css` fails with the selector named instead of a generic throw.
+  - **R2-2** (readability): the 200px is now the named `--settings-chrome` on
+    `.dlg.settings`, and the test pins both the subtraction and the declaration.
+  These follow-ups are a new candidate; the receipt above still stands for the
+  candidate it was given for.

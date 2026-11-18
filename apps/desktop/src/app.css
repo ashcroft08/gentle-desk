@@ -1424,6 +1424,10 @@ p {
    is wider than the other dialogs' 440px to hold both, about 680px. */
 .dlg.settings {
   width: min(680px, calc(100vw - 32px));
+  /* What the card's OWN chrome takes out of the window: the title above and the
+     Close button below, with slack. Named here so the body's bound below never
+     holds a number nobody can trace (native review R2-2). */
+  --settings-chrome: 200px;
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -1435,12 +1439,12 @@ p {
    The body is BOUNDED against the window (ui-density T1): a section can be long
    - Usage draws every provider, limit and window - and with nothing holding it
    the card grew past the bottom of the window, pushing its own Close button out
-   of reach. The room left over is the card's title above and its buttons below. */
+   of reach. The room left over is what the card's own chrome does not use. */
 .settings-body {
   display: flex;
   gap: 18px;
   min-height: 240px;
-  max-height: calc(100vh - 200px);
+  max-height: calc(100vh - var(--settings-chrome));
 }
 
 .settings-rail {
