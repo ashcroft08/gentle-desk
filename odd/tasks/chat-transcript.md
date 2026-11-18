@@ -202,3 +202,29 @@ turn)"), and any gpui-kit widget.
   `cargo check --workspace` clean. `cargo fmt --check` is red on the base as well
   (pre-existing drift in files this slice never touches); it was not reformatted to
   avoid drive-by churn.
+- L9 (2026-11-18, the receipt for the R3-001 fix, and three more real warnings):
+  lineage `review-3261b9bd7912b3b2`, tier medium, 2181 original lines, lenses risk
+  + reliability, **APPROVED and its acknowledgement burned**. The escalation cause
+  is gone: the lookup can no longer be handed an id it does not have. Three new
+  WARNINGs came back, all true, all fixed:
+  - **R3-001** (reliability): `ToolPayload` cut array items and object VALUES but
+    never object KEYS, so a huge key kept the row whole and reported
+    `truncated: false`. Keys are now cut and flagged too. Recorded edge: two
+    oversized keys sharing their first 8 KiB collide, and the later value wins -
+    no suffix was invented, because that would change payload text.
+  - **R3-002** (reliability): the desktop window was built with `count()` +
+    `skip()`, and that iterator has no random access, so BOTH walked the whole
+    transcript - O(total), not the O(pushed) claim L7 made. **This supersedes L7's
+    mechanism wording**: the window now comes from `ChatState::last_text_items(limit)`,
+    which walks the transcript from the END and stops at the limit-th text row, so
+    the head is never visited. The complexity claim is now true; it was not before.
+  - **R3-003** (reliability): the layout test accepted ANY pixel value for
+    `--settings-chrome`, so a regression to 1px would pass and the unreachable
+    Close button could come back. It now asserts a 160px floor, with the chrome
+    arithmetic in the comment.
+  Receipts: `cargo test --workspace` **1698 passed, 0 failed**,
+  `cargo test -p gentle-desk-app` 532, `npm test -- src/settings/layout.test.ts` 3
+  passed, `cargo check --workspace` clean.
+  Two honest gaps, not hidden: the 50-row window is pinned at core level only (no
+  app-level test folds 51 turns through `view::messages`), and `cargo fmt --check`
+  was not run this round.

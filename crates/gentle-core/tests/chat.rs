@@ -1163,6 +1163,44 @@ mod transcript {
             ]
         );
     }
+
+    /// R3-002 of the transcript review: the pushed window is the tail of the
+    /// TEXT projection, oldest first, so a reader can take it from the END of
+    /// the transcript instead of walking all of it twice. A thinking row is not
+    /// a text row, so the tail has to skip one on its way back; `limit` at the
+    /// number of text rows is the whole projection, and `0` is nothing.
+    #[test]
+    fn the_last_text_rows_are_the_tail_of_the_text_projection_in_order() {
+        let state = ChatState {
+            items: vec![
+                ChatItem::Text(assistant("msg-0", "first", false)),
+                thought("think-0", "thinking"),
+                ChatItem::Text(assistant("msg-1", "second", false)),
+                thought("think-1", "thinking again"),
+                ChatItem::Text(assistant("msg-2", "third", false)),
+                thought("think-2", "a thought after the last text"),
+            ],
+            ..ChatState::default()
+        };
+        let ids = |limit: usize| -> Vec<&str> {
+            state
+                .last_text_items(limit)
+                .map(|message| message.id.as_str())
+                .collect()
+        };
+
+        assert_eq!(
+            ids(2),
+            vec!["msg-1", "msg-2"],
+            "N < total is the tail of the text, still oldest first"
+        );
+        assert_eq!(
+            ids(3),
+            vec!["msg-0", "msg-1", "msg-2"],
+            "N == total is the whole text projection"
+        );
+        assert_eq!(ids(0), Vec::<&str>::new(), "N == 0 is no row at all");
+    }
 }
 
 /// R1: a tool row keeps its arguments and its result for the life of the chat,
@@ -1276,6 +1314,47 @@ mod tool_payloads {
         assert!(kept.len() < TOOL_PAYLOAD_MAX_BYTES);
         assert!(kept.starts_with('a'));
         assert!(kept.chars().all(|c| c == 'a' || c == 'é'));
+    }
+
+    /// R3-001 of the transcript review: the bound is on every string a payload
+    /// RETAINS, and an object's key is one of them. A key longer than the bound
+    /// is cut and flagged, so no payload can keep an arbitrarily large key while
+    /// its `truncated` flag claims it holds the whole of a bounded payload.
+    #[test]
+    fn an_oversized_object_key_is_cut_to_the_bound_and_the_row_says_so() {
+        let long_key = "k".repeat(TOOL_PAYLOAD_MAX_BYTES * 4);
+        let mut fields = serde_json::Map::new();
+        fields.insert(long_key, json!("the value the payload keeps"));
+        let state = executed(json!({"command": "env"}), None, Value::Object(fields));
+        let ChatItem::Tool { result, .. } = &state.items[0] else {
+            panic!("no tool row: {:?}", state.items)
+        };
+        let payload = result.as_ref().expect("the result the tool ended with");
+        assert!(
+            payload.truncated,
+            "a cut KEY is a cut: the payload must not claim to be whole"
+        );
+
+        let field = payload.value.as_object().expect("an object");
+        let keys: Vec<&String> = field.keys().collect();
+        assert_eq!(keys.len(), 1, "the one field is kept: {:?}", payload.value);
+        let key: &String = keys[0];
+        assert_eq!(
+            key.len(),
+            TOOL_PAYLOAD_MAX_BYTES,
+            "the key is cut to the bound, like any other string"
+        );
+        assert!(key.chars().all(|c| c == 'k'));
+        assert_eq!(
+            field.get(key),
+            Some(&json!("the value the payload keeps")),
+            "the value under the cut key is kept"
+        );
+        assert!(
+            state.items[0].payload_truncated(),
+            "the row says a payload was cut: {:?}",
+            state.items[0]
+        );
     }
 
     /// The output so far is redundant once the result arrives: the call keeps

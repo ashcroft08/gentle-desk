@@ -57,7 +57,8 @@ pub const TOOL_PAYLOAD_MAX_BYTES: usize = 8 * 1024;
 #[derive(Debug, Clone, PartialEq)]
 pub struct ToolPayload {
     /// The JSON the child sent, with no single string longer than
-    /// [`TOOL_PAYLOAD_MAX_BYTES`].
+    /// [`TOOL_PAYLOAD_MAX_BYTES`] - the string KEYS of its objects included,
+    /// since a key is a string the payload retains like any other.
     pub value: Value,
     /// True when a string of it was cut to fit. The row is not lying about what
     /// it holds: what it holds is the head of a longer payload.
@@ -81,9 +82,21 @@ fn cut_strings(value: &mut Value) -> bool {
         Value::Array(items) => items
             .iter_mut()
             .fold(false, |cut, item| cut | cut_strings(item)),
-        Value::Object(fields) => fields
-            .values_mut()
-            .fold(false, |cut, item| cut | cut_strings(item)),
+        Value::Object(fields) => {
+            // An object's KEY is a string the payload retains just as its values
+            // are: walking only the values let a payload keep a key of any size
+            // and still report `truncated: false`, which is the bypass the bound
+            // exists to prevent (R3-001). Drained and refilled, so a cut key
+            // lands where the whole one was.
+            let mut cut = false;
+            let entries: Vec<(String, Value)> = std::mem::take(fields).into_iter().collect();
+            for (mut key, mut item) in entries {
+                cut |= cut_string(&mut key);
+                cut |= cut_strings(&mut item);
+                fields.insert(key, item);
+            }
+            cut
+        }
         Value::Null | Value::Bool(_) | Value::Number(_) => false,
     }
 }
@@ -242,6 +255,26 @@ impl ChatState {
             ChatItem::Text(message) => Some(message),
             ChatItem::Thinking { .. } | ChatItem::Tool { .. } => None,
         })
+    }
+
+    /// The LAST `limit` text rows of the transcript, oldest first, borrowed: the
+    /// tail [`messages`](Self::messages) would end with, taken from the end of
+    /// the thread instead of counted and skipped from its start.
+    ///
+    /// The cost is the rows that travel, plus the thinking and tool rows mixed in
+    /// among them: the walk starts at the last row and stops as soon as the
+    /// `limit`-th text row is reached, so a long session's head is never touched.
+    /// Counting and skipping instead walks the whole transcript twice (R3-002).
+    pub fn last_text_items(&self, limit: usize) -> impl Iterator<Item = &ChatMessage> + '_ {
+        // Walked backwards from the LAST row, so the walk stops as soon as the
+        // `limit`-th text row is in hand and the transcript's head is never
+        // touched; then put back in the order a thread reads. At most `limit`
+        // borrowed rows are held, and a `Vec` of borrowed rows is the smallest
+        // thing that can reverse a window (`Take`'s own backward walk needs an
+        // exact size count that a filtered row does not have).
+        let mut tail: Vec<&ChatMessage> = self.text_items().rev().take(limit).collect();
+        tail.reverse();
+        tail.into_iter()
     }
 
     /// The derived text projection of the transcript, oldest first: exactly the

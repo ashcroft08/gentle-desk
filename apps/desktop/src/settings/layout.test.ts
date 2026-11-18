@@ -42,6 +42,30 @@ describe('the Settings dialog bounds its own height', () => {
     expect(declarations('.dlg.settings')).toMatch(/--settings-chrome:\s*\d+px\s*;/)
   })
 
+  /**
+   * The smallest chrome the card's own title and Close button can take out of
+   * the window, in px: below it the subtraction leaves no room, which is the
+   * very bug this bound exists to stop.
+   *
+   * Counted from the declarations in app.css: `.dlg` pads 18px above and below
+   * the card (36), the `.dt` title is a 15px line with a 6px bottom margin
+   * (~26), `.dlg.settings` puts its own 14px gap twice around the body (28), and
+   * `.acts` adds a 16px top margin over a `.btn` row of 6px + 1px + ~20px text +
+   * 6px + 1px (~34). That is ~140px with the title on ONE line. A title that
+   * wraps adds a line (~20px), so 160px is the floor a real chrome cannot go
+   * under; `1px`, or any other value that leaves the Close button outside the
+   * window, fails here instead of passing on format alone (R3-003).
+   */
+  const CHROME_FLOOR_PX = 160
+
+  it('subtracts a chrome height a real dialog cannot go under', () => {
+    const pinned = /--settings-chrome:\s*(\d+)px\s*;/.exec(declarations('.dlg.settings'))
+    expect(pinned, 'the card names the chrome it subtracts').not.toBeNull()
+    const chrome = Number(pinned![1])
+
+    expect(chrome).toBeGreaterThanOrEqual(CHROME_FLOOR_PX)
+  })
+
   it('the pane scrolls inside that bound and is allowed to shrink', () => {
     const pane = declarations('.settings-pane')
 
