@@ -18,8 +18,11 @@ import APP_CSS from '../app.css?raw'
 /** One rule's DECLARATIONS, by its exact selector: comments and braces removed. */
 function declarations(selector: string): string {
   // The selector is matched with any spacing around it: reformatting the
-  // stylesheet must not turn this helper into a generic failure (review R2-1).
-  const pattern = new RegExp(`(^|\\n)\\s*${selector.replace('.', '\\.')}\\s*\\{`)
+  // stylesheet must not turn this helper into a generic failure (review R2-1),
+  // and EVERY dot is escaped - with a string pattern only the first one would be,
+  // turning `.dlg.settings` into a one-character wildcard (review R3-001).
+  const exact = selector.replace(/\./g, '\\.')
+  const pattern = new RegExp(`(^|\\n)\\s*${exact}\\s*\\{`)
   const start = pattern.exec(APP_CSS)
   if (start === null) throw new Error(`no rule for ${selector}`)
   const open = start.index + start[0].length
