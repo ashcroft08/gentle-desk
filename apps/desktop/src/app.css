@@ -1430,11 +1430,17 @@ p {
 }
 
 /* The rail and the pane, side by side: the rail is fixed and the pane takes the
-   rest, with the one section drawn there. */
+   rest, with the one section drawn there.
+
+   The body is BOUNDED against the window (ui-density T1): a section can be long
+   - Usage draws every provider, limit and window - and with nothing holding it
+   the card grew past the bottom of the window, pushing its own Close button out
+   of reach. The room left over is the card's title above and its buttons below. */
 .settings-body {
   display: flex;
   gap: 18px;
   min-height: 240px;
+  max-height: calc(100vh - 200px);
 }
 
 .settings-rail {
@@ -1489,10 +1495,15 @@ p {
 .settings-pane {
   flex: 1;
   min-width: 0;
+  /* The thing that scrolls inside the body's bound. `min-height: 0` is what lets
+     a flex child shrink below its content; without it the pane overflows anyway
+     and the bound above does nothing (ui-density T1). */
+  min-height: 0;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  padding: 2px 2px 0 2px;
+  padding: 2px 8px 0 2px;
 }
 
 .settings-pane .pane-body {
