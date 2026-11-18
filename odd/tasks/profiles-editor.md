@@ -618,4 +618,11 @@ es valor de producto".
   maintainer's window held the exe), fmt/clippy clean, vitest 816/816, svelte-check/eslint
   clean, bindings regenerated. The re-look of the apply buttons + dialog + answer line is
   owed in a fresh window.
+- L40 (parent, 2026-11-17): delivery stage 2: #201 merged to main directly (0f5e939) and
+  the composed chains commit cherry-picked onto main (feat/profile-chains-main, 067fd46,
+  clean; cargo workspace 1627/1627, vitest 841/841). The stale L37/L38 entries of the
+  composed branch are superseded by this entry (their lineage references stand as
+  history). Delivery PR to main next; the T5a content was reviewed twice
+  (review-5287fcc224fa785b, review-9da71667ed3c5004) and its delivery range fits the
+  budget.
 
