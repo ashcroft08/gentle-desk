@@ -629,4 +629,11 @@ es valor de producto".
   svelte-check/eslint clean, apply 21 + chain 21. The prior lineage review-5287fcc224fa785b
   reviewed the T5a content as authored; the composition itself is same-content re-stacking,
   and the native assess over it is the parent's next read.
+- L38 (parent, 2026-11-17): the COMPOSED T5a's native review (lineage
+  review-9da71667ed3c5004, high tier, risk+reliability) APPROVED and acknowledged, one new
+  non-blocking advisory: ChainEditor's re-seed effect replaces the user's draft when the
+  store's chain changes under it (another chat's save answering, or a terminal edit
+  re-read) - unsaved typed steps lost without notice; the same-content push test is pinned,
+  a changed-chain one is not. PR: feat/profile-chain-editor -> #201's base, superseding
+  #202.
 
