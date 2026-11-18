@@ -61,6 +61,13 @@ turn)"), and any gpui-kit widget.
   `tool_execution_*` and `thinking_*` events into it instead of the activity
   counter, and replace `crates/gentle-core/tests/chat.rs:651` with the contract
   that now holds. The web changes in this task: none.
+  WIDENED by L5: the decode comes first. `rpc/codec.rs:153-167` builds the three
+  `ToolExecution*` events from `toolCallId`, `toolName` and `isError` only, so
+  `args`, `partialResult` and `result` never reach the reducer; T1 therefore also
+  carries them on `rpc/types.rs:211-222` and decodes them, and updates the three
+  readers that slice `ChatState.messages` directly
+  (`crates/term/src/render.rs:38`, `apps/desktop/src-tauri/src/view.rs:37-38`,
+  `apps/desktop/src-tauri/src/bridge/images.rs:55`).
 - [ ] T2 (S1, S3, S4) web: the tool-call card in our components — icon, title,
   language chip, monospace subject, collapsible body with a tail-clipped
   "N earlier lines" head, and the status/duration footer. Measured before it is
@@ -101,3 +108,21 @@ turn)"), and any gpui-kit widget.
   timestamps; a test that wants the card's "Done 0.2s" passes `now_ms`). Per-item
   drawing notions (icon, language chip, collapsed body) never enter the core: they
   are T2's.
+- L5 (2026-11-18, CORRECTION of L2, found by the implementing worker before any
+  code was written): L2 is wrong about the codec. `crates/gentle-core/src/rpc/codec.rs:153-167`
+  builds `ToolExecutionStart` from `toolCallId` and `toolName`, `ToolExecutionUpdate`
+  from the same two, and `ToolExecutionEnd` from those plus `isError` - `args`,
+  `partialResult` and `result` are parsed out of the line and DROPPED, and
+  `rpc/types.rs:211-222` has no field for them. L2 described the wire JSON, not the
+  Rust variants, which is exactly the mistake this document exists to prevent.
+  Consequences, ruled here: (a) T1 owns the decode, so its surfaces include
+  `crates/gentle-core/src/rpc/` - without it a tool item could carry a command but
+  never an output, and the card T2 must draw would be empty where the maintainer's
+  screenshot shows "14 earlier lines"; (b) `ChatState.messages` goes away as the
+  single-source rule requires, and the three direct readers of that field are
+  inside T1's scope (`crates/term/src/render.rs:38` plus its test double,
+  `apps/desktop/src-tauri/src/view.rs:37-38`,
+  `apps/desktop/src-tauri/src/bridge/images.rs:55`); (c) the web projection is a
+  pure method on `ChatState` in `crates/gentle-core/src/chat/`, called from
+  `view.rs`, so `MessageView` and `apps/desktop/src/contract/bindings.ts` stay
+  byte-identical and the web needs no change and no regeneration.
