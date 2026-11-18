@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "chosen": "01-quiet-cards.html",
+  "handoffs": {
+    "01-quiet-cards.html": {
+      "status": "in_progress",
+      "queued": false,
+      "sentAt": "2026-11-18T22:05:22.709Z",
+      "startedAt": "2026-11-18T22:05:59.154Z",
+      "implementedAt": null,
+      "feature": "odd/tasks/chat-transcript.md",
+      "note": "Wiring the real data into the approved card: the contract exposes the transcript items and the thread renders the tool row and the reasoning row."
+    }
+  }
+}

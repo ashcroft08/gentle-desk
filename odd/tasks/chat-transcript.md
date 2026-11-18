@@ -300,3 +300,17 @@ turn)"), and any gpui-kit widget.
   many small strings is bounded per string and unbounded in total. Both are one
   decision: a per-row budget (count and bytes) that the card also relies on to
   decide what to fold. Recorded, not deferred silently.
+- L14 (2026-11-18, the card is the chosen design and its retention rule):
+  the maintainer saw `design/tool-card/01-quiet-cards.html` and ruled "me gusto el
+  diseno"; the artboard is the chosen one (`gentle_design implement`, handoff in
+  progress). Two consequences recorded here so T2 does not re-decide them:
+  (1) RETENTION, ruled by the maintainer: a tool row keeps **20 lines or 8 KiB,
+  whichever is smaller**. That closes the open aggregate-cap advisory of L13 by
+  making the retained bound a ROW bound rather than a per-string one, and it is the
+  same number the card folds at, so what the core keeps and what the card shows can
+  never disagree.
+  (2) The card is built from `design/system.md` tokens, not by copying the
+  artboard's HTML: the artboard is the visual spec, the tokens are the source.
+  The reasoning row is text with a hairline, never a card, so it does not compete
+  with the tool call - that is the tradeoff the artboard states and the maintainer
+  approved by approving the design.
