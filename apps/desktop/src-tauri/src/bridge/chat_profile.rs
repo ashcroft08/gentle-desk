@@ -31,7 +31,7 @@
 use std::ffi::OsStr;
 use std::path::{Component, Path, PathBuf};
 
-use gentle_app::ChatId;
+use gentle_app::{ChatCommand, ChatId};
 use gentle_core::i18n::Language;
 use gentle_core::rpc::config_store::{
     FallbacksDocument, OrchestratorMode, PinLayer, PinsValue, ProfilesDocument, SetConfigOutcome,
@@ -76,18 +76,49 @@ pub fn compose(chat: &ChatId, read: &ChatConfigRead, session: Option<&str>) -> C
             pins: availability(&read.pins),
         },
         // The save state is the SHELL's, not the read's: `chat_profile` overlays
-        // it from `mode_saves` every time the slice is built (T3-mode).
+        // it from `profile_work` every time the slice is built (T3-mode).
         saving: false,
         save_failed: false,
     }
 }
 
-/// One chat's mode-save state (profiles-editor T3-mode): whether a write is in
-/// flight, and whether the last one failed and wrote nothing.
+/// One chat's profile work state (profiles-editor T3-mode, L18): whether a READ
+/// of that chat's configuration is in flight, whether a mode SAVE is (the switch
+/// is drawn disabled while it is), and whether the last save failed and wrote
+/// nothing.
+///
+/// At most one of each is in flight per chat, and a second ask while one is in
+/// flight is DROPPED rather than queued ([`AppStateHolder::begin_chat_command`]):
+/// a web bug that asked in a loop must never again queue thousands of
+/// `chat-command` threads against one child (L18: 4,570 asks in 25 s, ~4,300 OS
+/// threads alive, 22 s per read). Shell-owned, and dropped with the chat.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub(super) struct ModeSave {
-    pub(super) in_flight: bool,
+pub(super) struct ProfileWork {
+    pub(super) reading: bool,
+    pub(super) saving: bool,
     pub(super) failed: bool,
+}
+
+/// Which profile work a per-chat command does, and so which of its chat's two
+/// slots it takes (profiles-editor L18).
+///
+/// Only the Profile tab's two commands hold one: every other per-chat command
+/// runs as often as it is asked for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ChatWork {
+    Read,
+    Save,
+}
+
+impl ChatWork {
+    /// The slot `command` takes, `None` for a command that takes none.
+    pub(crate) fn of(command: &ChatCommand) -> Option<Self> {
+        match command {
+            ChatCommand::ReadChatProfile { .. } => Some(Self::Read),
+            ChatCommand::SetChatProfileMode { .. } => Some(Self::Save),
+            _ => None,
+        }
+    }
 }
 
 /// The session-file seam of this run: the reader the Settings panes share and
@@ -310,23 +341,37 @@ impl AppStateHolder {
     /// dropped (review R4-late-read-reinstalls-view, R1-closed-chat-view-restored).
     /// `None` too when the read reached no store: the tab then keeps exactly what
     /// it drew (L11-4).
+    ///
+    /// Either way the read's slot comes free here: this is the command's answer,
+    /// so the chat may be asked again (L18).
     pub fn note_chat_profile(&self, chat: &ChatId, read: &ChatConfigRead) -> Option<ViewState> {
         // The app state is the authority on the open set, and it is read before
         // any shell lock is taken, as the shell's other reads are.
         if !self.is_open(chat) {
+            // A closed chat drops its work state with its view, so an unanswered
+            // read's slot goes with it rather than waiting for ever (L18).
+            lock(&self.profile_work).remove(chat.as_str());
             return None;
         }
-        if !reached_a_store(read) {
-            return None;
-        }
-        // A read that answered is the truth the tab draws: it clears the notice
-        // of a failed mode save (T3-mode: the next successful read, no timer).
-        // A save still in flight is NOT touched: the write lives until its own
-        // answer, so a mid-save read may not re-enable the switch
-        // (review R3-001, correction of ab09880).
+        let reached = reached_a_store(read);
         {
-            let mut saves = lock(&self.mode_saves);
-            saves.entry(chat.as_str().to_owned()).or_default().failed = false;
+            let mut held = lock(&self.profile_work);
+            if let Some(state) = held.get_mut(chat.as_str()) {
+                // Nothing of this read is in flight any more, whatever it
+                // reached: a read that answered nothing still answered (L18).
+                state.reading = false;
+                // A read that answered IS the truth the tab draws: it clears the
+                // notice of a failed mode save (T3-mode: the next successful
+                // read, no timer). A save still in flight is NOT touched: the
+                // write lives until its own answer, so a mid-save read may not
+                // re-enable the switch (review R3-001, correction of ab09880).
+                if reached {
+                    state.failed = false;
+                }
+            }
+        }
+        if !reached {
+            return None;
         }
         let view = self.compose_view(chat, read);
         self.install_chat_profile(view);
@@ -348,9 +393,12 @@ impl AppStateHolder {
     /// not answer at all).
     pub fn note_chat_profile_unread(&self, chat: &ChatId) -> Option<ViewState> {
         if !self.is_open(chat) {
-            lock(&self.mode_saves).remove(chat.as_str());
+            lock(&self.profile_work).remove(chat.as_str());
             return None;
         }
+        // The read never ran, so the slot its command took (the one-in-flight
+        // cap, L18) is already given back by run_chat_commands's branch; the
+        // view here is the answer the web draws.
         let view = self.compose_view(chat, &ChatConfigRead::unasked());
         self.install_chat_profile(view);
         Some(self.view())
@@ -389,16 +437,17 @@ impl AppStateHolder {
         read: &ChatConfigRead,
     ) -> Option<ViewState> {
         if !self.is_open(chat) {
-            lock(&self.mode_saves).remove(chat.as_str());
+            lock(&self.profile_work).remove(chat.as_str());
             return None;
         }
-        self.note_mode_save(
-            chat,
-            ModeSave {
-                in_flight: false,
-                failed: !result.saved(),
-            },
-        );
+        // One lock, one entry: the save's own answer, and nothing about a read
+        // that may be in flight at the same time (L18).
+        {
+            let mut held = lock(&self.profile_work);
+            let state = held.entry(chat.as_str().to_owned()).or_default();
+            state.saving = false;
+            state.failed = !result.saved();
+        }
         if reached_a_store(read) {
             let view = self.compose_view(chat, read);
             self.install_chat_profile(view);
@@ -406,12 +455,47 @@ impl AppStateHolder {
         Some(self.view())
     }
 
-    /// Marks a mode save of `chat` as in flight, before its command is run: the
-    /// slice the intent answers with disables the switch until the save answers
-    /// (profiles-editor T3-mode).
-    pub(super) fn begin_chat_mode_save(&self, chat: &ChatId) {
-        let mut saves = lock(&self.mode_saves);
-        saves.entry(chat.as_str().to_owned()).or_default().in_flight = true;
+    /// Gives back the slot `work` of `chat` when the worker thread that would
+    /// have run its command could not be CREATED (profiles-editor L18, L17(a)):
+    /// a command that never ran left nothing in flight, so the chat's next ask
+    /// must not be dropped for ever.
+    ///
+    /// Only the slot comes free: what the tab is told about the failure is the
+    /// fold's own business, never this.
+    pub fn note_chat_work_unstarted(&self, chat: &ChatId, work: ChatWork) {
+        let mut held = lock(&self.profile_work);
+        let Some(state) = held.get_mut(chat.as_str()) else {
+            return;
+        };
+        match work {
+            ChatWork::Read => state.reading = false,
+            ChatWork::Save => state.saving = false,
+        }
+    }
+
+    /// Takes the profile WORK `command` does for its chat, answering whether the
+    /// command may be handed to a worker at all (profiles-editor L18).
+    ///
+    /// One read and one mode save are in flight per chat at most, and a duplicate
+    /// ask is DROPPED here - not queued - because the tab's coalesced read and
+    /// its disabled switch already make the second one unnecessary, and because
+    /// the point of the cap is to leave that chat's child free. Every other
+    /// command takes no slot and is always run.
+    pub(super) fn begin_chat_command(&self, command: &ChatCommand) -> bool {
+        let Some(work) = ChatWork::of(command) else {
+            return true;
+        };
+        let mut held = lock(&self.profile_work);
+        let state = held.entry(command.chat().as_str().to_owned()).or_default();
+        let slot = match work {
+            ChatWork::Read => &mut state.reading,
+            ChatWork::Save => &mut state.saving,
+        };
+        if *slot {
+            return false;
+        }
+        *slot = true;
+        true
     }
 
     /// The view of one read, built off every lock it needs.
@@ -430,11 +514,6 @@ impl AppStateHolder {
         *held = Some(view);
     }
 
-    /// One chat's save state, written without holding any other lock.
-    fn note_mode_save(&self, chat: &ChatId, state: ModeSave) {
-        lock(&self.mode_saves).insert(chat.as_str().to_owned(), state);
-    }
-
     /// Whether `chat` is still one of the app's open chats: the state's own set,
     /// which the user's Close chat takes a chat out of (`Chats::close`). Nothing
     /// else decides that an answer still belongs to a live chat.
@@ -448,19 +527,22 @@ impl AppStateHolder {
     /// The save state is overlaid here, from the shell's own map, so every slice
     /// is built with the same truth about a write in flight: a push, an intent's
     /// answer and the first read a view makes all carry it (profiles-editor
-    /// T3-mode). The two locks are taken one after another, never together.
+    /// T3-mode). Only a SAVE disables the switch: a read in flight is the
+    /// shell's own business and travels in no slice (L18).
+    /// The two locks are taken one after another, never together.
     pub(super) fn chat_profile(&self) -> Option<ChatProfileView> {
         let mut view = lock(&self.chat_profile).clone()?;
-        let saves = lock(&self.mode_saves);
-        let state = saves.get(&view.chat_id).copied().unwrap_or_default();
-        view.saving = state.in_flight;
+        let work = lock(&self.profile_work);
+        let state = work.get(&view.chat_id).copied().unwrap_or_default();
+        view.saving = state.saving;
         view.save_failed = state.failed;
         Some(view)
     }
 
-    /// Drops the view when it is that chat's, and that chat's save state with it.
-    /// Read by the fold that closes a chat: a view may not outlive the chat it was
-    /// read for (L11-4), and neither may a write that will never answer.
+    /// Drops the view when it is that chat's, and that chat's work state with it
+    /// (which also frees any slot an unanswered command held). Read by the fold
+    /// that closes a chat: a view may not outlive the chat it was read for
+    /// (L11-4), and neither may a write that will never answer.
     pub(super) fn forget_chat_profile(&self, chat: &ChatId) {
         {
             let mut held = lock(&self.chat_profile);
@@ -471,7 +553,7 @@ impl AppStateHolder {
                 *held = None;
             }
         }
-        lock(&self.mode_saves).remove(chat.as_str());
+        lock(&self.profile_work).remove(chat.as_str());
     }
 }
 

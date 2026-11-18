@@ -50,6 +50,8 @@ use crate::theme::WindowTheme;
 use crate::workspace;
 
 mod chat_profile;
+
+pub use chat_profile::ChatWork;
 mod config;
 mod fatal;
 mod images;
@@ -153,10 +155,14 @@ pub struct AppStateHolder {
     /// armed no session file is read, so a view says the chat uses the default -
     /// which is what a chat with no file says too.
     session_files: Mutex<Option<chat_profile::SessionFiles>>,
-    /// The Profile tab's mode saves, one entry per chat: whether a write is in
-    /// flight (the switch is disabled while it is) and whether the last one
-    /// failed (profiles-editor T3-mode). Shell-owned, and dropped with the chat.
-    mode_saves: Mutex<std::collections::HashMap<String, chat_profile::ModeSave>>,
+    /// Each chat's profile WORK (profiles-editor T3-mode, L18), one entry per
+    /// chat: whether a read of that chat's configuration is in flight, whether a
+    /// mode save is (the switch is disabled while it is: the slice carries only
+    /// that one), and whether the last save failed. Shell-owned, and dropped with
+    /// the chat. The two slots are what the one-in-flight cap is made of
+    /// ([`AppStateHolder::dispatch_commands`],
+    /// [`AppStateHolder::deliver_chat_commands`]).
+    profile_work: Mutex<std::collections::HashMap<String, chat_profile::ProfileWork>>,
     /// The Account pane's slice (0.1.12, T3): the provider names the shell's
     /// store lists and what its own check said about each.
     auth: Mutex<AuthView>,
@@ -227,19 +233,29 @@ impl AppStateHolder {
         // it is a per-chat command: ONE chat's own child is where that chat's
         // profiles and its worktree's pin live. The answer is the slice as it
         // stands, and the read pushes what it found when it lands (`bridge::chat_profile`).
+        //
+        // At most ONE read per chat is in flight (L18): an ask that arrives while
+        // one runs is DROPPED here - answered with the slice as it stands and no
+        // command - because the tab's own ask is already coalesced and the point
+        // of the cap is to leave that chat's child free (the measured storm was
+        // 4,570 asks in 25 s and ~4,300 worker threads).
         if let UiIntent::RefreshChatProfile { chat_id } = &intent {
-            return (
-                self.view(),
-                vec![gentle_app::ChatCommand::ReadChatProfile {
-                    chat: crate::intent::chat_for(&state, chat_id),
-                }],
-            );
+            let chat = crate::intent::chat_for(&state, chat_id);
+            let command = gentle_app::ChatCommand::ReadChatProfile { chat };
+            if !self.begin_chat_command(&command) {
+                return (self.view(), Vec::new());
+            }
+            return (self.view(), vec![command]);
         }
         // Saving one profile's mode (profiles-editor T3-mode, S2, S3) is the
         // same kind of per-chat command: the chat's own child holds the
         // document, the token and the worktree that a write needs. The write
         // runs on a worker thread, so the slice this answers with already says
         // `saving`, which is what disables the switch until the answer lands.
+        //
+        // One save per chat too (L18): a second SaveChatProfileMode while one is
+        // in flight answers the slice as it stands and writes nothing, which is
+        // also what the review asked for (R1-002/R3-002).
         if let UiIntent::SaveChatProfileMode {
             chat_id,
             profile,
@@ -247,15 +263,15 @@ impl AppStateHolder {
         } = &intent
         {
             let chat = crate::intent::chat_for(&state, chat_id);
-            self.begin_chat_mode_save(&chat);
-            return (
-                self.view(),
-                vec![gentle_app::ChatCommand::SetChatProfileMode {
-                    chat,
-                    profile: profile.clone(),
-                    mode: crate::intent::mode_of(*mode),
-                }],
-            );
+            let command = gentle_app::ChatCommand::SetChatProfileMode {
+                chat,
+                profile: profile.clone(),
+                mode: crate::intent::mode_of(*mode),
+            };
+            if !self.begin_chat_command(&command) {
+                return (self.view(), Vec::new());
+            }
+            return (self.view(), vec![command]);
         }
         match crate::intent::to_intent(&state, intent) {
             Some(intent) => self.apply(gentle_app::Input::Intent(intent)),
@@ -298,6 +314,14 @@ impl AppStateHolder {
     /// sink starts a worker per command and returns, so this thread is never the
     /// one waiting on a child's pipe (S3).
     pub fn deliver_chat_commands(&self, commands: Vec<gentle_app::ChatCommand>) {
+        // The same one-in-flight cap the intent path keeps (L18): a profile
+        // command whose work is already in flight for its chat is DROPPED here
+        // too, so a child-event fold cannot queue a second read behind the first
+        // and nothing that holds no slot is ever filtered out.
+        let commands: Vec<gentle_app::ChatCommand> = commands
+            .into_iter()
+            .filter(|command| self.begin_chat_command(command))
+            .collect();
         if commands.is_empty() {
             return;
         }
