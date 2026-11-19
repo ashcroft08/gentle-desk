@@ -22,6 +22,17 @@
       "status": "open",
       "sentAt": "2026-11-19T00:28:36.239Z",
       "resolvedAt": null
+    },
+    {
+      "id": "djtvjqll",
+      "file": "01-dock.html",
+      "selector": "body > div > div:nth-of-type(1) > div > div:nth-of-type(3) > span:nth-of-type(4)",
+      "excerpt": "kallari_pagina_web · listo 43 Super YOLO",
+      "comment": "solo deja eso de Super Yolo , elimina lo demas",
+      "createdAt": "2026-11-19T00:31:50.277Z",
+      "status": "open",
+      "sentAt": "2026-11-19T00:31:50.324Z",
+      "resolvedAt": null
     }
   ]
 }
