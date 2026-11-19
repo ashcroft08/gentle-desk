@@ -1,150 +1,143 @@
 <!doctype html>
 <html lang="es" data-theme="dark">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Composer dock - A: la fila de estado y los chips</title>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Composer dock - B: apretado, sin cajas</title>
 <style>
-:root,[data-theme="dark"]{--bg:#0e1116;--surface:#151a21;--surface2:#1c222b;--border:#2b333d;--text:#e4e8ee;--muted:#9aa4b2;--faint:#7d8593;--accent:#7aa2f7;--tint:rgba(122,162,247,.14);--success:#7edc9a;--warning:#e7b455;--danger:#ff8585;--shadow:0 8px 24px rgba(0,0,0,.45)}
-[data-theme="light"]{--bg:#f2f4f7;--surface:#ffffff;--surface2:#e9edf2;--border:#cfd5dd;--text:#17202a;--muted:#576272;--faint:#6b7686;--accent:#2e5bd7;--tint:rgba(46,91,215,.10);--success:#166e38;--warning:#8a5800;--danger:#c22f37;--shadow:0 8px 24px rgba(23,32,42,.18)}
+:root,[data-theme="dark"]{--bg:#0e1116;--surface:#151a21;--surface2:#1c222b;--border:#2b333d;--text:#e4e8ee;--muted:#9aa4b2;--faint:#7d8593;--accent:#7aa2f7;--tint:rgba(122,162,247,.14);--success:#7edc9a;--warning:#e7b455;--danger:#ff8585}
+[data-theme="light"]{--bg:#f2f4f7;--surface:#ffffff;--surface2:#e9edf2;--border:#cfd5dd;--text:#17202a;--muted:#576272;--faint:#6b7686;--accent:#2e5bd7;--tint:rgba(46,91,215,.10);--success:#166e38;--warning:#8a5800;--danger:#c22f37}
 *{box-sizing:border-box}
 html,body{margin:0}
-body{background:var(--bg);color:var(--text);font:14px/1.55 -apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
-.page{max-width:880px;margin:0 auto;padding:26px 20px 70px}
-.sheet{margin:0 0 34px}
-.sheet>h2{font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:var(--faint);margin:0 0 10px;font-weight:600}
-.note{color:var(--muted);font-size:12.5px;margin:0 0 14px;max-width:66ch}
+body{background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+.page{max-width:900px;margin:0 auto;padding:22px 18px 60px}
+h2{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin:0 0 8px;font-weight:600}
+.note{color:var(--muted);font-size:12px;margin:0 0 12px;max-width:70ch}
 .note b{color:var(--text);font-weight:600}
 .mono{font-family:ui-monospace,SFMono-Regular,"Cascadia Mono",Consolas,monospace}
+.sheet{margin:0 0 32px}
+.stage{border:1px solid var(--border);border-radius:10px;background:var(--bg);padding:0;overflow:hidden}
 
-/* thread tail + the status row */
-.thread{display:flex;flex-direction:column;gap:12px;padding:16px;border:1px solid var(--border);border-radius:12px;background:var(--surface)}
-.msg p{margin:0}
-.you{align-self:flex-end;background:var(--tint);border-radius:10px;padding:8px 12px;max-width:48ch;font-size:13.5px}
+/* ---- one message column, no card around the state */
+.talk{padding:14px 16px 0}
+.you{margin-left:auto;width:fit-content;background:var(--tint);border-radius:9px;padding:6px 11px;font-size:13.5px;max-width:46ch}
 
-/* the reasoning row and the activity row share one anatomy: quiet, 12px, hairline icons */
-.line{display:flex;align-items:center;gap:7px;color:var(--muted);font-size:12.5px}
-.line .spark{color:var(--accent);font-size:13px;line-height:1}
-.line .spin{width:11px;height:11px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .9s linear infinite;flex:none}
+/* the state: ONE faint line, 11.5px, no box, no glyph soup */
+.state{display:flex;align-items:center;gap:6px;padding:10px 16px 0;font-size:11.5px;color:var(--faint)}
+.state .spin{width:9px;height:9px;border:1.5px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .9s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
-@media (prefers-reduced-motion: reduce){.spin{animation:none}*{transition:none!important}}
-.line .dur{font-variant-numeric:tabular-nums;color:var(--faint);font-size:12px;background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:0 5px}
-.line .sep{color:var(--border)}
-.sub{display:flex;align-items:center;gap:12px;color:var(--faint);font-size:11.5px;flex-wrap:wrap}
-.sub .what{color:var(--muted)}
-.sub .dot{width:7px;height:7px;border-radius:50%;background:var(--accent);flex:none}
-.sub .folder{display:inline-flex;align-items:center;gap:5px;color:var(--muted)}
-.sub svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
-.pill{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--border);border-radius:999px;padding:1px 8px;font-size:11px;color:var(--muted);background:var(--surface2)}
-.pill.readonly{cursor:default}
+@media (prefers-reduced-motion:reduce){.spin{animation:none}*{transition:none!important}}
+.state .t{color:var(--muted)}
+.state .n{font-variant-numeric:tabular-nums}
+.think{padding:6px 16px 0;font-size:11.5px;color:var(--faint);display:flex;align-items:center;gap:6px}
+.think .spark{color:var(--accent);font-size:11px}
+.think em{font-style:normal;color:var(--muted);font-size:12.5px;display:block;margin:3px 0 0 16px;border-left:1px solid var(--border);padding-left:9px}
 
-/* the composer */
-.dock{max-width:var(--chat-max,820px);margin:0 auto;border:1px solid var(--border);border-radius:14px;background:var(--surface);box-shadow:var(--shadow);overflow:hidden}
-.dock .box{padding:14px 16px 10px;color:var(--faint);font-size:14.5px}
-.dock .row{display:flex;align-items:center;gap:8px;padding:0 12px 10px;flex-wrap:nowrap;min-width:0}
-.chip{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);border-radius:7px;padding:4px 8px;font-size:12px;white-space:nowrap;max-width:220px;min-width:0}
-.chip .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
-.chip svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
-.chip:hover{color:var(--text);border-color:var(--faint)}
-.chip .caret{width:9px;height:9px;opacity:.7}
-.chip.accent{border-color:rgba(122,162,247,.45);color:var(--accent);background:var(--tint)}
-.ic{width:30px;height:30px;display:inline-grid;place-items:center;border:0;background:transparent;color:var(--muted);border-radius:8px;cursor:pointer;flex:none;padding:0}
-.ic:hover{background:var(--surface2);color:var(--text);box-shadow:inset 0 0 0 1px var(--border)}
-.ic svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-.ic.fill{background:var(--accent);color:var(--bg)}
-.grow{flex:1;min-width:8px}
-/* context: the percent, its bar, and the window only on hover */
-.ctx{display:inline-flex;align-items:center;gap:7px;font-variant-numeric:tabular-nums;font-size:12px;color:var(--muted);flex:none}
-.ctx .bar{width:52px;height:3px;border-radius:2px;background:var(--border);overflow:hidden}
-.ctx .bar i{display:block;height:100%;width:6%;background:var(--accent)}
-.ctx.near .bar i{background:var(--warning)}
-.hint{display:flex;justify-content:center;gap:14px;color:var(--faint);font-size:11.5px;padding:0 0 10px}
-.hint kbd{font:inherit;color:var(--muted)}
+/* ---- the dock: ONE border, everything inside is text */
+.dock{margin:14px 16px 0;border:1px solid var(--border);border-radius:12px;background:var(--surface)}
+.dock .in{padding:12px 14px 8px;color:var(--faint);font-size:14px}
 
-/* attachments */
-.atts{display:flex;gap:8px;flex-wrap:wrap;padding:0 12px 10px}
-.att{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);background:var(--surface2);border-radius:8px;padding:4px 8px;font-size:12px;color:var(--muted);max-width:340px}
-.att svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.8;flex:none}
-.att .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.att .x{background:none;border:0;color:var(--faint);cursor:pointer;padding:0 2px;font:inherit}
-.att.warn{border-color:rgba(231,180,85,.45);background:rgba(231,180,85,.10);color:var(--warning)}
-.att .why{color:var(--warning);font-size:11px;white-space:nowrap}
+/* context: a 2px rail ABOVE the row, % left, window right (the maintainer's screenshot) */
+.ctx{padding:0 2px;margin:0 0 8px}
+.ctx .rail{height:2px;background:var(--border);border-radius:1px;overflow:hidden}
+.ctx .rail i{display:block;height:100%;width:6%;background:var(--accent)}
+.ctx.near .rail i{background:var(--warning)}
+.ctx .lab{display:flex;justify-content:space-between;font-size:10.5px;color:var(--faint);padding-top:3px;font-variant-numeric:tabular-nums}
+
+/* the row: borderless, 12px, the folder name is the only bold thing */
+.row{display:flex;align-items:center;gap:10px;padding:0 12px 10px;min-width:0}
+.seg{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);white-space:nowrap;min-width:0;background:none;border:0;padding:0;font-family:inherit;cursor:pointer}
+.seg:hover{color:var(--text)}
+.seg .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.seg svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.seg .car{width:9px;height:9px;opacity:.65}
+.seg .dot{width:6px;height:6px;border-radius:50%;background:var(--warning);flex:none}
+.seg.name{color:var(--text);font-weight:600}
+.seg.name .pre{color:var(--faint);font-weight:400}
+.att{width:26px;height:26px;display:inline-grid;place-items:center;border:0;background:none;color:var(--faint);cursor:pointer;border-radius:6px;flex:none;padding:0}
+.att:hover{color:var(--text);background:var(--surface2)}
+.att svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.grow{flex:1;min-width:6px}
+.send{width:24px;height:24px;border-radius:50%;border:0;background:var(--accent);color:var(--bg);display:inline-grid;place-items:center;cursor:pointer;flex:none;padding:0}
+.send svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.hint{display:flex;justify-content:center;gap:12px;color:var(--faint);font-size:10.5px;padding:0 12px 9px}
+.hint b{color:var(--muted);font-weight:400}
+
+/* the right side of the state line: quiet pills only where they matter */
+.right{margin-left:auto;display:inline-flex;align-items:center;gap:10px;font-size:11px;color:var(--faint)}
+.tag{display:inline-flex;align-items:center;gap:4px;color:var(--muted)}
+.tag.hot{color:var(--danger);border:1px solid currentColor;border-radius:999px;padding:0 7px;font-size:10.5px}
+.tag svg{width:11px;height:11px;fill:none;stroke:currentColor;stroke-width:1.8}
 </style>
 </head>
 <body>
 <div class="page">
 
-  <p class="note"><b>A — la fila de estado y el composer.</b> Todo con tokens del sistema: los seis temas siguen funcionando porque no hay un color propio. Lo que la otra app muestra y nosotros <b>no podemos</b>: los tokens de salida y el costo — el hijo no los manda, así que no se dibujan.</p>
-
   <div class="sheet">
-    <h2>1 · Mientras piensa: dos líneas, no cuatro</h2>
-    <p class="note">La fila de razonamiento y la de actividad comparten anatomía (12px, icono fino, chip de tiempo). El nombre del proyecto aparece <b>una sola vez</b> y sin la ruta completa. El modo va como <b>lectura</b>: un switch que no puede cambiar nada sería una mentira.</p>
-    <div class="thread">
-      <div class="msg you"><p>¿por qué falla el ls en ese worktree?</p></div>
+    <h2>B · el dock, sin cajas</h2>
+    <p class="note">Lo único con borde es el composer. Adentro todo es <b>texto de 12px</b>: el nombre de la carpeta es lo único en blanco y semibold, con la cola de la ruta atenuada. El contexto es <b>una línea de 2px arriba</b>, con el número a la izquierda y la ventana a la derecha — no un chip.</p>
 
-      <div class="line">
+    <div class="stage">
+
+      <div class="talk">
+        <div class="you">cómo mejoro el header del proyecto</div>
+      </div>
+
+      <div class="think">
+        <span class="spark">✳</span><span>Pensamiento</span><span class="n">1.2s</span>
+        <em>Antes de proponer nada miro cómo está armado el header hoy.</em>
+      </div>
+
+      <div class="state">
         <span class="spin"></span>
-        <span>trabajando…</span>
-        <span class="dur">12s</span>
-      </div>
-      <div class="sub">
-        <span class="folder"><svg viewBox="0 0 24 24"><path d="M3 7h6l2 2h10v10H3z"/></svg>Proyecto</span>
-        <span class="separator"></span>
-        <span class="folder"><svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="12" r="2"/><path d="M8 6h6a2 2 0 012 2v2M8 18h6a2 2 0 002-2v-2"/></svg>main</span>
-        <span class="sep">·</span>
-        <span class="pill readonly" title="Sólo lectura: pi se niega a conceder YOLO fuera de la TUI">Normal</span>
-        <span class="grow"></span>
-        <span class="ctx" title="ventana de 200k"><span class="bar"><i></i></span>6%</span>
+        <span class="t">trabajando…</span>
+        <span class="n">12s</span>
+        <span class="right">
+          <span class="tag">kallari_pagina_web · listo</span>
+          <span class="tag"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg>43</span>
+          <span class="tag hot"><svg viewBox="0 0 24 24"><path d="M12 3l7 17-7-4-7 4z"/></svg>Super YOLO</span>
+        </span>
       </div>
 
-      <div class="line">
-        <span class="spark">✳</span>
-        <span>Pensamiento</span>
-        <span class="dur">1.2s</span>
-        <p style="margin:0;color:var(--muted);font-size:13px;border-left:2px solid var(--border);padding-left:10px">Es OneDrive sosteniendo el directorio, no el repo.</p>
+      <div class="dock">
+        <div class="in">¿y el plan de migración?</div>
+        <div class="ctx"><div class="rail"><i></i></div><div class="lab"><span>6%</span><span>1M</span></div></div>
+        <div class="row">
+          <button class="att" title="Adjuntar archivos"><svg viewBox="0 0 24 24"><path d="M21 11l-8.5 8.5a5 5 0 01-7-7L14 4a3.5 3.5 0 015 5l-8.5 8.5a2 2 0 01-3-3L15 6"/></svg></button>
+          <button class="seg"><span class="dot"></span><span class="t">Claude Sonnet 5</span><svg class="car" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
+          <button class="seg"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v8"/></svg><span class="t">medium</span></button>
+          <button class="seg name" title="C:\Users\josep\OneDrive\Desktop\Proyectos\Kallari_Pagina_web"><svg viewBox="0 0 24 24"><path d="M3 7h6l2 2h10v10H3z"/></svg><span class="pre">…Desktop\Proyectos\&nbsp;</span>Kallari_Pagina_web</button>
+          <button class="seg" title="rama actual"><svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="12" r="2"/><path d="M8 6h6a2 2 0 012 2v2M8 18h6a2 2 0 002-2v-2"/></svg><span class="t">master</span></button>
+          <span class="grow"></span>
+          <button class="send" title="Enviar"><svg viewBox="0 0 24 24"><path d="M12 19V5"/><path d="M6 11l6-6 6 6"/></svg></button>
+        </div>
+        <div class="hint"><span><b>↵</b> envía</span><span><b>⇧↵</b> salto</span><span><b>!</b> comando</span><span><b>/</b> comandos</span><span><b>Ctrl+N</b> sesión</span></div>
       </div>
+      <div style="height:14px"></div>
     </div>
   </div>
 
   <div class="sheet">
-    <h2>2 · El composer: carpeta, rama, contexto, archivos</h2>
-    <p class="note">La carpeta muestra <b>sólo el último segmento</b>; la ruta completa vive en el tooltip. La rama <b>no aparece si no hay repo</b> — nada de un chip vacío o un guión. El <code class="mono">%</code> toma el acento cuando pasa el 75%.</p>
-    <div class="dock">
-      <div class="box">corré <span class="mono">ls</span> y contame qué hay</div>
-
-      <div class="atts">
-        <span class="att"><svg viewBox="0 0 24 24"><path d="M14 3v5h5"/><path d="M6 3h8l5 5v13H6z"/></svg><span class="t">cv_es.tex</span><button class="x" aria-label="Quitar">×</button></span>
-        <span class="att warn" title="La ruta está fuera del workspace: el agente puede no poder leerla"><svg viewBox="0 0 24 24"><path d="M14 3v5h5"/><path d="M6 3h8l5 5v13H6z"/></svg><span class="t">C:\Users\josep\Desktop\notas.md</span><span class="why">fuera del workspace</span><button class="x" aria-label="Quitar">×</button></span>
+    <h2>C · los dos bordes que importan</h2>
+    <p class="note">Sin repo: el segmento de rama <b>no existe</b>, no queda hueco. Contexto al 82%: la línea pasa a ámbar, sin agregar ningún chip. El archivo adjunto es la única cosa que gana una fila propia, porque es contenido, no cromo.</p>
+    <div class="stage">
+      <div class="state"><span class="spin"></span><span class="t">trabajando…</span><span class="n">4s</span>
+        <span class="right"><span class="tag">Scarlet · listo</span><span class="tag">Normal</span></span>
       </div>
-
-      <div class="row">
-        <button class="ic" title="Adjuntar archivos"><svg viewBox="0 0 24 24"><path d="M21 11l-8.5 8.5a5 5 0 01-7-7L14 4a3.5 3.5 0 015 5l-8.5 8.5a2 2 0 01-3-3L15 6"/></svg></button>
-        <span class="chip"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12h8"/></svg><span class="t">DeepSeek V4.1 Flash</span><svg class="caret" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span>
-        <span class="chip"><span class="t">high</span><svg class="caret" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span>
-        <span class="chip" title="C:\Users\josep\dev\Proyecto"><svg viewBox="0 0 24 24"><path d="M3 7h6l2 2h10v10H3z"/></svg><span class="t">Proyecto</span></span>
-        <span class="chip" title="rama actual"><svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="12" r="2"/><path d="M8 6h6a2 2 0 012 2v2M8 18h6a2 2 0 002-2v-2"/></svg><span class="t">main</span></span>
-        <span class="grow"></span>
-        <span class="ctx" title="ventana de 200k tokens"><span class="bar"><i></i></span>6%</span>
-        <button class="ic fill" title="Enviar"><svg viewBox="0 0 24 24"><path d="M12 20V5"/><path d="M6 11l6-6 6 6"/></svg></button>
+      <div class="dock">
+        <div style="padding:10px 12px 0;display:flex;gap:6px;flex-wrap:wrap">
+          <span class="seg" style="border:1px solid var(--border);border-radius:6px;padding:2px 6px;font-size:11px"><svg viewBox="0 0 24 24"><path d="M14 3v5h5"/><path d="M6 3h8l5 5v13H6z"/></svg><span class="t">cv_es.tex</span><span style="color:var(--faint)">×</span></span>
+          <span class="seg" style="border:1px solid rgba(231,180,85,.45);color:var(--warning);border-radius:6px;padding:2px 6px;font-size:11px" title="Fuera del workspace: el agente puede no poder leerla"><svg viewBox="0 0 24 24"><path d="M14 3v5h5"/><path d="M6 3h8l5 5v13H6z"/></svg><span class="t">C:\Users\josep\Desktop\notas.md</span><span>×</span></span>
+        </div>
+        <div class="ctx near"><div class="rail"><i style="width:82%"></i></div><div class="lab"><span>82%</span><span>200k</span></div></div>
+        <div class="row">
+          <button class="att"><svg viewBox="0 0 24 24"><path d="M21 11l-8.5 8.5a5 5 0 01-7-7L14 4a3.5 3.5 0 015 5l-8.5 8.5a2 2 0 01-3-3L15 6"/></svg></button>
+          <button class="seg"><span class="dot" style="background:var(--accent)"></span><span class="t">DeepSeek V4.1 Flash</span><svg class="car" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
+          <button class="seg name"><svg viewBox="0 0 24 24"><path d="M3 7h6l2 2h10v10H3z"/></svg>Scarlet</button>
+          <span class="grow"></span>
+          <button class="send"><svg viewBox="0 0 24 24"><path d="M12 19V5"/><path d="M6 11l6-6 6 6"/></svg></button>
+        </div>
+        <div class="hint"><span><b>↵</b> envía</span><span><b>⇧↵</b> salto</span><span><b>/</b> comandos</span></div>
       </div>
-
-      <div class="hint"><span><kbd>↵</kbd> envía</span><span><kbd>⇧↵</kbd> salto de línea</span><span><kbd>Ctrl+N</kbd> nueva sesión</span></div>
+      <div style="height:14px"></div>
     </div>
-  </div>
-
-  <div class="sheet">
-    <h2>3 · Los estados que importan</h2>
-    <p class="note">Contexto cerca del límite, sin repo, y un archivo que el agente no va a poder abrir. Cada caso tiene UNA señal, no tres.</p>
-    <div class="dock" style="margin-bottom:12px">
-      <div class="box" style="color:var(--faint)">¿y el plan de migración?</div>
-      <div class="row">
-        <button class="ic"><svg viewBox="0 0 24 24"><path d="M21 11l-8.5 8.5a5 5 0 01-7-7L14 4a3.5 3.5 0 015 5l-8.5 8.5a2 2 0 01-3-3L15 6"/></svg></button>
-        <span class="chip"><span class="t">Claude Sonnet</span><svg class="caret" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span>
-        <span class="chip"><svg viewBox="0 0 24 24"><path d="M3 7h6l2 2h10v10H3z"/></svg><span class="t">Scarlet</span></span>
-        <span class="grow"></span>
-        <span class="ctx near" title="ventana de 200k tokens"><span class="bar"><i style="width:82%"></i></span>82%</span>
-        <button class="ic fill"><svg viewBox="0 0 24 24"><path d="M12 20V5"/><path d="M6 11l6-6 6 6"/></svg></button>
-      </div>
-      <div class="hint" style="justify-content:flex-start;padding-left:14px"><span style="color:var(--warning)">sin rama: no hay repo en esta carpeta</span></div>
-    </div>
-    <p class="note" style="margin:0"><b>Sin repo</b> el chip de rama simplemente <b>no se dibuja</b>: no hay hueco, no hay guión, no hay "detached".</p>
   </div>
 
 </div>
