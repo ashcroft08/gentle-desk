@@ -125,8 +125,8 @@ fn the_open_of_a_stored_chat_claims_one_read_and_the_file_paints_the_thread() {
         .note_transcript(&read.read())
         .expect("the read's rows are pushed");
 
-    assert_eq!(
-        drawn.transcript_provisional, true,
+    assert!(
+        drawn.transcript_provisional,
         "what is drawn right now came from the file"
     );
     assert_eq!(
@@ -175,8 +175,8 @@ fn the_childs_answer_replaces_the_rows_and_a_late_read_is_dropped() {
         rows(&answered),
         [("msg-0".to_owned(), "the child's own turn".to_owned())]
     );
-    assert_eq!(
-        answered.transcript_provisional, false,
+    assert!(
+        !answered.transcript_provisional,
         "the child's answer is the authority, always"
     );
 
@@ -192,7 +192,7 @@ fn the_childs_answer_replaces_the_rows_and_a_late_read_is_dropped() {
         [("msg-0".to_owned(), "the child's own turn".to_owned())],
         "the child's row is still the only one drawn"
     );
-    assert_eq!(now.transcript_provisional, false);
+    assert!(!now.transcript_provisional);
 }
 
 #[test]
@@ -204,7 +204,7 @@ fn a_file_row_also_loses_to_an_answer_that_carries_no_row_at_all() {
     let read = holder.claim_transcript().expect("the one read");
     let answered = folded(&holder, &stored(), history(""));
     assert!(answered.items.is_empty(), "the child sent no turn");
-    assert_eq!(answered.transcript_provisional, false);
+    assert!(!answered.transcript_provisional);
 
     assert_eq!(holder.note_transcript(&read.read()), None);
     assert!(holder.view().items.is_empty());
@@ -242,7 +242,7 @@ fn a_read_of_a_chat_that_closed_and_reopened_is_dropped() {
     let drawn = holder
         .note_transcript(&new.read())
         .expect("the new read is the one this chat draws");
-    assert_eq!(drawn.transcript_provisional, true);
+    assert!(drawn.transcript_provisional);
     assert_eq!(drawn.items.len(), 2);
 }
 
@@ -277,7 +277,7 @@ fn a_file_that_draws_nothing_draws_nothing_and_says_nothing() {
         );
         let view = holder.view();
         assert!(view.items.is_empty(), "{case}");
-        assert_eq!(view.transcript_provisional, false, "{case}");
+        assert!(!view.transcript_provisional, "{case}");
         assert!(
             view.notices.is_empty(),
             "{case}: a file the app could not use is not news for the user"
@@ -312,8 +312,8 @@ fn a_chat_that_already_holds_rows_never_reads_its_file() {
     );
     let back = holder.view();
     assert_eq!(rows(&back), [("msg-0".to_owned(), "typed here".to_owned())]);
-    assert_eq!(
-        back.transcript_provisional, false,
+    assert!(
+        !back.transcript_provisional,
         "rows the reducer holds are never called provisional"
     );
 }
@@ -357,7 +357,7 @@ fn the_read_runs_on_a_worker_and_pushes_its_answer_exactly_once() {
             ("prov-1".to_owned(), "a resposta".to_owned()),
         ]
     );
-    assert_eq!(drawn.transcript_provisional, true);
+    assert!(drawn.transcript_provisional);
     assert_eq!(
         lock(&asked).len(),
         1,

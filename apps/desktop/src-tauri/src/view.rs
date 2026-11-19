@@ -95,7 +95,7 @@ pub(crate) fn provisional(rows: &[ChatMessage]) -> (Vec<MessageView>, Vec<ChatIt
 
 /// The foreground chat and its thread, which every slice of this module needs
 /// before it can read a row.
-fn thread<'a>(state: &'a AppState) -> Option<(&'a gentle_app::ChatId, &'a ChatState)> {
+fn thread(state: &AppState) -> Option<(&gentle_app::ChatId, &ChatState)> {
     let chat = state.chats.foreground()?;
     let thread = state.chats.state(chat)?;
     Some((chat, thread))

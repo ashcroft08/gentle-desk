@@ -232,8 +232,9 @@ fn an_oversized_file_draws_nothing() {
     text.push_str(&"x".repeat(SESSION_FILE_MAX_BYTES));
 
     assert!(messages_from_session_file(&text).is_empty());
-    assert!(
-        SESSION_FILE_MAX_BYTES == 8 * 1024 * 1024,
+    assert_eq!(
+        SESSION_FILE_MAX_BYTES,
+        8 * 1024 * 1024,
         "the cap the shell reads against is the one this parser applies"
     );
 }

@@ -214,10 +214,9 @@ fn a_method_the_child_does_not_advertise_is_unsupported() {
 
 #[test]
 fn a_chat_with_no_child_reads_and_writes_nothing() {
-    let (runtime, spawner, _events) =
-        answering(Arc::new(|method: &str, _params: &Value| match method {
-            other => panic!("a chat with no child is never asked: {other}"),
-        }));
+    let (runtime, spawner, _events) = answering(Arc::new(|_method: &str, _params: &Value| {
+        panic!("a chat with no child is never asked")
+    }));
     let chat = ChatId::fresh();
 
     for change in [None, Some(SessionMode::Auto)] {

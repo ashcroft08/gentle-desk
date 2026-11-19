@@ -160,14 +160,12 @@ impl AppStateHolder {
             return None;
         }
         self.free_session_mode_slot(chat);
-        if change.is_none() {
-            return None;
-        }
-        {
-            let mut modes = lock(&self.session_modes);
-            let state = modes.entry(chat.as_str().to_owned()).or_default();
-            state.refusal = Some(NO_ANSWER.to_owned());
-        }
+        // A READ that never ran reads nothing and says nothing (the `?`).
+        change?;
+        lock(&self.session_modes)
+            .entry(chat.as_str().to_owned())
+            .or_default()
+            .refusal = Some(NO_ANSWER.to_owned());
         Some(self.view())
     }
 
