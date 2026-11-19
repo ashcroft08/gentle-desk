@@ -1008,12 +1008,19 @@ pub fn run_chat_commands(
             .name("chat-command".to_owned())
             .spawn(move || {
                 let mut ran = effects::run_one(command, executor.as_ref());
-                if let Some((chat, started_in)) = epoch {
-                    if worker.session_epoch(&chat) != started_in {
-                        ran.session_mode.clear();
+                // The session-mode answer is noted with the epoch it started in,
+                // checked under the fold's own lock; the rest of the run folds
+                // as every command's does.
+                let answers = std::mem::take(&mut ran.session_mode);
+                fold_and_push(&worker, &emit, ran);
+                for (chat, change, outcome) in answers {
+                    let started_in = epoch.as_ref().map(|(_, epoch)| *epoch);
+                    if let Some(view) =
+                        worker.note_session_mode_in(&chat, change, &outcome, started_in)
+                    {
+                        push(&emit, view);
                     }
                 }
-                fold_and_push(&worker, &emit, ran);
             });
         if let Err(error) = spawned {
             // A failed OS call is worth a log line, and neither side may be

@@ -107,6 +107,22 @@ impl AppStateHolder {
         change: Option<SessionMode>,
         outcome: &PermissionOutcome,
     ) -> Option<ViewState> {
+        self.note_session_mode_in(chat, change, outcome, None)
+    }
+
+    /// [`note_session_mode`](Self::note_session_mode) for an answer that knows
+    /// which incarnation of its chat the command started in ([`session_epoch`]):
+    /// an answer from an older one belongs to a chat that closed, even when the
+    /// same chat id is open again, and is dropped. The epoch is compared under
+    /// the same lock the fold takes, and the close bumps it under that lock too,
+    /// so no close can slip between the check and the fold (R3-001).
+    pub fn note_session_mode_in(
+        &self,
+        chat: &ChatId,
+        change: Option<SessionMode>,
+        outcome: &PermissionOutcome,
+        started_in: Option<u64>,
+    ) -> Option<ViewState> {
         // The app state is the authority on the open set, read before any shell
         // lock is taken, as the chat profile's own note does.
         if !self.is_open(chat) {
@@ -116,6 +132,9 @@ impl AppStateHolder {
         }
         {
             let mut modes = lock(&self.session_modes);
+            if started_in.is_some_and(|epoch| epoch != self.session_epoch(chat)) {
+                return None;
+            }
             let state = modes.entry(chat.as_str().to_owned()).or_default();
             fold(state, change, outcome);
         }
@@ -175,7 +194,10 @@ impl AppStateHolder {
     /// Drops that chat's session mode with the chat it was read for, and frees
     /// the slot any unanswered command held.
     pub(super) fn forget_session_mode(&self, chat: &ChatId) {
-        lock(&self.session_modes).remove(chat.as_str());
+        // Under the modes lock, so an answer's epoch check and its fold cannot
+        // straddle a close.
+        let mut modes = lock(&self.session_modes);
+        modes.remove(chat.as_str());
         *lock(&self.session_epochs).entry(chat.as_str().to_owned()).or_default() += 1;
     }
 

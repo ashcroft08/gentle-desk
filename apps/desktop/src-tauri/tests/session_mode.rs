@@ -279,10 +279,9 @@ fn a_late_answer_for_a_closed_chat_is_dropped() {
 }
 
 #[test]
-fn a_chat_that_closes_and_opens_again_is_a_new_incarnation_for_an_old_command() {
-    // R3-001: a command that started before the close is told apart from one
-    // of the reopened chat by the epoch it started in, because the chat id is
-    // the same and `is_open` is true again.
+fn an_answer_from_before_a_close_is_not_installed_on_the_reopened_chat() {
+    // R3-001: the chat id is the same and `is_open` is true again, so only the
+    // incarnation the command started in tells the old child's answer apart.
     let (holder, chat) = open_stored();
     let started_in = holder.session_epoch(&chat);
 
@@ -291,18 +290,28 @@ fn a_chat_that_closes_and_opens_again_is_a_new_incarnation_for_an_old_command() 
         chat: chat.clone(),
         expected: true,
     });
+    holder.fold_input(Input::Intent(Intent::OpenChat(chat.clone())));
+    holder.fold_input(Input::ChatOpened { chat: chat.clone() });
 
-    assert_ne!(
-        holder.session_epoch(&chat),
-        started_in,
-        "closing the chat moves its epoch, so an answer that carries the old one is stale"
-    );
-    let after_reopen = holder.session_epoch(&chat);
+    let pushed = holder.note_session_mode_in(&chat, None, &answered("super-yolo"), Some(started_in));
+
+    assert!(pushed.is_none(), "the old child's answer pushes nothing");
     assert_eq!(
-        holder.session_epoch(&chat),
-        after_reopen,
-        "and the epoch is stable until the chat closes again"
+        mode_view(&holder),
+        None,
+        "and the reopened chat does not inherit the old child's mode"
     );
+}
+
+#[test]
+fn an_answer_from_the_current_incarnation_is_installed() {
+    let (holder, chat) = open_stored();
+    let started_in = holder.session_epoch(&chat);
+
+    let pushed = holder.note_session_mode_in(&chat, None, &answered("auto"), Some(started_in));
+
+    assert!(pushed.is_some());
+    assert_eq!(mode_view(&holder).map(|view| view.mode), Some("auto".to_owned()));
 }
 
 #[test]
