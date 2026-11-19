@@ -36,6 +36,31 @@
       "sentAt": "2026-11-19T00:31:50.324Z",
       "resolvedAt": "2026-11-19T00:35:46.220Z",
       "resolution": "The right side of the status line now carries only the mode (Super YOLO / Normal); the project name and the elapsed-tag are gone."
+    },
+    {
+      "id": "v1fyfgkl",
+      "file": "01-dock.html",
+      "selector": "body > div > div:nth-of-type(1) > div > div:nth-of-type(4) > div:nth-of-type(4)",
+      "excerpt": "Enter para enviar · Shift+Enter para una línea nueva · Esc para detener",
+      "comment": "este texto va afuera del cuadro donde se escribe te esstoy diciendo",
+      "createdAt": "2026-11-19T00:36:54.454Z",
+      "status": "resolved",
+      "sentAt": "2026-11-19T00:36:54.498Z",
+      "resolvedAt": "2026-11-19T00:39:07.839Z",
+      "screenshot": ".screenshots/v1fyfgkl.png",
+      "resolution": "The key-hint line now sits BELOW the composer's border, left-aligned, in both examples; the bordered box holds only the input and the chip row."
+    },
+    {
+      "id": "wv9d2gvr",
+      "file": "01-dock.html",
+      "selector": "body > div > div:nth-of-type(1) > div > div:nth-of-type(4) > div:nth-of-type(2) > div:nth-of-type(2)",
+      "excerpt": "6% 1M",
+      "comment": "y esto va encima del cuadro donde se escribe como una linea que se va cargando dependiendo el contexto",
+      "createdAt": "2026-11-19T00:37:51.632Z",
+      "status": "open",
+      "sentAt": "2026-11-19T00:37:51.675Z",
+      "resolvedAt": null,
+      "screenshot": ".screenshots/wv9d2gvr.png"
     }
   ]
 }
