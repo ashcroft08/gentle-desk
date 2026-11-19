@@ -40,7 +40,7 @@ from a cheaper spawn. That mechanism was removed here on purpose - see S3.
   authoritative; a partial or stale file must never win.
 - [x] T2 (S1, S2) hold the "opening" state until the first event instead of
   drawing an empty thread and then repainting it.
-- [ ] T3 (S1, S2) MEASURE, and only then decide: if a chat still takes more than
+- [x] T3 (S1, S2) MEASURE (harness done; real-shell run still open, see L5), and only then decide: if a chat still takes more than
   ~1.5 s to show content, evaluate a warm standby child. That costs ~64 MB per
   idle child against a 6-live-child cap, so it is a maintainer decision with a
   measurement in hand, never a default.
@@ -68,3 +68,12 @@ from a cheaper spawn. That mechanism was removed here on purpose - see S3.
   gentle-desk-app 597. NOT measured: whether a real chat now shows content in under ~1.5 s
   (T3 is still open and needs a harness against the real shell). Known: the file is read
   whole into memory before the cap refuses it (the shared FileRead seam returns a String).
+- L5 (2026-11-19, T3 measured, with a caveat): `tools/perf/measure-open.ps1` (+ `tools/perf/README.md`)
+  now reaches the real window (five causes found: wrong binary `gentle-desk-app.exe`, window
+  found by pid + class `Tauri Window`, first-start flow needs `shell_home: isolated`, a missing
+  workspace folder hides its chats, the window must be foregrounded while the webview boots).
+  Two runs against a 5x130 KB synthetic home with the FAKE shell: content 250 ms and 296 ms
+  after the double-click, no empty frame, no "Opening chat" line seen. That measures the app's
+  own path to first paint (T1/T2), NOT a real `gentle-shell` boot (~3 s `get_state`), so the
+  warm-standby decision (T3's second half) is still open: it needs the same run without the
+  fake shell. `measure-startup.ps1` still searches the old window title and is broken.
