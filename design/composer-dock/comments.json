@@ -62,6 +62,18 @@
       "resolvedAt": "2026-11-19T00:39:44.117Z",
       "screenshot": ".screenshots/wv9d2gvr.png",
       "resolution": "The context moved ABOVE the composer box: a 2px rail spanning its width that fills as the context grows, with the clock icon and the percent on the left and the window size on the right, outside the border in both examples."
+    },
+    {
+      "id": "nsi4d4ij",
+      "file": "01-dock.html",
+      "selector": "body > div > div:nth-of-type(1) > div > div:nth-of-type(4) > div:nth-of-type(1)",
+      "excerpt": "6% 1M",
+      "comment": "pero mira la imagen que te envie, es un poco menos ancho que el cuadro de texto y ademas va mas pegado al cuadro de texto",
+      "createdAt": "2026-11-19T00:40:35.206Z",
+      "status": "resolved",
+      "sentAt": "2026-11-19T00:40:35.221Z",
+      "resolvedAt": "2026-11-19T00:41:06.789Z",
+      "resolution": "The context rail is now inset ~10px on each side (narrower than the box) and sits 3px above it instead of 6px, so it reads as a measure attached to the composer."
     }
   ]
 }
