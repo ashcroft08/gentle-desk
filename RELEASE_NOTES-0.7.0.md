@@ -1,0 +1,15 @@
+What's new in 0.7.0
+- **Chats read like the other app's.** Tool calls draw as cards — icon, subject, status, duration, a collapsible body with its earlier lines folded — and thinking shows as a reasoning row that opens while it streams and folds when it ends.
+- **A chat shows its content as soon as you open it.** The transcript is painted from the chat's own session file while the child process starts; the child's answer replaces it the moment it lands and always wins.
+- **The composer is a dock.** While it works, one line says what the chat is doing and for how long; above the box, a rail shows how full the context is; the folder name and the git branch sit in the row — the branch chip only when there is a repository.
+- **The permission mode is on screen and changeable.** A quiet control in the status row (only while the agent works) opens Normal / Auto / YOLO / Super YOLO; YOLO and Super YOLO ask for a confirmation first. The label changes only when the channel confirms; the session's mode changes, never the saved default.
+- **Files attach like images do.** The clip opens the system's file picker (multi-select), and dragging files onto the window works the same. Each file becomes a chip with its name; one outside the chat's folder is flagged "outside the workspace" and attached anyway. On send, every file's absolute path is appended to the message, one per line.
+- **Settings and the first start are calmer** (the density pass): bounded bodies, dead controls removed.
+
+Novedades en 0.7.0
+- **Los chats se leen como los de la otra app.** Las llamadas a herramientas se dibujan como tarjetas — ícono, tema, estado, duración, cuerpo plegable con sus líneas anteriores — y el pensamiento se ve como una fila de razonamiento que se abre mientras fluye y se pliega al terminar.
+- **Un chat muestra su contenido apenas lo abrís.** El transcript se pinta desde el propio archivo de sesión del chat mientras arranca el proceso hijo; la respuesta del hijo lo reemplaza en el momento que llega y siempre gana.
+- **El composer es un dock.** Mientras trabaja, una línea dice qué hace el chat y desde cuándo; sobre la caja, una barra muestra cuán lleno está el contexto; el nombre de la carpeta y la rama de git van en la fila — la rama sólo cuando hay repositorio.
+- **El modo de permisos está en pantalla y se cambia.** Un control discreto en la fila de estado (sólo mientras el agente trabaja) abre Normal / Auto / YOLO / Super YOLO; YOLO y Super YOLO piden confirmación antes. La etiqueta cambia sólo cuando el canal confirma; se cambia el modo de la sesión, nunca el default guardado.
+- **Los archivos se adjuntan como las imágenes.** El clip abre el selector de archivos del sistema (varios a la vez), y arrastrar archivos sobre la ventana funciona igual. Cada archivo queda como un chip con su nombre; uno fuera de la carpeta del chat se marca "fuera del workspace" y se adjunta igual. Al enviar, la ruta absoluta de cada archivo se agrega al mensaje, una por línea.
+- **Configuración y primer arranque más tranquilos** (la pasada de densidad): cuerpos acotados y controles muertos fuera.
