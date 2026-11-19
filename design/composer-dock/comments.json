@@ -32,9 +32,10 @@
       "excerpt": "kallari_pagina_web · listo 43 Super YOLO",
       "comment": "solo deja eso de Super Yolo , elimina lo demas",
       "createdAt": "2026-11-19T00:31:50.277Z",
-      "status": "open",
+      "status": "resolved",
       "sentAt": "2026-11-19T00:31:50.324Z",
-      "resolvedAt": null
+      "resolvedAt": "2026-11-19T00:35:46.220Z",
+      "resolution": "The right side of the status line now carries only the mode (Super YOLO / Normal); the project name and the elapsed-tag are gone."
     }
   ]
 }
