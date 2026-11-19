@@ -172,15 +172,15 @@ fn the_branch_of_a_real_repository_arrives_on_the_push_its_read_makes() {
         }
     }));
 
-    // The first fold that names the folder answers from a cache that has never
-    // heard of it, so its slice carries no branch and the read starts there.
-    let claimed = opens(&holder, &cwd)
-        .into_iter()
-        .find(|view| view.foreground_folder.is_some())
-        .expect("the open names the folder of the chat's working directory");
-    assert_eq!(
-        claimed.foreground_branch, None,
-        "nothing is known about the branch before the read answers"
+    // The first fold that names the folder starts the read. What that fold's own
+    // slice says about the branch is not asserted: the read runs on a worker, so
+    // it may already have recorded its answer by the time the slice is built.
+    // What matters is that the answer arrives on the push, checked below.
+    assert!(
+        opens(&holder, &cwd)
+            .into_iter()
+            .any(|view| view.foreground_folder.is_some()),
+        "the open names the folder of the chat's working directory"
     );
 
     // The answer arrives on the push the read itself makes: no later fold, no
@@ -267,6 +267,12 @@ fn repo_on(branch: &str) -> Scratch {
     git_in(
         repo.path(),
         &[
+            // Isolated from the machine: no signing, and no hooks from a global
+            // `core.hooksPath` (an empty value names no hook directory).
+            "-c",
+            "commit.gpgsign=false",
+            "-c",
+            "core.hooksPath=",
             "-c",
             "user.name=gentle-desk tests",
             "-c",
@@ -274,6 +280,7 @@ fn repo_on(branch: &str) -> Scratch {
             "commit",
             "-q",
             "--allow-empty",
+            "--no-verify",
             "-m",
             "one",
         ],
