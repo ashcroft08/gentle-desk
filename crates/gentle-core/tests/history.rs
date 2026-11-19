@@ -268,7 +268,8 @@ fn a_file_and_the_childs_own_answer_project_the_same_roles_and_texts() {
         .map(|entry| {
             format!(
                 "{}\n",
-                json!({"type": "message", "message": entry}).to_string()
+                serde_json::to_string(&json!({"type": "message", "message": entry}))
+                    .expect("the message entry is valid JSON"),
             )
         })
         .collect();
