@@ -2766,8 +2766,14 @@ p {
 /* The status line at the end of the thread (design/composer-dock S1): ONE faint
    line sharing the reasoning row's anatomy - a 9px spinner, the working word and
    the seconds it has been working - never a card, never a second visual language.
-   Its right side keeps the place the read-only session mode takes (R1); this
-   slice draws nothing there. Reduced motion leaves the ring still. */
+   Its right side holds the session mode control (T3c, L7/L8). Reduced motion
+   leaves both rings still, through the shared rule at the end of this file. */
+.work {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .work-line {
   display: flex;
   align-items: center;
@@ -2794,6 +2800,217 @@ p {
 
 .work-line .n {
   font-variant-numeric: tabular-nums;
+}
+
+/* The session mode (design/composer-dock/02-mode-picker.html, sheet A): a quiet
+   text button with a caret at the right edge of the line. YOLO and Super YOLO
+   wear the danger tone, a sent change keeps its old text and adds a ring. */
+.work-line .mode {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font: inherit;
+  font-size: 11px;
+  color: var(--muted);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 1px 7px;
+  cursor: pointer;
+}
+
+.work-line .mode:hover {
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.work-line .mode:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.work-line .mode.hot {
+  color: var(--danger);
+  border-color: currentColor;
+}
+
+.work-line .mode.wait {
+  color: var(--faint);
+}
+
+.work-line .mode .dots {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border: 1.5px solid var(--border);
+  border-top-color: var(--muted);
+  border-radius: 50%;
+  animation: tc-spin 0.9s linear infinite;
+}
+
+/* The menu: pinned to the control, never clipped by the thread's own scroll, so
+   it covers nothing of the message it was opened from. */
+.mode-pop {
+  position: fixed;
+  z-index: 30;
+  width: 292px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 5px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.mode-pop .cap {
+  margin: 0;
+  padding: 5px 8px 6px;
+  font-size: 10.5px;
+  letter-spacing: 0.02em;
+  color: var(--faint);
+}
+
+.mode-opt {
+  display: grid;
+  grid-template-columns: 14px 1fr;
+  column-gap: 8px;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: var(--text);
+  background: none;
+  border: 0;
+  border-radius: 7px;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+
+.mode-opt:hover,
+.mode-opt:focus-visible {
+  background: var(--surface2);
+}
+
+.mode-opt:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.mode-opt .ck {
+  color: var(--accent);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.mode-opt .nm {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.mode-opt .warn {
+  margin-left: 6px;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--faint);
+}
+
+.mode-opt .ds {
+  grid-column: 2;
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--muted);
+}
+
+.mode-opt.hot .nm {
+  color: var(--danger);
+}
+
+.mode-sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--border);
+}
+
+/* The confirmation of sheet B: the same popover, one question and two buttons. */
+.mode-conf {
+  padding: 8px 9px 9px;
+}
+
+.mode-conf .q {
+  margin: 0 0 4px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.mode-conf .why {
+  margin: 0 0 10px;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+.mode-conf .why strong {
+  font-weight: 600;
+  color: var(--danger);
+}
+
+.mode-conf .acts {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.mode-btn {
+  font: inherit;
+  font-size: 12px;
+  color: var(--text);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 4px 11px;
+  cursor: pointer;
+}
+
+.mode-btn:hover {
+  background: var(--surface2);
+}
+
+.mode-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.mode-btn.go {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.mode-btn.go:hover {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+}
+
+/* The refusal of sheet C: one line under the row, and the mode it kept. */
+.mode-fail {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  margin: 0;
+  padding: 0 4px;
+  font-size: 11px;
+  color: var(--danger);
+}
+
+.mode-fail code {
+  font-family: var(--mono, ui-monospace, SFMono-Regular, 'Cascadia Mono', Consolas, monospace);
+  font-size: 10.5px;
+  padding: 0 4px;
+  color: var(--muted);
+  background: var(--surface2);
+  border-radius: 4px;
+}
+
+.mode-fail .keep {
+  color: var(--faint);
 }
 
 @keyframes activity-pulse {

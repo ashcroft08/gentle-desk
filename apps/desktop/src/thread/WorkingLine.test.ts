@@ -6,8 +6,9 @@
 //
 // The seconds are the WEB's clock: it starts counting the moment the chat's mark
 // becomes `Working` and stops when the mark leaves, which is why the contract
-// carries no timestamp for it. The right side keeps the place the read-only
-// session mode takes (T3); this slice puts nothing there, not even a gap.
+// carries no timestamp for it. The session mode control at its right edge
+// (composer-dock T3c) is `SessionMode.test.ts`'s business; here the line is only
+// the spinner, the word and the clock.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/svelte'
 import { tick } from 'svelte'

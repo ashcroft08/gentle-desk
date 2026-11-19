@@ -46,6 +46,7 @@ import type {
   HelpersView_Serialize as HelpersView,
   ModelChipView_Serialize as ModelChipView,
   NoticeView,
+  SessionModeView_Serialize as SessionModeView,
   ShellView_Serialize as ShellView,
   ViewState_Serialize as ViewState,
   WhatsNewView,
@@ -92,6 +93,11 @@ export type ChatViewState = {
   /** The profile view the shell holds for this chat (profiles-editor T2c), or
    * `null` until a read answered and after a chat closes. */
   chatProfile: ChatProfileView | null
+  /** The session permission mode of this chat (composer-dock T3c): the mode its
+   * own child reported, the refusal of the last attempt that wrote nothing and
+   * the count of answered writes. `null` until an exchange answers, which is
+   * exactly when the status row draws no control at all. */
+  sessionMode: SessionModeView | null
   /** The run's fatal launcher failure, or `null`; not about any one chat. */
   fatal: string | null
   /** The notes of the version this run follows, or `null`; not about a chat. */
@@ -152,6 +158,7 @@ export function chatOf(view: ViewState | null): ChatViewState {
       folder: null,
       branch: null,
       chatProfile: null,
+      sessionMode: null,
       fatal,
       whatsNew,
       shell,
@@ -173,6 +180,7 @@ export function chatOf(view: ViewState | null): ChatViewState {
     folder: view?.foreground_folder ?? null,
     branch: view?.foreground_branch ?? null,
     chatProfile: view?.chat_profile ?? null,
+    sessionMode: view?.session_mode ?? null,
     fatal,
     whatsNew,
     shell,
@@ -193,6 +201,16 @@ function sameShell(a: ShellView, b: ShellView): boolean {
     a.restart_needed === b.restart_needed &&
     JSON.stringify(a.install) === JSON.stringify(b.install)
   )
+}
+
+/**
+ * Whether two pushes say the same about the session mode. By value, because the
+ * shell builds the slice afresh on every push and it is three plain fields
+ * (composer-dock T3c).
+ */
+function sameSessionMode(a: SessionModeView | null, b: SessionModeView | null): boolean {
+  if (a === null || b === null) return a === b
+  return a.mode === b.mode && a.refusal === b.refusal && a.attempt === b.attempt
 }
 
 /**
@@ -226,6 +244,7 @@ export function createChatView(deps: ChatViewDeps = {}): ChatView {
     folder: null,
     branch: null,
     chatProfile: null,
+    sessionMode: null,
     fatal: null,
     whatsNew: null,
     shell: NO_SHELL,
@@ -256,6 +275,7 @@ export function createChatView(deps: ChatViewDeps = {}): ChatView {
       next.folder === state.folder &&
       next.branch === state.branch &&
       next.chatProfile === state.chatProfile &&
+      sameSessionMode(next.sessionMode, state.sessionMode) &&
       next.fatal === state.fatal &&
       next.whatsNew === state.whatsNew &&
       sameShell(next.shell, state.shell)

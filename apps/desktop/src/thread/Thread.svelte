@@ -19,9 +19,11 @@
     ChatActivityMark,
     ChatItemView_Serialize as ChatItem,
     MessageView,
+    SessionModeView_Serialize as SessionModeView,
     ThinkingItemView_Serialize as ThinkingItem,
     ToolCallItemView_Serialize as ToolItem,
   } from '../contract/bindings'
+  import { dispatchIntent } from '../bridge'
   import { language } from '../i18n/language.svelte'
   import Activity from './Activity.svelte'
   import Message from './Message.svelte'
@@ -39,6 +41,7 @@
     visible = true,
     scrollTop = $bindable(0),
     mark = null,
+    sessionMode = null,
   }: {
     /** The foreground chat's messages, oldest first, as Rust pushed them. */
     messages?: MessageView[]
@@ -57,6 +60,9 @@
     scrollTop?: number
     /** What the chat is doing: the activity line under the last message follows it. */
     mark?: ChatActivityMark | null
+    /** That chat's session permission mode, or `null` when nothing answered
+     * (composer-dock T3c): the status line draws no control for a `null`. */
+    sessionMode?: SessionModeView | null
   } = $props()
 
   /** The thread's own words in the language the app holds (0.2.0, S3/D4). */
@@ -73,6 +79,20 @@
 
   /** The one cache of this thread: per message id, only the growing tail renders. */
   const cache = createMarkdownCache()
+
+  // The chats whose mode this thread already asked for (composer-dock T3c). The
+  // read belongs to a chat, not to a push: the thread asks ONCE, the first time
+  // that chat's mark is live (`Opening` is not live yet), and no later render
+  // asks again. A chat that comes back is still the chat it was.
+  const askedForMode = new Set<string>()
+
+  $effect(() => {
+    const chat = foregroundChat
+    const live = mark !== null && mark !== 'Opening'
+    if (!live || chat === null || askedForMode.has(chat)) return
+    askedForMode.add(chat)
+    void dispatchIntent({ type: 'ReadSessionMode', data: { chat_id: chat } })
+  })
 
   /** The scroll container. */
   let box: HTMLElement | null = $state(null)
@@ -178,9 +198,9 @@
     {/each}
     <Activity {mark} />
     <!-- The working line (design/composer-dock S1): the reasoning row's anatomy,
-         the web's own clock, and the place the read-only session mode takes. It
-         shares the last slot with the opening line, never both at once. -->
-    <WorkingLine {mark} />
+         the web's own clock, and the session mode control at its right edge
+         (T3c). It shares the last slot with the opening line, never both at once. -->
+    <WorkingLine {mark} chatId={foregroundChat} {sessionMode} />
   </div>
   {#if streaming}
     <!-- The only live region of the thread: the reply bodies stay out of it, so
