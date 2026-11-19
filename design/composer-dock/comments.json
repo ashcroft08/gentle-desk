@@ -74,6 +74,18 @@
       "sentAt": "2026-11-19T00:40:35.221Z",
       "resolvedAt": "2026-11-19T00:41:06.789Z",
       "resolution": "The context rail is now inset ~10px on each side (narrower than the box) and sits 3px above it instead of 6px, so it reads as a measure attached to the composer."
+    },
+    {
+      "id": "mf3kk990",
+      "file": "01-dock.html",
+      "selector": "body > div > div:nth-of-type(1) > div > div:nth-of-type(5) > div:nth-of-type(2)",
+      "excerpt": "Claude Sonnet 5 medium Kallari_Pagina_web master",
+      "comment": "me gusta que haya iconos, en el modelo pon un mejor icono ese punto de color amarillo no me convence, en donde dice medium falta la flecha para que se sepa que es un select y tambien ponle un mejor icono. otra cosa mira la organizacion y dime si esta bien como estan puestos y separados si tienes una mejor idea hazlo",
+      "createdAt": "2026-11-19T00:43:07.574Z",
+      "status": "resolved",
+      "sentAt": "2026-11-19T00:43:07.590Z",
+      "resolvedAt": "2026-11-19T00:43:30.415Z",
+      "resolution": "Model now wears a four-point spark (accent, not a colour dot); effort wears ascending bars AND a caret so both read as selects; a hairline separates \"what it runs on\" (model, effort) from \"where it runs\" (folder, branch)."
     }
   ]
 }
