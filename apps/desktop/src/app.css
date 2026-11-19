@@ -903,8 +903,8 @@ p {
 
 /* The composer's one row, under the input (design/composer-dock): what the
    message runs ON (the two selects), a 1px hairline, then where it runs (the
-   folder; the branch is a later slice, so nothing stands in its place), the
-   flexible space and Send. Everything here is text - no chip carries a box. */
+   folder and the branch it is on), the flexible space and Send. Everything here
+   is text - no chip carries a box. */
 .composer .row {
   display: flex;
   align-items: center;
@@ -940,6 +940,38 @@ p {
 .composer .row .folder .t {
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* The branch on that folder (design/composer-dock S2, R3, R4): the folder's own
+   anatomy - glyph, then one line of text - in the quiet colour, because the
+   folder's name is the only bold thing in the row. It carries no hairline of its
+   own: the one before the group is the folder's, and a chat with no branch leaves
+   nothing behind it. */
+.composer .row .branch {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.composer .row .branch .t {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Its glyph, in the artboard's own four shapes and the composer's stroke: the
+   named-icon registry is not this slice's, so the one branch glyph the composer
+   needs is drawn by the chip itself. */
+.composer .row .branch .g {
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 /* The two selects' own glyphs (design/composer-dock): the model wears the accent,

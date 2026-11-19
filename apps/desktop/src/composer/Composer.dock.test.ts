@@ -30,6 +30,7 @@ const READY: ModelChipView = {
 }
 
 const FOLDER = { name: 'gentle-desk', path: 'C:\\Users\\josep\\dev\\gentle-desk' }
+const BRANCH = { name: 'feat/0.7.0-transcript', path: FOLDER.path }
 const USAGE = { tokens: 70_000, percent: 35, window: 200_000 }
 const { keysHint: KEYS } = composerCopy('en')
 
@@ -44,7 +45,6 @@ afterEach(cleanup)
 function draw() {
   return render(Composer, { props: { chat: 'c1', chip: READY, contextUsage: USAGE, folder: FOLDER } })
 }
-
 describe('the dock', () => {
   it('puts the context rail above the box, outside its border', () => {
     const { container } = draw()
@@ -82,6 +82,34 @@ describe('the dock', () => {
     expect(row.querySelectorAll('.vsep')).toHaveLength(1)
     expect(row.querySelector('.branch')).toBeNull()
     expect(row.querySelector('[data-glyph="branch"]')).toBeNull()
+  })
+
+  it('draws the branch after the folder, and the one hairline stays before the group', () => {
+    const { container } = render(Composer, {
+      props: { chat: 'c1', chip: READY, folder: FOLDER, branch: BRANCH },
+    })
+    const row = container.querySelector('.composer .row') as HTMLElement
+    const parts = Array.from(row.children).map((child) => child.className)
+
+    // What the message runs ON, the hairline, then where it runs - the folder
+    // and the branch on it, in that order - and Send.
+    expect(parts).toEqual(['chip', 'vsep', 'folder', 'branch', 'grow', 'ic fill tip-r'])
+    expect(row.querySelectorAll('.vsep')).toHaveLength(1)
+    expect((row.querySelector('.branch') as HTMLElement).textContent?.trim()).toBe(BRANCH.name)
+  })
+
+  it('leaves the branch out for a folder no repository holds, with no gap either', () => {
+    // R3: no repo means no chip at all, so the row keeps its folder and its
+    // flexible space and nothing stands where the branch would have been.
+    const { container } = render(Composer, {
+      props: { chat: 'c1', chip: READY, folder: FOLDER, branch: null },
+    })
+    const row = container.querySelector('.composer .row') as HTMLElement
+    const parts = Array.from(row.children).map((child) => child.className)
+
+    expect(parts).toEqual(['chip', 'vsep', 'folder', 'grow', 'ic fill tip-r'])
+    expect(row.querySelector('.branch')).toBeNull()
+    expect(row.querySelectorAll('.vsep')).toHaveLength(1)
   })
 
   it('draws no context chip in the row any more: the rail is the only reading', () => {

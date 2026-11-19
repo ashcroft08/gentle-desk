@@ -30,6 +30,9 @@ export function viewState(overrides: Partial<ViewState_Serialize> = {}): ViewSta
     foreground_title: null,
     // A chat whose session is not listed yet has no folder to name (S2, R4).
     foreground_folder: null,
+    // And no branch on it either: nothing read this run's git yet, and a folder
+    // no repository holds never has one (S2, R3).
+    foreground_branch: null,
     list_status: { type: 'Complete' },
     sessions_revision: 1,
     total_sessions: 0,

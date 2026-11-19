@@ -19,6 +19,9 @@
 // - the folder the chat runs in (design/composer-dock S2, R4): Rust projects its
 //   working directory as the last segment plus the whole path, and the
 //   composer's chip draws the name with the path in the hover;
+// - the branch that folder is on (design/composer-dock S2, R3, R4): the shell
+//   reads it once per working directory and the chip draws it after the folder,
+//   or not at all when there is no repository to name;
 // - the run's one fatal failure, which belongs to no chat and outlives all of
 //   them: a launcher that cannot be resolved means no chat can start at all;
 // - the notes of the version this run follows, which the what's-new modal draws
@@ -32,6 +35,7 @@
 // behind. The fatal bar is the exception, because it is not about a chat.
 
 import type {
+  BranchView,
   ChatActivityMark,
   ChatProfileView_Serialize as ChatProfileView,
   ContextUsageView_Serialize as ContextUsageView,
@@ -80,6 +84,11 @@ export type ChatViewState = {
    * segment of its working directory and the whole path, `null` for a chat whose
    * session is not listed yet - absent, never a placeholder. */
   folder: FolderView | null
+  /** The branch that folder is on (design/composer-dock S2, R3, R4): its name
+   * and the directory it was read from, `null` whenever there is no branch to
+   * draw - no repository, a bare one, no git on this machine, or an answer that
+   * has not landed yet. `null` draws no chip at all (R3). */
+  branch: BranchView | null
   /** The profile view the shell holds for this chat (profiles-editor T2c), or
    * `null` until a read answered and after a chat closes. */
   chatProfile: ChatProfileView | null
@@ -141,6 +150,7 @@ export function chatOf(view: ViewState | null): ChatViewState {
       modelChip: null,
       contextUsage: null,
       folder: null,
+      branch: null,
       chatProfile: null,
       fatal,
       whatsNew,
@@ -161,6 +171,7 @@ export function chatOf(view: ViewState | null): ChatViewState {
     modelChip: view?.model_chip ?? null,
     contextUsage: view?.context_usage ?? null,
     folder: view?.foreground_folder ?? null,
+    branch: view?.foreground_branch ?? null,
     chatProfile: view?.chat_profile ?? null,
     fatal,
     whatsNew,
@@ -213,6 +224,7 @@ export function createChatView(deps: ChatViewDeps = {}): ChatView {
     modelChip: null,
     contextUsage: null,
     folder: null,
+    branch: null,
     chatProfile: null,
     fatal: null,
     whatsNew: null,
@@ -242,6 +254,7 @@ export function createChatView(deps: ChatViewDeps = {}): ChatView {
       next.imagesNotice === state.imagesNotice &&
       next.contextUsage === state.contextUsage &&
       next.folder === state.folder &&
+      next.branch === state.branch &&
       next.chatProfile === state.chatProfile &&
       next.fatal === state.fatal &&
       next.whatsNew === state.whatsNew &&

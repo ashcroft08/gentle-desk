@@ -19,9 +19,10 @@ use gentle_runtime::app_config::Theme;
 use gentle_runtime::badge::{Badge, BadgeMark};
 
 use crate::contract::{
-    AuthView, ChatActivityMark, ChatActivityView, ChatProfileView, ContextUsageView, FolderView,
-    ImageView, LanguageView, ModelChipView, ModelChoiceView, ModelListStatusView, NoticeActionView,
-    NoticeLevel, NoticeView, ShellView, ThemeView, UpdatesView, UsageView, ViewState, WhatsNewView,
+    AuthView, BranchView, ChatActivityMark, ChatActivityView, ChatProfileView, ContextUsageView,
+    FolderView, ImageView, LanguageView, ModelChipView, ModelChoiceView, ModelListStatusView,
+    NoticeActionView, NoticeLevel, NoticeView, ShellView, ThemeView, UpdatesView, UsageView,
+    ViewState, WhatsNewView,
 };
 use crate::images::Images;
 use crate::{dialogs, helper_thread, helpers, sessions, view};
@@ -59,6 +60,11 @@ pub struct ShellParts<'a> {
     /// The Profile tab's view of one chat (profiles-editor T2b-2, L11), as the
     /// shell holds it: it belongs to the chat its own `chat_id` names.
     pub chat_profile: Option<ChatProfileView>,
+    /// The branch the foreground chat's folder is on (design/composer-dock S2,
+    /// R3, R4), as the shell's git cache holds it. It arrives with the directory
+    /// it was read from, so a read that lands after the user moved to another
+    /// chat is dropped instead of labelling the wrong folder.
+    pub branch: Option<BranchView>,
     /// Where the shell's authentication stands (0.1.12, T3).
     pub auth: AuthView,
     /// The versions this machine runs (0.1.12, S2, S7).
@@ -85,6 +91,7 @@ pub fn view_state(state: &AppState, sessions_revision: u32, shell: ShellParts<'_
         language,
         shell,
         chat_profile,
+        branch,
         auth,
         updates,
         usage,
@@ -102,6 +109,12 @@ pub fn view_state(state: &AppState, sessions_revision: u32, shell: ShellParts<'_
         (Some(view), Some(chat)) if view.chat_id == chat => Some(view),
         _ => None,
     };
+    // The folder and the branch it is on are one answer (design/composer-dock S2,
+    // R3, R4): the branch is kept only while it was read from the very directory
+    // the folder chip names, so a read still in flight for the chat the user just
+    // left never labels the one they are looking at.
+    let foreground_folder = foreground_folder(state);
+    let foreground_branch = branch_of(foreground_folder.as_ref(), branch);
     ViewState {
         theme: view_theme(theme),
         language: view_language(language),
@@ -111,7 +124,8 @@ pub fn view_state(state: &AppState, sessions_revision: u32, shell: ShellParts<'_
             .chats
             .foreground()
             .map(|chat| sessions::view::header_title(state, chat)),
-        foreground_folder: foreground_folder(state),
+        foreground_folder,
+        foreground_branch,
         list_status: sessions::view::status(state),
         sessions_revision,
         total_sessions: sessions::view::total(state),
@@ -159,7 +173,11 @@ pub fn view_state(state: &AppState, sessions_revision: u32, shell: ShellParts<'_
 /// the whole directory travels beside it, for the hover only. A chat whose
 /// session file is not listed yet (one started a moment ago) has no folder to
 /// name, so it has none - absent, never a placeholder (R3's rule).
-fn foreground_folder(state: &AppState) -> Option<FolderView> {
+///
+/// `pub(crate)` because the shell reads the same directory to ask git about it
+/// (`bridge::AppStateHolder::branch_view`): one lookup, so the branch chip and the
+/// folder chip can never name two different folders.
+pub(crate) fn foreground_folder(state: &AppState) -> Option<FolderView> {
     let chat = state.chats.foreground()?;
     let session = state
         .sessions
@@ -169,6 +187,18 @@ fn foreground_folder(state: &AppState) -> Option<FolderView> {
         name: session.project().to_owned(),
         path: session.cwd.clone(),
     })
+}
+
+/// The branch chip's slice: the cached answer, kept only while it was read from
+/// the very directory the folder chip beside it names (design/composer-dock S2,
+/// R3, R4).
+///
+/// Both strings come from one field of one session row, so comparing them for
+/// equality is exact: an answer whose directory is not the folder's is a read
+/// that landed after the user moved on, and it is dropped rather than drawn.
+fn branch_of(folder: Option<&FolderView>, branch: Option<BranchView>) -> Option<BranchView> {
+    let folder = folder?;
+    branch.filter(|branch| branch.path == folder.path)
 }
 
 /// The composer's model chip from the app state, one to one. A no-foreground

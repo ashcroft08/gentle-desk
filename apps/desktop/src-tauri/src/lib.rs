@@ -18,6 +18,7 @@ pub mod dialogs;
 pub mod effects;
 pub mod events;
 pub mod folder_name;
+pub mod git;
 pub mod helper_thread;
 pub mod helpers;
 pub mod images;

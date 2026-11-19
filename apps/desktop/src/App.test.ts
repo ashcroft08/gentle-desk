@@ -100,6 +100,57 @@ describe('App', () => {
     expect(chip.getAttribute('title')).toBe(path)
   })
 
+  it('draws the composer’s branch chip for the branch Rust pushed, after the folder', async () => {
+    const path = 'C:\\Users\\josep\\dev\\gentle-desk'
+    serveSidebar({
+      view: viewState({
+        foreground_chat: 'chat-1',
+        foreground_title: 'Gentle desk',
+        messages: [MESSAGE],
+        foreground_folder: { name: 'gentle-desk', path },
+        foreground_branch: { name: 'feat/0.7.0-transcript', path },
+      }),
+    })
+    const { container } = render(App)
+
+    const chip = (await waitFor(() => {
+      const found = container.querySelector('.composer .row .branch')
+      expect(found).toBeTruthy()
+      return found as HTMLElement
+    })) as HTMLElement
+
+    // The branch name only, with the directory it was read from in the hover.
+    expect(chip.textContent?.trim()).toBe('feat/0.7.0-transcript')
+    expect(chip.getAttribute('title')).toBe(path)
+    // It sits AFTER the folder, inside the group the one hairline opens.
+    expect(chip.previousElementSibling?.className).toBe('folder')
+  })
+
+  it('draws no branch chip for a folder no repository holds, and no gap either', async () => {
+    const path = 'C:\\Users\\josep\\dev\\gentle-desk'
+    serveSidebar({
+      view: viewState({
+        foreground_chat: 'chat-1',
+        foreground_title: 'Gentle desk',
+        messages: [MESSAGE],
+        foreground_folder: { name: 'gentle-desk', path },
+        foreground_branch: null,
+      }),
+    })
+    const { container } = render(App)
+
+    const folder = (await waitFor(() => {
+      const found = container.querySelector('.composer .row .folder')
+      expect(found).toBeTruthy()
+      return found as HTMLElement
+    })) as HTMLElement
+
+    // R3: the folder is drawn and the branch is simply not there - the row
+    // moves on to its flexible space, with nothing standing in the gap.
+    expect(container.querySelector('.composer .row .branch')).toBeNull()
+    expect(folder.nextElementSibling?.className).toBe('grow')
+  })
+
   it('draws no folder chip for a chat whose folder Rust did not name', async () => {
     serveSidebar({
       view: viewState({ foreground_chat: 'chat-1', foreground_title: 'Fresh one', messages: [MESSAGE] }),

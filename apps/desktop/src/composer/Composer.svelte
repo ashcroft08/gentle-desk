@@ -17,6 +17,7 @@
   import { attachImages, dispatchIntent, removeImage } from '../bridge'
   import type {
     ChatActivityMark,
+    BranchView,
     ContextUsageView_Serialize as ContextUsageView,
     FolderView,
     ImageView,
@@ -24,6 +25,7 @@
   } from '../contract/bindings'
   import Icon from '../icons/Icon.svelte'
   import { language } from '../i18n/language.svelte'
+  import BranchChip from './BranchChip.svelte'
   import ContextRail from './ContextRail.svelte'
   import FolderChip from './FolderChip.svelte'
   import ModelChip from './ModelChip.svelte'
@@ -42,6 +44,7 @@
     chip = null,
     contextUsage = null,
     folder = null,
+    branch = null,
   }: {
     /** The foreground chat: which draft is shown, and where a send goes. */
     chat: string | null
@@ -60,6 +63,11 @@
      * segment of its working directory and the whole path, or `null` for a chat
      * whose session is not listed yet - absent, never a placeholder. */
     folder?: FolderView | null
+    /** The branch that folder is on (design/composer-dock S2, R3, R4), as Rust
+     * pushes it: the name and the directory it was read from, `null` whenever
+     * there is no branch to draw. `null` draws no chip at all - not a gap, not a
+     * placeholder (R3). */
+    branch?: BranchView | null
   } = $props()
 
   /** The composer's own words in the language the app holds (0.2.0, S3/D4). */
@@ -211,12 +219,14 @@
       onkeydown={keyed}
     ></textarea>
     <!-- The row, regrouped (design/composer-dock): what the message runs ON
-         (model, effort), a hairline, then where it runs (the folder - the branch
-         is a later slice, so nothing sits in its place), the flexible space, and
-         Send. Every part is text: no box, no chip border. -->
+         (model, effort), a hairline, then where it runs (the folder, and the
+         branch that folder is on - absent when there is no repository to name),
+         the flexible space, and Send. Every part is text: no box, no chip
+         border. -->
     <div class="row">
       <ModelChip {chip} />
       <FolderChip {folder} />
+      <BranchChip {branch} />
       <span class="grow"></span>
       {#if rule.mode === 'stop'}
         <StopButton onStop={stop} />

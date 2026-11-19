@@ -55,6 +55,9 @@ describe('chatOf', () => {
       contextUsage: { tokens: null, percent: null, window: null },
       // The folder it runs in: absent for a chat whose session is not listed.
       folder: null,
+      // And the branch on it: absent for the same reason, and for a folder no
+      // repository holds (R3).
+      branch: null,
       // Nothing read this chat's profile yet (the Profile tab reads it).
       chatProfile: null,
       fatal: null,
@@ -88,6 +91,27 @@ describe('chatOf', () => {
     expect(chatOf(state).folder).toEqual(folder)
     // The chip is part of a chat's chrome: with none open there is no folder.
     expect(chatOf(viewState({ foreground_folder: folder })).folder).toBeNull()
+  })
+
+  it("carries the branch the foreground chat's folder is on, name and where", () => {
+    const branch = { name: 'feat/0.7.0-transcript', path: 'C:\\Users\\josep\\dev\\gentle-desk' }
+    const state = viewState({ foreground_chat: 'chat-1', foreground_branch: branch })
+
+    expect(chatOf(state).branch).toEqual(branch)
+    // The chip belongs to a chat's chrome too: with none open there is no branch.
+    expect(chatOf(viewState({ foreground_branch: branch })).branch).toBeNull()
+  })
+
+  it('carries no branch for a folder git had nothing to say about (R3)', () => {
+    // Rust answers `null` for a folder outside any repository, and the composer
+    // reads exactly that: absent, never a placeholder to fill the row.
+    const state = viewState({
+      foreground_chat: 'chat-1',
+      foreground_folder: { name: 'gentle-desk', path: 'C:\\dev\\gentle-desk' },
+      foreground_branch: null,
+    })
+
+    expect(chatOf(state).branch).toBeNull()
   })
 
   it('leaves an idle chat unmarked, so its composer is ready', () => {
@@ -139,6 +163,7 @@ describe('chatOf', () => {
       modelChip: null,
       contextUsage: null,
       folder: null,
+      branch: null,
       chatProfile: null,
       fatal: null,
       whatsNew: null,

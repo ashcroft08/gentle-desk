@@ -205,6 +205,7 @@
             chip={chat.modelChip}
             contextUsage={chat.contextUsage}
             folder={chat.folder}
+            branch={chat.branch}
           />
         </div>
         <div class="view" id="p-helpers" role="tabpanel" aria-labelledby="t-help" hidden={tab !== 'helpers'}>

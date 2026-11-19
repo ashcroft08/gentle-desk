@@ -95,6 +95,8 @@ fn the_view_state_slice_has_no_invented_fields() {
             foreground_title: None,
             // And no chat means no folder for the composer's chip.
             foreground_folder: None,
+            // Nor a branch for the chip beside it (design/composer-dock S2, R3).
+            foreground_branch: None,
             list_status: ListStatusView::Loading { done: 0, total: 0 },
             sessions_revision: 0,
             total_sessions: 0,

@@ -211,6 +211,29 @@ export type AuthView_Serialize = {
 	providers: AuthProviderView_Serialize[],
 };
 
+/**
+ *  The branch the foreground chat's working directory is on (design/composer-dock
+ *  S2, R3, R4): the branch's name, and the directory it was read from, which is
+ *  only ever the hover.
+ * 
+ *  There is no "no repository" variant on purpose: a folder outside a work tree,
+ *  a bare one, a machine without git and every other refusal are all `None` on
+ *  [`ViewState::foreground_branch`], and a `None` draws no chip at all - no
+ *  gap, no dash, no placeholder (R3).
+ * 
+ *  A detached HEAD carries the SHORT sha as its name, because the word git
+ *  answers there (`HEAD`) names no branch and the chip never lies.
+ */
+export type BranchView = {
+	/**  The branch's name as git spells it, or the short sha of a detached HEAD. */
+	name: string,
+	/**
+	 *  The working directory the branch was read from: the chip's `title`, never
+	 *  its text. It is also what ties the answer to the folder beside it.
+	 */
+	path: string,
+};
+
 export type ChatActivityMark = "Working" | "Queued" | "Opening" | "NewReply" | "NeedsAttention" | "Ended";
 
 /**
@@ -2979,6 +3002,14 @@ export type ViewState_Deserialize = {
 	 */
 	foreground_folder?: FolderView | null,
 	/**
+	 *  The branch that folder is on (design/composer-dock S2, R3, R4), read once
+	 *  per working directory by the shell (`git`) and kept only while it was read
+	 *  from the very directory `foreground_folder` names. `None` when there is no
+	 *  branch to draw - no repository, a bare one, git not installed, an answer
+	 *  that has not landed yet - and the composer then draws no chip at all.
+	 */
+	foreground_branch?: BranchView | null,
+	/**
 	 *  How complete the session list is. It starts `Loading`, so the sidebar
 	 *  never claims there are no chats before the first pass ends.
 	 */
@@ -3216,6 +3247,14 @@ export type ViewState_Serialize = {
 	 *  absent rather than a placeholder.
 	 */
 	foreground_folder: FolderView | null,
+	/**
+	 *  The branch that folder is on (design/composer-dock S2, R3, R4), read once
+	 *  per working directory by the shell (`git`) and kept only while it was read
+	 *  from the very directory `foreground_folder` names. `None` when there is no
+	 *  branch to draw - no repository, a bare one, git not installed, an answer
+	 *  that has not landed yet - and the composer then draws no chip at all.
+	 */
+	foreground_branch: BranchView | null,
 	/**
 	 *  How complete the session list is. It starts `Loading`, so the sidebar
 	 *  never claims there are no chats before the first pass ends.

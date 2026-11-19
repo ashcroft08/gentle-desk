@@ -330,6 +330,19 @@ impl Bridge {
         // pump's own thread. Armed before the pump's push, because arming the
         // push is what may start it.
         self.arm_chat_commands(&emit);
+        // The branch chip's read runs off the window (design/composer-dock S2,
+        // R3, R4), so what it answers reaches the web the way every other late
+        // answer does: a push from the thread that read it. The holder is held
+        // weakly, exactly as the chat-command sink holds it, because the sink
+        // lives inside the holder it pushes.
+        let branch_holder = Arc::downgrade(&self.holder);
+        let branch_emit = Arc::clone(&emit);
+        self.holder.arm_branch_push(Arc::new(move || {
+            if let Some(holder) = branch_holder.upgrade() {
+                let view = holder.view();
+                push(&branch_emit, view);
+            }
+        }));
         self.pump.arm(push_via(emit.clone()));
         // The folder dialog is owned by the window, so it is modal to the app
         // instead of to the desktop. The window exists only from this step, and

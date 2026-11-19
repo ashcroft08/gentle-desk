@@ -38,7 +38,8 @@ use gentle_runtime::clock::now_ms;
 
 use crate::config::{ConfigSnapshot, ConfigWriter};
 use crate::contract::{
-    AuthView, ChatProfileView, SessionsWindow, UiIntent, UpdatesView, UsageView, ViewState,
+    AuthView, BranchView, ChatProfileView, SessionsWindow, UiIntent, UpdatesView, UsageView,
+    ViewState,
 };
 use crate::images::Images;
 use crate::sessions::cache::TreeCache;
@@ -77,6 +78,11 @@ pub type CommandSink = Arc<dyn Fn(Command) + Send + Sync>;
 /// the bridge installs starts one `chat-command` worker thread per command,
 /// exactly as the intent path does with the commands it is answered.
 pub type ChatCommandSink = Arc<dyn Fn(Vec<gentle_app::ChatCommand>) + Send + Sync>;
+
+/// Installed once at startup: what pushes the slice a branch read answered on a
+/// worker thread ([`AppStateHolder::arm_branch_push`]). Before it exists the
+/// answer is still cached, and the next fold pushes it.
+pub type BranchPush = Arc<dyn Fn() + Send + Sync>;
 
 /// The app state the Tauri shell owns. Created at startup, managed by Tauri;
 /// nothing else anywhere holds an `AppState`.
@@ -174,6 +180,11 @@ pub struct AppStateHolder {
     /// The run's one fatal failure, as `ViewState.fatal` carries it: the
     /// launcher could not be resolved, so no chat can start (`bridge::fatal`).
     fatal: Mutex<Option<String>>,
+    /// The branch each working directory was on, read once per directory off the
+    /// window's thread and reused by every push after it (`crate::git`), with
+    /// the push a late answer travels on.
+    branches: Arc<crate::git::Branches>,
+    branch_push: Mutex<Option<BranchPush>>,
 }
 
 impl AppStateHolder {
@@ -210,6 +221,19 @@ impl AppStateHolder {
     /// ([`Self::deliver_chat_commands`]).
     pub fn arm_chat_commands(&self, sink: ChatCommandSink) {
         *lock(&self.chat_commands) = Some(sink);
+    }
+
+    /// Installs what pushes the slice a branch read answered (design/composer-dock
+    /// S2, R3, R4). The read runs on its own thread so no push ever waits for a
+    /// `git` process; this is how what it found reaches the window.
+    pub fn arm_branch_push(&self, push: BranchPush) {
+        *lock(&self.branch_push) = Some(push);
+    }
+
+    /// The branch cache, for a caller outside a fold: the tests seed it so an
+    /// answer can be asserted without a repository or a process.
+    pub fn branches(&self) -> &crate::git::Branches {
+        &self.branches
     }
 
     /// Folds one intent of the contract through the reducer and answers the
@@ -455,6 +479,45 @@ impl AppStateHolder {
             .and_then(|chat| chat.session_path().map(str::to_owned))
     }
 
+    /// The branch the foreground chat's folder is on (design/composer-dock S2,
+    /// R3, R4), from the cache the one read left.
+    ///
+    /// It never runs `git` on the caller's thread: a directory nobody has read
+    /// yet claims its one read here and a worker thread runs it, so this answers
+    /// `None` for exactly one push and the read's answer arrives on its own
+    /// ([`Self::arm_branch_push`]).
+    fn branch_view(&self) -> Option<BranchView> {
+        let cwd = {
+            // The directory comes from the same session row the folder chip
+            // reads, under one short lock: the read itself happens with none.
+            let app = lock(&self.app);
+            crate::state_view::foreground_folder(&app).map(|folder| folder.path)
+        }?;
+        match self.branches.lookup(&cwd) {
+            crate::git::Lookup::Read(branch) => branch,
+            crate::git::Lookup::Waiting => None,
+            crate::git::Lookup::Missing => {
+                self.start_branch_read(cwd);
+                None
+            }
+        }
+    }
+
+    /// Starts the ONE read of a working directory's branch, off this thread and
+    /// with no lock held: a `git` process is the last thing a push should wait
+    /// for. What it answers is cached and pushed.
+    fn start_branch_read(&self, cwd: String) {
+        let branches = Arc::clone(&self.branches);
+        let push = lock(&self.branch_push).clone();
+        std::thread::spawn(move || {
+            let branch = crate::git::read(std::path::Path::new(&cwd));
+            branches.record(&cwd, branch);
+            if let Some(push) = push {
+                push();
+            }
+        });
+    }
+
     /// The label the sidebar draws for the workspace `key` names, when the tree
     /// of the current revision carries it: the delete's notice names the
     /// workspace that vanished, and the naming rule is the tree's (T4).
@@ -534,6 +597,7 @@ impl AppStateHolder {
             language: self.language_value(),
             shell: self.shell_view(),
             chat_profile: self.chat_profile(),
+            branch: self.branch_view(),
             auth: self.auth(),
             updates: self.updates(),
             usage: self.usage(),
