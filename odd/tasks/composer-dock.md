@@ -92,3 +92,21 @@ those chips are cheap, one needs a new command, and one cannot be built at all.
   mapping with the raw value as fallback, NO switch per R1), then T4 the attachments
   (picker + drag, path insertion, the outside-workspace warning). The mode slice was
   started and could not be delegated for the reason in L5.
+- L7 (2026-11-19, the maintainer asks for the mode to be changeable from the UI; probed
+  against a real `gentle-shell --mode rpc` with `GENTLE_SHELL_INTERACTIVE_HOST=1`,
+  contract in gentle-pi `docs/desktop-rpc.md`): R1 is REVOKED. Findings:
+  - Four modes, wire strings `normal` | `auto` | `yolo` | `super-yolo` (the status text
+    reads `NORMAL` / `SUPER-YOLO`; the wire is lowercase with a hyphen).
+  - `get_permission_mode` -> `{mode, default_mode}`.
+  - `set_permission_mode {mode, persist?}` (only those two keys; `persist` defaults to
+    false = session only) answered ok for `normal`, `yolo` and `super-yolo`, each with
+    `{mode, default_mode, persisted:false, changed:true}`, and emitted
+    `permission_mode_changed {mode, previous_mode, default_mode, persisted,
+    source:"desktop"}` AFTER the response. An unknown mode answers
+    `invalid_request` ("Unknown permission mode"), state unchanged. The docs also list
+    `permission_denied` / `permission_unavailable`, so the UI must show a refusal.
+  - So the earlier premise "upstream refuses YOLO outside a TUI" does not hold for an
+    interactive-host child. Rulings that replace R1: the UI changes only SESSION mode
+    (`persist` never sent); the shown mode changes only on the confirmed response or
+    `permission_mode_changed`, never optimistically; a failure shows its code and
+    leaves the mode alone; yolo / super-yolo need an explicit confirmation step.
