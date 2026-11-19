@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "comments": [
+    {
+      "id": "qq96ah12",
+      "file": "01-dock.html",
+      "selector": "body > div > div:nth-of-type(1) > div > div:nth-of-type(4) > div:nth-of-type(4)",
+      "excerpt": "↵ envía ⇧↵ salto ! comando / comandos Ctrl+N sesión",
+      "comment": "esto va debajo es el texto que tenemos nosotros que dice \"Enter para enviar · Shift+Enter para una línea nueva · Esc para detener\"",
+      "createdAt": "2026-11-19T00:28:12.334Z",
+      "status": "open",
+      "sentAt": "2026-11-19T00:28:12.389Z",
+      "resolvedAt": null
+    },
+    {
+      "id": "yax1661e",
+      "file": "01-dock.html",
+      "selector": "body > div > div:nth-of-type(1) > div > div:nth-of-type(4) > div:nth-of-type(3) > button:nth-of-type(4)",
+      "excerpt": "…Desktop\\Proyectos\\ Kallari_Pagina_web",
+      "comment": "aqui vamos a enseñar solo el nombre del workspace que es como manejamos nosotros en el sidebar",
+      "createdAt": "2026-11-19T00:28:36.200Z",
+      "status": "open",
+      "sentAt": "2026-11-19T00:28:36.239Z",
+      "resolvedAt": null
+    }
+  ]
+}
