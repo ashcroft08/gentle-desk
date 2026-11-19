@@ -4,7 +4,7 @@
 // hairline that separates where the message runs from what it runs on belongs to
 // the group, so a chat with no folder leaves no dangling line.
 import { afterEach, describe, expect, it } from 'vitest'
-import { cleanup, render, screen } from '@testing-library/svelte'
+import { cleanup, render } from '@testing-library/svelte'
 import FolderChip from './FolderChip.svelte'
 
 afterEach(cleanup)

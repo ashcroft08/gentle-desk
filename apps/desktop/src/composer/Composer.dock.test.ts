@@ -12,7 +12,7 @@
 // first part now, and it is pinned here only by its place: what it DOES lives in
 // `Composer.attachments.test.ts`.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen } from '@testing-library/svelte'
+import { cleanup, render } from '@testing-library/svelte'
 import type { ModelChipView } from '../contract/bindings'
 import { resetTauriMock, setHandler, viewState } from '../test-support/tauri-mock'
 import Composer from './Composer.svelte'
