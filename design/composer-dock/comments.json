@@ -8,9 +8,10 @@
       "excerpt": "↵ envía ⇧↵ salto ! comando / comandos Ctrl+N sesión",
       "comment": "esto va debajo es el texto que tenemos nosotros que dice \"Enter para enviar · Shift+Enter para una línea nueva · Esc para detener\"",
       "createdAt": "2026-11-19T00:28:12.334Z",
-      "status": "open",
+      "status": "resolved",
       "sentAt": "2026-11-19T00:28:12.389Z",
-      "resolvedAt": null
+      "resolvedAt": "2026-11-19T00:35:06.427Z",
+      "resolution": "The footer now uses our own copy: \"Enter para enviar · Shift+Enter para una línea nueva · Esc para detener\", with the keys emphasised and the separators kept."
     },
     {
       "id": "yax1661e",
