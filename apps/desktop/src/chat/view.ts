@@ -36,7 +36,7 @@ import type {
   ChatProfileView_Serialize as ChatProfileView,
   ContextUsageView_Serialize as ContextUsageView,
   DialogView,
-  FolderView_Serialize as FolderView,
+  FolderView,
   ImageView,
   HelperThreadView as HelperThreadView,
   HelpersView_Serialize as HelpersView,

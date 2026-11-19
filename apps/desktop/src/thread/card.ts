@@ -193,9 +193,11 @@ export type ToolBody = { error: string | null; lines: string[] }
  * folded body must never swallow the reason a call failed. The rest stays folded
  * under it, and an output that fits is untouched.
  */
-export function toolBody(
-  tool: Pick<ToolCall, 'result' | 'partial_result' | 'is_error'>,
-): ToolBody {
+export function toolBody(tool: {
+  result?: unknown
+  partial_result?: unknown
+  is_error: boolean
+}): ToolBody {
   const payload = tool.result ?? tool.partial_result ?? null
   const normal = splitLines(textOf(payload))
   if (!tool.is_error) return { error: null, lines: normal }

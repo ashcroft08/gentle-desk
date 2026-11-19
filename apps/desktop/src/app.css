@@ -408,11 +408,8 @@ p {
   color: var(--text);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .copy {
-    transition: none;
-  }
-}
+/* Copy's own transition needs no reduced-motion block of its own: the global one
+   at the end of this file already turns every transition off. */
 
 /* A model error replaces the reply: the iced danger box, drawn with the states
    board's error edge. */

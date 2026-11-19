@@ -32,7 +32,7 @@
   const subject = $derived(toolSubject(tool))
   const body = $derived(toolBody(tool))
   const elapsed = $derived(formatDuration(tool.duration_ms))
-  const state = $derived(
+  const stateWord = $derived(
     tool.running ? copy.toolRunning : tool.is_error ? copy.toolFailed : copy.toolDone,
   )
 
@@ -124,7 +124,7 @@
       </svg>
     {/if}
     <span class="tc-state">
-      {state}{#if elapsed !== null}<span class="tc-time">{` ${elapsed}`}</span>{/if}
+      {stateWord}{#if elapsed !== null}<span class="tc-time">{` ${elapsed}`}</span>{/if}
     </span>
   </div>
 </div>

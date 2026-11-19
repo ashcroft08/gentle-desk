@@ -18,7 +18,7 @@
   import type {
     ChatActivityMark,
     ContextUsageView_Serialize as ContextUsageView,
-    FolderView_Serialize as FolderView,
+    FolderView,
     ImageView,
     ModelChipView,
   } from '../contract/bindings'

@@ -8,7 +8,7 @@
   // what the message runs ON (model, effort) from where it runs (folder, and the
   // branch in a later slice), so a chat with no folder to name leaves no
   // dangling separator either (R3's rule, applied one group earlier).
-  import type { FolderView_Serialize as FolderView } from '../contract/bindings'
+  import type { FolderView } from '../contract/bindings'
   import Icon from '../icons/Icon.svelte'
 
   let { folder = null }: { folder?: FolderView | null } = $props()
