@@ -1616,6 +1616,94 @@ export type ProviderStatusView = "Ready" | "NotReady" |
 "Unverified" | "Invalid" | "Error";
 
 /**
+ *  One mode the page may ask the session to switch to (composer-dock T3b, S1).
+ * 
+ *  A closed set, named exactly as the channel's own wire spells the four modes
+ *  (`normal`, `auto`, `yolo`, `super-yolo`), so neither side translates a value
+ *  and no string a page sends can become a mode nobody offers. Which of them
+ *  needs a confirmation step first is the page's business and its design's
+ *  (`yolo` and `super-yolo`), never this enum's.
+ */
+export type SessionModeChoice = 
+/**  Asks before a tool the mode would otherwise allow. */
+"normal" | 
+/**  Chooses by the owner's own rules without asking. */
+"auto" | 
+/**  Never asks: the session runs unattended. */
+"yolo" | 
+/**
+ *  The widest of the four: never asks, and takes the owner's own widest
+ *  permission set. The status text reads `SUPER-YOLO`; the wire is
+ *  `super-yolo`.
+ */
+"super-yolo";
+
+/**
+ *  The session's permission mode as the slice carries it (composer-dock T3b,
+ *  L7): what the chat's own child reported, and what became of the last attempt
+ *  to change it.
+ */
+export type SessionModeView = SessionModeView_Serialize | SessionModeView_Deserialize;
+
+/**
+ *  The session's permission mode as the slice carries it (composer-dock T3b,
+ *  L7): what the chat's own child reported, and what became of the last attempt
+ *  to change it.
+ */
+export type SessionModeView_Deserialize = {
+	/**
+	 *  The mode in effect, in the channel's OWN string, exactly as it arrived.
+	 *  A value this build does not know is shown as-is, never hidden and never
+	 *  mapped onto a mode the app does know, so an upstream mode the page has
+	 *  not learned yet still says what the session really runs.
+	 */
+	mode: string,
+	/**
+	 *  The owner's own code for the last attempt that did not happen
+	 *  (`permission_denied`, `permission_unavailable`, `invalid_request`, ...),
+	 *  or `no_answer`/`unsupported` when the child did not answer at all. `None`
+	 *  while nothing was refused, and cleared by the next answered exchange.
+	 *  The mode above is left exactly as it was: a failure shows its code and
+	 *  changes nothing (L7).
+	 */
+	refusal?: string | null,
+	/**
+	 *  How many WRITE attempts this chat has answered since it opened. A read is
+	 *  no attempt, and the page tells one confirmed change from the next by it.
+	 */
+	attempt: number,
+};
+
+/**
+ *  The session's permission mode as the slice carries it (composer-dock T3b,
+ *  L7): what the chat's own child reported, and what became of the last attempt
+ *  to change it.
+ */
+export type SessionModeView_Serialize = {
+	/**
+	 *  The mode in effect, in the channel's OWN string, exactly as it arrived.
+	 *  A value this build does not know is shown as-is, never hidden and never
+	 *  mapped onto a mode the app does know, so an upstream mode the page has
+	 *  not learned yet still says what the session really runs.
+	 */
+	mode: string,
+	/**
+	 *  The owner's own code for the last attempt that did not happen
+	 *  (`permission_denied`, `permission_unavailable`, `invalid_request`, ...),
+	 *  or `no_answer`/`unsupported` when the child did not answer at all. `None`
+	 *  while nothing was refused, and cleared by the next answered exchange.
+	 *  The mode above is left exactly as it was: a failure shows its code and
+	 *  changes nothing (L7).
+	 */
+	refusal: string | null,
+	/**
+	 *  How many WRITE attempts this chat has answered since it opened. A read is
+	 *  no attempt, and the page tells one confirmed change from the next by it.
+	 */
+	attempt: number,
+};
+
+/**
  *  One row of the session list, flattened for display. Rows are served a
  *  WINDOW at a time ([`SessionsWindow`], S3); the whole list is never pushed.
  */
@@ -2374,6 +2462,36 @@ export type UiIntent_Deserialize = { type: "SendPrompt"; data: {
 	profile?: string | null,
 } } | 
 /**
+ *  Read the SESSION permission mode of one chat (composer-dock T3b, L7):
+ *  `get_permission_mode` over that chat's OWN child, which is the only one
+ *  that knows the mode of the session it runs. Nothing is written.
+ * 
+ *  The answer travels back on [`ViewState::session_mode`], for that chat
+ *  alone, and it is the owner's own string, never a name this app coined.
+ *  A read that did not answer draws no mode at all: the control is absent
+ *  rather than guessed at.
+ */
+{ type: "ReadSessionMode"; data: {
+	chat_id: string,
+} } | 
+/**
+ *  Ask the SESSION permission mode of one chat to change (composer-dock T3b,
+ *  L7): `set_permission_mode { mode }` over that chat's own child, and never
+ *  `persist` - this changes the mode of THIS session and leaves the saved
+ *  default exactly as it was.
+ * 
+ *  The shown mode changes only on the confirmed answer, never optimistically
+ *  (L7), so the answer that travels back on [`ViewState::session_mode`] is
+ *  the state the owner re-read after the attempt. A refused or unanswered
+ *  write keeps the mode it had and leaves its own `refusal`, which the page
+ *  shows; `yolo` and `super-yolo` are the page's confirmation step to ask
+ *  for, never this intent's.
+ */
+{ type: "SetSessionMode"; data: {
+	chat_id: string,
+	mode: SessionModeChoice,
+} } | 
+/**
  *  Re-read the provider names and re-run one `auth check` per provider
  *  (0.1.12, T3). The answer travels back on [`ViewState::auth`].
  */
@@ -2668,6 +2786,36 @@ export type UiIntent_Serialize = { type: "SendPrompt"; data: {
 	source: string,
 	/**  A profile name the store defines, or `null` to clear that layer. */
 	profile: string | null,
+} } | 
+/**
+ *  Read the SESSION permission mode of one chat (composer-dock T3b, L7):
+ *  `get_permission_mode` over that chat's OWN child, which is the only one
+ *  that knows the mode of the session it runs. Nothing is written.
+ * 
+ *  The answer travels back on [`ViewState::session_mode`], for that chat
+ *  alone, and it is the owner's own string, never a name this app coined.
+ *  A read that did not answer draws no mode at all: the control is absent
+ *  rather than guessed at.
+ */
+{ type: "ReadSessionMode"; data: {
+	chat_id: string,
+} } | 
+/**
+ *  Ask the SESSION permission mode of one chat to change (composer-dock T3b,
+ *  L7): `set_permission_mode { mode }` over that chat's own child, and never
+ *  `persist` - this changes the mode of THIS session and leaves the saved
+ *  default exactly as it was.
+ * 
+ *  The shown mode changes only on the confirmed answer, never optimistically
+ *  (L7), so the answer that travels back on [`ViewState::session_mode`] is
+ *  the state the owner re-read after the attempt. A refused or unanswered
+ *  write keeps the mode it had and leaves its own `refusal`, which the page
+ *  shows; `yolo` and `super-yolo` are the page's confirmation step to ask
+ *  for, never this intent's.
+ */
+{ type: "SetSessionMode"; data: {
+	chat_id: string,
+	mode: SessionModeChoice,
 } } | 
 /**
  *  Re-read the provider names and re-run one `auth check` per provider
@@ -3143,6 +3291,20 @@ export type ViewState_Deserialize = {
 	 */
 	chat_profile?: ChatProfileView_Deserialize | null,
 	/**
+	 *  The SESSION permission mode of the FOREGROUND chat (composer-dock T3b,
+	 *  L7): the mode that chat's own child reported, in the channel's own string,
+	 *  with the refusal of the last attempt that wrote nothing and the number of
+	 *  write attempts answered so far.
+	 * 
+	 *  Shell-owned, like [`chat_profile`](Self::chat_profile): the reducer knows
+	 *  nothing about a permission mode. It is carried only while its mode is
+	 *  KNOWN and the chat it was read for is the foreground one, so a late answer
+	 *  never draws on the wrong chat and a chat nothing answered draws no control
+	 *  at all. `None` until an exchange answers, and for every chat that is not
+	 *  the foreground one.
+	 */
+	session_mode?: SessionModeView_Deserialize | null,
+	/**
 	 *  Where the shell's authentication stands (0.1.12, T3): provider names and
 	 *  their own check, never a key.
 	 */
@@ -3388,6 +3550,20 @@ export type ViewState_Serialize = {
 	 *  own.
 	 */
 	chat_profile: ChatProfileView_Serialize | null,
+	/**
+	 *  The SESSION permission mode of the FOREGROUND chat (composer-dock T3b,
+	 *  L7): the mode that chat's own child reported, in the channel's own string,
+	 *  with the refusal of the last attempt that wrote nothing and the number of
+	 *  write attempts answered so far.
+	 * 
+	 *  Shell-owned, like [`chat_profile`](Self::chat_profile): the reducer knows
+	 *  nothing about a permission mode. It is carried only while its mode is
+	 *  KNOWN and the chat it was read for is the foreground one, so a late answer
+	 *  never draws on the wrong chat and a chat nothing answered draws no control
+	 *  at all. `None` until an exchange answers, and for every chat that is not
+	 *  the foreground one.
+	 */
+	session_mode: SessionModeView_Serialize | null,
 	/**
 	 *  Where the shell's authentication stands (0.1.12, T3): provider names and
 	 *  their own check, never a key.

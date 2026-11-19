@@ -137,6 +137,9 @@ fn the_view_state_slice_has_no_invented_fields() {
             // answered, so the Profile tab has nothing of its own to draw
             // (profiles-editor T2b-2).
             chat_profile: None,
+            // Nor has any chat answered for its session mode, so there is no
+            // mode label to draw (design/composer-dock T3b).
+            session_mode: None,
             auth: AuthView::default(),
             updates: UpdatesView::default(),
             // Nothing asked the shell's usage sources anything yet, so the

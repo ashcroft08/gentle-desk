@@ -133,20 +133,29 @@ pub(super) struct ProfileWork {
     /// The pin editor's own notice: the third parallel slot, so a pin write that
     /// did not happen never lights the mode switch's or a chain's line (T6).
     pub(super) pin_failed: bool,
+    /// A session-mode read or change of this chat is in flight (composer-dock
+    /// T3b, L7): one at a time per chat, and a second ask is dropped rather than
+    /// queued. Independent of the profile slots, because the mode is another
+    /// child's other answer.
+    pub(super) session_mode: bool,
 }
 
-/// Which profile work a per-chat command does, and so which of its chat's two
-/// slots it takes (profiles-editor L18).
+/// Which per-chat work a command does, and so which of its chat's slots it takes
+/// (profiles-editor L18).
 ///
-/// Only the Profile tab's commands hold one: every other per-chat command runs as
-/// often as it is asked for. The mode switch and the chain editor SHARE the save
-/// slot (profiles-editor T5): one write per chat in flight, whichever control
-/// started it, so a mode save can never race a chain save of the same profile.
+/// The Profile tab's commands hold theirs, and so does the session permission
+/// mode (composer-dock T3b): every other per-chat command runs as often as it is
+/// asked for. The mode switch and the chain editor SHARE the save slot
+/// (profiles-editor T5): one write per chat in flight, whichever control started
+/// it, so a mode save can never race a chain save of the same profile. The
+/// session mode has its own slot, because it is a different child's answer and
+/// the two never wait for each other.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ChatWork {
     Read,
     Save,
     Apply,
+    SessionMode,
 }
 
 impl ChatWork {
@@ -158,6 +167,9 @@ impl ChatWork {
             | ChatCommand::SetChatProfileChain { .. }
             | ChatCommand::SetChatProfilePin { .. } => Some(Self::Save),
             ChatCommand::ApplyChatProfile { .. } => Some(Self::Apply),
+            // One session-mode command per chat, read or write: a read and a
+            // change of one chat's mode never overlap.
+            ChatCommand::SessionMode { .. } => Some(Self::SessionMode),
             _ => None,
         }
     }
@@ -812,6 +824,7 @@ impl AppStateHolder {
             ChatWork::Read => state.reading = false,
             ChatWork::Save => state.saving = false,
             ChatWork::Apply => state.applying = false,
+            ChatWork::SessionMode => state.session_mode = false,
         }
     }
 
@@ -833,6 +846,7 @@ impl AppStateHolder {
             ChatWork::Read => &mut state.reading,
             ChatWork::Save => &mut state.saving,
             ChatWork::Apply => &mut state.applying,
+            ChatWork::SessionMode => &mut state.session_mode,
         };
         if *slot {
             return false;
@@ -860,7 +874,10 @@ impl AppStateHolder {
     /// Whether `chat` is still one of the app's open chats: the state's own set,
     /// which the user's Close chat takes a chat out of (`Chats::close`). Nothing
     /// else decides that an answer still belongs to a live chat.
-    fn is_open(&self, chat: &ChatId) -> bool {
+    ///
+    /// `pub(super)` because the session mode's own answer asks the same question
+    /// before it installs anything (composer-dock T3b): one rule for both.
+    pub(super) fn is_open(&self, chat: &ChatId) -> bool {
         lock(&self.app).chats.state(chat).is_some()
     }
 

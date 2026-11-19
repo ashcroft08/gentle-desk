@@ -21,6 +21,7 @@ mod open_chat;
 mod pin;
 mod profile;
 mod rekey;
+mod session_mode;
 mod stop;
 use fake::FakeSpawner;
 

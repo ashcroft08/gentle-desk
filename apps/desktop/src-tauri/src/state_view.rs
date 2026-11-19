@@ -21,8 +21,8 @@ use gentle_runtime::badge::{Badge, BadgeMark};
 use crate::contract::{
     AuthView, BranchView, ChatActivityMark, ChatActivityView, ChatProfileView, ContextUsageView,
     FolderView, ImageView, LanguageView, ModelChipView, ModelChoiceView, ModelListStatusView,
-    NoticeActionView, NoticeLevel, NoticeView, ShellView, ThemeView, UpdatesView, UsageView,
-    ViewState, WhatsNewView,
+    NoticeActionView, NoticeLevel, NoticeView, SessionModeView, ShellView, ThemeView, UpdatesView,
+    UsageView, ViewState, WhatsNewView,
 };
 use crate::images::Images;
 use crate::{dialogs, helper_thread, helpers, sessions, view};
@@ -60,6 +60,12 @@ pub struct ShellParts<'a> {
     /// The Profile tab's view of one chat (profiles-editor T2b-2, L11), as the
     /// shell holds it: it belongs to the chat its own `chat_id` names.
     pub chat_profile: Option<ChatProfileView>,
+    /// The session permission mode of one chat (composer-dock T3b, L7), as the
+    /// shell holds it: the chat it was read for, and what that chat's own child
+    /// answered. The chat is carried beside the view for the same reason
+    /// [`chat_profile`](Self::chat_profile) carries its own: the two are compared
+    /// to the foreground chat here before anything is drawn.
+    pub session_mode: Option<(String, SessionModeView)>,
     /// The branch the foreground chat's folder is on (design/composer-dock S2,
     /// R3, R4), as the shell's git cache holds it. It arrives with the directory
     /// it was read from, so a read that lands after the user moved to another
@@ -91,6 +97,7 @@ pub fn view_state(state: &AppState, sessions_revision: u32, shell: ShellParts<'_
         language,
         shell,
         chat_profile,
+        session_mode,
         branch,
         auth,
         updates,
@@ -107,6 +114,13 @@ pub fn view_state(state: &AppState, sessions_revision: u32, shell: ShellParts<'_
     // the user moved to another chat never draws on the wrong one.
     let chat_profile = match (chat_profile, foreground.as_deref()) {
         (Some(view), Some(chat)) if view.chat_id == chat => Some(view),
+        _ => None,
+    };
+    // The session mode is the foreground chat's and nobody else's, by the same
+    // rule (composer-dock T3b, L7): an answer that lands after the user moved to
+    // another chat never labels the wrong one.
+    let session_mode = match (session_mode, foreground.as_deref()) {
+        (Some((chat_id, view)), Some(chat)) if chat_id == chat => Some(view),
         _ => None,
     };
     // The folder and the branch it is on are one answer (design/composer-dock S2,
@@ -153,6 +167,7 @@ pub fn view_state(state: &AppState, sessions_revision: u32, shell: ShellParts<'_
         model_chip: model_chip_view(state),
         context_usage: context_usage_view(state),
         chat_profile,
+        session_mode,
         auth,
         updates,
         usage,

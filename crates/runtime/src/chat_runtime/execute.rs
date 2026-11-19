@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use gentle_app::{ChatCommand, ChatId};
 use gentle_backend::chat_host::Opened;
 use gentle_core::i18n::{messages, Language};
+use gentle_core::rpc::permission::{PermissionOutcome, SessionMode};
 use gentle_core::rpc::RpcCommand;
 
 use super::{
@@ -106,6 +107,22 @@ pub enum Outcome {
         result: PinWriteResult,
         /// Boxed for the same reason as [`Outcome::ChatProfile`]'s read.
         read: Box<ChatConfigRead>,
+    },
+    /// One chat's SESSION permission mode was read, or one change of it was
+    /// asked for, over that chat's own child (composer-dock T3b, L7): `change`
+    /// is what the request asked for (`None` is a read) and `outcome` is what
+    /// the owner answered - the state it re-read, its own refusal, or the typed
+    /// reason there is no answer at all.
+    ///
+    /// Shell-owned like the profile answers above: the reducer knows nothing
+    /// about a permission mode, and the shell is what decides which mode is
+    /// drawn.
+    SessionMode {
+        chat: ChatId,
+        /// The change that was asked for, `None` for a read.
+        change: Option<SessionMode>,
+        /// What the exchange came to.
+        outcome: PermissionOutcome,
     },
 }
 
@@ -254,6 +271,18 @@ impl ChatRuntime {
             ChatCommand::SetWorking { chat, working } => {
                 self.set_working(&chat, working);
                 Outcome::Working { chat, working }
+            }
+            // One chat's session permission mode, over the desktop channel into
+            // that chat's own child (composer-dock T3b, L7). Blocking on the
+            // channel's deadline under the chat's one client, so the caller runs
+            // it off the window's thread.
+            ChatCommand::SessionMode { chat, change } => {
+                let outcome = self.session_mode(&chat, change);
+                Outcome::SessionMode {
+                    chat,
+                    change,
+                    outcome,
+                }
             }
         }
     }

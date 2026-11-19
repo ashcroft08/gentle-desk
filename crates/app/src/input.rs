@@ -282,6 +282,19 @@ pub enum ChatCommand {
         /// A profile name the store defines, or `None` to clear the layer.
         profile: Option<String>,
     },
+    /// Read, or ask to change, the SESSION permission mode of that chat, over
+    /// that chat's own child (composer-dock T3b, L7): `get_permission_mode`
+    /// reads it and `set_permission_mode { mode }` asks for a change.
+    ///
+    /// `change: None` is a READ, which writes nothing; `Some(mode)` is a WRITE
+    /// of this session's mode only - the saved default travels as no request at
+    /// all, because `persist` is never sent (L7). The mode is the session's and
+    /// never a chat's alone: it is the mode of the child that answers, so it
+    /// goes to that chat's own child and no other.
+    SessionMode {
+        chat: ChatId,
+        change: Option<gentle_core::rpc::permission::SessionMode>,
+    },
     /// Tell the host whether that chat is running a turn. The reducer owns the
     /// mark (it is the one that reads `agent_start` / `agent_end`), so this is
     /// how the host's protection rules learn it: a working chat is never the
@@ -302,6 +315,7 @@ impl ChatCommand {
             Self::ApplyChatProfile { chat, .. } => chat,
             Self::SetChatProfileChain { chat, .. } => chat,
             Self::SetChatProfilePin { chat, .. } => chat,
+            Self::SessionMode { chat, .. } => chat,
             Self::SetWorking { chat, .. } => chat,
         }
     }

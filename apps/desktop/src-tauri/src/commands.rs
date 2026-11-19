@@ -1053,6 +1053,13 @@ pub fn fold_spawn_failure(
         gentle_app::ChatCommand::SetChatProfilePin { chat, .. } => {
             holder.note_chat_pin_unstarted(chat)
         }
+        // A session mode that never reached a child owes the page the same answer
+        // a write that got no answer gives: nothing was written, the mode stays,
+        // and one short line names it. A READ that never ran says nothing at all
+        // (composer-dock T3b, L7).
+        gentle_app::ChatCommand::SessionMode { chat, change } => {
+            holder.note_session_mode_unstarted(chat, *change)
+        }
         // Every other command has already answered the web side with the slice
         // its intent folded, and none of them is a slice the failure changes.
         _ => None,
@@ -1108,6 +1115,14 @@ fn fold_and_push(holder: &Arc<AppStateHolder>, emit: &Emit, ran: Ran) {
     // configuration the attempt re-read.
     for (chat, result, read) in ran.chat_pin {
         if let Some(view) = holder.note_chat_pin(&chat, &result, &read) {
+            push(emit, view);
+        }
+    }
+    // One chat's session permission mode was read, or one change of it was
+    // answered (composer-dock T3b, L7): the label draws the owner's own string,
+    // and an attempt that wrote nothing keeps the mode and says its code.
+    for (chat, change, outcome) in ran.session_mode {
+        if let Some(view) = holder.note_session_mode(&chat, change, &outcome) {
             push(emit, view);
         }
     }

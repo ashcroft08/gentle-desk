@@ -9,6 +9,7 @@ use std::sync::Mutex;
 
 use gentle_app::{ChatCommand, ChatId};
 use gentle_backend::chat_host::Opened;
+use gentle_core::rpc::permission::PermissionOutcome;
 use gentle_desk_lib::effects::ChatExecutor;
 use gentle_runtime::chat_runtime::{
     ChainWriteResult, ChatConfigRead, ChatProfileApply, ModeWriteResult, Outcome, PinWriteResult,
@@ -52,6 +53,9 @@ pub enum Answer {
     /// The user's Close chat stopped that chat's child, as the host reports it
     /// (profiles-editor T2b-3).
     Closed,
+    /// One chat's session permission mode was read, or one change of it was
+    /// answered (composer-dock T3b, L7).
+    SessionMode(Box<PermissionOutcome>),
 }
 
 impl Answer {
@@ -124,6 +128,16 @@ impl Answer {
                 }
             }
             (Self::Closed, ChatCommand::CloseProcess { .. }) => Outcome::Closed { chat },
+            (
+                Self::SessionMode(outcome),
+                ChatCommand::SessionMode {
+                    change, ..
+                },
+            ) => Outcome::SessionMode {
+                chat,
+                change: *change,
+                outcome: (**outcome).clone(),
+            },
             // Sent, and every send after an open: the child took it.
             _ => Outcome::Sent,
         }

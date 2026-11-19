@@ -58,6 +58,7 @@ mod fatal;
 mod images;
 mod language;
 mod notice;
+mod session_mode;
 mod session_notice;
 mod settings;
 mod shell;
@@ -169,6 +170,11 @@ pub struct AppStateHolder {
     /// ([`AppStateHolder::dispatch_commands`],
     /// [`AppStateHolder::deliver_chat_commands`]).
     profile_work: Mutex<std::collections::HashMap<String, chat_profile::ProfileWork>>,
+    /// Each chat's SESSION permission mode (composer-dock T3b, L7), one entry per
+    /// chat that answered: the mode its own child last reported, the refusal of
+    /// the last attempt that wrote nothing, and how many writes it answered.
+    /// Shell-owned, and dropped with the chat (`bridge::session_mode`).
+    session_modes: Mutex<session_mode::SessionModes>,
     /// The Account pane's slice (0.1.12, T3): the provider names the shell's
     /// store lists and what its own check said about each.
     auth: Mutex<AuthView>,
@@ -375,6 +381,41 @@ impl AppStateHolder {
             }
             return (self.view(), vec![command]);
         }
+        // The session permission mode (composer-dock T3b, L7) is the same kind of
+        // per-chat command: the mode belongs to the child of the chat it names,
+        // so it is asked of that chat's own child and no other. One read draws no
+        // control until it answers, and one write's shown mode changes only on
+        // the confirmed answer the run folds back.
+        //
+        // One session-mode command per chat is in flight at most (the same cap
+        // the profile commands keep): a second ask is DROPPED with the slice as
+        // it stands rather than queued against that chat's child.
+        if let UiIntent::ReadSessionMode { chat_id } = &intent {
+            let chat = crate::intent::chat_for(&state, chat_id);
+            let command = gentle_app::ChatCommand::SessionMode {
+                chat,
+                change: None,
+            };
+            if !self.begin_chat_command(&command) {
+                return (self.view(), Vec::new());
+            }
+            return (self.view(), vec![command]);
+        }
+        // A change of that mode is the same command with the mode in it: the
+        // closed choice of the contract maps to the channel's own wire string,
+        // and the saved default is never touched because `persist` is never sent
+        // (L7).
+        if let UiIntent::SetSessionMode { chat_id, mode } = &intent {
+            let chat = crate::intent::chat_for(&state, chat_id);
+            let command = gentle_app::ChatCommand::SessionMode {
+                chat,
+                change: Some(crate::intent::session_mode_of(*mode)),
+            };
+            if !self.begin_chat_command(&command) {
+                return (self.view(), Vec::new());
+            }
+            return (self.view(), vec![command]);
+        }
         match crate::intent::to_intent(&state, intent) {
             Some(intent) => self.apply(gentle_app::Input::Intent(intent)),
             // Every intent has an answer: the reducer's, or the config's above.
@@ -559,6 +600,9 @@ impl AppStateHolder {
         // no view of it.
         if let gentle_app::Input::ChatClosed { chat, .. } = &input {
             self.forget_chat_profile(chat);
+            // The session mode is that chat's own reading of its own child, and
+            // it may not outlive it either (composer-dock T3b, L7).
+            self.forget_session_mode(chat);
         }
         // One lock for the fold and the slice it answers: a revision read here
         // describes exactly the state it is pushed with. Everything the shell
@@ -597,6 +641,7 @@ impl AppStateHolder {
             language: self.language_value(),
             shell: self.shell_view(),
             chat_profile: self.chat_profile(),
+            session_mode: self.session_mode(),
             branch: self.branch_view(),
             auth: self.auth(),
             updates: self.updates(),

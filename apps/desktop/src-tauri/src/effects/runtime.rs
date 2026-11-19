@@ -22,6 +22,8 @@ use gentle_backend::chat_host::{
 use gentle_backend::home::{with_home_flag, HomeChoice, HomeEnv};
 use gentle_backend::launcher::{self, LauncherEnv};
 use gentle_core::i18n::{messages, Language};
+use gentle_core::rpc::permission::{PermissionOutcome, SessionMode};
+use gentle_core::rpc::NoAnswer;
 use gentle_runtime::chat_runtime::{
     ChatChainWrite, ChatConfigRead, ChatModeWrite, ChatPinWrite, ChatProfileApply, ChatRuntime,
     Outcome,
@@ -187,6 +189,7 @@ impl ChatExecutor for RuntimeExecutor {
             | ChatCommand::ApplyChatProfile { .. }
             | ChatCommand::SetChatProfileChain { .. }
             | ChatCommand::SetChatProfilePin { .. }
+            | ChatCommand::SessionMode { .. }
             | ChatCommand::SetWorking { .. } => None,
         };
         // The chat's attached images are merged in HERE, beside the folder and
@@ -226,6 +229,10 @@ impl ChatExecutor for RuntimeExecutor {
                 // nothing is written, and the page hears the same reason
                 // (profiles-editor T6).
                 ChatCommand::SetChatProfilePin { chat, .. } => unasked_pin(chat),
+                // Nor is there a child whose session mode a read or a change
+                // could reach: nothing is read, nothing is written, and the
+                // answer is the not-connected reason (composer-dock T3b, L7).
+                ChatCommand::SessionMode { chat, change } => unasked_session_mode(chat, change),
                 // There is no host, so there is nothing to protect from and
                 // nothing to reap: the mark has no reader in this run.
                 ChatCommand::SetWorking { chat, working } => Outcome::Working { chat, working },
@@ -294,6 +301,9 @@ fn refuse(language: Language, command: ChatCommand) -> Outcome {
         // Nor a pin write: the child whose worktree it would touch is going away
         // (profiles-editor T6).
         ChatCommand::SetChatProfilePin { chat, .. } => unasked_pin(chat),
+        // Nor a session mode: the child that would answer for it is going away,
+        // so nothing is read and nothing is written (composer-dock T3b).
+        ChatCommand::SessionMode { chat, change } => unasked_session_mode(chat, change),
         // No host is left to mark, and the run that would have read the mark is
         // the one being torn down.
         ChatCommand::SetWorking { chat, working } => Outcome::Working { chat, working },
@@ -339,6 +349,17 @@ fn unasked_pin(chat: gentle_app::ChatId) -> Outcome {
         chat,
         result: write.result,
         read: Box::new(write.read),
+    }
+}
+
+/// The session-mode answer a run with no host - or a window that is closing -
+/// gives: no child to ask, so the not-connected reason is the whole answer, and
+/// nothing was written (composer-dock T3b, L7).
+fn unasked_session_mode(chat: gentle_app::ChatId, change: Option<SessionMode>) -> Outcome {
+    Outcome::SessionMode {
+        chat,
+        change,
+        outcome: PermissionOutcome::NoAnswer(NoAnswer::NotConnected),
     }
 }
 

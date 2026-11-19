@@ -78,6 +78,11 @@ pub fn to_intent(state: &gentle_app::AppState, intent: UiIntent) -> Option<gentl
         | UiIntent::ApplyChatProfile { .. }
         | UiIntent::SaveChatProfileChain { .. }
         | UiIntent::SaveChatProfilePin { .. }
+        // So are the two session-mode intents (composer-dock T3b, L7): the mode
+        // is that chat's OWN child's, asked through a per-chat command of the
+        // shell's own (`AppStateHolder::dispatch_commands`).
+        | UiIntent::ReadSessionMode { .. }
+        | UiIntent::SetSessionMode { .. }
         | UiIntent::RefreshAuth
         | UiIntent::CheckUpdates
         | UiIntent::RefreshUsage => return None,
@@ -106,6 +111,27 @@ pub(crate) fn mode_of(
         OrchestratorModeView::FullDelegation => {
             gentle_core::rpc::config_store::OrchestratorMode::FullDelegation
         }
+    }
+}
+
+/// The session mode the contract names, as the channel spells it (`normal`,
+/// `auto`, `yolo`, `super-yolo`): the two enums carry the same four values, so a
+/// request never translates the mode it asks for (composer-dock T3b, L7).
+///
+/// The closed choice is the contract's and can only name a mode that exists;
+/// what the owner REPORTS is kept raw in [`SessionModeView`](crate::contract::SessionModeView)
+/// and is never mapped through this, because a mode this build does not know must
+/// still be shown as it arrived.
+pub(crate) fn session_mode_of(
+    mode: crate::contract::SessionModeChoice,
+) -> gentle_core::rpc::permission::SessionMode {
+    use crate::contract::SessionModeChoice;
+    use gentle_core::rpc::permission::SessionMode;
+    match mode {
+        SessionModeChoice::Normal => SessionMode::Normal,
+        SessionModeChoice::Auto => SessionMode::Auto,
+        SessionModeChoice::Yolo => SessionMode::Yolo,
+        SessionModeChoice::SuperYolo => SessionMode::SuperYolo,
     }
 }
 

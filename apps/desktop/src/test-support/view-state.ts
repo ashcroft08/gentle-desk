@@ -61,6 +61,9 @@ export function viewState(overrides: Partial<ViewState_Serialize> = {}): ViewSta
     // Nothing read this chat's profile yet: the Profile tab (T2c) reads it when
     // it opens, and until an answer lands it says it is reading.
     chat_profile: null,
+    // No chat answered for its session mode yet: with no mode there is no
+    // control to draw (composer-dock T3b, L7).
+    session_mode: null,
     // The Settings panes before their first read (0.1.12): nothing known yet.
     auth: { status: { type: 'Unknown' }, providers: [] },
     updates: {
