@@ -110,3 +110,12 @@ those chips are cheap, one needs a new command, and one cannot be built at all.
     (`persist` never sent); the shown mode changes only on the confirmed response or
     `permission_mode_changed`, never optimistically; a failure shows its code and
     leaves the mode alone; yolo / super-yolo need an explicit confirmation step.
+- L8 (2026-11-19, maintainer approved sheet A of `design/composer-dock/02-mode-picker.html`
+  and the two proposals: `auto` is in the selector, yolo / super-yolo need confirmation).
+  Probe of the open risk: with a real turn running (`bash sleep 25`, agent_start ..
+  agent_end), `set_permission_mode` yolo -> super-yolo (an ESCALATION while busy) and
+  super-yolo -> normal both answered ok. `escalation_while_busy` belongs to the
+  desktop-feed session-action path, not to this RPC method. The control may therefore
+  live in the status row, which only exists while working. T3 plan: T3a pure client
+  (`crates/gentle-core/src/rpc/permission.rs`, mirror of `config_store.rs`), T3b runtime
+  command + shell + `ViewState` field (mirror of `chat_profile`), T3c the web control.
