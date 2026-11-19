@@ -25,15 +25,18 @@
 </script>
 
 {#if chip.kind !== 'hidden'}
-  <div class="ctx-rail {chip.kind === 'reading' ? chip.tone : 'unknown'}">
-    <div class="lab">
+  <!-- The title and the live region live on the WHOLE rail, not on the 2px bar:
+       the reader hovers the percentage, not the hairline, and a screen reader must
+       hear the number that changes (review R3-1, R3-2). -->
+  <div class="ctx-rail {chip.kind === 'reading' ? chip.tone : 'unknown'}" title={chip.title}>
+    <div class="lab" role="status" aria-label={chip.label}>
       <span class="l">
         <Icon name="clock" size={11} />
         {chip.kind === 'reading' ? `${chip.percent}%` : CONTEXT_DASH}
       </span>
       <span>{window === null ? '' : formatTokens(window)}</span>
     </div>
-    <div class="rail" role="status" aria-label={chip.label} title={chip.title}>
+    <div class="rail">
       {#if chip.kind === 'reading'}
         <i style="width: {barWidth(chip.percent)}"></i>
       {/if}

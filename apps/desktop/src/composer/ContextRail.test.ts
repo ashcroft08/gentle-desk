@@ -68,7 +68,11 @@ describe('the context rail', () => {
     const status = drawn.querySelector('[role="status"]') as HTMLElement
 
     expect(status.getAttribute('aria-label')).toContain('35')
-    expect(status.getAttribute('title')).toBe('70k / 200k tokens')
+    // The live region is the LABEL row, so the changing number is inside it, and
+    // the tooltip hangs on the whole rail: hovering the percent has to reach it,
+    // not only the 2px line (review R3-1, R3-2).
+    expect(status.textContent).toContain('35%')
+    expect(drawn.getAttribute('title')).toBe('70k / 200k tokens')
   })
 
   it('draws a dash and an empty rail for a chat that just compacted', () => {
