@@ -31,14 +31,14 @@ use crate::clipboard::{self, Clipboard, SystemClipboard};
 use crate::close::{self, BridgeSteps, CloseFlow};
 use crate::config::{ConfigSnapshot, ConfigWriter};
 use crate::contract::{
-    SettingsFilesChanged, SettingsFilesChangedView, StateChanged, TerminalActionView, UiIntent,
-    UpdatesStatusView, UpdatesView, UsageStatusView, UsageView, ViewState,
+    AttachmentView, SettingsFilesChanged, SettingsFilesChangedView, StateChanged, TerminalActionView,
+    UiIntent, UpdatesStatusView, UpdatesView, UsageStatusView, UsageView, ViewState,
 };
 use crate::effects::{self, Ran, RuntimeExecutor};
 use crate::events::{EventPump, Push};
 use crate::link_opener::{LinkOpener, SystemLinkOpener};
 use crate::pending::PendingFolders;
-use crate::picker::{FolderPicker, NativeFolderPicker};
+use crate::picker::{FilePicker, FolderPicker, NativeFilePicker, NativeFolderPicker};
 use crate::reaper;
 use crate::sessions::{startup, SessionsService};
 use crate::settings::{
@@ -95,6 +95,10 @@ pub struct Bridge {
     /// window that makes the dialog modal. The flows take the seam, not this
     /// field.
     picker: Arc<NativeFolderPicker>,
+    /// The file dialog the composer's clip asks (design/composer-dock T4, S3):
+    /// the real one, sharing the folder picker's window parent so both dialogs
+    /// are modal to the app. The command takes the seam, not this field.
+    file_picker: Arc<NativeFilePicker>,
     /// The one writer of the config file: a save never runs on this thread.
     writer: ConfigWriter,
     /// The close of this run, armed once at startup because only the setup step
@@ -164,6 +168,11 @@ impl Bridge {
         let writer = ConfigWriter::spawn(path);
         holder.arm_config_saves(writer.clone());
         let folders = Arc::new(PendingFolders::default());
+        // The two dialogs share one window parent: only the setup step has a
+        // window, and it installs it on the folder picker, which is the one the
+        // file picker was built from.
+        let picker = Arc::new(NativeFolderPicker::new());
+        let file_picker = Arc::new(NativeFilePicker::with_parent(picker.parent()));
         let bridge = Self {
             holder: Arc::clone(&holder),
             executor: Arc::new(
@@ -175,7 +184,8 @@ impl Bridge {
             folders,
             clipboard,
             opener,
-            picker: Arc::new(NativeFolderPicker::new()),
+            picker,
+            file_picker,
             writer,
             close: Mutex::new(None),
             relaunch: Arc::new(std::sync::atomic::AtomicBool::new(false)),
@@ -305,6 +315,11 @@ impl Bridge {
     /// The folder dialog as the seam the workspace flows take.
     pub fn picker(&self) -> Arc<dyn FolderPicker> {
         self.picker.clone()
+    }
+
+    /// The file dialog as the seam the clip's command takes.
+    pub fn file_picker(&self) -> Arc<dyn FilePicker> {
+        self.file_picker.clone()
     }
 
     /// The folders waiting for the open that takes them.
@@ -1239,6 +1254,48 @@ pub fn remove_image(
     _app: AppHandle<tauri::Wry>,
 ) -> Result<ViewState, String> {
     bridge.inner().remove_image(&id)
+}
+
+/// The files the human picked for this message (design/composer-dock T4, S3):
+/// the clip's one command. It answers the chosen paths as strings, and the empty
+/// list for a cancelled dialog, so a cancel changes nothing on the page.
+///
+/// The dialog can stay open for minutes, so it runs off the window's thread and
+/// under no lock, exactly as the folder picker does. The title is the web side's
+/// own word for the dialog ([`Bridge`] carries no words), in the language the
+/// composer is drawn in, so one dictionary names both the button and its dialog.
+#[tauri::command]
+#[specta::specta]
+pub async fn pick_files(
+    title: String,
+    bridge: tauri::State<'_, Bridge>,
+) -> Result<Vec<String>, String> {
+    let picker = bridge.inner().file_picker();
+    tauri::async_runtime::spawn_blocking(move || crate::attachments::pick(picker.as_ref(), &title))
+        .await
+        .map_err(|error| format!("the file dialog could not run: {error}"))
+}
+
+/// What each path the user chose or dropped is (design/composer-dock T4, R5,
+/// R6): an image still travels as an image, every other file becomes a chip that
+/// carries its path, and one that cannot be attached answers why.
+///
+/// `folder` is the foreground chat's working directory, which is what decides
+/// `outside`. Nothing here sends, writes or opens a dialog: it reads the
+/// metadata of the named files once and answers, so it needs no holder and no
+/// lock. It runs off the window's thread because it touches the disk (a path on a
+/// network drive can take a while), like every other read here.
+#[tauri::command]
+#[specta::specta]
+pub async fn describe_attachments(
+    paths: Vec<String>,
+    folder: Option<String>,
+) -> Vec<AttachmentView> {
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::attachments::describe(&paths, folder.as_deref())
+    })
+    .await
+    .unwrap_or_default()
 }
 
 /// The dismiss of the what's-new modal (what's-new S5): store the version this run

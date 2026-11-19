@@ -1223,6 +1223,54 @@ pub struct ImageView {
     pub preview_url: String,
 }
 
+/// Where one file the composer attached stands (design/composer-dock T4, R5,
+/// R6): an image still travels as an image, every other file travels as a path,
+/// and one that cannot be attached says why instead of becoming a chip.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
+#[serde(tag = "type", content = "data")]
+pub enum AttachmentKindView {
+    /// One of the four image types a message carries: it goes to
+    /// `attach_images`, so it still travels as an image and not as a path (R6).
+    Image,
+    /// Every other file: it becomes a chip, and its absolute path is what the
+    /// message carries.
+    File,
+    /// A path that cannot be attached at all, and the reason, which is the one
+    /// line the composer draws in place of a chip.
+    Rejected(AttachmentRejectView),
+}
+
+/// Why one path the user chose or dropped was not attached.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Type)]
+pub enum AttachmentRejectView {
+    /// Nothing exists at that path.
+    NotFound,
+    /// A folder, which is not a file to open.
+    IsDirectory,
+    /// Something is there but could not be read.
+    Unreadable,
+}
+
+/// One file the composer attached, as the web side draws it: the whole path
+/// (absolute, as the app shows paths elsewhere), the name the chip draws, what
+/// it is, and whether it lives outside the chat's folder (R5).
+///
+/// Nothing here is decided twice: the image rule is [`crate::images::Mime`]'s own
+/// and the path is classified once, in [`crate::attachments`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
+pub struct AttachmentView {
+    /// The absolute path, with no Windows verbatim prefix: what the message
+    /// carries and what the agent's own tools open. It is also the chip's hover.
+    pub path: String,
+    /// The last segment of that path: what the chip draws.
+    pub name: String,
+    /// What this file is, or why it was not attached.
+    pub kind: AttachmentKindView,
+    /// Whether the file lives outside the chat's folder, so the agent may not be
+    /// able to open it. A path with no chat folder is never outside.
+    pub outside: bool,
+}
+
 /// One message of the foreground chat's thread, flattened for display.
 ///
 /// The three fields after the text are what a streamed thread needs and the

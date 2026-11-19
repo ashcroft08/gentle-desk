@@ -105,6 +105,29 @@ export const commands = {
 	 */
 	removeImage: (id: string) => typedError<ViewState_Serialize, string>(__TAURI_INVOKE("remove_image", { id })),
 	/**
+	 *  The files the human picked for this message (design/composer-dock T4, S3):
+	 *  the clip's one command. It answers the chosen paths as strings, and the empty
+	 *  list for a cancelled dialog, so a cancel changes nothing on the page.
+	 * 
+	 *  The dialog can stay open for minutes, so it runs off the window's thread and
+	 *  under no lock, exactly as the folder picker does. The title is the web side's
+	 *  own word for the dialog ([`Bridge`] carries no words), in the language the
+	 *  composer is drawn in, so one dictionary names both the button and its dialog.
+	 */
+	pickFiles: (title: string) => typedError<string[], string>(__TAURI_INVOKE("pick_files", { title })),
+	/**
+	 *  What each path the user chose or dropped is (design/composer-dock T4, R5,
+	 *  R6): an image still travels as an image, every other file becomes a chip that
+	 *  carries its path, and one that cannot be attached answers why.
+	 * 
+	 *  `folder` is the foreground chat's working directory, which is what decides
+	 *  `outside`. Nothing here sends, writes or opens a dialog: it reads the
+	 *  metadata of the named files once and answers, so it needs no holder and no
+	 *  lock. It runs off the window's thread because it touches the disk (a path on a
+	 *  network drive can take a while), like every other read here.
+	 */
+	describeAttachments: (paths: string[], folder: string | null) => __TAURI_INVOKE<AttachmentView[]>("describe_attachments", { paths, folder }),
+	/**
 	 *  The dismiss of the what's-new modal (what's-new S5): store the version this run
 	 *  runs as and clear the notes it pushed. The version is the run's own, never the
 	 *  manifest's. It takes no argument: the page says it put the modal away, and the
@@ -146,6 +169,62 @@ export type ApplyModeView =
  *  `active` and may answer `confirmation_required` first (L30 ruling 1).
  */
 "default";
+
+/**
+ *  Where one file the composer attached stands (design/composer-dock T4, R5,
+ *  R6): an image still travels as an image, every other file travels as a path,
+ *  and one that cannot be attached says why instead of becoming a chip.
+ */
+export type AttachmentKindView = 
+/**
+ *  One of the four image types a message carries: it goes to
+ *  `attach_images`, so it still travels as an image and not as a path (R6).
+ */
+{ type: "Image" } | 
+/**
+ *  Every other file: it becomes a chip, and its absolute path is what the
+ *  message carries.
+ */
+{ type: "File" } | 
+/**
+ *  A path that cannot be attached at all, and the reason, which is the one
+ *  line the composer draws in place of a chip.
+ */
+{ type: "Rejected"; data: AttachmentRejectView };
+
+/**  Why one path the user chose or dropped was not attached. */
+export type AttachmentRejectView = 
+/**  Nothing exists at that path. */
+"NotFound" | 
+/**  A folder, which is not a file to open. */
+"IsDirectory" | 
+/**  Something is there but could not be read. */
+"Unreadable";
+
+/**
+ *  One file the composer attached, as the web side draws it: the whole path
+ *  (absolute, as the app shows paths elsewhere), the name the chip draws, what
+ *  it is, and whether it lives outside the chat's folder (R5).
+ * 
+ *  Nothing here is decided twice: the image rule is [`crate::images::Mime`]'s own
+ *  and the path is classified once, in [`crate::attachments`].
+ */
+export type AttachmentView = {
+	/**
+	 *  The absolute path, with no Windows verbatim prefix: what the message
+	 *  carries and what the agent's own tools open. It is also the chip's hover.
+	 */
+	path: string,
+	/**  The last segment of that path: what the chip draws. */
+	name: string,
+	/**  What this file is, or why it was not attached. */
+	kind: AttachmentKindView,
+	/**
+	 *  Whether the file lives outside the chat's folder, so the agent may not be
+	 *  able to open it. A path with no chat folder is never outside.
+	 */
+	outside: boolean,
+};
 
 /**
  *  One provider the shell's auth store lists, with what its own check said. The

@@ -16,6 +16,13 @@
       "tradeoff": "A quiet text button with a caret at the right of the status row opens the four modes (Normal, Auto, YOLO, Super YOLO); YOLO and Super YOLO need an in-menu confirmation, so a risky mode costs one deliberate click and no new modal. The shown mode changes only when the channel confirms, never optimistically. Cost: it exists only while the agent works (as asked), and a sibling path refuses permission escalation while busy (escalation_while_busy) - not yet probed on this RPC method, so the failure line is a first-class state.",
       "width": 920,
       "height": 1500
+    },
+    {
+      "file": "03-attachments.html",
+      "title": "C - File attachments: picker, drag, chips, the outside-workspace warning",
+      "tradeoff": "Attached files are chips on their own row above the text (content, not chrome); the outside-workspace case warns in amber but never blocks, because what travels is the path. On send each file is appended as its absolute path, one per line, and images keep travelling as images. Cost: the message the agent receives carries raw paths, so the thread shows them verbatim; there is no file preview.",
+      "width": 920,
+      "height": 1500
     }
   ]
 }

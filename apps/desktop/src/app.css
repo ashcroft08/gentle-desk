@@ -1165,9 +1165,159 @@ p {
   border-color: var(--danger);
 }
 
-/* The composer takes a drag: the box says so while the files are in the air. */
+/* The composer takes a drag: the box says so while the files are in the air.
+   The accent tints it, the way the artboard draws the drop (sheet B). */
 .composer.over {
   border-color: var(--accent);
+  background: var(--tint);
+}
+
+/* The clip (design/composer-dock/03-attachments.html, sheet A): the artboard's
+   26px quiet button, the row's first part, mute until it is reached. */
+.composer .att {
+  width: 26px;
+  height: 26px;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  border: 0;
+  padding: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--faint);
+  cursor: pointer;
+}
+
+.composer .att:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--surface2);
+}
+
+.composer .att:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.composer .att svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* The attached FILES are content, not chrome (sheet A): their own row above the
+   text, the name drawn and the whole path only in the hover. */
+.composer .chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 2px;
+}
+
+.composer .chips .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 260px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px 4px 2px 6px;
+  font-size: 11px;
+  color: var(--muted);
+  background: var(--surface);
+}
+
+.composer .chips .chip svg {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.composer .chips .chip .t {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+/* A file outside the chat's folder is amber and says so (R5, sheet B). It is
+   never refused: the message carries its path like any other. */
+.composer .chips .chip.out {
+  border-color: color-mix(in srgb, var(--warning) 45%, transparent);
+  color: var(--warning);
+}
+
+.composer .chips .chip.out .t,
+.composer .chips .chip.out .why {
+  color: var(--warning);
+}
+
+.composer .chips .chip.out .why {
+  opacity: 0.85;
+  white-space: nowrap;
+}
+
+.composer .chips .chip .x {
+  background: none;
+  border: 0;
+  padding: 0 3px;
+  border-radius: 4px;
+  color: var(--faint);
+  cursor: pointer;
+  line-height: 1;
+  font: inherit;
+}
+
+.composer .chips .chip .x:hover {
+  color: var(--text);
+  background: var(--surface2);
+}
+
+/* The collapsed row's "+N more" (sheet D): quiet, dashed, and a control, not a
+   chip of its own. */
+.composer .chips .more {
+  background: none;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  color: var(--faint);
+  font: inherit;
+  font-size: 11px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+
+.composer .chips .more:hover {
+  color: var(--text);
+}
+
+.composer .att:focus-visible,
+.composer .chips .chip .x:focus-visible,
+.composer .chips .more:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ONE line under the chips while any file is outside the chat's folder (R5),
+   and ONE line in place of a refused path's chip (sheet D). */
+.composer .warn {
+  margin: 0 0 2px;
+  font-size: 11px;
+  color: var(--warning);
+}
+
+.composer .attach-failed {
+  margin: 0 0 2px;
+  font-size: 11px;
+  color: var(--danger);
 }
 
 .composer-dock .drop {

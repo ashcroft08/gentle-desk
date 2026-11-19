@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="es" data-theme="dark">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Composer dock - archivos adjuntos</title>
+<style>
+:root,[data-theme="dark"]{--bg:#0e1116;--surface:#151a21;--surface2:#1c222b;--border:#2b333d;--text:#e4e8ee;--muted:#9aa4b2;--faint:#7d8593;--accent:#7aa2f7;--tint:rgba(122,162,247,.14);--success:#7edc9a;--warning:#e7b455;--danger:#ff8585}
+[data-theme="light"]{--bg:#f2f4f7;--surface:#ffffff;--surface2:#e9edf2;--border:#cfd5dd;--text:#17202a;--muted:#576272;--faint:#6b7686;--accent:#2e5bd7;--tint:rgba(46,91,215,.10);--success:#166e38;--warning:#8a5800;--danger:#c22f37}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+.page{max-width:900px;margin:0 auto;padding:22px 18px 60px}
+h2{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin:0 0 8px;font-weight:600}
+.note{color:var(--muted);font-size:12px;margin:0 0 12px;max-width:74ch}
+.note b{color:var(--text);font-weight:600}
+code{font-family:ui-monospace,SFMono-Regular,"Cascadia Mono",Consolas,monospace;font-size:11px;background:var(--surface2);border-radius:4px;padding:0 4px;color:var(--muted)}
+.sheet{margin:0 0 32px}
+.stage{border:1px solid var(--border);border-radius:10px;background:var(--bg);overflow:hidden;padding:14px 0}
+
+.dock{position:relative;margin:0 16px;border:1px solid var(--border);border-radius:12px;background:var(--surface)}
+.dock.over{border-color:var(--accent);background:var(--tint)}
+.dock .in{padding:12px 14px 8px;color:var(--faint);font-size:14px}
+.dock .in.typed{color:var(--text)}
+.row{display:flex;align-items:center;gap:10px;padding:0 12px 10px;font-size:12px;color:var(--muted)}
+.row .name{color:var(--text);font-weight:600}
+.row .grow{flex:1}
+.send{width:24px;height:24px;border-radius:50%;background:var(--accent);display:inline-block}
+
+/* the clip: same 26px quiet button as in artboard 01 */
+.att{width:26px;height:26px;display:inline-grid;place-items:center;border:0;background:none;color:var(--faint);cursor:pointer;border-radius:6px;padding:0}
+.att:hover,.att.on{color:var(--text);background:var(--surface2)}
+.att:focus-visible,.x:focus-visible,.more:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.att svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+
+/* the chips: content, not chrome - they get their own row above the text */
+.chips{display:flex;gap:6px;flex-wrap:wrap;padding:10px 12px 0}
+.chip{display:inline-flex;align-items:center;gap:5px;max-width:260px;border:1px solid var(--border);border-radius:6px;padding:2px 4px 2px 6px;font-size:11px;color:var(--muted);background:var(--surface)}
+.chip svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.chip .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)}
+.chip .dir{color:var(--faint)}
+.chip .x{background:none;border:0;color:var(--faint);cursor:pointer;font:inherit;padding:0 3px;border-radius:4px;line-height:1}
+.chip .x:hover{color:var(--text);background:var(--surface2)}
+.chip.out{border-color:rgba(231,180,85,.45);color:var(--warning)}
+.chip.out .t{color:var(--warning)}
+.chip.out .why{opacity:.85;white-space:nowrap}
+.more{background:none;border:1px dashed var(--border);border-radius:6px;color:var(--faint);font:inherit;font-size:11px;padding:2px 8px;cursor:pointer}
+
+/* one line under the chips only when something is outside the workspace */
+.warn{margin:6px 14px 0;font-size:11px;color:var(--warning);display:flex;gap:6px}
+.warn.err{color:var(--danger)}
+
+/* the drag overlay: inside the dock's own border, no new layer */
+.drop{position:absolute;inset:0;border-radius:12px;display:grid;place-items:center;font-size:13px;color:var(--accent);pointer-events:none}
+.sent{margin:0 16px 12px;display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+.you{background:var(--tint);border-radius:9px;padding:6px 11px;font-size:13.5px;max-width:52ch}
+.you .paths{margin-top:4px;font-family:ui-monospace,SFMono-Regular,"Cascadia Mono",Consolas,monospace;font-size:11.5px;color:var(--muted);white-space:pre-wrap;word-break:break-all}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="sheet">
+    <h2>A · el clip abre el explorador y el archivo queda como un chip</h2>
+    <p class="note">El clip ya existe en la fila del composer (artboard 01). Ahora <b>abre el selector de archivos del sistema</b> y acepta varios. Cada archivo elegido, o soltado encima del dock, se vuelve un <b>chip con su nombre</b> en una fila propia sobre el texto: el adjunto es contenido, no cromo. El nombre es lo que se ve; la ruta completa vive en el tooltip. <b>Adjuntar nunca envía.</b></p>
+    <div class="stage">
+      <div class="dock">
+        <div class="chips" role="list" aria-label="Archivos adjuntos">
+          <span class="chip" role="listitem" title="C:\Users\josep\dev\Kallari_Pagina_web\src\header.tsx"><svg viewBox="0 0 24 24"><path d="M14 3v5h5"/><path d="M6 3h8l5 5v13H6z"/></svg><span class="t">header.tsx</span><button class="x" type="button" aria-label="Quitar header.tsx">×</button></span>
+          <span class="chip" role="listitem" title="C:\Users\josep\dev\Kallari_Pagina_web\docs\plan-migracion.md"><svg viewBox="0 0 24 24"><path d="M14 3v5h5"/><path d="M6 3h8l5 5v13H6z"/></svg><span class="t">plan-migracion.md</span><button class="x" type="button" aria-label="Quitar plan-migracion.md">×</button></span>
+        </div>
+        <div class="in typed">revisá estos dos archivos y decime qué falta migrar</div>
+        <div class="row">
+          <button class="att on" type="button" aria-label="Adjuntar archivos"><svg viewBox="0 0 24 24"><path d="M21 11l-8.5 8.5a5 5 0 01-7-7L14 4a3.5 3.5 0 015 5l-8.5 8.5a2 2 0 01-3-3L15 6"/></svg></button>
+          <span>Claude Sonnet 5</span><span>medium</span><span class="name">Kallari_Pagina_web</span>
+          <span class="grow"></span><span class="send"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sheet">
+    <h2>B · arrastrar y el aviso de "fuera del workspace"</h2>
+    <p class="note">Arrastrando sobre la ventana, el dock <b>pasa a tinta de acento</b> con "Soltá para adjuntar": sin capa nueva. Un archivo que está <b>fuera de la carpeta del chat</b> lleva el chip en ámbar con "fuera del workspace", y una línea debajo explica el motivo (el agente puede no tener permiso para leerlo). <b>No se bloquea:</b> se adjunta igual, porque lo que se manda es la ruta y el usuario sabe lo que hace.</p>
+    <div class="stage" style="margin-bottom:10px">
+      <div class="dock over" aria-label="Soltá para adjuntar">
+        <div class="in">¿y el plan de migración?</div>
+        <div class="row"><span class="att"><svg viewBox="0 0 24 24"><path d="M21 11l-8.5 8.5a5 5 0 01-7-7L14 4a3.5 3.5 0 015 5l-8.5 8.5a2 2 0 01-3-3L15 6"/></svg></span><span class="name">Kallari_Pagina_web</span><span class="grow"></span><span class="send"></span></div>
+        <div class="drop">Soltá para adjuntar</div>
+      </div>
+    </div>
+    <div class="stage">
+      <div class="dock">
+        <div class="chips">
+          <span class="chip"><svg viewBox="0 0 24 24"><path d="M14 3v5h5"/><path d="M6 3h8l5 5v13H6z"/></svg><span class="t">cv_es.tex</span><button class="x" type="button" aria-label="Quitar cv_es.tex">×</button></span>
+          <span class="chip out" title="C:\Users\josep\Desktop\notas.md"><svg viewBox="0 0 24 24"><path d="M14 3v5h5"/><path d="M6 3h8l5 5v13H6z"/></svg><span class="t">notas.md</span><span class="why">fuera del workspace</span><button class="x" type="button" aria-label="Quitar notas.md">×</button></span>
+        </div>
+        <div class="warn" role="status">Hay archivos fuera de la carpeta de este chat; el agente puede no poder abrirlos.</div>
+        <div class="in typed">usá las notas para completar el CV</div>
+        <div class="row"><span class="att"><svg viewBox="0 0 24 24"><path d="M21 11l-8.5 8.5a5 5 0 01-7-7L14 4a3.5 3.5 0 015 5l-8.5 8.5a2 2 0 01-3-3L15 6"/></svg></span><span class="name">Kallari_Pagina_web</span><span class="grow"></span><span class="send"></span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sheet">
+    <h2>C · cómo viaja: la ruta, en texto</h2>
+    <p class="note">Al enviar, <b>cada archivo se agrega al final del mensaje como su ruta absoluta, una por línea</b>, y el agente lo abre con sus propias herramientas. Es la regla de siempre para archivos: lo que se manda es la dirección. Las <b>imágenes siguen viajando como imágenes</b>, no como ruta. En el hilo, el mensaje enviado muestra las rutas tal cual, así lo que ves es lo que recibió el agente. Tras enviar, los chips se vacían.</p>
+    <div class="stage">
+      <div class="sent">
+        <div class="you">revisá estos dos archivos y decime qué falta migrar
+          <div class="paths">C:\Users\josep\dev\Kallari_Pagina_web\src\header.tsx
+C:\Users\josep\dev\Kallari_Pagina_web\docs\plan-migracion.md</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sheet">
+    <h2>D · los bordes</h2>
+    <p class="note"><b>Muchos archivos:</b> se ven los primeros y un "+N más" que abre la lista completa para quitar. <b>El mismo archivo dos veces</b> se adjunta una sola. <b>Una carpeta</b> o un archivo ilegible se rechaza con una línea de error y no crea chip. El selector cancelado no cambia nada.</p>
+    <div class="stage" style="margin-bottom:10px">
+      <div class="dock">
+        <div class="chips">
+          <span class="chip"><svg viewBox="0 0 24 24"><path d="M14 3v5h5"/><path d="M6 3h8l5 5v13H6z"/></svg><span class="t">header.tsx</span><button class="x" type="button" aria-label="Quitar header.tsx">×</button></span>
+          <span class="chip"><svg viewBox="0 0 24 24"><path d="M14 3v5h5"/><path d="M6 3h8l5 5v13H6z"/></svg><span class="t">footer.tsx</span><button class="x" type="button" aria-label="Quitar footer.tsx">×</button></span>
+          <span class="chip"><svg viewBox="0 0 24 24"><path d="M14 3v5h5"/><path d="M6 3h8l5 5v13H6z"/></svg><span class="t">routes.ts</span><button class="x" type="button" aria-label="Quitar routes.ts">×</button></span>
+          <button class="more" type="button" aria-label="Ver los 9 archivos restantes">+9 más</button>
+        </div>
+        <div class="in">Escribí un mensaje</div>
+        <div class="row"><span class="att"><svg viewBox="0 0 24 24"><path d="M21 11l-8.5 8.5a5 5 0 01-7-7L14 4a3.5 3.5 0 015 5l-8.5 8.5a2 2 0 01-3-3L15 6"/></svg></span><span class="name">Kallari_Pagina_web</span><span class="grow"></span><span class="send"></span></div>
+      </div>
+    </div>
+    <div class="stage">
+      <div class="dock">
+        <div class="warn err" role="alert" style="margin-top:10px">No se pudo adjuntar <code>assets</code>: es una carpeta, no un archivo.</div>
+        <div class="in">Escribí un mensaje</div>
+        <div class="row"><span class="att"><svg viewBox="0 0 24 24"><path d="M21 11l-8.5 8.5a5 5 0 01-7-7L14 4a3.5 3.5 0 015 5l-8.5 8.5a2 2 0 01-3-3L15 6"/></svg></span><span class="name">Kallari_Pagina_web</span><span class="grow"></span><span class="send"></span></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

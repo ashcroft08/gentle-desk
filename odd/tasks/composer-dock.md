@@ -46,13 +46,13 @@ those chips are cheap, one needs a new command, and one cannot be built at all.
 
 ## Tasks
 
-- [ ] T1 (S1, S2) the status row: the working state with an elapsed time and the
+- [x] T1 (S1, S2) the status row: the working state with an elapsed time and the
   project name (last segment only), sharing ONE anatomy with the reasoning row.
-- [ ] T2 (S1, S2) the composer chips: context percent with its bar (reusing what
+- [x] T2 (S1, S2) the composer chips: context percent with its bar (reusing what
   exists), the folder name, and the branch - the branch behind a new Tauri command
   that answers "no repo" rather than failing.
-- [ ] T3 (S1) the permission mode, read-only, behind `supports()`.
-- [ ] T4 (S3) attachments: a picker command plus the existing drag-and-drop, chips
+- [x] T3 (S1) the permission mode (writable since L7), behind `supports()`.
+- [x] T4 (S3) attachments: a picker command plus the existing drag-and-drop, chips
   in the composer, the outside-workspace warning, and paths inserted into the
   message.
 
@@ -133,3 +133,14 @@ those chips are cheap, one needs a new command, and one cannot be built at all.
   verification read); `session_epochs` is never pruned. `permission_mode_changed` external
   events do not reach the UI. The closing review of the T3 range was escalated, so it has
   no receipt.
+- L10 (2026-11-19, T4 landed, handoffs): artboard `02-mode-picker.html` (the session mode
+  control) is implemented (T3a-c, `1cf3988` `d04cae2` `0c67ad4`, fixes `9ebc01c` `2841b1a`)
+  and artboard `03-attachments.html` is implemented (T4): the clip opens rfd's multi-file
+  dialog (`pick_files`, off the window thread, no new plugin), `describe_attachments`
+  classifies each path in Rust (image / file / rejected, `outside` against the chat's
+  folder), images still go to `attachImages`, files become chips, and a send appends
+  `text + "\n" + absolute paths`. Verified: `npm run check` 0 errors, web 350 tests in the
+  bounded run, `-p gentle-desk-app` 590 in 71 suites. Not seen in the running app: dialog,
+  drag tint and chip layout were exercised only in jsdom and fakes. `Unreadable` has no
+  test. Spanish copy uses the neutral column ("Suelta para adjuntar"), not the artboard's
+  voseo. Format decision: absolute paths one per line after the text.

@@ -7,9 +7,10 @@
 // the box, what shares the row, and the order of the row's groups. Each part's
 // own behaviour lives beside its component.
 //
-// What this slice deliberately does NOT draw, because its data arrives with a
-// later slice: the attach clip (T4), the git branch (T2, R3) and the permission
-// mode (T3). Absent, never a placeholder.
+// What this file deliberately does NOT draw: the permission mode (T3), whose
+// behaviour lives beside its own component. The attach clip (T4) is the row's
+// first part now, and it is pinned here only by its place: what it DOES lives in
+// `Composer.attachments.test.ts`.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/svelte'
 import type { ModelChipView } from '../contract/bindings'
@@ -65,12 +66,12 @@ describe('the dock', () => {
     expect(hint.previousElementSibling?.tagName).toBe('FORM')
   })
 
-  it('regroups the row: the two selects, a hairline, the folder, then Send', () => {
+  it('regroups the row: the clip, the two selects, a hairline, the folder, then Send', () => {
     const { container } = draw()
     const row = container.querySelector('.composer .row') as HTMLElement
     const parts = Array.from(row.children).map((child) => child.className)
 
-    expect(parts).toEqual(['chip', 'vsep', 'folder', 'grow', 'ic fill tip-r'])
+    expect(parts).toEqual(['att', 'chip', 'vsep', 'folder', 'grow', 'ic fill tip-r'])
   })
 
   it('leaves the gap that is not a group empty: no branch and no placeholder', () => {
@@ -93,7 +94,7 @@ describe('the dock', () => {
 
     // What the message runs ON, the hairline, then where it runs - the folder
     // and the branch on it, in that order - and Send.
-    expect(parts).toEqual(['chip', 'vsep', 'folder', 'branch', 'grow', 'ic fill tip-r'])
+    expect(parts).toEqual(['att', 'chip', 'vsep', 'folder', 'branch', 'grow', 'ic fill tip-r'])
     expect(row.querySelectorAll('.vsep')).toHaveLength(1)
     expect((row.querySelector('.branch') as HTMLElement).textContent?.trim()).toBe(BRANCH.name)
   })
@@ -107,7 +108,7 @@ describe('the dock', () => {
     const row = container.querySelector('.composer .row') as HTMLElement
     const parts = Array.from(row.children).map((child) => child.className)
 
-    expect(parts).toEqual(['chip', 'vsep', 'folder', 'grow', 'ic fill tip-r'])
+    expect(parts).toEqual(['att', 'chip', 'vsep', 'folder', 'grow', 'ic fill tip-r'])
     expect(row.querySelector('.branch')).toBeNull()
     expect(row.querySelectorAll('.vsep')).toHaveLength(1)
   })
@@ -124,7 +125,7 @@ describe('the dock', () => {
     const row = container.querySelector('.composer .row') as HTMLElement
     const parts = Array.from(row.children).map((child) => child.className)
 
-    expect(parts).toEqual(['chip', 'grow', 'ic fill tip-r'])
+    expect(parts).toEqual(['att', 'chip', 'grow', 'ic fill tip-r'])
     expect(container.querySelector('.folder')).toBeNull()
   })
 })
