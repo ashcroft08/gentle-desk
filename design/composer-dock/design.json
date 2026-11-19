@@ -1,0 +1,14 @@
+{
+  "title": "Composer dock - the status row, the chips and file attachments",
+  "brief": "The maintainer asked for the other desktop app's costaldo: the thinking/working row, the context percentage, the folder name (last segment only), the git branch when there is a repo, the session mode, and a clip that inserts files by path. Built with gentle-desk's own tokens so the six themes keep working. Two things are decided by evidence, not taste: output tokens and cost are NOT drawn because pi's RPC does not send them, and the permission mode is a READ-ONLY label because gentle-shell refuses to grant YOLO outside a TUI - a switch that cannot change anything would be a lie on screen. A file attached from outside the workspace says so, because the agent may not be able to read it.",
+  "feature": "odd/tasks/composer-dock.md",
+  "artboards": [
+    {
+      "file": "01-dock.html",
+      "title": "A - The dock: two lines while it thinks, and the composer row",
+      "tradeoff": "The reasoning row and the activity row share ONE anatomy (12px, thin glyph, time chip) so the thread does not grow a third visual language; the project name appears once and never with its full path; the branch chip disappears entirely when there is no repo instead of showing a placeholder. Cost: the working state has no separate card and no per-turn token readout, because that data does not exist in the channel - the honest alternative would be a fake number.",
+      "width": 920,
+      "height": 1080
+    }
+  ]
+}
