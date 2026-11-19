@@ -68,11 +68,11 @@ turn)"), and any gpui-kit widget.
   readers that slice `ChatState.messages` directly
   (`crates/term/src/render.rs:38`, `apps/desktop/src-tauri/src/view.rs:37-38`,
   `apps/desktop/src-tauri/src/bridge/images.rs:55`).
-- [ ] T2 (S1, S3, S4) web: the tool-call card in our components — icon, title,
+- [x] T2 (S1, S3, S4) web: the tool-call card in our components — icon, title,
   language chip, monospace subject, collapsible body with a tail-clipped
   "N earlier lines" head, and the status/duration footer. Measured before it is
   called done: a chat with 400 tool calls must keep the list responsive.
-- [ ] T3 (S3, S4) web: the reasoning row, open while streaming and folded when the
+- [x] T3 (S3, S4) web: the reasoning row, open while streaming and folded when the
   block ends, with its elapsed time.
 - [ ] T4 moved to `chat-open-latency.md`: painting the transcript before the child
   answers is its own surface (the open path, not the transcript model) and its own
@@ -355,3 +355,10 @@ turn)"), and any gpui-kit widget.
   today (unknown causality, lens-context budget, validator access). The code kept
   getting better each time; the receipt machinery did not keep up. Review the
   remaining slice ONCE, at the end, with one lens.
+- L17 (2026-11-19, reconciliation of the checkboxes): T2 and T3 are ticked because the
+  card and the reasoning row exist, are wired, and are covered (web 354 tests, `npm run
+  check` 0 errors, PR 208 CI green on `88360aa`). Two things are NOT proven and stay
+  open: (a) the "400 tool calls must stay responsive" measurement T2 names was never
+  recorded here; (b) the card's lineage `review-f2fa447e582d2c50` ended BLOCKED (L16), so
+  the card has no review receipt. A chat reopened from a session file still draws no
+  cards (L15 limit a).

@@ -66,3 +66,15 @@ with the owner's own rejection shown when it refuses.
   in terminal" ... eso es darle dos metodos al usuario por interfaz o terminal";
   update and usage sources stay on the terminal ("si lo del update/usage sorce
   sigue como estan"); target version 0.7.0.
+
+## Status (2026-11-19, from the commits on `feat/0.7.0-transcript`, PR 208)
+
+- Done and CI-green: slices 0-3 (density, transcript items, tool card, reasoning row), 4
+  (the session file paints while the child starts; T3 measured with the FAKE shell only,
+  `chat-open-latency.md` L5), and the unplanned `composer-dock.md` T1-T4 (status row,
+  folder and branch chips, the session mode as a changeable control, file attachments).
+- NOT done: slice 5 (P1 pickers `agent.model` / `agent.thinking`), and the real-shell
+  open measurement that decides the warm-standby question.
+- No review receipt for the whole range: it exceeds the reviewer's context budget; the
+  parts reviewed are recorded in the per-feature logs.
+- The release itself (version 0.7.0, notes, tag) is the maintainer's gate.
