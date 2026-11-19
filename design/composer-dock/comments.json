@@ -57,10 +57,11 @@
       "excerpt": "6% 1M",
       "comment": "y esto va encima del cuadro donde se escribe como una linea que se va cargando dependiendo el contexto",
       "createdAt": "2026-11-19T00:37:51.632Z",
-      "status": "open",
+      "status": "resolved",
       "sentAt": "2026-11-19T00:37:51.675Z",
-      "resolvedAt": null,
-      "screenshot": ".screenshots/wv9d2gvr.png"
+      "resolvedAt": "2026-11-19T00:39:44.117Z",
+      "screenshot": ".screenshots/wv9d2gvr.png",
+      "resolution": "The context moved ABOVE the composer box: a 2px rail spanning its width that fills as the context grows, with the clock icon and the percent on the left and the window size on the right, outside the border in both examples."
     }
   ]
 }
