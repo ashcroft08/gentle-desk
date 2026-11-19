@@ -18,12 +18,14 @@
   import type {
     ChatActivityMark,
     ContextUsageView_Serialize as ContextUsageView,
+    FolderView_Serialize as FolderView,
     ImageView,
     ModelChipView,
   } from '../contract/bindings'
   import Icon from '../icons/Icon.svelte'
   import { language } from '../i18n/language.svelte'
-  import ContextChip from './ContextChip.svelte'
+  import ContextRail from './ContextRail.svelte'
+  import FolderChip from './FolderChip.svelte'
   import ModelChip from './ModelChip.svelte'
   import { SEND_WHY_ID, composerCopy } from './copy'
   import { watchDrops } from './drop'
@@ -39,6 +41,7 @@
     imagesNotice = null,
     chip = null,
     contextUsage = null,
+    folder = null,
   }: {
     /** The foreground chat: which draft is shown, and where a send goes. */
     chat: string | null
@@ -53,6 +56,10 @@
     chip?: ModelChipView | null
     /** How full this chat's context is (0.1.12, S5), as Rust pushes it. */
     contextUsage?: ContextUsageView | null
+    /** The folder this chat runs in (design/composer-dock S2, R4): the last
+     * segment of its working directory and the whole path, or `null` for a chat
+     * whose session is not listed yet - absent, never a placeholder. */
+    folder?: FolderView | null
   } = $props()
 
   /** The composer's own words in the language the app holds (0.2.0, S3/D4). */
@@ -189,6 +196,9 @@
       {/each}
     </ul>
   {/if}
+  <!-- The context rail ABOVE the box and outside its border (design/composer-dock
+       S1, S5): it replaced the chip that used to share the row with the pills. -->
+  <ContextRail usage={contextUsage} />
   <form class="composer" class:over={dropping} onsubmit={submitted}>
     <textarea
       id="msg"
@@ -200,11 +210,20 @@
       oninput={typed}
       onkeydown={keyed}
     ></textarea>
-    {#if rule.mode === 'stop'}
-      <StopButton onStop={stop} />
-    {:else}
-      <SendButton disabled={rule.disabled} describedBy={SEND_WHY_ID} />
-    {/if}
+    <!-- The row, regrouped (design/composer-dock): what the message runs ON
+         (model, effort), a hairline, then where it runs (the folder - the branch
+         is a later slice, so nothing sits in its place), the flexible space, and
+         Send. Every part is text: no box, no chip border. -->
+    <div class="row">
+      <ModelChip {chip} />
+      <FolderChip {folder} />
+      <span class="grow"></span>
+      {#if rule.mode === 'stop'}
+        <StopButton onStop={stop} />
+      {:else}
+        <SendButton disabled={rule.disabled} describedBy={SEND_WHY_ID} />
+      {/if}
+    </div>
   </form>
   {#if rule.reason !== null}
     <!-- The visible reason for a disabled Send, which Send is described by. -->
@@ -214,13 +233,8 @@
     <!-- Why the last drop attached nothing, in the words Rust refused it with. -->
     <p class="refused" role="status">{imagesNotice}</p>
   {/if}
-  <!-- The chip shares the keys-hint line (S7): the hints take the left, the
-       context chip sits beside the model pills (0.1.12, S5), and the pills take
-       the right, so no blank row is left under the box. Stop mode is Working or
-       Queued, where Enter sends nothing, so the hint stops promising it. -->
-  <div class="dock-bottom">
-    <p class="keys">{rule.mode === 'stop' ? copy.keysHintWorking : copy.keysHint}</p>
-    <ContextChip usage={contextUsage} />
-    <ModelChip {chip} />
-  </div>
+  <!-- The keys BELOW the box's border, left-aligned, in the app's own words (S7):
+       Stop mode is Working or Queued, where Enter sends nothing, so the hint stops
+       promising a send the composer will not do. -->
+  <p class="keys">{rule.mode === 'stop' ? copy.keysHintWorking : copy.keysHint}</p>
 </div>

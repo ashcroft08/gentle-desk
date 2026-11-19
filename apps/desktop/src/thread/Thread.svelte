@@ -27,6 +27,7 @@
   import Message from './Message.svelte'
   import ReasoningRow from './ReasoningRow.svelte'
   import ToolCard from './ToolCard.svelte'
+  import WorkingLine from './WorkingLine.svelte'
   import { threadCopy } from './copy'
   import { createMarkdownCache } from './markdown'
   import { nearBottom, nextScrollTop } from './scroll'
@@ -176,6 +177,10 @@
       {/if}
     {/each}
     <Activity {mark} />
+    <!-- The working line (design/composer-dock S1): the reasoning row's anatomy,
+         the web's own clock, and the place the read-only session mode takes. It
+         shares the last slot with the opening line, never both at once. -->
+    <WorkingLine {mark} />
   </div>
   {#if streaming}
     <!-- The only live region of the thread: the reply bodies stay out of it, so

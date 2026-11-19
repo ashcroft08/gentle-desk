@@ -53,6 +53,8 @@ describe('chatOf', () => {
       },
       // How full its context is: null until the chat's own child answers.
       contextUsage: { tokens: null, percent: null, window: null },
+      // The folder it runs in: absent for a chat whose session is not listed.
+      folder: null,
       // Nothing read this chat's profile yet (the Profile tab reads it).
       chatProfile: null,
       fatal: null,
@@ -77,6 +79,15 @@ describe('chatOf', () => {
     expect(chatOf(state).chatProfile).toBe(view)
     // The Profile tab is a view OF a chat: with none open there is none either.
     expect(chatOf(viewState({ chat_profile: view })).chatProfile).toBeNull()
+  })
+
+  it("carries the folder the foreground chat runs in, name and whole path", () => {
+    const folder = { name: 'gentle-desk', path: 'C:\\Users\\josep\\dev\\gentle-desk' }
+    const state = viewState({ foreground_chat: 'chat-1', foreground_folder: folder })
+
+    expect(chatOf(state).folder).toEqual(folder)
+    // The chip is part of a chat's chrome: with none open there is no folder.
+    expect(chatOf(viewState({ foreground_folder: folder })).folder).toBeNull()
   })
 
   it('leaves an idle chat unmarked, so its composer is ready', () => {
@@ -127,6 +138,7 @@ describe('chatOf', () => {
       imagesNotice: null,
       modelChip: null,
       contextUsage: null,
+      folder: null,
       chatProfile: null,
       fatal: null,
       whatsNew: null,

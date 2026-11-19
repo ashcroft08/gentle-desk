@@ -76,6 +76,40 @@ describe('App', () => {
     expect(screen.getByText('ls node_modules')).toBeTruthy()
   })
 
+  it('draws the composer’s folder chip for the folder Rust pushed', async () => {
+    const path = 'C:\\Users\\josep\\dev\\gentle-desk'
+    serveSidebar({
+      view: viewState({
+        foreground_chat: 'chat-1',
+        foreground_title: 'Gentle desk',
+        messages: [MESSAGE],
+        foreground_folder: { name: 'gentle-desk', path },
+      }),
+    })
+    const { container } = render(App)
+
+    const chip = (await waitFor(() => {
+      const found = container.querySelector('.composer .row .folder')
+      expect(found).toBeTruthy()
+      return found as HTMLElement
+    })) as HTMLElement
+
+    // The last segment only, with the whole path in the hover (S2, R4).
+    expect(chip.textContent?.trim()).toBe('gentle-desk')
+    expect(chip.textContent).not.toContain('Users')
+    expect(chip.getAttribute('title')).toBe(path)
+  })
+
+  it('draws no folder chip for a chat whose folder Rust did not name', async () => {
+    serveSidebar({
+      view: viewState({ foreground_chat: 'chat-1', foreground_title: 'Fresh one', messages: [MESSAGE] }),
+    })
+    const { container } = render(App)
+
+    expect(await screen.findByRole('region', { name: 'Chat thread' })).toBeTruthy()
+    expect(container.querySelector('.composer .row .folder')).toBeNull()
+  })
+
   it('draws the open chat as its header, its thread and its composer', async () => {
     serveSidebar({
       view: viewState({

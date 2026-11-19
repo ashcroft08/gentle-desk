@@ -19,8 +19,8 @@ use gentle_runtime::app_config::Theme;
 use gentle_runtime::badge::{Badge, BadgeMark};
 
 use crate::contract::{
-    AuthView, ChatActivityMark, ChatActivityView, ChatProfileView, ContextUsageView, ImageView,
-    LanguageView, ModelChipView, ModelChoiceView, ModelListStatusView, NoticeActionView,
+    AuthView, ChatActivityMark, ChatActivityView, ChatProfileView, ContextUsageView, FolderView,
+    ImageView, LanguageView, ModelChipView, ModelChoiceView, ModelListStatusView, NoticeActionView,
     NoticeLevel, NoticeView, ShellView, ThemeView, UpdatesView, UsageView, ViewState, WhatsNewView,
 };
 use crate::images::Images;
@@ -111,6 +111,7 @@ pub fn view_state(state: &AppState, sessions_revision: u32, shell: ShellParts<'_
             .chats
             .foreground()
             .map(|chat| sessions::view::header_title(state, chat)),
+        foreground_folder: foreground_folder(state),
         list_status: sessions::view::status(state),
         sessions_revision,
         total_sessions: sessions::view::total(state),
@@ -148,6 +149,26 @@ pub fn view_state(state: &AppState, sessions_revision: u32, shell: ShellParts<'_
         app_version,
         fatal,
     }
+}
+
+/// The folder the foreground chat runs in (design/composer-dock S2, R4), read
+/// from the session row the header's title also reads.
+///
+/// The name is `SessionItem::project`, the very rule a sidebar row applies, so
+/// the composer's chip and the row can never name the same folder differently;
+/// the whole directory travels beside it, for the hover only. A chat whose
+/// session file is not listed yet (one started a moment ago) has no folder to
+/// name, so it has none - absent, never a placeholder (R3's rule).
+fn foreground_folder(state: &AppState) -> Option<FolderView> {
+    let chat = state.chats.foreground()?;
+    let session = state
+        .sessions
+        .iter()
+        .find(|session| Some(session.path.as_str()) == chat.session_path())?;
+    Some(FolderView {
+        name: session.project().to_owned(),
+        path: session.cwd.clone(),
+    })
 }
 
 /// The composer's model chip from the app state, one to one. A no-foreground

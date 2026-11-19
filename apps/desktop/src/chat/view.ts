@@ -16,6 +16,9 @@
 // - the images the chat holds and the line that says why a drop was refused,
 //   which are the shell's own: it reads the files, so it is what answers with a
 //   thumbnail's URL or with a refusal (S1, S4);
+// - the folder the chat runs in (design/composer-dock S2, R4): Rust projects its
+//   working directory as the last segment plus the whole path, and the
+//   composer's chip draws the name with the path in the hover;
 // - the run's one fatal failure, which belongs to no chat and outlives all of
 //   them: a launcher that cannot be resolved means no chat can start at all;
 // - the notes of the version this run follows, which the what's-new modal draws
@@ -33,6 +36,7 @@ import type {
   ChatProfileView_Serialize as ChatProfileView,
   ContextUsageView_Serialize as ContextUsageView,
   DialogView,
+  FolderView_Serialize as FolderView,
   ImageView,
   HelperThreadView as HelperThreadView,
   HelpersView_Serialize as HelpersView,
@@ -72,6 +76,10 @@ export type ChatViewState = {
   /** How full this chat's context is (0.1.12, S5): pi's own reading, every
    * field null when there is none. `null` while no chat is open. */
   contextUsage: ContextUsageView | null
+  /** The folder this chat runs in (design/composer-dock S2, R4): the last
+   * segment of its working directory and the whole path, `null` for a chat whose
+   * session is not listed yet - absent, never a placeholder. */
+  folder: FolderView | null
   /** The profile view the shell holds for this chat (profiles-editor T2c), or
    * `null` until a read answered and after a chat closes. */
   chatProfile: ChatProfileView | null
@@ -132,6 +140,7 @@ export function chatOf(view: ViewState | null): ChatViewState {
       imagesNotice: null,
       modelChip: null,
       contextUsage: null,
+      folder: null,
       chatProfile: null,
       fatal,
       whatsNew,
@@ -151,6 +160,7 @@ export function chatOf(view: ViewState | null): ChatViewState {
     imagesNotice: view?.images_notice ?? null,
     modelChip: view?.model_chip ?? null,
     contextUsage: view?.context_usage ?? null,
+    folder: view?.foreground_folder ?? null,
     chatProfile: view?.chat_profile ?? null,
     fatal,
     whatsNew,
@@ -202,6 +212,7 @@ export function createChatView(deps: ChatViewDeps = {}): ChatView {
     imagesNotice: null,
     modelChip: null,
     contextUsage: null,
+    folder: null,
     chatProfile: null,
     fatal: null,
     whatsNew: null,
@@ -230,6 +241,7 @@ export function createChatView(deps: ChatViewDeps = {}): ChatView {
       next.images === state.images &&
       next.imagesNotice === state.imagesNotice &&
       next.contextUsage === state.contextUsage &&
+      next.folder === state.folder &&
       next.chatProfile === state.chatProfile &&
       next.fatal === state.fatal &&
       next.whatsNew === state.whatsNew &&

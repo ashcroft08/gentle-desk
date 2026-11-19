@@ -93,6 +93,8 @@ fn the_view_state_slice_has_no_invented_fields() {
             foreground_chat: None,
             // No chat is open, so no header title is drawn either.
             foreground_title: None,
+            // And no chat means no folder for the composer's chip.
+            foreground_folder: None,
             list_status: ListStatusView::Loading { done: 0, total: 0 },
             sessions_revision: 0,
             total_sessions: 0,

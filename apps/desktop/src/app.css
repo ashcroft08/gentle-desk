@@ -822,12 +822,12 @@ p {
 
 .composer {
   display: flex;
-  align-items: flex-end;
-  gap: 8px;
+  flex-direction: column;
+  gap: 6px;
   border: 1px solid var(--border);
   border-radius: 18px;
   background: var(--surface);
-  padding: 10px 10px 10px 16px;
+  padding: 10px 12px 8px 16px;
 }
 
 .composer:focus-within {
@@ -836,7 +836,9 @@ p {
 }
 
 .composer textarea {
-  flex: 1;
+  flex: none;
+  width: 100%;
+  min-width: 0;
   border: 0;
   background: transparent;
   resize: none;
@@ -873,6 +875,59 @@ p {
   color: var(--danger);
 }
 
+/* The composer's one row, under the input (design/composer-dock): what the
+   message runs ON (the two selects), a 1px hairline, then where it runs (the
+   folder; the branch is a later slice, so nothing stands in its place), the
+   flexible space and Send. Everything here is text - no chip carries a box. */
+.composer .row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.composer .row .vsep {
+  width: 1px;
+  height: 14px;
+  flex: none;
+  background: var(--border);
+}
+
+.composer .row .grow {
+  flex: 1;
+  min-width: 6px;
+}
+
+/* The folder name is the only bold thing in the row, the way the artboard draws
+   it; the whole path lives in the hover and is never the text (R4). */
+.composer .row .folder {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.composer .row .folder .t {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The two selects' own glyphs (design/composer-dock): the model wears the accent,
+   the effort the quiet colour of its pill. Decoration: the caret beside the value
+   is what says "select", and the accessible name says which one. */
+.pill .g {
+  display: inline-flex;
+  flex: none;
+}
+
+.pill .g-model {
+  color: var(--accent);
+}
+
 /* The reason line under the box: the states board's `.why`, offset to the box
    the way the `New session` reason is offset from its button. */
 .composer-dock .why {
@@ -880,16 +935,14 @@ p {
   padding-left: 16px;
 }
 
-/* The model chip (0.1.11, S7): the two pill dropdowns sit at the right of the
-   bottom row under the composer form, sharing it with the key hints (`.dock-bottom`),
-   and open the themed popover listbox upward (the row is at the window's bottom
-   edge). */
+/* The model chip (0.1.11, S7): the two pill dropdowns now sit IN the composer's
+   row, after what surrounds them (design/composer-dock), and open the themed
+   popover listbox upward (the row is at the window's bottom edge). */
 .chip {
-  display: flex;
-  justify-content: flex-end;
+  display: inline-flex;
   align-items: center;
-  flex-wrap: nowrap;
   gap: 4px;
+  min-width: 0;
 }
 
 .pill-select {
@@ -1074,23 +1127,8 @@ p {
   font-size: 12px;
 }
 
-/* The bottom row under the box: the key hints take the left, the chip's pills
-   take the right, so no blank row is left under the box (S7 feedback). */
-.composer-dock .dock-bottom {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 4px 12px;
-  margin-top: 8px;
-}
-
-.composer-dock .dock-bottom .keys {
-  margin: 0;
-}
-
-/* The key hints under the box: quiet, left-aligned with the box's text, never
-   competing with it. */
+/* The key hints under the box: quiet, left-aligned with the box's text, BELOW the
+   composer's border and never competing with it (design/composer-dock). */
 .composer-dock .keys {
   margin: 8px 0 0;
   padding-left: 16px;
@@ -1099,67 +1137,55 @@ p {
   font-size: 12px;
 }
 
-/* The context chip (0.1.12, S5): how full this chat's window is, in the bottom
-   row between the key hints and the model pills. One number and one tiny bar;
-   the tokens behind it are the hover. Its tone is the reader's own scale - quiet
-   until 75%, the warning token from there, the danger token from 95% - so the
-   colour never carries the meaning alone: the number is drawn too. */
-.ctx {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 4px 10px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  color: var(--text);
-  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1;
-  white-space: nowrap;
-  cursor: default;
+/* The context rail ABOVE the box and outside its border (design/composer-dock S1,
+   S5): a 2px line narrower than the composer, the percent at its left with a
+   clock and the window at its right. It is a measure, not a chip - no box, no
+   border. Its tone is the reader's own scale, the one the chip already used
+   (`composer/context.ts`): quiet until 75%, the warning token from there - so the
+   percentage is always drawn too and colour never carries the meaning alone. */
+.composer-dock .ctx-rail {
+  margin: 0 10px 3px;
 }
 
-.ctx .bar {
-  display: inline-block;
-  width: 46px;
-  height: 5px;
-  border-radius: 3px;
+.composer-dock .ctx-rail .lab {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 4px;
+  font-size: 10.5px;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.composer-dock .ctx-rail .lab .l {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.composer-dock .ctx-rail .rail {
+  height: 2px;
+  border-radius: 1px;
   background: var(--border);
   overflow: hidden;
 }
 
-.ctx .bar i {
+.composer-dock .ctx-rail .rail i {
   display: block;
   height: 100%;
   /* A small share still shows a sliver: at 6% the fill is under a pixel
-     otherwise, and the bar would read as empty. */
+     otherwise, and the rail would read as empty. */
   min-width: 4px;
-  border-radius: 3px;
+  border-radius: 1px;
   background: var(--accent);
 }
 
-.ctx.warning {
-  color: var(--warning);
-  border-color: var(--warning);
-}
-
-.ctx.warning .bar i {
+.composer-dock .ctx-rail.warning .rail i {
   background: var(--warning);
 }
 
-.ctx.danger {
-  color: var(--danger);
-  border-color: var(--danger);
-}
-
-.ctx.danger .bar i {
+.composer-dock .ctx-rail.danger .rail i {
   background: var(--danger);
-}
-
-/* No percentage: a dash, quiet, and no bar to pretend there is a reading. */
-.ctx.unknown {
-  color: var(--faint);
 }
 
 .placeholder {
@@ -2677,6 +2703,39 @@ p {
 
 .activity .dot:nth-child(3) {
   animation-delay: 0.4s;
+}
+
+/* The status line at the end of the thread (design/composer-dock S1): ONE faint
+   line sharing the reasoning row's anatomy - a 9px spinner, the working word and
+   the seconds it has been working - never a card, never a second visual language.
+   Its right side keeps the place the read-only session mode takes (R1); this
+   slice draws nothing there. Reduced motion leaves the ring still. */
+.work-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0 4px;
+  font-size: 11.5px;
+  color: var(--faint);
+}
+
+.work-line .spin {
+  width: 9px;
+  height: 9px;
+  flex: none;
+  border: 1.5px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: tc-spin 0.9s linear infinite;
+}
+
+.work-line .t {
+  color: var(--muted);
+}
+
+.work-line .n {
+  font-variant-numeric: tabular-nums;
 }
 
 @keyframes activity-pulse {

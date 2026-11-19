@@ -1106,6 +1106,22 @@ export type DialogView_Serialize =
 { kind: "Editor"; id: string; title: string; prefill: string | null };
 
 /**
+ *  The folder the foreground chat runs in (design/composer-dock S2, R4): the
+ *  last segment of its working directory - the name its sidebar row draws - and
+ *  the whole directory, which is only ever the hover.
+ * 
+ *  The name is the app's own rule ([`SessionItem::project`](gentle_app::SessionItem::project)),
+ *  the one the session rows use, so the composer's chip and the sidebar row can
+ *  never name the same folder differently.
+ */
+export type FolderView = {
+	/**  The last segment of the chat's working directory, as the sidebar draws it. */
+	name: string,
+	/**  The whole working directory: the chip's `title`, never its text. */
+	path: string,
+};
+
+/**
  *  One card of the helpers panel, flattened for display: what the iced panel
  *  draws for a task (`crates/ui/src/view/helpers.rs`) and nothing more. The
  *  helper's thread is NOT here - the said/thought/ran view is T7b-2 - so the
@@ -2954,6 +2970,15 @@ export type ViewState_Deserialize = {
 	 */
 	foreground_title?: string | null,
 	/**
+	 *  The folder the foreground chat runs in (design/composer-dock S2, R4): the
+	 *  last segment of its working directory and the whole path, which the
+	 *  composer draws as its folder chip. Read from the same session row the
+	 *  header's title reads, so the two can never name one folder differently.
+	 *  `None` for a chat whose session is not listed yet: an unknown folder is
+	 *  absent rather than a placeholder.
+	 */
+	foreground_folder?: FolderView | null,
+	/**
 	 *  How complete the session list is. It starts `Loading`, so the sidebar
 	 *  never claims there are no chats before the first pass ends.
 	 */
@@ -3182,6 +3207,15 @@ export type ViewState_Serialize = {
 	 *  foreground chat has no title.
 	 */
 	foreground_title: string | null,
+	/**
+	 *  The folder the foreground chat runs in (design/composer-dock S2, R4): the
+	 *  last segment of its working directory and the whole path, which the
+	 *  composer draws as its folder chip. Read from the same session row the
+	 *  header's title reads, so the two can never name one folder differently.
+	 *  `None` for a chat whose session is not listed yet: an unknown folder is
+	 *  absent rather than a placeholder.
+	 */
+	foreground_folder: FolderView | null,
 	/**
 	 *  How complete the session list is. It starts `Loading`, so the sidebar
 	 *  never claims there are no chats before the first pass ends.

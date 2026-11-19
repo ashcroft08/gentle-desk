@@ -983,6 +983,21 @@ pub struct ContextUsageView {
     pub window: Option<u32>,
 }
 
+/// The folder the foreground chat runs in (design/composer-dock S2, R4): the
+/// last segment of its working directory - the name its sidebar row draws - and
+/// the whole directory, which is only ever the hover.
+///
+/// The name is the app's own rule ([`SessionItem::project`](gentle_app::SessionItem::project)),
+/// the one the session rows use, so the composer's chip and the sidebar row can
+/// never name the same folder differently.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub struct FolderView {
+    /// The last segment of the chat's working directory, as the sidebar draws it.
+    pub name: String,
+    /// The whole working directory: the chip's `title`, never its text.
+    pub path: String,
+}
+
 /// How complete the session list is, matching `gentle_app::ListStatus` one to
 /// one. `Loading` carries how far the first pass got, so the sidebar can say it
 /// is still reading; only `Complete` lets an empty list call itself empty.
@@ -1496,6 +1511,13 @@ pub struct ViewState {
     /// named [`NEW_CHAT_TITLE`](crate::sessions::view::NEW_CHAT_TITLE), and no
     /// foreground chat has no title.
     pub foreground_title: Option<String>,
+    /// The folder the foreground chat runs in (design/composer-dock S2, R4): the
+    /// last segment of its working directory and the whole path, which the
+    /// composer draws as its folder chip. Read from the same session row the
+    /// header's title reads, so the two can never name one folder differently.
+    /// `None` for a chat whose session is not listed yet: an unknown folder is
+    /// absent rather than a placeholder.
+    pub foreground_folder: Option<FolderView>,
     /// How complete the session list is. It starts `Loading`, so the sidebar
     /// never claims there are no chats before the first pass ends.
     pub list_status: ListStatusView,

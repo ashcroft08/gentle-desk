@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "chosen": "01-dock.html",
+  "handoffs": {
+    "01-dock.html": {
+      "status": "in_progress",
+      "queued": false,
+      "sentAt": "2026-11-19T00:45:16.070Z",
+      "startedAt": "2026-11-19T00:45:35.942Z",
+      "implementedAt": null,
+      "feature": "odd/tasks/composer-dock.md",
+      "note": "Implementing the dock in slices: first the status line (working + elapsed + folder), the context rail above the composer, the row regrouping and the hint below. The branch, the mode and the attachments need new data and follow."
+    }
+  }
+}
