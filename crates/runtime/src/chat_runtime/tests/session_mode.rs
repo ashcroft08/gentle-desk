@@ -47,11 +47,7 @@ fn state(mode: &str) -> Value {
 }
 
 /// The two methods this slice asks for, as `capabilities` lists them.
-const METHODS: [&str; 3] = [
-    "capabilities",
-    "get_permission_mode",
-    "set_permission_mode",
-];
+const METHODS: [&str; 3] = ["capabilities", "get_permission_mode", "set_permission_mode"];
 
 #[test]
 fn the_read_asks_capabilities_once_then_the_mode() {
@@ -127,7 +123,11 @@ fn a_write_asks_the_mode_alone_and_never_persist() {
         vec![
             Asked::of("desktop-1", "capabilities", json!({})),
             // Exactly the mode: `persist` is never sent (L7).
-            Asked::of("desktop-2", "set_permission_mode", json!({ "mode": "yolo" })),
+            Asked::of(
+                "desktop-2",
+                "set_permission_mode",
+                json!({ "mode": "yolo" })
+            ),
         ]
     );
 }

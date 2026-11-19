@@ -198,14 +198,19 @@ impl AppStateHolder {
         // straddle a close.
         let mut modes = lock(&self.session_modes);
         modes.remove(chat.as_str());
-        *lock(&self.session_epochs).entry(chat.as_str().to_owned()).or_default() += 1;
+        *lock(&self.session_epochs)
+            .entry(chat.as_str().to_owned())
+            .or_default() += 1;
     }
 
     /// Which incarnation of the chat a session-mode command starts in: it changes
     /// every time the chat's mode is forgotten, so an answer that carries an older
     /// one belongs to a chat that closed, even if the same chat is open again.
     pub fn session_epoch(&self, chat: &ChatId) -> u64 {
-        lock(&self.session_epochs).get(chat.as_str()).copied().unwrap_or(0)
+        lock(&self.session_epochs)
+            .get(chat.as_str())
+            .copied()
+            .unwrap_or(0)
     }
 
     /// Gives back the chat's one in-flight session-mode slot: this command has

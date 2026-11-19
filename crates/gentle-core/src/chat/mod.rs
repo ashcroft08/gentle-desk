@@ -11,8 +11,7 @@ mod reducer;
 mod state;
 
 pub use history::{
-    messages_from_history, messages_from_session_file, PROVISIONAL_PREFIX,
-    SESSION_FILE_MAX_BYTES,
+    messages_from_history, messages_from_session_file, PROVISIONAL_PREFIX, SESSION_FILE_MAX_BYTES,
 };
 pub use reducer::{reduce_chat, reduce_chat_at};
 pub use state::{

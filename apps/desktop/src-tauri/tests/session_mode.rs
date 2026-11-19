@@ -194,14 +194,10 @@ fn a_write_the_child_did_not_answer_keeps_the_mode_and_says_so() {
     let _ = holder.note_session_mode(&chat, None, &answered("normal"));
 
     for (outcome, code) in [
-        (
-            PermissionOutcome::NoAnswer(NoAnswer::TimedOut),
-            "no_answer",
-        ),
+        (PermissionOutcome::NoAnswer(NoAnswer::TimedOut), "no_answer"),
         (PermissionOutcome::Unsupported, "unsupported"),
     ] {
-        let _ =
-            holder.note_session_mode(&chat, Some(SessionMode::Auto), &outcome);
+        let _ = holder.note_session_mode(&chat, Some(SessionMode::Auto), &outcome);
 
         assert_eq!(
             mode_view(&holder),
@@ -293,7 +289,8 @@ fn an_answer_from_before_a_close_is_not_installed_on_the_reopened_chat() {
     holder.fold_input(Input::Intent(Intent::OpenChat(chat.clone())));
     holder.fold_input(Input::ChatOpened { chat: chat.clone() });
 
-    let pushed = holder.note_session_mode_in(&chat, None, &answered("super-yolo"), Some(started_in));
+    let pushed =
+        holder.note_session_mode_in(&chat, None, &answered("super-yolo"), Some(started_in));
 
     assert!(pushed.is_none(), "the old child's answer pushes nothing");
     assert_eq!(
@@ -311,7 +308,10 @@ fn an_answer_from_the_current_incarnation_is_installed() {
     let pushed = holder.note_session_mode_in(&chat, None, &answered("auto"), Some(started_in));
 
     assert!(pushed.is_some());
-    assert_eq!(mode_view(&holder).map(|view| view.mode), Some("auto".to_owned()));
+    assert_eq!(
+        mode_view(&holder).map(|view| view.mode),
+        Some("auto".to_owned())
+    );
 }
 
 #[test]

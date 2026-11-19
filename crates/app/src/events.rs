@@ -52,7 +52,9 @@ fn apply_response(state: &mut AppState, response: &RpcResponse, commands: &mut V
         }
         ("get_messages", Ok(data)) => {
             let language = state.language();
-            state.chat.replace_messages(messages_from_history(language, data));
+            state
+                .chat
+                .replace_messages(messages_from_history(language, data));
         }
         ("set_model", Ok(data)) => {
             // The chip's new model owns the levels list and the current

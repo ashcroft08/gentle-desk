@@ -31,8 +31,9 @@ use crate::clipboard::{self, Clipboard, SystemClipboard};
 use crate::close::{self, BridgeSteps, CloseFlow};
 use crate::config::{ConfigSnapshot, ConfigWriter};
 use crate::contract::{
-    AttachmentView, SettingsFilesChanged, SettingsFilesChangedView, StateChanged, TerminalActionView,
-    UiIntent, UpdatesStatusView, UpdatesView, UsageStatusView, UsageView, ViewState,
+    AttachmentView, SettingsFilesChanged, SettingsFilesChangedView, StateChanged,
+    TerminalActionView, UiIntent, UpdatesStatusView, UpdatesView, UsageStatusView, UsageView,
+    ViewState,
 };
 use crate::effects::{self, Ran, RuntimeExecutor};
 use crate::events::{EventPump, Push};

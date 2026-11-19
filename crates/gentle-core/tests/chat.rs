@@ -76,11 +76,9 @@ fn reducer_run(events: Vec<RpcEvent>) -> ChatState {
 
 /// Folds `events` into `state`, with no clock: the state a fixture replays to.
 fn reducer_run_from(state: ChatState, events: Vec<RpcEvent>) -> ChatState {
-    events
-        .into_iter()
-        .fold(state, |state, event| {
-            reduce_chat(Language::En, state, &event)
-        })
+    events.into_iter().fold(state, |state, event| {
+        reduce_chat(Language::En, state, &event)
+    })
 }
 
 /// Folds `events` with the wall-clock time each one arrived at, which is how a
@@ -100,13 +98,14 @@ fn texts(messages: Vec<ChatMessage>) -> Vec<ChatItem> {
 
 /// Replays a recorded fixture through the real decoder and the real fold.
 fn replay(raw: &str) -> ChatState {
-    raw.lines().filter(|line| !line.trim().is_empty()).fold(
-        ChatState::default(),
-        |state, line| match decode_line(line) {
-            Decoded::Event(event) => reduce_chat(Language::En, state, &event),
-            Decoded::Unknown(raw) => panic!("fixture line decoded as unknown: {raw}"),
-        },
-    )
+    raw.lines()
+        .filter(|line| !line.trim().is_empty())
+        .fold(ChatState::default(), |state, line| {
+            match decode_line(line) {
+                Decoded::Event(event) => reduce_chat(Language::En, state, &event),
+                Decoded::Unknown(raw) => panic!("fixture line decoded as unknown: {raw}"),
+            }
+        })
 }
 
 mod working {
@@ -829,7 +828,10 @@ mod transcript {
         ]);
         assert_eq!(
             state.items,
-            texts(vec![user("msg-0", "stored"), assistant("msg-1", "kept", false)])
+            texts(vec![
+                user("msg-0", "stored"),
+                assistant("msg-1", "kept", false)
+            ])
         );
     }
 
@@ -1039,7 +1041,10 @@ mod transcript {
         assert_eq!(state.items.len(), 3, "got {:?}", state.items);
         assert_eq!(state.items[0], thought("think-0", "hmm"));
         assert!(matches!(state.items[1], ChatItem::Tool { .. }));
-        assert_eq!(state.items[2], ChatItem::Text(assistant("msg-0", "done", true)));
+        assert_eq!(
+            state.items[2],
+            ChatItem::Text(assistant("msg-0", "done", true))
+        );
     }
 
     /// Each reasoning block of a turn is its own row, and the ids count them.
@@ -1071,7 +1076,8 @@ mod transcript {
     /// Text that arrived before a tool call keeps its place: the bubble has
     /// something to say by then, so the tool call goes after it.
     #[test]
-    fn text_that_arrived_before_a_tool_call_keeps_its_place() {        let state = reducer_run(vec![
+    fn text_that_arrived_before_a_tool_call_keeps_its_place() {
+        let state = reducer_run(vec![
             assistant_start(),
             text_delta("Looking."),
             update(AssistantMessageEvent::ToolcallStart {
@@ -1438,7 +1444,10 @@ mod tool_payloads {
         // makes them the same string.
         let prefix = "k".repeat(TOOL_PAYLOAD_MAX_BYTES);
         let mut fields = serde_json::Map::new();
-        fields.insert(format!("{prefix}-first"), json!("the value the payload keeps"));
+        fields.insert(
+            format!("{prefix}-first"),
+            json!("the value the payload keeps"),
+        );
         fields.insert(
             format!("{prefix}-second"),
             json!("the value that would overwrite it"),
@@ -1530,7 +1539,8 @@ mod tool_payloads {
 mod dialogs {
     use super::*;
 
-    fn select() -> UiRequest {        UiRequest::Select {
+    fn select() -> UiRequest {
+        UiRequest::Select {
             id: "dlg-1".to_owned(),
             title: "Allow?".to_owned(),
             options: vec!["Allow".to_owned(), "Block".to_owned()],
@@ -1766,10 +1776,7 @@ mod fixtures {
                 options: vec!["Allow".to_owned(), "Block".to_owned()],
             }]
         );
-        assert_eq!(
-            state.items,
-            texts(vec![assistant("msg-0", "", true)])
-        );
+        assert_eq!(state.items, texts(vec![assistant("msg-0", "", true)]));
         assert_eq!(state.activity, 0);
         assert_eq!(state.last_error, None);
     }

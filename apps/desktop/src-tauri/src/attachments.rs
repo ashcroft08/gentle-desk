@@ -76,9 +76,17 @@ fn classify(path: &Path) -> (AttachmentKindView, Option<PathBuf>) {
     let metadata = match std::fs::metadata(path) {
         Ok(metadata) => metadata,
         Err(error) if error.kind() == ErrorKind::NotFound => {
-            return (AttachmentKindView::Rejected(AttachmentRejectView::NotFound), None)
+            return (
+                AttachmentKindView::Rejected(AttachmentRejectView::NotFound),
+                None,
+            )
         }
-        Err(_) => return (AttachmentKindView::Rejected(AttachmentRejectView::Unreadable), None),
+        Err(_) => {
+            return (
+                AttachmentKindView::Rejected(AttachmentRejectView::Unreadable),
+                None,
+            )
+        }
     };
     if metadata.is_dir() {
         return (
@@ -209,7 +217,11 @@ mod tests {
         assert_eq!(views[1].name, "notes.txt");
         // The whole path, absolute, and no verbatim prefix on it.
         assert!(views[0].path.ends_with("shot.PNG"), "got {}", views[0].path);
-        assert!(Path::new(&views[0].path).is_absolute(), "got {}", views[0].path);
+        assert!(
+            Path::new(&views[0].path).is_absolute(),
+            "got {}",
+            views[0].path
+        );
         assert!(!views[0].path.starts_with(r"\\?\"), "got {}", views[0].path);
     }
 
@@ -272,10 +284,7 @@ mod tests {
         let notes = file(dir.path(), "notes.md", b"x");
         let same = dir.path().join(".").join("notes.md");
 
-        let views = describe(
-            &[notes, same.to_string_lossy().into_owned()],
-            None,
-        );
+        let views = describe(&[notes, same.to_string_lossy().into_owned()], None);
 
         assert_eq!(views.len(), 1, "got {views:?}");
         assert_eq!(views[0].name, "notes.md");

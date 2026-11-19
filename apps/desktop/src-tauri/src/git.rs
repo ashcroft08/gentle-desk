@@ -102,10 +102,7 @@ pub fn decide(
 ///
 /// The sha read happens only after `symbolic-ref` has refused, which is what
 /// keeps an unborn branch from falling through to a dead `--short HEAD` read.
-pub fn resolve_head(
-    symbolic: &Answer,
-    sha: impl FnOnce() -> Option<String>,
-) -> Option<String> {
+pub fn resolve_head(symbolic: &Answer, sha: impl FnOnce() -> Option<String>) -> Option<String> {
     if symbolic.line().is_some() {
         return None;
     }
@@ -279,7 +276,11 @@ mod tests {
     #[test]
     fn a_branch_is_its_name_and_the_sha_is_never_asked_for() {
         let asked = Cell::new(false);
-        let branch = decide(&ok("true\n"), &ok("feat/composer-dock\n"), sha(None, &asked));
+        let branch = decide(
+            &ok("true\n"),
+            &ok("feat/composer-dock\n"),
+            sha(None, &asked),
+        );
 
         assert_eq!(branch.as_deref(), Some("feat/composer-dock"));
         assert!(!asked.get(), "a branch needs no third read");
@@ -377,7 +378,10 @@ mod tests {
         // is: absent, never a placeholder.
         let asked = Cell::new(false);
 
-        assert_eq!(decide(&ok("false\n"), &ok("main\n"), sha(None, &asked)), None);
+        assert_eq!(
+            decide(&ok("false\n"), &ok("main\n"), sha(None, &asked)),
+            None
+        );
         assert!(!asked.get());
     }
 
@@ -418,10 +422,13 @@ mod tests {
         assert_eq!(cache.lookup(dir), Lookup::Read(Some(branch)));
 
         // The answer is reused for every push after it, and no read starts.
-        assert_eq!(cache.lookup(dir), Lookup::Read(Some(BranchView {
-            name: "feat/composer-dock".to_owned(),
-            path: dir.to_owned(),
-        })));
+        assert_eq!(
+            cache.lookup(dir),
+            Lookup::Read(Some(BranchView {
+                name: "feat/composer-dock".to_owned(),
+                path: dir.to_owned(),
+            }))
+        );
     }
 
     #[test]
@@ -446,10 +453,13 @@ mod tests {
 
         assert_eq!(cache.lookup(one), Lookup::Missing);
         assert_eq!(cache.lookup(two), Lookup::Missing);
-        cache.record(one, Some(BranchView {
-            name: "main".to_owned(),
-            path: one.to_owned(),
-        }));
+        cache.record(
+            one,
+            Some(BranchView {
+                name: "main".to_owned(),
+                path: one.to_owned(),
+            }),
+        );
 
         assert_eq!(
             cache.lookup(one),

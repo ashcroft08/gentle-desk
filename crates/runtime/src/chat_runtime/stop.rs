@@ -26,7 +26,9 @@ use std::sync::{Arc, Mutex};
 use gentle_app::ChatId;
 use gentle_backend::chat_host::HostDesktopChannel;
 use gentle_core::rpc::helper_stop::{stop_helper, StopOutcome};
-use gentle_core::rpc::permission::{read_permission, write_permission, PermissionOutcome, SessionMode};
+use gentle_core::rpc::permission::{
+    read_permission, write_permission, PermissionOutcome, SessionMode,
+};
 use gentle_core::rpc::{DesktopClient, NoAnswer};
 
 use super::{lock, ChatRuntime};

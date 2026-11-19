@@ -407,10 +407,7 @@ impl AppStateHolder {
         // it stands rather than queued against that chat's child.
         if let UiIntent::ReadSessionMode { chat_id } = &intent {
             let chat = crate::intent::chat_for(&state, chat_id);
-            let command = gentle_app::ChatCommand::SessionMode {
-                chat,
-                change: None,
-            };
+            let command = gentle_app::ChatCommand::SessionMode { chat, change: None };
             if !self.begin_chat_command(&command) {
                 return (self.view(), Vec::new());
             }

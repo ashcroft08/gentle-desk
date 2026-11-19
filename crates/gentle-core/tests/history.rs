@@ -284,4 +284,3 @@ fn a_file_and_the_childs_own_answer_project_the_same_roles_and_texts() {
     assert_eq!(from_file, from_child);
     assert_eq!(from_file.len(), 3, "two turns and one failure");
 }
-

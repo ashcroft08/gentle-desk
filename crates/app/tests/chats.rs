@@ -247,7 +247,8 @@ fn the_history_of_a_stored_chat_fills_its_own_thread() {
 /// answer is an answer like any other (chat-open-latency T1).
 #[test]
 fn a_chats_history_counts_as_loaded_only_when_its_child_answered_it() {
-    const HISTORY: &str = r#"{"type":"response","command":"get_messages","success":true,"data":{"messages":[]}}"#;
+    const HISTORY: &str =
+        r#"{"type":"response","command":"get_messages","success":true,"data":{"messages":[]}}"#;
     let Decoded::Event(history) = decode_line(HISTORY) else {
         panic!("history is an event");
     };
@@ -269,7 +270,10 @@ fn a_chats_history_counts_as_loaded_only_when_its_child_answered_it() {
         "an empty answer is still the child's answer"
     );
     assert!(
-        state.chats.state(&a).is_some_and(|chat| chat.items.is_empty()),
+        state
+            .chats
+            .state(&a)
+            .is_some_and(|chat| chat.items.is_empty()),
         "and it loaded no row, which is why emptiness cannot stand for this"
     );
 

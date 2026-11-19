@@ -210,10 +210,8 @@ struct Scratch {
 
 impl Scratch {
     fn new(tag: &str) -> Self {
-        let path = std::env::temp_dir().join(format!(
-            "gentle-desk-git-{tag}-{}",
-            std::process::id()
-        ));
+        let path =
+            std::env::temp_dir().join(format!("gentle-desk-git-{tag}-{}", std::process::id()));
         std::fs::create_dir_all(&path).expect("failed to create the scratch directory");
         Self { path }
     }

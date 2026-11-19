@@ -75,7 +75,9 @@ impl Chats {
                 match (response.command.as_str(), &response.outcome) {
                     ("get_messages", Ok(data)) => {
                         let entry = self.entries.entry(chat.clone()).or_default();
-                        entry.state.replace_messages(messages_from_history(language, data));
+                        entry
+                            .state
+                            .replace_messages(messages_from_history(language, data));
                         // The child's answer is the ONLY history this chat has: what
                         // the shell read from the same session file before it arrived
                         // is no longer drawn, and no read still in flight may

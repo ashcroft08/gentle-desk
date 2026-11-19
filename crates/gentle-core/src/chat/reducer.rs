@@ -52,7 +52,12 @@ pub fn reduce_chat_at(
             args,
             partial_result,
             ..
-        } => update_tool_execution(&mut state, tool_call_id, args.as_ref(), partial_result.as_ref()),
+        } => update_tool_execution(
+            &mut state,
+            tool_call_id,
+            args.as_ref(),
+            partial_result.as_ref(),
+        ),
         RpcEvent::ToolExecutionEnd {
             tool_call_id,
             result,
@@ -95,7 +100,9 @@ fn apply_assistant_message_event(
         AssistantMessageEvent::ToolcallStart { id, tool_name, .. } => {
             open_tool_call(&mut state, id, tool_name)
         }
-        AssistantMessageEvent::ToolcallEnd { tool_call, .. } => finish_tool_call(&mut state, tool_call),
+        AssistantMessageEvent::ToolcallEnd { tool_call, .. } => {
+            finish_tool_call(&mut state, tool_call)
+        }
         // The arguments object arrives as text; the tool row keeps the parsed
         // object `toolcall_end` and `tool_execution_start` carry, so this delta
         // reaches no row and stays activity.

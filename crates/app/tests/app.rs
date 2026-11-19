@@ -384,10 +384,7 @@ mod sessions {
     fn the_history_response_fills_the_thread() {
         let (state, _) = update(AppState::default(), event(HISTORY));
         let thread = state.chat.messages();
-        let texts: Vec<_> = thread
-            .iter()
-            .map(|m| (m.role, m.text.as_str()))
-            .collect();
+        let texts: Vec<_> = thread.iter().map(|m| (m.role, m.text.as_str())).collect();
         assert_eq!(
             texts,
             [(ChatRole::User, "hola"), (ChatRole::Assistant, "**ey**")]

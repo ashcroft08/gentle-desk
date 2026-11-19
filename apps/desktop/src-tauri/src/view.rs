@@ -85,7 +85,11 @@ pub(crate) fn provisional(rows: &[ChatMessage]) -> (Vec<MessageView>, Vec<ChatIt
         .iter()
         .map(|message| message_view(message, &sent))
         .collect();
-    let items = messages.iter().cloned().map(ChatItemView::Message).collect();
+    let items = messages
+        .iter()
+        .cloned()
+        .map(ChatItemView::Message)
+        .collect();
     (messages, items)
 }
 

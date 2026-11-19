@@ -190,7 +190,11 @@ fn a_channel_without_the_methods_is_unsupported_and_writes_nothing_more() {
         read_permission(&mut client(&channel)),
         PermissionOutcome::Unsupported
     );
-    assert_eq!(channel.sent().len(), 1, "only `capabilities` left the client");
+    assert_eq!(
+        channel.sent().len(),
+        1,
+        "only `capabilities` left the client"
+    );
 }
 
 #[test]

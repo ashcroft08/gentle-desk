@@ -57,12 +57,16 @@ fn a_cancelled_pick_answers_no_path_at_all() {
     let picked = pick(&picker, "Attach files");
 
     assert_eq!(picker.calls(), 1, "the one dialog of the clip");
-    assert!(picked.is_empty(), "a cancel attaches nothing, got {picked:?}");
+    assert!(
+        picked.is_empty(),
+        "a cancel attaches nothing, got {picked:?}"
+    );
 }
 
 #[test]
 fn a_pick_answers_the_paths_the_dialog_named() {
-    let picker = FakeFilePicker::picking(&["C:\\dev\\repo\\src\\header.tsx", "C:\\dev\\repo\\plan.md"]);
+    let picker =
+        FakeFilePicker::picking(&["C:\\dev\\repo\\src\\header.tsx", "C:\\dev\\repo\\plan.md"]);
 
     let picked = pick(&picker, "Attach files");
 

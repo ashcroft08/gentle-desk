@@ -192,9 +192,8 @@ fn thinking_and_tool_turn(chat: &ChatId) -> Vec<Converted> {
         role: "assistant".to_owned(),
         raw,
     };
-    let thinking = |event: AssistantMessageEvent, at: u64| {
-        event_at(chat, RpcEvent::MessageUpdate(event), at)
-    };
+    let thinking =
+        |event: AssistantMessageEvent, at: u64| event_at(chat, RpcEvent::MessageUpdate(event), at);
     let execution = |event: RpcEvent, at: u64| event_at(chat, event, at);
     vec![
         event_at(
@@ -662,14 +661,20 @@ fn a_long_thread_pushes_the_same_tail_to_both_lists() {
     // mix of kinds.
     let prompts = MESSAGES_PUSHED + 2;
     for number in 0..prompts {
-        holder.fold_input(Input::Intent(Intent::SendPrompt(format!("prompt {number}"))));
+        holder.fold_input(Input::Intent(Intent::SendPrompt(format!(
+            "prompt {number}"
+        ))));
     }
     let view = fold_turn(&holder, thinking_and_tool_turn(&chat));
 
     // 52 prompts, a reasoning block, a tool call and the answer: 55 rows, of
     // which the push carries the LAST 50 - the first five are cut away.
     let rows: Vec<&str> = view.items.iter().map(id_of).collect();
-    assert_eq!(rows.len(), MESSAGES_PUSHED, "the transcript window is bounded");
+    assert_eq!(
+        rows.len(),
+        MESSAGES_PUSHED,
+        "the transcript window is bounded"
+    );
     assert_eq!(
         rows.first().copied(),
         Some("msg-5"),

@@ -67,7 +67,9 @@ fn files(answer: Result<Option<String>, String>) -> (FileRead, Arc<Mutex<Vec<Pat
 
 /// The holder with the seam armed and the stored chat OPENED, exactly as the
 /// web's `OpenChat` leaves it: foreground, opening, and no row of its own.
-fn opened_with(answer: Result<Option<String>, String>) -> (AppStateHolder, Arc<Mutex<Vec<PathBuf>>>) {
+fn opened_with(
+    answer: Result<Option<String>, String>,
+) -> (AppStateHolder, Arc<Mutex<Vec<PathBuf>>>) {
     let holder = AppStateHolder::default();
     let (read, asked) = files(answer);
     holder.arm_session_files(read, PathBuf::from(STORE));
@@ -142,10 +144,7 @@ fn the_open_of_a_stored_chat_claims_one_read_and_the_file_paints_the_thread() {
             .map(|message| (message.role, message.text.as_str()))
             .collect::<Vec<_>>(),
         [
-            (
-                gentle_desk_lib::contract::MessageRole::User,
-                "a pregunta"
-            ),
+            (gentle_desk_lib::contract::MessageRole::User, "a pregunta"),
             (
                 gentle_desk_lib::contract::MessageRole::Assistant,
                 "a resposta"
@@ -216,7 +215,9 @@ fn a_read_of_a_chat_that_closed_and_reopened_is_dropped() {
     // The lesson of R3-001: the same chat id coming back is a NEW incarnation,
     // and the read of the old one belongs to a chat that is gone.
     let (holder, _asked) = opened_with(Ok(Some(file())));
-    let old = holder.claim_transcript().expect("the first incarnation's read");
+    let old = holder
+        .claim_transcript()
+        .expect("the first incarnation's read");
 
     holder.fold_input(Input::Intent(Intent::CloseChat(stored())));
     holder.fold_input(Input::Intent(Intent::OpenChat(stored())));
@@ -253,11 +254,15 @@ fn a_file_that_draws_nothing_draws_nothing_and_says_nothing() {
     // what it must never do is draw the half-written line or say anything about
     // it.
     let oversize = format!("{}{}", file(), "x".repeat(SESSION_FILE_MAX_BYTES));
-    let being_written = r#"{"type":"message","message":{"role":"assistant","content":[{"type":"te"#.to_owned();
+    let being_written =
+        r#"{"type":"message","message":{"role":"assistant","content":[{"type":"te"#.to_owned();
     let cases: [(&str, Result<Option<String>, String>); 4] = [
         ("a file that is not there", Ok(None)),
         ("a file that cannot be read", Err("denied".to_owned())),
-        ("a file holding one half-written line", Ok(Some(being_written))),
+        (
+            "a file holding one half-written line",
+            Ok(Some(being_written)),
+        ),
         ("a file past the cap", Ok(Some(oversize))),
     ];
 
@@ -306,10 +311,7 @@ fn a_chat_that_already_holds_rows_never_reads_its_file() {
         "a chat that already holds rows of its own asks its file for none"
     );
     let back = holder.view();
-    assert_eq!(
-        rows(&back),
-        [("msg-0".to_owned(), "typed here".to_owned())]
-    );
+    assert_eq!(rows(&back), [("msg-0".to_owned(), "typed here".to_owned())]);
     assert_eq!(
         back.transcript_provisional, false,
         "rows the reducer holds are never called provisional"

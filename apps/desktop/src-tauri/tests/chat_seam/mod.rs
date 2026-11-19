@@ -128,16 +128,13 @@ impl Answer {
                 }
             }
             (Self::Closed, ChatCommand::CloseProcess { .. }) => Outcome::Closed { chat },
-            (
-                Self::SessionMode(outcome),
-                ChatCommand::SessionMode {
-                    change, ..
-                },
-            ) => Outcome::SessionMode {
-                chat,
-                change: *change,
-                outcome: (**outcome).clone(),
-            },
+            (Self::SessionMode(outcome), ChatCommand::SessionMode { change, .. }) => {
+                Outcome::SessionMode {
+                    chat,
+                    change: *change,
+                    outcome: (**outcome).clone(),
+                }
+            }
             // Sent, and every send after an open: the child took it.
             _ => Outcome::Sent,
         }

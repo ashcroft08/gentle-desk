@@ -249,7 +249,11 @@ fn send_prompt(state: &mut AppState, text: &str) -> Option<Vec<ChatCommand>> {
 /// Copies a message of the foreground chat, if it is that chat's message.
 fn copy_message(state: &AppState, id: &str) -> Option<Vec<Command>> {
     let chat = state.chats.foreground()?;
-    let message = state.chats.state(chat)?.text_items().find(|message| message.id == id)?;
+    let message = state
+        .chats
+        .state(chat)?
+        .text_items()
+        .find(|message| message.id == id)?;
     Some(vec![Command::CopyToClipboard(message.text.clone())])
 }
 
