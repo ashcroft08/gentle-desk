@@ -369,20 +369,49 @@ p {
   text-align: left;
 }
 
+/* Copy is an icon that only exists under the pointer: the thread is where the
+   reader looks, so a word on every finished reply is furniture. It comes back for
+   the keyboard through :focus-visible, and its accessible name carries the word. */
 .copy {
   border: 0;
   background: transparent;
-  color: var(--muted);
-  font-size: 12px;
-  padding: 2px 6px;
-  margin-top: 6px;
-  border-radius: 6px;
+  color: var(--faint);
+  width: 24px;
+  height: 24px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  margin-top: 4px;
+  border-radius: 5px;
   cursor: pointer;
+  opacity: 0;
+  transition: opacity 100ms ease;
+}
+
+.copy svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.msg:hover .copy,
+.copy:focus-visible {
+  opacity: 1;
 }
 
 .copy:hover {
   background: var(--surface2);
   color: var(--text);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .copy {
+    transition: none;
+  }
 }
 
 /* A model error replaces the reply: the iced danger box, drawn with the states
