@@ -175,6 +175,10 @@ pub struct AppStateHolder {
     /// the last attempt that wrote nothing, and how many writes it answered.
     /// Shell-owned, and dropped with the chat (`bridge::session_mode`).
     session_modes: Mutex<session_mode::SessionModes>,
+    /// How many times each chat's session mode was forgotten, so a command that
+    /// started before a close and answers after a reopen is told apart from one
+    /// of the new chat (`bridge::session_mode`).
+    session_epochs: Mutex<std::collections::BTreeMap<String, u64>>,
     /// The Account pane's slice (0.1.12, T3): the provider names the shell's
     /// store lists and what its own check said about each.
     auth: Mutex<AuthView>,

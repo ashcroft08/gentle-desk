@@ -995,10 +995,24 @@ pub fn run_chat_commands(
         // both the profile work slot it took (the one-in-flight cap, L18) and
         // the web answer it can no longer give.
         let unstarted = command.clone();
+        // A session-mode command remembers which incarnation of its chat it
+        // started in: a chat that closes and opens again is a new chat, and the
+        // old child's answer may not be installed on it (composer-dock T3b, R3-001).
+        let epoch = match &command {
+            gentle_app::ChatCommand::SessionMode { chat, .. } => {
+                Some((chat.clone(), holder.session_epoch(chat)))
+            }
+            _ => None,
+        };
         let spawned = std::thread::Builder::new()
             .name("chat-command".to_owned())
             .spawn(move || {
-                let ran = effects::run_one(command, executor.as_ref());
+                let mut ran = effects::run_one(command, executor.as_ref());
+                if let Some((chat, started_in)) = epoch {
+                    if worker.session_epoch(&chat) != started_in {
+                        ran.session_mode.clear();
+                    }
+                }
                 fold_and_push(&worker, &emit, ran);
             });
         if let Err(error) = spawned {

@@ -279,6 +279,33 @@ fn a_late_answer_for_a_closed_chat_is_dropped() {
 }
 
 #[test]
+fn a_chat_that_closes_and_opens_again_is_a_new_incarnation_for_an_old_command() {
+    // R3-001: a command that started before the close is told apart from one
+    // of the reopened chat by the epoch it started in, because the chat id is
+    // the same and `is_open` is true again.
+    let (holder, chat) = open_stored();
+    let started_in = holder.session_epoch(&chat);
+
+    holder.fold_input(Input::Intent(Intent::CloseChat(chat.clone())));
+    holder.fold_input(Input::ChatClosed {
+        chat: chat.clone(),
+        expected: true,
+    });
+
+    assert_ne!(
+        holder.session_epoch(&chat),
+        started_in,
+        "closing the chat moves its epoch, so an answer that carries the old one is stale"
+    );
+    let after_reopen = holder.session_epoch(&chat);
+    assert_eq!(
+        holder.session_epoch(&chat),
+        after_reopen,
+        "and the epoch is stable until the chat closes again"
+    );
+}
+
+#[test]
 fn a_second_command_while_one_is_in_flight_is_dropped() {
     let (holder, chat) = open_stored();
     let read = UiIntent::ReadSessionMode {
