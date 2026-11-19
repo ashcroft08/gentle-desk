@@ -105,6 +105,8 @@ fn the_view_state_slice_has_no_invented_fields() {
             messages: Vec::new(),
             // No chat is open, so the transcript holds no row either.
             items: Vec::new(),
+            // And no row was read from a session file: nothing is provisional.
+            transcript_provisional: false,
             notices: Vec::new(),
             // No chat is open, so no extension is waiting for an answer.
             dialog: None,

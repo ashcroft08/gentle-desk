@@ -7,7 +7,11 @@
 // - the rows are the last ones Rust pushed for that chat, oldest first, untouched:
 //   the order, the kind, the streaming flag, the payloads and the two loss marks
 //   are Rust's (chat-transcript T2b). A text row of the list is the same row the
-//   `messages` slice carries, so the thread draws it from whichever arrived.
+//   `messages` slice carries, so the thread draws it from whichever arrived;
+// - `provisional` says those rows were read from the chat's session FILE while its
+//   child was starting (chat-open-latency T1). It is Rust's flag: only the shell
+//   knows whether the rows are the child's answer or the file's, and the thread
+//   only draws what the flag says it may.
 
 import type {
   ChatItemView_Serialize as ChatItem,
@@ -24,6 +28,8 @@ export type ThreadViewState = {
   messages: MessageView[]
   /** That chat's whole transcript, oldest row first: text, thinking and tools. */
   items: ChatItem[]
+  /** Whether those rows came from the session file, not from the child (T1). */
+  provisional: boolean
 }
 
 export type ThreadView = {
@@ -45,8 +51,13 @@ const NO_ROWS: ChatItem[] = []
 /** The slice of `view` the thread draws. */
 export function threadOf(view: ViewState | null): ThreadViewState {
   const chat = view?.foreground_chat ?? null
-  if (chat === null) return { chat: null, messages: NONE, items: NO_ROWS }
-  return { chat, messages: view?.messages ?? NONE, items: view?.items ?? NO_ROWS }
+  if (chat === null) return { chat: null, messages: NONE, items: NO_ROWS, provisional: false }
+  return {
+    chat,
+    messages: view?.messages ?? NONE,
+    items: view?.items ?? NO_ROWS,
+    provisional: view?.transcript_provisional === true,
+  }
 }
 
 /**
@@ -55,7 +66,7 @@ export function threadOf(view: ViewState | null): ThreadViewState {
  */
 export function createThreadView(deps: ThreadViewDeps = {}): ThreadView {
   const store = deps.store ?? createSessionsStore()
-  let state: ThreadViewState = { chat: null, messages: [], items: [] }
+  let state: ThreadViewState = { chat: null, messages: [], items: [], provisional: false }
   const listeners = new Set<(state: ThreadViewState) => void>()
 
   function emit(next: ThreadViewState): void {
@@ -67,7 +78,12 @@ export function createThreadView(deps: ThreadViewDeps = {}): ThreadView {
     const next = threadOf(view)
     // A push that leaves the chat and both lists alone changes nothing here: the
     // arrays are the ones Rust sent, so identity is the cheapest answer.
-    if (next.chat === state.chat && next.messages === state.messages && next.items === state.items)
+    if (
+      next.chat === state.chat &&
+      next.messages === state.messages &&
+      next.items === state.items &&
+      next.provisional === state.provisional
+    )
       return
     emit(next)
   })

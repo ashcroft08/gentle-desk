@@ -53,6 +53,7 @@ use crate::workspace;
 mod chat_profile;
 
 pub use chat_profile::ChatWork;
+pub use transcript::{SessionRead, SessionRows, TranscriptPush};
 mod config;
 mod fatal;
 mod images;
@@ -63,6 +64,7 @@ mod session_notice;
 mod settings;
 mod shell;
 mod theme;
+mod transcript;
 mod whats_new;
 
 /// What runs one shared command the reducer asked for. `Command::RefreshSessions`
@@ -179,6 +181,15 @@ pub struct AppStateHolder {
     /// started before a close and answers after a reopen is told apart from one
     /// of the new chat (`bridge::session_mode`).
     session_epochs: Mutex<std::collections::BTreeMap<String, u64>>,
+    /// The rows read from each stored chat's session FILE, painted while that
+    /// chat's child is still starting and dropped the moment the child's answer
+    /// is folded (`bridge::transcript`, chat-open-latency T1). Shell-owned, like
+    /// the session mode: the reducer's transcript is the authority and this is
+    /// the frame that fills the seconds before it arrives.
+    transcripts: Mutex<transcript::Transcripts>,
+    /// Installed once at startup: what pushes the answer of a file read that
+    /// ran on its own thread ([`AppStateHolder::arm_transcript_push`]).
+    transcript_push: Mutex<Option<TranscriptPush>>,
     /// The Account pane's slice (0.1.12, T3): the provider names the shell's
     /// store lists and what its own check said about each.
     auth: Mutex<AuthView>,
@@ -421,7 +432,18 @@ impl AppStateHolder {
             return (self.view(), vec![command]);
         }
         match crate::intent::to_intent(&state, intent) {
-            Some(intent) => self.apply(gentle_app::Input::Intent(intent)),
+            Some(intent) => {
+                let opened = opens_a_chat(&intent);
+                let answer = self.apply(gentle_app::Input::Intent(intent));
+                // Opening a stored chat paints its thread from its session file
+                // while its child starts (chat-open-latency T1): the read is
+                // claimed here and run on a worker, because this path is
+                // synchronous and a file is the last thing it may wait for.
+                if opened {
+                    self.start_transcript_read();
+                }
+                answer
+            }
             // Every intent has an answer: the reducer's, or the config's above.
             None => (self.view(), Vec::new()),
         }
@@ -597,6 +619,17 @@ impl AppStateHolder {
     }
 
     fn apply(&self, input: gentle_app::Input) -> (ViewState, Vec<gentle_app::ChatCommand>) {
+        // A chat the user CLOSED leaves the open set, and it takes the rows read
+        // from its session file with it, together with the incarnation those rows
+        // were read for (chat-open-latency T1, S4): the same id coming back is a
+        // NEW chat, so a read of the old one may never be installed on it
+        // (R3-001 of `chat-transcript.md`). It is acted on after the fold, not
+        // before it, because a close the reducer REFUSES - a chat mid-turn - keeps
+        // the chat open and keeps its rows.
+        let closing = match &input {
+            gentle_app::Input::Intent(gentle_app::Intent::CloseChat(chat)) => Some(chat.clone()),
+            _ => None,
+        };
         // A chat that closes takes the Profile tab's view with it (profiles-editor
         // T2b-2, L11-4): the view is that chat's, and a read still in flight for
         // it may not leave a stale one behind for the next frame to draw. Done
@@ -628,6 +661,9 @@ impl AppStateHolder {
             (view, effects.chat_commands, effects.commands)
         };
         self.run_shared(commands);
+        if let Some(chat) = closing.filter(|chat| !self.is_open(chat)) {
+            self.forget_transcript(&chat);
+        }
         (view, chat_commands)
     }
 
@@ -646,6 +682,7 @@ impl AppStateHolder {
             shell: self.shell_view(),
             chat_profile: self.chat_profile(),
             session_mode: self.session_mode(),
+            transcript: self.provisional_transcript(),
             branch: self.branch_view(),
             auth: self.auth(),
             updates: self.updates(),
@@ -740,7 +777,6 @@ impl AppStateHolder {
 }
 
 /// Gives `state` the language this run speaks, read off the config.
-///
 /// This is the ONE place the reducer learns the language (0.2.0, S3): every
 /// notice `crates/app` produces is worded through the field this sets, so
 /// nothing there reads a config or a locale. `None` — no stored preference — is
@@ -748,6 +784,17 @@ impl AppStateHolder {
 /// the stored choice wins from then on).
 fn speak(state: &mut gentle_app::AppState, language: Option<Language>) {
     state.language = language;
+}
+
+/// Whether one intent is an OPENING of a chat: the two the web sends that put a
+/// chat (and its session file) on screen, which is when the thread's first frame
+/// is claimed (`bridge::transcript`). A fresh chat is one of them and has no file
+/// yet, so its claim answers nothing.
+fn opens_a_chat(intent: &gentle_app::Intent) -> bool {
+    matches!(
+        intent,
+        gentle_app::Intent::OpenChat(_) | gentle_app::Intent::RestartChat(_)
+    )
 }
 
 /// A lock that survives a poisoned mutex: nothing here may panic because a

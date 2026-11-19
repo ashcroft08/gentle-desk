@@ -34,11 +34,11 @@ from a cheaper spawn. That mechanism was removed here on purpose - see S3.
 
 ## Tasks
 
-- [ ] T1 (S1, S4) paint the session file first: the scanner and the reparsers that
+- [x] T1 (S1, S4) paint the session file first: the scanner and the reparsers that
   already read a session file for the tree feed the thread's first frame, and the
   `get_messages` answer replaces it when the child answers. The child's answer is
   authoritative; a partial or stale file must never win.
-- [ ] T2 (S1, S2) hold the "opening" state until the first event instead of
+- [x] T2 (S1, S2) hold the "opening" state until the first event instead of
   drawing an empty thread and then repainting it.
 - [ ] T3 (S1, S2) MEASURE, and only then decide: if a chat still takes more than
   ~1.5 s to show content, evaluate a warm standby child. That costs ~64 MB per
@@ -58,3 +58,13 @@ from a cheaper spawn. That mechanism was removed here on purpose - see S3.
 - L3 (2026-11-18, ruling): T1 and T2 are separable and neither needs the other's
   review; T3 is explicitly "measure first" because its cost lands on the low-end
   machines this app exists for.
+- L4 (2026-11-19, T1+T2 landed): a stored chat paints its rows from its own session file
+  while the child starts (`messages_from_session_file`, shell-owned provisional rows keyed
+  by an incarnation epoch compared under the install lock, 8 MiB cap, partial trailing line
+  ignored). The child's `get_messages` answer wins: the reducer now records
+  `history_loaded` and the draw rule needs foreground + non-empty + no reducer row + history
+  not loaded. File rows carry no Copy; the composer still refuses to send while Opening.
+  Verified: `npm run check` 0 errors, web 354, gentle-core 340, gentle-app 241,
+  gentle-desk-app 597. NOT measured: whether a real chat now shows content in under ~1.5 s
+  (T3 is still open and needs a harness against the real shell). Known: the file is read
+  whole into memory before the cap refuses it (the shared FileRead seam returns a String).

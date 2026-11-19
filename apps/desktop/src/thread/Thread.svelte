@@ -15,6 +15,13 @@
   // Nothing here measures a row: the window is Rust's (`last_items`), the fold of
   // a body is a slice, so a chat of 400 tool calls stays a bounded list of bounded
   // rows and the thread keeps ONE scroll container.
+  //
+  // `provisional` says these rows were read from the chat's session FILE while its
+  // child was starting (chat-open-latency T1): they are drawn like every other row
+  // and give nothing that assumes the chat owns them. The child's answer replaces
+  // them in ONE push, so the list is never emptied on the way - the ids differ
+  // (`prov-<n>` against `msg-<n>`), and a keyed remount of identical content is the
+  // same text in the same place.
   import type {
     ChatActivityMark,
     ChatItemView_Serialize as ChatItem,
@@ -42,6 +49,7 @@
     scrollTop = $bindable(0),
     mark = null,
     sessionMode = null,
+    provisional = false,
   }: {
     /** The foreground chat's messages, oldest first, as Rust pushed them. */
     messages?: MessageView[]
@@ -63,6 +71,9 @@
     /** That chat's session permission mode, or `null` when nothing answered
      * (composer-dock T3c): the status line draws no control for a `null`. */
     sessionMode?: SessionModeView | null
+    /** Whether the rows above came from the session file rather than from the
+     * child (chat-open-latency T1): drawn, and never acted on. */
+    provisional?: boolean
   } = $props()
 
   /** The thread's own words in the language the app holds (0.2.0, S3/D4). */
@@ -189,7 +200,7 @@
   <div class="thread-in">
     {#each rows as row (row.id)}
       {#if row.kind === 'message'}
-        <Message message={row.message} html={row.html} />
+        <Message message={row.message} html={row.html} {provisional} />
       {:else if row.kind === 'thinking'}
         <ReasoningRow item={row.thinking} />
       {:else}

@@ -242,6 +242,44 @@ fn the_history_of_a_stored_chat_fills_its_own_thread() {
     );
 }
 
+/// The child's answer to `get_messages` is the ONE thing that says a chat's
+/// history has arrived: an open asks for it and reads nothing, and an empty
+/// answer is an answer like any other (chat-open-latency T1).
+#[test]
+fn a_chats_history_counts_as_loaded_only_when_its_child_answered_it() {
+    const HISTORY: &str = r#"{"type":"response","command":"get_messages","success":true,"data":{"messages":[]}}"#;
+    let Decoded::Event(history) = decode_line(HISTORY) else {
+        panic!("history is an event");
+    };
+    let a = chat("a");
+
+    let (state, _) = apply(AppState::default(), vec![open(&a)]);
+    assert!(
+        !state.chats.history_loaded(&a),
+        "opening a chat reads no history: the answer is the child's"
+    );
+    assert!(
+        !state.chats.history_loaded(&chat("unknown")),
+        "a chat the app never opened has no history either"
+    );
+
+    let (state, _) = apply(state, vec![event(&a, history)]);
+    assert!(
+        state.chats.history_loaded(&a),
+        "an empty answer is still the child's answer"
+    );
+    assert!(
+        state.chats.state(&a).is_some_and(|chat| chat.items.is_empty()),
+        "and it loaded no row, which is why emptiness cannot stand for this"
+    );
+
+    let (state, _) = apply(state, vec![open(&chat("b"))]);
+    assert!(
+        !state.chats.history_loaded(&chat("b")),
+        "the answer belongs to the chat that asked"
+    );
+}
+
 mod chip {
     use super::*;
 

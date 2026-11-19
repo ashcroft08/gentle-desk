@@ -76,6 +76,51 @@ describe('App', () => {
     expect(screen.getByText('ls node_modules')).toBeTruthy()
   })
 
+  it('draws the rows a session file painted, with no Copy, and then the chat’s own', async () => {
+    // chat-open-latency T1/T2: a stored chat opens on the rows its file holds,
+    // and the child's answer replaces them in the SAME slice - the flag travels
+    // with the rows, so the thread never draws a frame without them.
+    const FILE_ROW = { ...MESSAGE, id: 'prov-0', text: 'a pregunta' }
+    const FILED = [
+      { kind: 'Message' as const, data: FILE_ROW },
+      {
+        kind: 'Message' as const,
+        data: { ...MESSAGE, id: 'prov-1', role: 'Assistant' as const, text: 'a resposta' },
+      },
+    ]
+    const fixture = serveSidebar({
+      view: viewState({
+        foreground_chat: 'chat-1',
+        messages: [FILE_ROW],
+        items: FILED,
+        transcript_provisional: true,
+        // The chat is opening: that is exactly when the file's rows are drawn.
+        activity: [activity('chat-1', 'Opening')],
+      }),
+    })
+    render(App)
+
+    expect(await screen.findByText('a resposta')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Copy' })).toBeNull()
+    expect(screen.getByText('Opening chat')).toBeTruthy()
+
+    // The child's answer: the same turns under its own ids, and Copy is back.
+    fixture.view = viewState({
+      foreground_chat: 'chat-1',
+      messages: [{ ...MESSAGE, id: 'msg-0', text: 'a pregunta' }, { ...MESSAGE, id: 'msg-1', role: 'Assistant', text: 'a resposta' }],
+      items: [
+        { kind: 'Message', data: { ...MESSAGE, id: 'msg-0', text: 'a pregunta' } },
+        { kind: 'Message', data: { ...MESSAGE, id: 'msg-1', role: 'Assistant', text: 'a resposta' } },
+      ],
+      transcript_provisional: false,
+    })
+    fixture.push()
+
+    expect(await screen.findByRole('button', { name: 'Copy' })).toBeTruthy()
+    expect(screen.getByText('a resposta')).toBeTruthy()
+    expect(screen.queryByText('Opening chat')).toBeNull()
+  })
+
   it('draws the composer’s folder chip for the folder Rust pushed', async () => {
     const path = 'C:\\Users\\josep\\dev\\gentle-desk'
     serveSidebar({

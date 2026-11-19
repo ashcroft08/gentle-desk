@@ -358,6 +358,20 @@ impl Bridge {
                 push(&branch_emit, view);
             }
         }));
+        // The thread's first frame is read from the chat's own session file off
+        // the window (chat-open-latency T1), so its answer reaches the web the
+        // same way: a push from the thread that read it, and only when the read
+        // may still be drawn (`note_transcript` answers nothing for one a close or
+        // the child's own answer superseded).
+        let transcript_holder = Arc::downgrade(&self.holder);
+        let transcript_emit = Arc::clone(&emit);
+        self.holder.arm_transcript_push(Arc::new(move |read| {
+            if let Some(holder) = transcript_holder.upgrade() {
+                if let Some(view) = holder.note_transcript(&read) {
+                    push(&transcript_emit, view);
+                }
+            }
+        }));
         self.pump.arm(push_via(emit.clone()));
         // The folder dialog is owned by the window, so it is modal to the app
         // instead of to the desktop. The window exists only from this step, and

@@ -1700,6 +1700,20 @@ pub struct ViewState {
     /// rows out of one builder, which is what lets the web move from the one to
     /// the other without the two disagreeing on the way.
     pub items: Vec<ChatItemView>,
+    /// Whether [`items`](Self::items) and [`messages`](Self::messages) are the
+    /// PROVISIONAL rows read from the chat's own session FILE, painted while its
+    /// child is still starting (`chat-open-latency.md` T1, T2).
+    ///
+    /// True only while the thread draws those rows, and those rows are drawn only
+    /// for the foreground chat, only while its child has answered nothing and its
+    /// thread holds no row of its own. The child's `get_messages` answer replaces
+    /// them and always wins (S4), so this flag turns false in the same push that
+    /// carries the real rows - never one frame later.
+    ///
+    /// While it is true a row may be DRAWN but not ACTED on: the rows are the
+    /// file's, not the child's, so the thread gives them no Copy and nothing else
+    /// that assumes the chat owns them.
+    pub transcript_provisional: bool,
     pub notices: Vec<NoticeView>,
     /// The foreground chat's first pending blocking dialog, if an extension is
     /// waiting for an answer. `None` when no chat is foreground or nothing is

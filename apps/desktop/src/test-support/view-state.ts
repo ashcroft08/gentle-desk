@@ -41,6 +41,8 @@ export function viewState(overrides: Partial<ViewState_Serialize> = {}): ViewSta
     messages: [],
     // No chat open, so the transcript holds no row either.
     items: [],
+    // And no row was read from a session file: nothing is provisional.
+    transcript_provisional: false,
     notices: [],
     dialog: null,
     helpers: null,

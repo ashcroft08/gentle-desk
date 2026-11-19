@@ -76,6 +76,11 @@ impl Chats {
                     ("get_messages", Ok(data)) => {
                         let entry = self.entries.entry(chat.clone()).or_default();
                         entry.state.replace_messages(messages_from_history(language, data));
+                        // The child's answer is the ONLY history this chat has: what
+                        // the shell read from the same session file before it arrived
+                        // is no longer drawn, and no read still in flight may
+                        // re-install itself (chat-open-latency T1, S4).
+                        entry.history_loaded = true;
                     }
                     // A reply without a reading (an older child, a failure)
                     // changes nothing: the chip keeps what it knew.

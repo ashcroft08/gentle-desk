@@ -145,3 +145,92 @@ describe('the transcript', () => {
     expect(screen.queryByRole('status')).toBeNull()
   })
 })
+
+describe('the first frame read from the session file (chat-open-latency T1, T2)', () => {
+  /** The rows a stored chat's file paints: the core's own `prov-<n>` ids. */
+  function fromFile(): Item[] {
+    return [message(user('prov-0', 'a pregunta')), message(assistant('prov-1', 'a resposta'))]
+  }
+
+  /** The same exchange once the child answered: its own `msg-<n>` ids. */
+  function fromChild(): Item[] {
+    return [message(user('msg-0', 'a pregunta')), message(assistant('msg-1', 'a resposta'))]
+  }
+
+  it('draws the file rows, gives them no Copy, and puts Opening below them', () => {
+    render(Thread, {
+      props: {
+        items: fromFile(),
+        foregroundChat: 'chat-1',
+        mark: 'Opening',
+        provisional: true,
+      },
+    })
+    const region = screen.getByRole('region', { name: THREAD })
+
+    // T2: the thread is never an empty frame while a stored chat opens.
+    expect(within(region).getByRole('article', { name: 'You said' }).textContent).toContain(
+      'a pregunta',
+    )
+    expect(
+      within(region).getByRole('article', { name: 'Assistant said' }).textContent,
+    ).toContain('a resposta')
+
+    // The file's rows are drawn but never ACTED on: no Copy, because a copy is
+    // the chat's own and these rows are not (T1, S4).
+    expect(within(region).queryByRole('button', { name: 'Copy' })).toBeNull()
+
+    // The existing Opening line, below the rows instead of in an empty thread.
+    const opening = within(region).getByRole('status')
+    expect(opening.textContent).toContain('Opening chat')
+    const last = within(region).getByRole('article', { name: 'Assistant said' })
+    expect(last.compareDocumentPosition(opening) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('draws the same text with its Copy the moment the child answers', async () => {
+    // The swap is ONE push of the pushed slice - the rows and the flag travel
+    // together (view::provisional) - so the thread never draws a frame without
+    // them. What this pins is that the rows the answer carries are the rows the
+    // file painted, now with the actions a row the chat owns has.
+    const { rerender } = render(Thread, {
+      props: {
+        items: fromFile(),
+        messages: fromFile().map((row) => row.data as MessageView),
+        foregroundChat: 'chat-1',
+        mark: 'Opening',
+        provisional: true,
+      },
+    })
+    expect(toArticles(screen.getByRole('region', { name: THREAD }))).toHaveLength(2)
+
+    await rerender({
+      items: fromChild(),
+      messages: fromChild().map((row) => row.data as MessageView),
+      foregroundChat: 'chat-1',
+      mark: 'Working',
+      provisional: false,
+    })
+    const region = screen.getByRole('region', { name: THREAD })
+
+    expect(toArticles(region)).toHaveLength(2)
+    expect(region.textContent).toContain('a resposta')
+    expect(within(region).getAllByRole('button', { name: 'Copy' })).toHaveLength(1)
+  })
+
+  it('draws as it always did when the file gave nothing to paint', () => {
+    // A fresh chat and an unreadable file are the same slice: no row, no
+    // provisional flag, and the Opening line alone.
+    render(Thread, {
+      props: { items: [], messages: [], foregroundChat: 'chat-1', mark: 'Opening', provisional: false },
+    })
+    const region = screen.getByRole('region', { name: THREAD })
+
+    expect(toArticles(region)).toHaveLength(0)
+    expect(within(region).getByRole('status').textContent).toContain('Opening chat')
+  })
+})
+
+/** Every drawn message of a thread: the rows a reader counts. */
+function toArticles(region: HTMLElement): HTMLElement[] {
+  return Array.from(region.querySelectorAll('article'))
+}

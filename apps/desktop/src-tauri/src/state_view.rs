@@ -14,6 +14,7 @@
 //! version this run runs as, and the notes it follows (`bridge::whats_new`).
 
 use gentle_app::{AppState, ModelsStatus};
+use gentle_core::chat::ChatMessage;
 use gentle_core::i18n::Language;
 use gentle_runtime::app_config::Theme;
 use gentle_runtime::badge::{Badge, BadgeMark};
@@ -66,6 +67,10 @@ pub struct ShellParts<'a> {
     /// [`chat_profile`](Self::chat_profile) carries its own: the two are compared
     /// to the foreground chat here before anything is drawn.
     pub session_mode: Option<(String, SessionModeView)>,
+    /// The rows read from the foreground chat's session FILE while its child
+    /// starts (`bridge::transcript`, chat-open-latency T1), with the chat they
+    /// were read for. Whether they may be drawn is this module's rule, below.
+    pub transcript: Option<(String, Vec<ChatMessage>)>,
     /// The branch the foreground chat's folder is on (design/composer-dock S2,
     /// R3, R4), as the shell's git cache holds it. It arrives with the directory
     /// it was read from, so a read that lands after the user moved to another
@@ -98,6 +103,7 @@ pub fn view_state(state: &AppState, sessions_revision: u32, shell: ShellParts<'_
         shell,
         chat_profile,
         session_mode,
+        transcript,
         branch,
         auth,
         updates,
@@ -129,6 +135,21 @@ pub fn view_state(state: &AppState, sessions_revision: u32, shell: ShellParts<'_
     // left never labels the one they are looking at.
     let foreground_folder = foreground_folder(state);
     let foreground_branch = branch_of(foreground_folder.as_ref(), branch);
+    // The rows read from the chat's session file are the thread only while that
+    // chat's child has answered nothing and the reducer holds no row of its own:
+    // the child's answer always wins (S4, chat-open-latency T1).
+    let provisional = provisional_rows(state, transcript);
+    let (messages, items, transcript_provisional) = match provisional {
+        Some(rows) => {
+            let (messages, items) = view::provisional(&rows);
+            (messages, items, true)
+        }
+        None => (
+            view::messages(state, images),
+            view::items(state, images),
+            false,
+        ),
+    };
     ViewState {
         theme: view_theme(theme),
         language: view_language(language),
@@ -146,8 +167,9 @@ pub fn view_state(state: &AppState, sessions_revision: u32, shell: ShellParts<'_
         // Every chat whose child this run started, idle ones included: the
         // Updates pane's chats-closed gate reads exactly this (0.1.12, S4).
         open_chats: u32::try_from(state.chats.len()).unwrap_or(u32::MAX),
-        messages: view::messages(state, images),
-        items: view::items(state, images),
+        messages,
+        items,
+        transcript_provisional,
         notices: state.notices.iter().map(NoticeView::of).collect(),
         dialog: dialogs::dialog(state),
         helpers: helpers_view,
@@ -325,6 +347,41 @@ fn view_mark(mark: BadgeMark) -> ChatActivityMark {
         BadgeMark::NeedsAttention => ChatActivityMark::NeedsAttention,
         BadgeMark::Ended => ChatActivityMark::Ended,
     }
+}
+
+/// The rows read from the foreground chat's session FILE, kept only while they
+/// may be drawn (chat-open-latency T1, S4).
+///
+/// Four things have to hold at once, and all four are the app state's own (read
+/// here, in the one place that has it):
+///
+/// - the rows were read for the chat that is on screen NOW, so a read that landed
+///   after the user moved to another chat never draws on the wrong one;
+/// - they hold something to draw;
+/// - the chat's thread holds NO row of its own, because a row the reducer has is
+///   the chat's own truth and the file's is a fallback;
+/// - the chat's child has not answered `get_messages`, because that answer IS the
+///   history and a file read that lands after it is never drawn - nor, further
+///   back, re-installed ([`AppStateHolder::note_transcript`]).
+fn provisional_rows(
+    state: &AppState,
+    transcript: Option<(String, Vec<ChatMessage>)>,
+) -> Option<Vec<ChatMessage>> {
+    let (chat_id, rows) = transcript?;
+    if rows.is_empty() {
+        return None;
+    }
+    let chat = state
+        .chats
+        .foreground()
+        .filter(|chat| chat.as_str() == chat_id)?;
+    if state.chats.history_loaded(chat) {
+        return None;
+    }
+    if !state.chats.state(chat)?.items.is_empty() {
+        return None;
+    }
+    Some(rows)
 }
 
 impl NoticeView {

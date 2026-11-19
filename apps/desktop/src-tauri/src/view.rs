@@ -70,6 +70,25 @@ pub(crate) fn items(state: &AppState, images: &Images) -> Vec<ChatItemView> {
         .collect()
 }
 
+/// The thread a session FILE paints while its chat's child is still starting
+/// (chat-open-latency T1): the rows in BOTH lists a push carries, built by the
+/// one rule [`message_view`] applies to a text row, so a file row and the child's
+/// own row for the same message read the same - only their ids differ, and the
+/// ids are the core's [`PROVISIONAL_PREFIX`](gentle_core::chat::PROVISIONAL_PREFIX)
+/// ones, never a `msg-<n>` the reducer owns.
+///
+/// No image is ever attached: the shell remembers the images of the messages this
+/// run SENT, and a row read from a file was not one of them.
+pub(crate) fn provisional(rows: &[ChatMessage]) -> (Vec<MessageView>, Vec<ChatItemView>) {
+    let sent = Sent::new();
+    let messages: Vec<MessageView> = rows
+        .iter()
+        .map(|message| message_view(message, &sent))
+        .collect();
+    let items = messages.iter().cloned().map(ChatItemView::Message).collect();
+    (messages, items)
+}
+
 /// The foreground chat and its thread, which every slice of this module needs
 /// before it can read a row.
 fn thread<'a>(state: &'a AppState) -> Option<(&'a gentle_app::ChatId, &'a ChatState)> {

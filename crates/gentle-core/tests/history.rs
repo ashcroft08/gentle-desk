@@ -1,6 +1,11 @@
-//! Rebuilding the thread from a `get_messages` response (reopening a session).
+//! Rebuilding the thread from a `get_messages` response (reopening a session),
+//! and from the session FILE itself, which paints the first frame while the
+//! child is still starting (`chat-open-latency.md` T1).
 
-use gentle_core::chat::{messages_from_history, ChatMessage, ChatRole};
+use gentle_core::chat::{
+    messages_from_history, messages_from_session_file, ChatMessage, ChatRole,
+    SESSION_FILE_MAX_BYTES,
+};
 use gentle_core::i18n::Language;
 use serde_json::json;
 
@@ -102,3 +107,181 @@ fn malformed_data_gives_an_empty_thread() {
         );
     }
 }
+
+// --- The session file as the thread's first frame (chat-open-latency T1) ---
+
+/// One `message` entry of a session file, the shape `session.rs` scans and
+/// `tools/perf/gen-home.mjs` writes.
+fn line(role: &str, text: &str) -> String {
+    format!(
+        r#"{{"type":"message","id":"m","timestamp":"2026-01-01T00:01:00.000Z","message":{{"role":"{role}","content":[{{"type":"text","text":"{text}"}}]}}}}"#
+    )
+}
+
+/// A realistic file: the header, a name, a compaction marker, the entries a
+/// thread does not show, and the turns it does.
+fn realistic() -> String {
+    let lines = [
+        r#"{"type":"session","version":3,"id":"s1","timestamp":"2026-01-01T00:00:00.000Z","cwd":"C:\\dev\\x"}"#.to_owned(),
+        r#"{"type":"session_info","name":"a chat"}"#.to_owned(),
+        line("system", "you are a helpful agent"),
+        line("user", "hola"),
+        line("toolResult", "total 0"),
+        line("assistant", "ey"),
+        r#"{"type":"compaction","summary":"so far so good"}"#.to_owned(),
+        line("user", "otra"),
+        line("assistant", "listo"),
+    ];
+    lines.join("\n") + "\n"
+}
+
+#[test]
+fn a_session_file_projects_its_turns_and_nothing_else() {
+    let messages = messages_from_session_file(&realistic());
+
+    assert_eq!(
+        messages
+            .iter()
+            .map(|message| (message.role, message.text.as_str()))
+            .collect::<Vec<_>>(),
+        [
+            (ChatRole::User, "hola"),
+            (ChatRole::Assistant, "ey"),
+            (ChatRole::User, "otra"),
+            (ChatRole::Assistant, "listo"),
+        ],
+        "the header, the name, the compaction and the tool result are not the thread"
+    );
+    assert!(
+        messages.iter().all(|message| !message.streaming),
+        "a file line is a closed turn, never a streaming one"
+    );
+}
+
+#[test]
+fn a_file_row_gets_a_provisional_id_the_child_never_uses() {
+    let messages = messages_from_session_file(&realistic());
+
+    assert_eq!(
+        messages
+            .iter()
+            .map(|message| message.id.as_str())
+            .collect::<Vec<_>>(),
+        ["prov-0", "prov-1", "prov-2", "prov-3"],
+        "the ids are this file's own: the child's `msg-<n>` rows are a different identity"
+    );
+    let child = messages_from_history(
+        Language::En,
+        &json!({"messages": [{"role": "user", "content": "hola"}]}),
+    );
+    assert!(
+        messages
+            .iter()
+            .all(|row| child.iter().all(|own| own.id != row.id)),
+        "a provisional id is never one of the child's"
+    );
+}
+
+#[test]
+fn a_trailing_partial_line_is_ignored_never_an_error() {
+    // A file being appended to: the last line is still half written, so it is
+    // not JSON yet. The rows before it are what the thread can draw.
+    let text = format!(
+        "{}\n{}",
+        line("user", "hola"),
+        r#"{"type":"message","message":{"role":"assistant","content":[{"type":"te"#
+    );
+
+    let messages = messages_from_session_file(&text);
+
+    assert_eq!(
+        messages
+            .iter()
+            .map(|message| message.text.as_str())
+            .collect::<Vec<_>>(),
+        ["hola"],
+        "the half-written line draws nothing and breaks nothing"
+    );
+}
+
+#[test]
+fn a_malformed_line_in_the_middle_is_skipped() {
+    let text = format!(
+        "{}\n{{{{\n{}\nnot json at all\n{}\n",
+        line("user", "uno"),
+        line("assistant", "dos"),
+        line("user", "tres")
+    );
+
+    let messages = messages_from_session_file(&text);
+
+    assert_eq!(
+        messages
+            .iter()
+            .map(|message| message.text.as_str())
+            .collect::<Vec<_>>(),
+        ["uno", "dos", "tres"]
+    );
+}
+
+#[test]
+fn an_oversized_file_draws_nothing() {
+    // The file is read whole, once, before the child replaces it: a session of
+    // many megabytes is not parsed into rows the answer is about to discard.
+    let mut text = realistic();
+    text.push_str(&"x".repeat(SESSION_FILE_MAX_BYTES));
+
+    assert!(messages_from_session_file(&text).is_empty());
+    assert!(
+        SESSION_FILE_MAX_BYTES == 8 * 1024 * 1024,
+        "the cap the shell reads against is the one this parser applies"
+    );
+}
+
+#[test]
+fn an_empty_or_blank_file_draws_nothing() {
+    for text in ["", "\n", "  \n\t\n"] {
+        assert!(messages_from_session_file(text).is_empty(), "{text:?}");
+    }
+}
+
+#[test]
+fn a_file_and_the_childs_own_answer_project_the_same_roles_and_texts() {
+    // Parity is the whole point of reusing the projection: the rows the file
+    // paints are the rows the child is about to send, only their ids differ.
+    let data = json!({"messages": [
+        {"role": "system", "content": ""},
+        {"role": "user", "content": [{"type": "text", "text": "hola"}]},
+        {"role": "toolResult", "content": [{"type": "text", "text": "output"}]},
+        {"role": "assistant", "content": [
+            {"type": "thinking", "thinking": "hmm"},
+            {"type": "text", "text": "uno "},
+            {"type": "text", "text": "dos"},
+        ]},
+        {"role": "assistant", "content": [], "stopReason": "error", "errorMessage": "quota"},
+        {"role": "assistant", "content": [{"type": "toolCall", "id": "t", "name": "bash"}]},
+    ]});
+    let entries = data["messages"].as_array().expect("the messages array");
+    let file: String = entries
+        .iter()
+        .map(|entry| {
+            format!(
+                "{}\n",
+                json!({"type": "message", "message": entry}).to_string()
+            )
+        })
+        .collect();
+
+    let from_file: Vec<_> = messages_from_session_file(&file)
+        .into_iter()
+        .map(|message| (message.role, message.text, message.error))
+        .collect();
+    let from_child: Vec<_> = messages_from_history(Language::En, &data)
+        .into_iter()
+        .map(|message| (message.role, message.text, message.error))
+        .collect();
+
+    assert_eq!(from_file, from_child);
+    assert_eq!(from_file.len(), 3, "two turns and one failure");
+}
+

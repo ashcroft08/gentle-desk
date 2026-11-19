@@ -195,6 +195,7 @@
             foregroundChat={model.chat}
             mark={chat.mark}
             sessionMode={chat.sessionMode}
+            provisional={model.provisional}
             visible={tab === 'chat'}
             bind:scrollTop={threadScroll}
           />
