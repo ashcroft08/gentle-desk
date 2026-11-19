@@ -20,9 +20,10 @@
       "excerpt": "…Desktop\\Proyectos\\ Kallari_Pagina_web",
       "comment": "aqui vamos a enseñar solo el nombre del workspace que es como manejamos nosotros en el sidebar",
       "createdAt": "2026-11-19T00:28:36.200Z",
-      "status": "open",
+      "status": "resolved",
       "sentAt": "2026-11-19T00:28:36.239Z",
-      "resolvedAt": null
+      "resolvedAt": "2026-11-19T00:35:25.342Z",
+      "resolution": "The folder chip now shows only the workspace name, the same as the sidebar does; the full path stays in the tooltip."
     },
     {
       "id": "djtvjqll",
