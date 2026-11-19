@@ -234,6 +234,17 @@ export function textOf(value: unknown, keys: readonly string[] = TEXT_KEYS): str
     return json(value)
   }
   if (isRecord(value)) {
+    // A tool result is usually `{ content: [{ type: 'text', text }], ... }`: its
+    // answer lives one level DOWN. Rendering the raw JSON instead buries the text
+    // the user asked for (maintainer's screenshot, 2026-11-18).
+    const parts = value.content
+    if (
+      Array.isArray(parts) &&
+      parts.length > 0 &&
+      parts.every((part) => isRecord(part) && typeof part.text === 'string')
+    ) {
+      return parts.map((part) => String((part as Record<string, unknown>).text)).join('\n')
+    }
     // A key whose value IS a string settles the question even when it is blank: an
     // all-blank payload has no text, so it renders as an empty body - NOT as its
     // own JSON, which would put `{"output":""}` on the card (review regression of

@@ -68,3 +68,17 @@ describe('a payload with blank text AND other data', () => {
     expect(textOf({ output: '', exitCode: 1 })).toContain('exitCode')
   })
 })
+
+it('reads the text inside a content list instead of the raw JSON', () => {
+  // The maintainer's real `ls` came back as {content:[{text}], structuredContent}.
+  const body = toolBody({
+    is_error: false,
+    result: {
+      content: [{ type: 'text', text: 'total 72\ncv_en.tex\ncv_es.tex' }],
+      structuredContent: { exit_code: 0, output: 'total 72\ncv_en.tex\ncv_es.tex' },
+    },
+  })
+
+  expect(body.lines.join('\n')).toContain('cv_en.tex')
+  expect(body.lines.join('\n')).not.toContain('structuredContent')
+})
