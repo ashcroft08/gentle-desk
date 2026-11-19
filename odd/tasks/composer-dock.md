@@ -119,3 +119,17 @@ those chips are cheap, one needs a new command, and one cannot be built at all.
   live in the status row, which only exists while working. T3 plan: T3a pure client
   (`crates/gentle-core/src/rpc/permission.rs`, mirror of `config_store.rs`), T3b runtime
   command + shell + `ViewState` field (mirror of `chat_profile`), T3c the web control.
+- L9 (2026-11-19, T3 landed): T3a `1cf3988`, T3b `d04cae2`, T3c web (see git log). Review of the
+  T3a+T3b range (lineage review-45a11616a8574766) found R3-001 CRITICAL: an answer from a
+  chat that closed and reopened was installed on the new one (`is_open` is true again). The
+  one bounded correction (`9ebc01c`) checked the epoch BEFORE the fold and its test only
+  asserted the counter, so the targeted validator rejected it (escalated, terminal). The
+  real fix landed after (`2841b1a`): the epoch is compared under the same lock the fold takes
+  and `forget` bumps it under that lock, with a behaviour test through close and reopen.
+  Not fixed on purpose (informational, same review): R3-002 the in-flight slot is not freed
+  by `forget_session_mode` itself; R4 a refused FIRST read is invisible; R4 the shared
+  desktop-client mutex can stall other same-chat requests up to 5 s; R4 an `ok` write answer
+  this contract cannot parse shows `no_answer` while the session may have changed (worth a
+  verification read); `session_epochs` is never pruned. `permission_mode_changed` external
+  events do not reach the UI. The closing review of the T3 range was escalated, so it has
+  no receipt.
