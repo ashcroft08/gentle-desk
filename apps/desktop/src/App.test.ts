@@ -283,6 +283,38 @@ describe('App', () => {
 
 
 
+  it('draws view B for a new chat, and its own composer keeps the draft when it lands', async () => {
+    // welcome-screen T3 (S1, S3, R1): a NEW chat - the fresh id Rust builds for a
+    // chat with no session file - is the centred view, and the box it draws is the
+    // one composer the app owns, still there once the first row arrives.
+    const path = 'C:\\Users\\josep\\dev\\gentle-desk'
+    const fixture = serveSidebar({
+      view: viewState({
+        foreground_chat: 'new-1',
+        foreground_folder: { name: 'gentle-desk', path },
+      }),
+    })
+    render(App)
+
+    expect(await screen.findByRole('heading', { level: 2, name: 'New session' })).toBeTruthy()
+    expect(screen.getByText('in gentle-desk')).toBeTruthy()
+    const box = screen.getByRole('textbox', { name: 'Message' }) as HTMLTextAreaElement
+    await fireEvent.input(box, { target: { value: 'hola' } })
+
+    fixture.view = viewState({
+      foreground_chat: 'new-1',
+      foreground_folder: { name: 'gentle-desk', path },
+      messages: [MESSAGE],
+      items: [{ kind: 'Message', data: MESSAGE }],
+    })
+    fixture.push()
+
+    expect(await screen.findByText(MESSAGE.text)).toBeTruthy()
+    expect(screen.queryByRole('heading', { level: 2, name: 'New session' })).toBeNull()
+    expect(screen.getByRole('textbox', { name: 'Message' })).toBe(box)
+    expect(box.value).toBe('hola')
+  })
+
   it('draws view A where the placeholder was, and keeps the page\u2019s one h1', async () => {
     serveSidebar({
       view: viewState({

@@ -3,6 +3,11 @@
 // and `./tabs` keeps the ORDER, the ids and the walk - this module keeps the words,
 // so the area that draws them owns them and no string-keyed lookup is introduced.
 //
+// It also keeps the words of the NEW SESSION view (welcome-screen T3): the hero's
+// title, the rose's accessible name and the one muted line that says which folder
+// the session will run in. Same reason, same shape: the pane that draws them owns
+// them.
+//
 // The shape is one dictionary per language and a builder that answers the whole
 // object (D4), so the parametrized badge (one helper singular, every other count
 // plural) stays a function and the tablist redraws in the same tick the language
@@ -41,6 +46,17 @@ export interface ChatCopy {
    * asked for zero.
    */
   workingBadge: (running: number) => string
+  /** The new session view's title: the hero's own h2 (welcome-screen T3). */
+  newSessionTitle: string
+  /** The rose's accessible name in that view: decoration, with a name (R5). */
+  roseLabel: string
+  /**
+   * The muted line under the title, naming the folder the session runs in. It is
+   * built from the folder's label - the last segment of the working directory,
+   * exactly as the composer's chip draws it - and is drawn only when there is one
+   * (`ViewState.foreground_folder` answers `null` early in a chat's life).
+   */
+  inFolder: (label: string) => string
 }
 
 /** English: the words 01b already drew. */
@@ -51,6 +67,11 @@ const ENGLISH: ChatCopy = {
   chatName: 'Chat name',
   renameReason: 'No chat is open to rename.',
   workingBadge: (running) => (running === 1 ? '1 helper working' : `${running} helpers working`),
+  // Sheet B of design/welcome-screen/02-hero-composer.html: the title over the
+  // folder the session will run in.
+  newSessionTitle: 'New session',
+  roseLabel: 'The gentle-shell rose',
+  inFolder: (label) => `in ${label}`,
 }
 
 /** Neutral Spanish: no voseo, no regionalisms, nothing left in English. */
@@ -63,6 +84,9 @@ const SPANISH: typeof ENGLISH = {
   renameReason: 'Ningún chat abierto para renombrar.',
   workingBadge: (running) =>
     running === 1 ? '1 ayudante trabajando' : `${running} ayudantes trabajando`,
+  newSessionTitle: 'Nueva sesión',
+  roseLabel: 'La rosa de gentle shell',
+  inFolder: (label) => `en ${label}`,
 }
 
 /**

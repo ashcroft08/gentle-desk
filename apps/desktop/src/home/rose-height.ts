@@ -21,6 +21,13 @@ const SMALLEST = 72
 const NARROW = 96
 /** Under this window width the rose stops growing: the pane, not the window. */
 const NARROW_MIN = 700
+/**
+ * View B's rose stops at the second step (welcome-screen T3): that pane shares its
+ * height with the composer, which is the protagonist there, so the picture grows
+ * no further than 116 whatever the window affords - 136 is view A's, alone on its
+ * screen. The view applies the cap; what a frame looks like stays ./rose.ts's.
+ */
+export const NEW_SESSION_ROSE_MAX = 116
 /** What the view starts with where no window can be asked (jsdom, an old webview). */
 export const ROSE_FALLBACK = 96
 

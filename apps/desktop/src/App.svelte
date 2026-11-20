@@ -9,10 +9,10 @@
   // extension dialog as a modal. The Helpers view draws the list or, once a card is
   // selected, that helper's own thread (T7b-2).
   import ChatHeader from './chat/Header.svelte'
+  import ChatPane from './chat/ChatPane.svelte'
   import FatalBanner from './chat/FatalBanner.svelte'
   import type { ViewTab } from './chat/tabs'
   import { createChatView } from './chat/view'
-  import Composer from './composer/Composer.svelte'
   import Dialogs from './dialogs/Dialogs.svelte'
   import HelpersPanel from './helpers/HelpersPanel.svelte'
   import Notices from './notices/Notices.svelte'
@@ -21,7 +21,6 @@
   import Sidebar from './sidebar/Sidebar.svelte'
   import SidebarToggle from './chat/SidebarToggle.svelte'
   import { collapsedOf, overlayOf } from './sidebar/collapse'
-  import Thread from './thread/Thread.svelte'
   import type { Update } from '@tauri-apps/plugin-updater'
   import UpdateNotice from './update/UpdateNotice.svelte'
   import { downloadAndInstall, findUpdate } from './update/plugin'
@@ -190,26 +189,10 @@
           aria-labelledby="t-chat"
           hidden={tab !== 'chat'}
         >
-          <Thread
-            messages={model.messages}
-            items={model.items}
-            foregroundChat={model.chat}
-            mark={chat.mark}
-            sessionMode={chat.sessionMode}
-            provisional={model.provisional}
-            visible={tab === 'chat'}
-            bind:scrollTop={threadScroll}
-          />
-          <Composer
-            chat={model.chat}
-            mark={chat.mark}
-            images={chat.images}
-            imagesNotice={chat.imagesNotice}
-            chip={chat.modelChip}
-            contextUsage={chat.contextUsage}
-            folder={chat.folder}
-            branch={chat.branch}
-          />
+          <!-- One tree for both faces of a chat: the thread and the composer,
+               or the new-session hero above the centred composer
+               (welcome-screen T3). Never a second composer. -->
+          <ChatPane chat={chat} thread={model} visible={tab === 'chat'} bind:scrollTop={threadScroll} />
         </div>
         <div class="view" id="p-helpers" role="tabpanel" aria-labelledby="t-help" hidden={tab !== 'helpers'}>
           {#if chat.helpers !== null}

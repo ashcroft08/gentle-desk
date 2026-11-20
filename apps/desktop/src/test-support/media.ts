@@ -3,14 +3,19 @@
 // window is and then moves it, and every listener the component registered is
 // called as the browser would call it. Only the two queries the view asks are
 // understood - `(min-width: Npx)` and `(min-height: Npx)` - and any other query
-// (reduced motion, a pointer) answers false, which is what an unremarkable window
-// is. Nothing here decides anything: it reports a size and nothing else.
+// (a pointer, a colour scheme) answers false, which is what an unremarkable window
+// is. The one exception is reduced motion: a window that asks for it says so
+// (welcome-screen T3's move is skipped there), and a test says it with the third
+// argument. Nothing here decides anything: it reports a size and a preference.
 import { vi } from 'vitest'
 
 type Listener = () => void
 
 /** One window's size the queries are answered against. */
 type Size = { width: number; height: number }
+
+/** The query a window that asks for no animation answers `true` to. */
+const REDUCE_MOTION = 'prefers-reduced-motion'
 
 /** Does one `(min-width|min-height: Npx)` query hold at `size`? */
 function matches(query: string, size: Size): boolean {
@@ -28,11 +33,21 @@ export interface MediaWindow {
 /**
  * Stubs `matchMedia` for a `width` x `height` px window, through `vi.stubGlobal`
  * so the test's cleanup puts the previous one back. The returned `resize` is how a
- * test says the user dragged the window's corner.
+ * test says the user dragged the window's corner. `reducedMotion` is how it says
+ * the user asked the system for no animation.
  */
-export function mediaWindow(width: number, height: number): MediaWindow {
-  let size: Size = { width, height }
+export function mediaWindow(
+  width: number,
+  height: number,
+  options: { reducedMotion?: boolean } = {},
+): MediaWindow {
+  const size: Size = { width, height }
+  const reduced = options.reducedMotion === true
   const lists: { query: string; listeners: Set<Listener> }[] = []
+
+  /** The answer to one query: the preference first, then the window's size. */
+  const answer = (query: string): boolean =>
+    query.includes(REDUCE_MOTION) ? reduced : matches(query, size)
 
   const media = (query: string): MediaQueryList => {
     const listeners = new Set<Listener>()
@@ -50,7 +65,7 @@ export function mediaWindow(width: number, height: number): MediaWindow {
       },
       dispatchEvent: () => false,
     }
-    Object.defineProperty(list, 'matches', { get: () => matches(query, size) })
+    Object.defineProperty(list, 'matches', { get: () => answer(query) })
     return list as unknown as MediaQueryList
   }
 
@@ -58,7 +73,8 @@ export function mediaWindow(width: number, height: number): MediaWindow {
 
   return {
     resize(nextWidth: number, nextHeight: number): void {
-      size = { width: nextWidth, height: nextHeight }
+      size.width = nextWidth
+      size.height = nextHeight
       for (const list of lists) for (const listener of [...list.listeners]) listener()
     },
   }

@@ -225,11 +225,100 @@ p {
   display: none;
 }
 
-/* The thread takes what the composer leaves inside its own view. */
-.view > .thread {
+/* The thread takes what the composer leaves inside the pane's body. */
+.pane-body > .thread {
   flex: 1 1 0;
   min-height: 0;
 }
+
+/* The chat pane (welcome-screen T3, S1, S3): ONE tree with two faces. With rows it
+   is the thread and the composer at the bottom, exactly as before; in a chat that
+   holds no row yet, view B centres the composer with the hero in the thread's
+   place. Only the class on this element changes - the composer inside it is the
+   same element before and after, so its draft, its focus and its chips survive
+   the move. The rows below are the geometry ChatPane.test.ts pins as text. */
+.chat-pane {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+/* What holds the thread: it takes what the composer leaves, as the view did
+   before the pane existed. */
+.pane-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+/* The composer's own row in the tree: it spans the pane and the dock inside it
+   decides its width (the thread's max, 560 px in view B). This is the element the
+   move is applied to, so the whole dock travels as one piece. */
+.pane-dock {
+  width: 100%;
+}
+
+/* View B: the column [hero][composer] centred a little ABOVE the middle - the
+   bottom padding is the bigger one - so the box reads as the protagonist and not
+   as a box that fell to the floor. `safe` keeps that centre for the ordinary case
+   and falls back to the start when the content is taller than the pane. */
+.chat-pane.new {
+  align-items: center;
+  justify-content: safe center;
+  padding: 24px 24px clamp(24px, 8vh, 96px);
+  overflow-y: auto;
+}
+
+/* The thread's place is the hero's while the chat has no rows: the thread keeps
+   its element - its mount, its reader's place - and simply draws nothing there. */
+.chat-pane.new .pane-body {
+  display: none;
+}
+
+/* The composer is the protagonist in view B, so it is narrower than the column it
+   lines up with once there are rows. */
+.chat-pane.new .composer-dock {
+  width: min(560px, 100%);
+}
+
+/* The hero itself: the rose, the title and the one line that names the folder,
+   over the same 560 px column the box under it takes (sheet B). */
+.new-session {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: min(560px, 100%);
+  text-align: center;
+}
+
+.new-session-rose {
+  margin: 0 0 18px;
+}
+
+.new-session-rose canvas {
+  max-width: 100%;
+}
+
+.new-session-title {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0 0 12px;
+}
+
+.new-session-where {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* View B's two window rules - a short window starts at the top and a narrow one
+   keeps 16 px at the sides - sit in the shared `@media` blocks further down, so
+   each of those queries stays in ONE place for both views. */
 
 /* The widest the conversation gets: the messages and the box under them share
    it, so the box lines up with the thread. The number is a readability one, not
@@ -1642,7 +1731,8 @@ p {
 
 /* A SHORT window does not centre the block: it starts at the top with tighter
    paddings, and the pane scrolls what does not fit, so nothing is clipped and
-   nothing is unreachable. */
+   nothing is unreachable. View B follows the same rule (welcome-screen T3): the
+   hero and the centred composer start at the top too, and the pane scrolls. */
 @media (max-height: 600px) {
   .home {
     justify-content: flex-start;
@@ -1653,11 +1743,25 @@ p {
   .home-rose {
     margin-bottom: 20px;
   }
+
+  .chat-pane.new {
+    justify-content: flex-start;
+    padding: 16px 16px 24px;
+    overflow-y: auto;
+  }
+
+  .new-session-rose {
+    margin-bottom: 8px;
+  }
+
+  .new-session-title {
+    margin-bottom: 8px;
+  }
 }
 
 /* A NARROW window: 16 px at the sides, the column is the whole width and the one
    action stretches to it, so the screen keeps one left edge instead of a small
-   block floating in the middle. */
+   block floating in the middle. View B keeps the same sides. */
 @media (max-width: 640px) {
   .home {
     padding-inline: 16px;
@@ -1670,6 +1774,10 @@ p {
   .home-go {
     width: 100%;
     justify-content: center;
+  }
+
+  .chat-pane.new {
+    padding-inline: 16px;
   }
 }
 
