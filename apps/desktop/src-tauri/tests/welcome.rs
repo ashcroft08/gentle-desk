@@ -52,11 +52,13 @@ fn recent(modified_ms: u64) -> WelcomeChat {
     }
 }
 
-/// The quiet link of one configured workspace.
-fn link(path: &str, label: &str) -> WelcomeLink {
+/// The quiet link of one configured workspace, with whether new chats can still
+/// start in it.
+fn link(path: &str, label: &str, available: bool) -> WelcomeLink {
     WelcomeLink {
         path: path.to_owned(),
         label: label.to_owned(),
+        available,
     }
 }
 
@@ -151,7 +153,7 @@ fn the_workspace_of_the_newest_session_is_the_last_one_with_its_three_newest_cha
     );
     assert_eq!(
         welcome.others,
-        vec![link(&desk, "desk"), link(&proyecto, "proyecto"),],
+        vec![link(&desk, "desk", true), link(&proyecto, "proyecto", true),],
         "the other configured workspaces in config order, without the last one"
     );
 }
@@ -178,7 +180,7 @@ fn a_last_workspace_with_no_chats_says_so_and_offers_no_list() {
         Vec::new(),
         "the list is absent, never empty"
     );
-    assert_eq!(welcome.others, vec![link(&other, "other")]);
+    assert_eq!(welcome.others, vec![link(&other, "other", true)]);
 }
 
 #[test]
@@ -228,6 +230,43 @@ fn the_last_workspace_reports_what_the_sidebar_reports_about_its_folder() {
     let row = sidebar(&holder, &file);
     assert_eq!(last.reason, row.reason);
     assert_eq!(last.available, row.available);
+}
+
+#[test]
+fn a_quiet_link_says_whether_its_folder_can_still_host_a_chat() {
+    let home = tempfile::tempdir().unwrap();
+    // A link whose folder is gone: the sidebar disables its button, so view A
+    // must not offer a new chat there either.
+    let gone = home.path().join("gone").to_string_lossy().into_owned();
+    let working = folder(home.path(), "working");
+    let other = folder(home.path(), "other");
+    let holder = holder(
+        // `working` holds the newest session, so it is the last workspace and
+        // the two others are the links, in config order.
+        &[&gone, &working, &other],
+        vec![session(&working, 500)],
+    );
+
+    let welcome = welcome(&holder);
+
+    assert_eq!(
+        welcome.last.expect("the workspace of the session").path,
+        working
+    );
+    assert_eq!(
+        welcome.others,
+        vec![link(&gone, "gone", false), link(&other, "other", true)],
+        "the folder that is gone cannot host a chat; the one that is there can"
+    );
+    // And each answer is the one the sidebar itself gives for that workspace.
+    for quiet in &welcome.others {
+        let row = sidebar(&holder, &quiet.path);
+        assert_eq!(
+            quiet.available, row.available,
+            "the sidebar's own answer for {}",
+            quiet.label
+        );
+    }
 }
 
 #[test]

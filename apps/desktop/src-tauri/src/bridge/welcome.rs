@@ -8,13 +8,14 @@
 //! workspace are the runtime's, so the welcome can never name a workspace or a
 //! chat differently from the row beside it.
 //!
-//! The one thing this module asks the outside world is whether the last
-//! workspace's folder can host a new chat, through the probe the caller brings:
-//! the same [`folder_status`](crate::sessions::window::folder_status) a served
-//! page of rows runs, asked for ONE folder and never for the whole list. Its two
-//! answers are carried the way a sidebar workspace row carries them, so the
-//! welcome disables the primary action exactly when the sidebar disables new
-//! chats, and prints the line the sidebar already words.
+//! The one thing this module asks the outside world is whether a workspace's
+//! folder can host a new chat, through the probe the caller brings: the same
+//! [`folder_status`](crate::sessions::window::folder_status) a served page of rows
+//! runs, asked once for the last workspace and once per quiet link, never for the
+//! whole list. The answers are carried the way a sidebar workspace row carries
+//! them, so the welcome disables the primary action exactly when the sidebar
+//! disables new chats, and a link whose folder cannot host one says so instead of
+//! offering a chat the open intent would not refuse.
 //!
 //! "The last workspace" is R3's: the CONFIGURED workspace that owns the most
 //! recent session, `last_activity_ms` being the newest `modified_ms` the runtime
@@ -55,7 +56,7 @@ pub(crate) fn welcome(
             let folder = status(&last.path);
             WelcomeView {
                 recents: recents(last, sessions),
-                others: others(config, workspaces, last),
+                others: others(config, workspaces, last, status),
                 last: Some(WelcomeWorkspace {
                     path: last.path.clone(),
                     label: last.label.clone(),
@@ -129,7 +130,16 @@ fn recents(workspace: &Workspace, sessions: &[SessionItem]) -> Vec<WelcomeChat> 
 /// are still the ones the runtime gave the workspace, never a second spelling.
 /// A folder the config names twice keeps its first entry, exactly as
 /// [`gentle_runtime::workspaces::build`] gathers it.
-fn others(config: &AppConfig, workspaces: &WorkspaceList, last: &Workspace) -> Vec<WelcomeLink> {
+///
+/// Each link is probed once through `status`, the same question a served header
+/// asks for that folder: a link whose folder cannot host a new chat has to say so,
+/// because the open intent itself would not refuse it (welcome-screen T2).
+fn others(
+    config: &AppConfig,
+    workspaces: &WorkspaceList,
+    last: &Workspace,
+    status: &dyn Fn(&str) -> WorkspaceStatus,
+) -> Vec<WelcomeLink> {
     let mut seen: HashSet<String> = HashSet::new();
     config
         .workspaces
@@ -147,6 +157,7 @@ fn others(config: &AppConfig, workspaces: &WorkspaceList, last: &Workspace) -> V
             (workspace.key != last.key).then(|| WelcomeLink {
                 path: workspace.path.clone(),
                 label: workspace.label.clone(),
+                available: status(&workspace.path).is_available(),
             })
         })
         .collect()

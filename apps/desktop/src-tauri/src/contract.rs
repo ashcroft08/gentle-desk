@@ -1697,7 +1697,8 @@ pub struct WelcomeChat {
 }
 
 /// One other configured workspace, as the quiet link under the recents
-/// (welcome-screen T1): the folder and the label the sidebar draws for it.
+/// (welcome-screen T1): the folder, the label the sidebar draws for it, and
+/// whether a new chat can start there right now.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
 pub struct WelcomeLink {
     /// The canonical spelling of the folder, as [`UiIntent::NewChatInWorkspace`]
@@ -1705,6 +1706,13 @@ pub struct WelcomeLink {
     pub path: String,
     /// The label the sidebar row draws.
     pub label: String,
+    /// Whether new chats can start in this folder right now: the very
+    /// `available` a sidebar workspace row carries
+    /// ([`WorkspaceRowView::available`]), from the same probe. `false` is a
+    /// folder that is gone and a path that holds something else instead, and a
+    /// link that is not available must not offer a new chat: the intent alone
+    /// would not refuse it.
+    pub available: bool,
 }
 
 /// The state the current views render: the foreground chat (as the app names

@@ -3778,7 +3778,8 @@ export type WelcomeChat = {
 
 /**
  *  One other configured workspace, as the quiet link under the recents
- *  (welcome-screen T1): the folder and the label the sidebar draws for it.
+ *  (welcome-screen T1): the folder, the label the sidebar draws for it, and
+ *  whether a new chat can start there right now.
  */
 export type WelcomeLink = {
 	/**
@@ -3788,6 +3789,15 @@ export type WelcomeLink = {
 	path: string,
 	/**  The label the sidebar row draws. */
 	label: string,
+	/**
+	 *  Whether new chats can start in this folder right now: the very
+	 *  `available` a sidebar workspace row carries
+	 *  ([`WorkspaceRowView::available`]), from the same probe. `false` is a
+	 *  folder that is gone and a path that holds something else instead, and a
+	 *  link that is not available must not offer a new chat: the intent alone
+	 *  would not refuse it.
+	 */
+	available: boolean,
 };
 
 /**
