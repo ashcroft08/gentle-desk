@@ -103,6 +103,10 @@ pub fn run() {
         // The updater, which the app side reads from the web (see `update/`). On
         // Windows it closes the app itself to hand over to the installer.
         .plugin(tauri_plugin_updater::Builder::new().build())
+        // The system notification the web side sends through
+        // `notifications/toast.ts` while the window is not in front
+        // (notifications S2, S5).
+        .plugin(tauri_plugin_notification::init())
         .manage(Bridge::new())
         // The thumbnails the composer and the thread draw: the shell's own
         // scheme, served from the files the user dropped. An `<img>` loads it

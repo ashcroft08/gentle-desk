@@ -58,6 +58,11 @@ rfd = { version = "0.17", default-features = false }
 # version, so the build keeps one file-watching stack and no second one.
 notify = "8"
 tauri = { version = "2", default-features = false, features = ["wry"] }
+# The system notification the alert sends when the window is not in front
+# (notifications S2, S5): the official plugin, which is also what the web side's
+# `@tauri-apps/plugin-notification` calls into, gated by `notification:default`
+# in `capabilities/default.json`.
+tauri-plugin-notification = "2"
 tauri-plugin-updater = "2"
 # The what's-new notes are read from the updater's own `latest.json` (what's-new
 # S3): one GET with a bounded timeout. The client rides the SAME TLS stack the

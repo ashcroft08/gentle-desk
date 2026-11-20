@@ -1,11 +1,12 @@
 {
   "identifier": "default",
-  "description": "Default capability for the main window: core built-ins and the updater it checks with.",
+  "description": "Default capability for the main window: core built-ins, the updater it checks with, and the system notification it shows while it is not in front.",
   "windows": [
     "main"
   ],
   "permissions": [
     "core:default",
-    "updater:default"
+    "updater:default",
+    "notification:default"
   ]
 }
