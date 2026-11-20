@@ -903,12 +903,26 @@ p {
 
 /* The composer's one row, under the input (design/composer-dock): what the
    message runs ON (the two selects), then where it runs (the folder and the
-   branch it is on), the flexible space and Send. */
-.composer .row {
+   branch it is on), the flexible space and Send.
+
+   The class `row` is ALSO the sidebar's (`.row` below: fixed height, padding, a
+   radius and a hover that paints a background and an outline), and it reaches
+   this element too. That inherited hover is the one big rectangle the maintainer
+   kept pointing at (L16): the composer's row is not a list row, so it resets
+   everything the sidebar rule gives it and keeps only its own layout. The
+   individual controls inside it keep their own hover. */
+.composer .row,
+.composer .row:hover {
   display: flex;
   align-items: center;
   gap: 12px;
   min-width: 0;
+  height: auto;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  cursor: default;
 }
 
 /* The row's groups: each group keeps its own tight 6px rhythm, and wears its own

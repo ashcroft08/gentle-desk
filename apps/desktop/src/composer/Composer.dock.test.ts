@@ -143,8 +143,21 @@ describe('the dock', () => {
     expect(rule('.composer .row .grp')).not.toContain('border-radius')
     expect(rule('.composer .row .grp')).not.toContain('padding')
     // The 12px gap between the groups stays, and the hairline is back.
-    expect(rule('.composer .row')).toContain('gap: 12px')
+    expect(rule('.composer .row:hover')).toContain('gap: 12px')
     expect(rule('.composer .row .vsep')).toContain('background: var(--border)')
+  })
+
+  it('does not inherit the sidebar row hover: the composer row paints nothing of its own (L16)', () => {
+    // `.row` is also the sidebar's list row (fixed height, padding, a radius, and a
+    // hover that paints a background and an outline). The composer's row carries the
+    // same class, so without a reset the WHOLE row lit up as one rectangle.
+    const reset = rule('.composer .row:hover')
+
+    expect(reset).toContain('background: transparent')
+    expect(reset).toContain('box-shadow: none')
+    expect(reset).toContain('padding: 0')
+    expect(reset).toContain('height: auto')
+    expect(reset).toContain('border-radius: 0')
   })
 
   it('draws no context chip in the row any more: the rail is the only reading', () => {
