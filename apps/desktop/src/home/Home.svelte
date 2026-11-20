@@ -17,9 +17,11 @@
   import { dispatchIntent } from '../bridge'
   import { appCopy } from '../app-copy'
   import { language } from '../i18n/language.svelte'
+  import { onMount } from 'svelte'
   import type { WelcomeView_Serialize as WelcomeView } from '../contract/bindings'
   import { homeCopy } from './copy'
-  import { ago } from './ago'
+  import { ago, isJustNow } from './ago'
+  import { ROSE_FALLBACK, watchRoseHeight } from './rose-height'
 
   let { welcome }: { welcome: WelcomeView | null } = $props()
 
@@ -31,6 +33,14 @@
   /** The clock this screen was drawn with: taken once, never ticking. */
   const nowMs = Date.now()
 
+  /**
+   * The rose's height, which is the WINDOW's: the screen redraws the same picture
+   * bigger in a tall window and smaller in a short or narrow one, and follows the
+   * user when the window is resized. The fallback holds until the window answers.
+   */
+  let rosePx = $state(ROSE_FALLBACK)
+  onMount(() => watchRoseHeight((px) => (rosePx = px)))
+
   /** The age the sidebar would word this chat's last write with. */
   function ageOf(thenMs: number | null): string {
     return thenMs === null ? '' : ago(language.current, nowMs, thenMs)
@@ -39,7 +49,8 @@
   /** The line beside the folder: its age, or that it holds no chat yet. */
   function lineOf(chatCount: number, thenMs: number | null): string {
     if (chatCount === 0 || recents.length === 0) return copy.noChats
-    return thenMs === null ? '' : copy.lastActivity(ageOf(thenMs))
+    if (thenMs === null) return ''
+    return copy.lastActivity(ageOf(thenMs), isJustNow(nowMs, thenMs))
   }
 
   function newChatIn(path: string): void {
@@ -54,7 +65,7 @@
 {#if welcome !== null}
   <section class="home">
     <div class="home-rose">
-      <Rose label={copy.roseLabel} height={108} />
+      <Rose label={copy.roseLabel} height={rosePx} />
     </div>
 
     {#if last === null}

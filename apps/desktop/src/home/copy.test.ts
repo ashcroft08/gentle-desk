@@ -58,7 +58,14 @@ describe('the welcome copy', () => {
   })
 
   it('words the age the sidebar gave it, in the order each language uses', () => {
-    expect(homeCopy('en').lastActivity('21m')).toBe('· last activity 21m ago')
-    expect(homeCopy('es').lastActivity('21m')).toBe('· última actividad hace 21m')
+    expect(homeCopy('en').lastActivity('21m', false)).toBe('· last activity 21m ago')
+    expect(homeCopy('es').lastActivity('21m', false)).toBe('· última actividad hace 21m')
+  })
+
+  // "now ago" is not a sentence in either language: a chat written under a minute
+  // ago says so on its own, with the verb each language actually uses.
+  it('words a chat written just now as a sentence, never as "now ago"', () => {
+    expect(homeCopy('en').lastActivity('now', true)).toBe('· last activity: just now')
+    expect(homeCopy('es').lastActivity('ahora', true)).toBe('· última actividad: ahora')
   })
 })

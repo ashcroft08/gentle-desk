@@ -23,8 +23,12 @@ export interface HomeCopy {
   roseLabel: string
   /** The line beside the folder when it holds no chat yet, instead of an age. */
   noChats: string
-  /** "· last activity 21m ago": the line beside the folder, given its age. */
-  lastActivity: (age: string) => string
+  /**
+   * "· last activity 21m ago": the line beside the folder, given its age and
+   * whether that age is `isJustNow` - the one case whose verb would otherwise be
+   * glued to "now"/"ahora" ("now ago" is not a sentence in either language).
+   */
+  lastActivity: (age: string, justNow: boolean) => string
   /** The one primary action, naming the workspace it starts a chat in. */
   newSession: (label: string) => string
   /** The recents section's heading, naming the same workspace. */
@@ -40,7 +44,8 @@ const ENGLISH: HomeCopy = {
   title: 'Pick up where you left off',
   roseLabel: 'The gentle-shell rose',
   noChats: 'no chats yet',
-  lastActivity: (age) => `· last activity ${age} ago`,
+  lastActivity: (age, justNow) =>
+    justNow ? '· last activity: just now' : `· last activity ${age} ago`,
   newSession: (label) => `New session in ${label}`,
   recentsTitle: (label) => `Recent chats in ${label}`,
   othersTitle: 'Other workspaces:',
@@ -52,7 +57,8 @@ const SPANISH: typeof ENGLISH = {
   title: 'Sigue donde lo dejaste',
   roseLabel: 'La rosa de gentle shell',
   noChats: 'sin chats todavía',
-  lastActivity: (age) => `· última actividad hace ${age}`,
+  lastActivity: (age, justNow) =>
+    justNow ? '· última actividad: ahora' : `· última actividad hace ${age}`,
   newSession: (label) => `Nueva sesión en ${label}`,
   recentsTitle: (label) => `Chats recientes de ${label}`,
   othersTitle: 'Otros espacios:',

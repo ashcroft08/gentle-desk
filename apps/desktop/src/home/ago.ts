@@ -15,6 +15,15 @@ const NOW: Record<LanguageView, string> = { en: 'now', es: 'ahora' }
 
 const MINUTE_MS = 60_000
 
+/**
+ * Is `thenMs` so recent that `ago` answers its one word at `nowMs`? True under a
+ * minute and for a future time (Rust saturates instead of counting backwards), so
+ * a line of copy can say "just now" instead of gluing that word to its verb.
+ */
+export function isJustNow(nowMs: number, thenMs: number): boolean {
+  return Math.max(0, nowMs - thenMs) < MINUTE_MS
+}
+
 /** `thenMs` as a short age seen at `nowMs` (both epoch milliseconds). */
 export function ago(language: LanguageView, nowMs: number, thenMs: number): string {
   // Rust saturates: a future time, or the epoch's own zero, is "now" rather than
@@ -22,7 +31,7 @@ export function ago(language: LanguageView, nowMs: number, thenMs: number): stri
   const minutes = Math.floor(Math.max(0, nowMs - thenMs) / MINUTE_MS)
   const hours = Math.floor(minutes / 60)
   const days = Math.floor(hours / 24)
-  if (minutes < 1) return NOW[language]
+  if (isJustNow(nowMs, thenMs)) return NOW[language]
   if (hours < 1) return `${minutes}m`
   if (days < 1) return `${hours}h`
   if (days < 30) return `${days}d`

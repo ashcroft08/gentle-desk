@@ -5,7 +5,7 @@
 // "now"/"ahora", which Rust keeps in `gentle_core::i18n::messages`.
 import { describe, expect, it } from 'vitest'
 import type { LanguageView } from '../contract/bindings'
-import { ago } from './ago'
+import { ago, isJustNow } from './ago'
 
 const SEC = 1000
 const MIN = 60 * SEC
@@ -49,5 +49,26 @@ describe('the age of a chat', () => {
 
   it("words an unknown zero time as Rust does, without panicking", () => {
     expect(ago('en', NOW, 0)).toBe('56y')
+  })
+})
+
+// The same boundary, asked as a question: the copy that says "just now" instead of
+// "now ago" must fire exactly where `ago` answers its one word.
+describe('whether a chat was written just now', () => {
+  it('is true under a minute, and false at the minute itself', () => {
+    expect(isJustNow(NOW, NOW)).toBe(true)
+    expect(isJustNow(NOW, NOW - 59 * SEC)).toBe(true)
+    expect(isJustNow(NOW, NOW - 60 * SEC)).toBe(false)
+  })
+
+  it('is true for a time in the future, which `ago` also calls "now"', () => {
+    expect(isJustNow(NOW, NOW + 1)).toBe(true)
+    expect(isJustNow(NOW, NOW + 5 * MIN)).toBe(true)
+  })
+
+  it('answers true exactly where `ago` says its one word', () => {
+    for (const delta of [0, 1, 59 * SEC, 60 * SEC, MIN, HOUR, DAY, -5 * MIN]) {
+      expect(isJustNow(NOW, NOW - delta), String(delta)).toBe(age(delta) === 'now')
+    }
   })
 })

@@ -27,8 +27,19 @@
   let canvas: HTMLCanvasElement | null = $state(null)
   /** The frame this rose is waiting for, so it can be cancelled when it leaves. */
   let waiting = 0
+  /**
+   * The frame last drawn: how far the bloom got, whether it was the still form,
+   * and at which height. A height that changes after mount redraws THAT frame once
+   * (the screen resizes the rose with the window), never the bloom again.
+   */
+  let reveal = 0
+  let rested = false
+  let drawnAt: number | null = null
 
-  function draw(reveal: number, still: boolean): void {
+  function draw(revealNow: number, still: boolean): void {
+    reveal = revealNow
+    rested = still
+    drawnAt = height
     const element = canvas
     if (!element) return
     const ratio = globalThis.devicePixelRatio || 1
@@ -41,7 +52,7 @@
     if (!context) return
     context.setTransform(ratio, 0, 0, ratio, 0, 0)
     const side = Math.max(1, DOT_SIDE * dot)
-    for (const cell of frameAt(reveal, still)) {
+    for (const cell of frameAt(revealNow, still)) {
       // A folded dot is not drawn at all, as it is not in the artboard's frame.
       if (cell.alpha <= 0) continue
       const { hue } = BASE_COLOUR
@@ -65,12 +76,22 @@
     }
     const started = performance.now()
     const step = (now: number) => {
-      const reveal = Math.min(1, (now - started) / WRITE_MS)
-      draw(reveal, false)
-      if (reveal < 1) waiting = requestAnimationFrame(step)
+      const progress = Math.min(1, (now - started) / WRITE_MS)
+      draw(progress, false)
+      if (progress < 1) waiting = requestAnimationFrame(step)
     }
     step(started)
     return () => cancelAnimationFrame(waiting)
+  })
+
+  // A new size is not the bloom's business: it draws the frame the screen already
+  // has at the new geometry, once, and asks for no frame of its own. While the
+  // bloom runs, the frames it already asked for keep coming at the new size; at
+  // rest this is the ONE redraw, and the rose stays at rest (nothing is waiting).
+  $effect(() => {
+    const asked = height
+    if (drawnAt === null || drawnAt === asked) return
+    draw(reveal, rested)
   })
 </script>
 

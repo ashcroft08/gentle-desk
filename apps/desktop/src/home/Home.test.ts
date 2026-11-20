@@ -11,9 +11,11 @@
 import '../test-support/dom-env'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/svelte'
+import { tick } from 'svelte'
 import type { UiIntent } from '../contract/bindings'
 import { handlerArgs, resetTauriMock, setHandler, viewState } from '../test-support/tauri-mock'
 import { welcomeChat, welcomeLink, welcomeView, welcomeWorkspace } from '../test-support/welcome'
+import { mediaWindow } from '../test-support/media'
 import { setLanguage } from '../i18n/language.svelte'
 import Home from './Home.svelte'
 
@@ -24,7 +26,16 @@ const MIN = 60_000
 const DAY = 24 * 60 * MIN
 const HINT = 'Choose a chat in the workspace tree, or start a new session.'
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  vi.unstubAllGlobals()
+})
+
+/** The height the rose was DRAWN at, in CSS px: the canvas is the art plus 8 px twice. */
+function roseHeight(): number {
+  const canvas = screen.getByRole('img', { name: 'The gentle-shell rose' })
+  return Number.parseFloat((canvas as HTMLCanvasElement).style.height) - 16
+}
 
 beforeEach(() => {
   resetTauriMock()
@@ -197,5 +208,106 @@ describe('view A, the resume screen', () => {
     expect(screen.getByRole('button', { name: 'Nueva sesión en Curriculum' })).toBeTruthy()
     expect(screen.getByRole('heading', { level: 3, name: 'Chats recientes de Curriculum' })).toBeTruthy()
     expect(screen.queryByText('Pick up where you left off')).toBeNull()
+  })
+})
+
+// The line beside the folder when the chat is under a minute old: "now ago" is not
+// a sentence, so each language says it its own way.
+describe('a chat written just now', () => {
+  /** The last workspace, written to `delta` ms before this test took its clock. */
+  function justWritten(): ReturnType<typeof welcomeView> {
+    const last = welcomeWorkspace({ label: 'Curriculum', last_activity_ms: Date.now() - 30_000 })
+    return welcomeView({
+      last,
+      recents: [welcomeChat('C:\\s\\a.jsonl', { modified_ms: Date.now() - 30_000 })],
+    })
+  }
+
+  it('says "just now" in English, not "now ago"', () => {
+    render(Home, { props: { welcome: justWritten() } })
+
+    expect(screen.getByText('· last activity: just now')).toBeTruthy()
+    expect(screen.queryByText(/now ago/)).toBeNull()
+  })
+
+  it('says "ahora" in Spanish, not "hace ahora"', () => {
+    setLanguage('es')
+    render(Home, { props: { welcome: justWritten() } })
+
+    expect(screen.getByText('· última actividad: ahora')).toBeTruthy()
+    expect(screen.queryByText(/hace ahora/)).toBeNull()
+  })
+
+  it('goes back to the plain age at the minute itself', () => {
+    const last = welcomeWorkspace({ label: 'Curriculum', last_activity_ms: Date.now() - MIN - 1_000 })
+    render(Home, {
+      props: {
+        welcome: welcomeView({
+          last,
+          recents: [welcomeChat('C:\\s\\a.jsonl', { modified_ms: Date.now() - MIN - 1_000 })],
+        }),
+      },
+    })
+
+    expect(screen.getByText('· last activity 1m ago')).toBeTruthy()
+    expect(screen.queryByText(/just now/)).toBeNull()
+  })
+})
+
+// The rose is drawn once at the height it is given, so the view picks that height
+// from the window: four steps by height, and a smaller step in a narrow window.
+describe('the rose’s size', () => {
+  it.each([
+    [1600, 1000, 136],
+    [1600, 760, 136],
+    [1600, 759, 116],
+    [1000, 600, 116],
+    [1000, 599, 96],
+    [1000, 480, 96],
+    [1000, 479, 72],
+  ])('draws a %ix%i window’s rose %i px tall', async (width, height, px) => {
+    mediaWindow(width, height)
+    render(Home, { props: { welcome: welcomeView() } })
+    await tick()
+
+    expect(roseHeight()).toBe(px)
+  })
+
+  it('takes the smaller step when the window is narrow, however tall it is', async () => {
+    mediaWindow(600, 1000)
+    render(Home, { props: { welcome: welcomeView() } })
+    await tick()
+
+    expect(roseHeight()).toBe(96)
+  })
+
+  it('follows the window when the user resizes it', async () => {
+    const window = mediaWindow(1600, 1000)
+    render(Home, { props: { welcome: welcomeView() } })
+    await tick()
+    expect(roseHeight()).toBe(136)
+
+    window.resize(1000, 560)
+    await tick()
+    expect(roseHeight()).toBe(96)
+  })
+})
+
+// A recent title arrives in full now (120 characters and more), and the cell is
+// what copes: the row stays one line and the age stays in it.
+describe('a very long recent title', () => {
+  it('keeps the title in one cell with its age beside it', () => {
+    const title = 'una pregunta larga sobre el repo '.repeat(5).trim()
+    const recents = [
+      welcomeChat('C:\\s\\long.jsonl', { title, modified_ms: Date.now() - 21 * MIN }),
+    ]
+    render(Home, { props: { welcome: welcomeView({ recents }) } })
+
+    const row = screen.getByRole('button', { name: /una pregunta larga sobre el repo/ })
+    const cell = row.querySelector('.home-chat-title')
+    // The whole title is in the one cell: CSS ellipsizes it, nothing is cut here.
+    expect(cell?.textContent).toBe(title)
+    expect(title.length).toBeGreaterThan(120)
+    expect(row.querySelector('.home-chat-age')?.textContent).toBe('21m')
   })
 })

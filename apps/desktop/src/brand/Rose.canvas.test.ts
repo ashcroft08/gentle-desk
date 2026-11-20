@@ -203,4 +203,60 @@ describe('the rose', () => {
     canvas.click()
     expect(request).toHaveBeenCalledTimes(1)
   })
+
+  // The screen resizes the rose with the window (welcome-screen T2's follow-up).
+  // The bloom is not the resize's business: the frame the screen already has is
+  // drawn once at the new geometry, and no frame of its own is asked for.
+  it('redraws once, and only once, at the new size when the height changes', async () => {
+    const { drawn, request, flush, rerender, container } = mountRose()
+
+    flush(WRITE_MS / 4)
+    expect(drawn.frames).toBe(2)
+    expect(request).toHaveBeenCalledTimes(2)
+
+    await rerender({ label: LABEL, height: 136 })
+
+    expect(drawn.frames).toBe(3)
+    // The bloom carries on where it was: the redraw is not a replay.
+    expect(drawn.rects.length).toBeLessThan(frameAt(1, false).length)
+    expect(Number.parseFloat(canvasOf(container).style.height)).toBeCloseTo(136 + 16, 6)
+    expect(request).toHaveBeenCalledTimes(2)
+  })
+
+  it('redraws once at the new size after the bloom rested, asking for no frame', async () => {
+    const { drawn, request, flush, rerender, pending, container } = mountRose()
+
+    flush(WRITE_MS)
+    expect(drawn.frames).toBe(2)
+    expect(pending.size).toBe(0)
+
+    await rerender({ label: LABEL, height: 136 })
+
+    expect(drawn.frames).toBe(3)
+    // The rest frame, dot for dot, at the taller geometry.
+    const dot = 136 / ROSE_HEIGHT
+    const rests = frameAt(1, false)
+    expect(drawn.rects).toHaveLength(rests.length)
+    expect(drawn.rects[0][0]).toBeCloseTo(8 + rests[0].x * dot, 6)
+    expect(drawn.rects[0][1]).toBeCloseTo(8 + rests[0].y * dot, 6)
+    expect(Number.parseFloat(canvasOf(container).style.height)).toBeCloseTo(136 + 16, 6)
+
+    // Still at rest: the resize started no animation and left none waiting.
+    expect(request).toHaveBeenCalledTimes(1)
+    expect(pending.size).toBe(0)
+  })
+
+  it('redraws the open rose at the new size under reduced motion, without a frame', async () => {
+    const { drawn, request, rerender, container } = mountRose({ reducedMotion: true })
+
+    expect(drawn.frames).toBe(1)
+    await rerender({ label: LABEL, height: 72 })
+
+    expect(drawn.frames).toBe(2)
+    const dot = 72 / ROSE_HEIGHT
+    const rests = frameAt(1, true)
+    expect(drawn.rects[0][0]).toBeCloseTo(8 + rests[0].x * dot, 6)
+    expect(Number.parseFloat(canvasOf(container).style.height)).toBeCloseTo(72 + 16, 6)
+    expect(request).not.toHaveBeenCalled()
+  })
 })

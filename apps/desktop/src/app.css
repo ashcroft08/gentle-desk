@@ -1433,26 +1433,46 @@ p {
    area's header - the rose, its title, the workspace worked in last with its ONE
    action, that workspace's recent chats and the other workspaces as quiet links.
    Tokens only, so both themes hold it, and no motion of its own: the rose owns
-   its one bloom and reduced motion (R6). */
+   its one bloom and reduced motion (R6).
+
+   The geometry holds at every window size (T2's follow-up, after the maintainer
+   looked at it maximized): the column FILLS the pane and its block sits a little
+   above the middle, because the bottom padding is the big one; `flex: 1 1 0` is
+   what fills the pane (the header above shares this column, so a `min-height:
+   100%` here would add the header's height back and make the document scroll),
+   and `safe center` keeps the top reachable when the content outgrows the pane. */
 .home {
   flex: 1 1 0;
   min-height: 0;
-  overflow: auto;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
+  /* `safe` keeps the same centre and falls back to the start when the content is
+     taller than the pane, so the top is never unreachable. A browser too old for
+     it keeps the declaration above. */
+  justify-content: safe center;
   text-align: center;
-  padding: 34px 24px 40px;
+  padding: 24px 24px clamp(24px, 8vh, 96px);
 }
 
+/* The rose breathes: more air under it than between the title and its line, so
+   the picture is not glued to the words. Its canvas never outgrows the pane. */
 .home-rose {
   display: flex;
   justify-content: center;
+  margin: 0 0 30px;
+  max-width: 100%;
+}
+
+.home-rose canvas {
+  max-width: 100%;
 }
 
 .home-title {
-  margin: 2px 0 6px;
-  font-size: 20px;
+  margin: 0 0 6px;
+  font-size: clamp(18px, 2.2vh + 10px, 24px);
   font-weight: 600;
 }
 
@@ -1525,13 +1545,16 @@ p {
 }
 
 .home-recents {
-  width: min(460px, 100%);
+  width: min(400px, 100%);
   margin-top: 28px;
   text-align: left;
 }
 
+/* The heading and the rows share ONE left edge: the row's text starts 10 px inside
+   its button, so the heading carries the same inset. */
 .home-kicker {
   margin: 0 0 6px;
+  padding: 0 10px;
   color: var(--faint);
   font-size: 11px;
   font-weight: 600;
@@ -1550,6 +1573,7 @@ p {
   align-items: center;
   gap: 10px;
   width: 100%;
+  min-width: 0;
   border: 0;
   border-radius: 8px;
   background: transparent;
@@ -1564,6 +1588,9 @@ p {
   background: var(--surface2);
 }
 
+/* Rust sends the whole title, however long: the cell ellipsizes it and the row
+   keeps one line, so a 120-character title neither grows the row nor pushes the
+   age out of it. */
 .home-chat-title {
   flex: 1;
   min-width: 0;
@@ -1573,6 +1600,8 @@ p {
 }
 
 .home-chat-age {
+  flex: none;
+  white-space: nowrap;
   color: var(--faint);
   font-size: 11.5px;
   font-variant-numeric: tabular-nums;
@@ -1609,6 +1638,39 @@ p {
   background: transparent;
   color: var(--faint);
   cursor: default;
+}
+
+/* A SHORT window does not centre the block: it starts at the top with tighter
+   paddings, and the pane scrolls what does not fit, so nothing is clipped and
+   nothing is unreachable. */
+@media (max-height: 600px) {
+  .home {
+    justify-content: flex-start;
+    padding: 18px 20px 22px;
+    overflow-y: auto;
+  }
+
+  .home-rose {
+    margin-bottom: 20px;
+  }
+}
+
+/* A NARROW window: 16 px at the sides, the column is the whole width and the one
+   action stretches to it, so the screen keeps one left edge instead of a small
+   block floating in the middle. */
+@media (max-width: 640px) {
+  .home {
+    padding-inline: 16px;
+  }
+
+  .home-recents {
+    width: 100%;
+  }
+
+  .home-go {
+    width: 100%;
+    justify-content: center;
+  }
 }
 
 .side {
