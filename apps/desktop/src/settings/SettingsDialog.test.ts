@@ -106,13 +106,15 @@ describe('the Settings dialog', () => {
     expect(within(pane(dialog)).getByRole('button', { name: 'Open shell to sign in or out' })).toBeTruthy()
   })
 
-  it('draws the theme picker in Appearance, named with the current theme', async () => {
+  it('draws one theme card per theme in Appearance, the current one chosen', async () => {
     const dialog = await openSettings()
-    const button = within(pane(dialog)).getByRole('button', { name: 'Theme: System' })
+    const chosen = within(pane(dialog)).getByRole('button', { name: 'System' })
 
-    expect(button.getAttribute('aria-haspopup')).toBe('listbox')
-    await fireEvent.click(button)
-    expect(within(pane(dialog)).getByRole('listbox', { name: 'Theme' })).toBeTruthy()
+    // The grid is the choice: six cards, the pushed theme pressed (ThemeCards
+    // owns the rest - the miniature, the check and the intent).
+    expect(chosen.getAttribute('aria-pressed')).toBe('true')
+    expect(within(pane(dialog)).getByRole('group', { name: 'Theme' })).toBeTruthy()
+    expect(within(pane(dialog)).getAllByRole('button')).toHaveLength(6)
   })
 
   it('switches the pane to Shell home when its rail entry is picked', async () => {
@@ -129,7 +131,7 @@ describe('the Settings dialog', () => {
       within(home).getByRole('button', { name: 'Separate' }).getAttribute('aria-pressed'),
     ).toBe('false')
     // Appearance left the pane, and the rail says which section is drawn.
-    expect(within(dialog).queryByRole('button', { name: 'Theme: System' })).toBeNull()
+    expect(within(dialog).queryByRole('button', { name: 'System' })).toBeNull()
     expect(within(dialog).getByRole('tab', { name: HOME }).getAttribute('aria-selected')).toBe(
       'true',
     )
@@ -169,7 +171,7 @@ describe('the Settings dialog', () => {
     expect(within(about).queryByRole('button', { name: 'Check now' })).toBeNull()
     // One section at a time: the other two are not drawn.
     expect(within(dialog).queryByText(EXPLAIN)).toBeNull()
-    expect(within(dialog).queryByRole('button', { name: 'Theme: System' })).toBeNull()
+    expect(within(dialog).queryByRole('button', { name: 'System' })).toBeNull()
   })
 
   it('says it does not know the version when the bridge named none', async () => {

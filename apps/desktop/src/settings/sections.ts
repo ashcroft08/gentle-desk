@@ -15,6 +15,15 @@
 //
 // The keys are the chat header's tablist keys (chat/tabs.ts): arrows walk the
 // rail and wrap, Home and End jump to the ends, and one entry is the tab stop.
+//
+// The search field above the rail reads the KEYWORDS below (the reference's
+// `navigation.rs` keeps the same list per page): they are the words a user may
+// look a section up by that the section does not draw. They are NOT drawn words,
+// which is why they live here and not in `copy.ts`: a list that must answer a
+// Spanish query while the app draws English is written in BOTH languages at
+// once, and a per-language dictionary cannot hold that. Lowercase, one word each
+// where a term is one word - the matcher folds case and accents on both sides,
+// so the accents stay here for the reader.
 import type { IconName } from '../icons/shapes'
 
 /** The seven sections, as the dialog names them. */
@@ -27,25 +36,78 @@ export type Section =
   | 'language'
   | 'about'
 
-/** One rail entry: the section it draws and its glyph. */
+/** One rail entry: the section it draws, its glyph and its search words. */
 export interface SectionEntry {
   id: Section
   icon: IconName
+  /** What a search may find this entry by, in both languages. Lowercase. */
+  keywords: readonly string[]
 }
 
 /** The rail, in the order the dialog draws it: Appearance comes first. */
 export const SECTIONS: SectionEntry[] = [
-  { id: 'appearance', icon: 'theme' },
-  { id: 'home', icon: 'house' },
-  { id: 'updates', icon: 'restart' },
-  { id: 'account', icon: 'key' },
-  { id: 'usage', icon: 'gauge' },
+  {
+    id: 'appearance',
+    icon: 'theme',
+    keywords: [
+      'theme', 'themes', 'color', 'colors', 'colours', 'palette', 'dark', 'light', 'look', 'style',
+      'window', 'tema', 'temas', 'colores', 'oscuro', 'claro', 'aspecto', 'estilo',
+      'ventana',
+    ],
+  },
+  {
+    id: 'home',
+    icon: 'house',
+    keywords: [
+      'home', 'shell', 'pi', 'installation', 'machine', 'terminal', 'signin', 'signout', 'models',
+      'chats', 'restart', 'isolated', 'separate', 'hogar', 'inicio', 'instalación', 'máquina',
+      'sesión', 'modelos', 'reiniciar', 'aislado', 'separado',
+    ],
+  },
+  {
+    id: 'updates',
+    icon: 'restart',
+    keywords: [
+      'update', 'updates', 'upgrade', 'version', 'newer', 'release', 'notes', 'check', 'restart',
+      'actualización', 'actualizaciones', 'actualizar', 'versión', 'nueva', 'notas', 'comprobar',
+      'reiniciar',
+    ],
+  },
+  {
+    id: 'account',
+    icon: 'key',
+    keywords: [
+      'account', 'provider', 'providers', 'signed', 'signin', 'signout', 'auth', 'login', 'logout',
+      'credentials', 'cuenta', 'proveedor', 'proveedores', 'sesión', 'iniciar', 'cerrar', 'clave',
+    ],
+  },
+  {
+    id: 'usage',
+    icon: 'gauge',
+    keywords: [
+      'usage', 'limits', 'plan', 'subscription', 'tokens', 'consumed', 'sources', 'uso', 'límites',
+      'suscripción', 'consumido', 'fuentes',
+    ],
+  },
   // The language of the app's own words (0.2.0): beside Usage and before About,
   // which stays the last entry Home and End walk to. Its glyph is the speech
   // bubble the house already draws (`message-square`), since the rail's set has
   // no letterform of its own.
-  { id: 'language', icon: 'message-square' },
-  { id: 'about', icon: 'info' },
+  {
+    id: 'language',
+    icon: 'message-square',
+    keywords: [
+      'language', 'words', 'english', 'spanish', 'idioma', 'palabras', 'inglés', 'español',
+    ],
+  },
+  {
+    id: 'about',
+    icon: 'info',
+    keywords: [
+      'about', 'version', 'build', 'name', 'info', 'acerca', 'versión', 'compilación', 'nombre',
+      'información',
+    ],
+  },
 ]
 
 /** The section the dialog opens on: the first one in the rail. */
@@ -69,20 +131,33 @@ export const PANEL_ID = 'settings-pane'
  * The entry a vertical move asks for: the arrow keys walk the rail and wrap,
  * Home and End jump to the ends. `null` for every other key, which keeps its own
  * meaning - Escape still closes the dialog.
+ *
+ * `rail` is the list the rail is DRAWING, which a search query narrows: the
+ * arrows then walk the entries on screen and wrap at the ends of that list, so a
+ * key never lands on an entry the field has hidden. With no query it is every
+ * entry, exactly as before.
  */
-export function sectionAfter(key: string, from: Section): Section | null {
-  const index = SECTIONS.findIndex((entry) => entry.id === from)
+export function sectionAfter(
+  key: string,
+  from: Section,
+  rail: readonly SectionEntry[] = SECTIONS,
+): Section | null {
+  if (rail.length === 0) return null
+  const index = rail.findIndex((entry) => entry.id === from)
+  // A move starts from an entry the rail is drawing: a search can hide the one
+  // the pane shows, and that entry has no key of its own to walk from.
+  if (index < 0) return null
   switch (key) {
     case 'ArrowDown':
     case 'ArrowRight':
-      return SECTIONS[(index + 1) % SECTIONS.length].id
+      return rail[(index + 1) % rail.length].id
     case 'ArrowUp':
     case 'ArrowLeft':
-      return SECTIONS[(index - 1 + SECTIONS.length) % SECTIONS.length].id
+      return rail[(index - 1 + rail.length) % rail.length].id
     case 'Home':
-      return SECTIONS[0].id
+      return rail[0].id
     case 'End':
-      return SECTIONS[SECTIONS.length - 1].id
+      return rail[rail.length - 1].id
     default:
       return null
   }

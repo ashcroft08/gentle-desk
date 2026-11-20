@@ -76,13 +76,14 @@ describe('the six theme names', () => {
     expect(dataThemeNames(THEME_CSS).sort()).toEqual([...THEMES].sort())
   })
 
-  it('are the values the picker list takes its colors from', () => {
-    // The list is a real list of the page, so the chosen theme's variables color
-    // it: no fixed palette, and no native popup that ignores the page.
-    const list = ruleBody(APP_CSS, '.tpl')
-    expect(list).toContain('background: var(--surface)')
-    expect(list).toContain('border: 1px solid var(--border)')
-    expect(ruleBody(APP_CSS, '.tpl li')).toContain('color: var(--text)')
+  it('are the values the theme cards take their colors from', () => {
+    // The cards are drawn on the page itself and each miniature carries its own
+    // theme's `data-theme` attribute, so `theme.css`'s tokens color it: no fixed
+    // palette, and nothing that could drift from the stylesheet.
+    const shot = ruleBody(APP_CSS, '.tc-shot')
+    expect(shot).toContain('background: var(--bg)')
+    expect(shot).toContain('color: var(--text)')
+    expect(ruleBody(APP_CSS, '.tc-prompt')).toContain('color: var(--accent)')
   })
 })
 

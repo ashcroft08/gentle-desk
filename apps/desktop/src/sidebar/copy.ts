@@ -64,11 +64,6 @@ export interface SidebarCopy {
    * dialog's (settings/copy.ts), so it is passed in and only the news is ours.
    */
   updateWaiting: (settings: string) => string
-  /** The theme control's tooltip, and the name of the list it opens. */
-  themeTip: string
-  themeListName: string
-  /** The control's own name, around the label of the current theme. */
-  themeName: (label: string) => string
   /** A chat row's actions: the button's tooltip, the menu's name and its items. */
   chatActionsTip: string
   chatActions: (title: string) => string
@@ -137,9 +132,6 @@ const ENGLISH: SidebarCopy = {
   preview: 'Preview',
   previewTitle: 'Preview: under active development - fixes ship fast',
   updateWaiting: (settings) => `${settings} - an update is available`,
-  themeTip: 'Theme',
-  themeListName: 'Theme',
-  themeName: (label) => `Theme: ${label}`,
   chatActionsTip: 'Chat actions',
   chatActions: (title) => `Chat actions for ${title}`,
   chatName: 'Chat name',
@@ -209,9 +201,6 @@ const SPANISH: typeof ENGLISH = {
   preview: 'Vista previa',
   previewTitle: 'Vista previa: en desarrollo activo; las correcciones llegan rápido',
   updateWaiting: (settings) => `${settings} - hay una actualización disponible`,
-  themeTip: 'Tema',
-  themeListName: 'Tema',
-  themeName: (label) => `Tema: ${label}`,
   chatActionsTip: 'Acciones del chat',
   chatActions: (title) => `Acciones del chat: ${title}`,
   chatName: 'Nombre del chat',

@@ -120,6 +120,10 @@ describe('the Settings dialog keys', () => {
     close.focus()
     await fireEvent.keyDown(close, { key: 'Tab' })
 
-    expect(document.activeElement).toBe(entry)
+    // The card's first control is the search field the rail gained above it, so
+    // the trap loops back to that one; the rule is that the focus never leaves
+    // the card. Opening still starts on the rail entry, above.
+    expect(document.activeElement).toBe(within(dialog).getByRole('searchbox'))
+    expect(dialog.contains(document.activeElement)).toBe(true)
   })
 })

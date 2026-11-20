@@ -2,12 +2,11 @@
   // The Settings dialog (settings-dialog S2-S6, L4; 0.1.12 S1-S7; 0.2.0 S2/S4):
   // a rail of seven sections on the left and the selected section's content in
   // the pane on the right. The rail carries the two controls the footer used to
-  // hold - the theme picker and the home setting - then the 0.1.12 panes, then
+  // hold - the theme cards and the home setting - then the 0.1.12 panes, then
   // Usage, then Language (0.2.0), then About: the app's name and the version
-  // this run runs as. The controls themselves are the
-  // same components the footer drew, with the same props and the same behavior:
-  // nothing here redesigns them, it only gives them a calmer place and one
-  // section at a time.
+  // this run runs as. The controls themselves are the same components the footer
+  // drew, with the same props and the same behavior: nothing here redesigns them,
+  // it only gives them a calmer place and one section at a time.
   //
   // Profiles left this dialog in profiles-editor T2d (L21, L22): the maintainer
   // ruled that a Settings section made the profiles look global while they are
@@ -26,6 +25,12 @@
   // drawn, so nothing off-screen can take a key, and a pane that reads the
   // machine (Account) only starts reading when it is the one on screen.
   //
+  // The field above the rail searches the seven entries (the reference's "Find a
+  // setting…", settings/navigation.rs): it filters on each entry's title, hint
+  // and keywords, in both languages, and it never moves the section the pane
+  // draws - a query that hides the open entry leaves the pane exactly as the
+  // user left it. Escape in the field clears the query and nothing else.
+  //
   // Closing sends nothing. Each section persists through the command it already
   // had, so Dismiss, Escape and the backdrop only close the card.
   import { Dialog } from 'bits-ui'
@@ -39,16 +44,16 @@
   import Icon from '../icons/Icon.svelte'
   import { language } from '../i18n/language.svelte'
   import HomeSetting from '../sidebar/HomeSetting.svelte'
-  import ThemePicker from '../sidebar/ThemePicker.svelte'
   import AccountPane from './AccountPane.svelte'
   import LanguagePane from './LanguagePane.svelte'
+  import ThemeCards from './ThemeCards.svelte'
   import UpdatesPane from './UpdatesPane.svelte'
   import UsagePane from './UsagePane.svelte'
   import { settingsCopy } from './copy'
+  import { visibleSections } from './search'
   import {
     DEFAULT_SECTION,
     PANEL_ID,
-    SECTIONS,
     TAB_IDS,
     sectionAfter,
     type Section,
@@ -85,19 +90,63 @@
   /** The section the pane draws: Appearance on open (L4). */
   let selected = $state<Section>(DEFAULT_SECTION)
 
+  /**
+   * What the search field holds. It narrows the RAIL and nothing else: the pane
+   * keeps drawing `selected`, so a query that stops matching the open section
+   * never moves what the user is reading (see `search.ts` for the match).
+   */
+  let query = $state('')
+
   /** The rail's own words in the language the app holds (0.2.0, D4). */
   const copy = $derived(settingsCopy(language.current))
+
+  /** The entries the rail draws: every one while the field is empty. */
+  const drawn = $derived(visibleSections(copy, query))
+
+  /**
+   * The entry that takes the tab. The selected one keeps its place while the
+   * rail still draws it - a search must not move the user's place in the rail -
+   * and otherwise the first result takes it, since the panel is still whatever
+   * the user opened and the rail has to stay reachable from the keyboard.
+   */
+  const tabStop = $derived(
+    drawn.some((entry) => entry.id === selected) ? selected : (drawn[0]?.id ?? null),
+  )
 
   /** The rail's own title per section: the entry's word is the pane's heading. */
   const title = $derived(copy.titles[selected])
 
+  /**
+   * The dialog opens where it always did: on the selected rail entry, not on the
+   * first control the card happens to hold. The search field now sits above the
+   * rail, and the primitive focuses the first tabbable element it finds, so the
+   * focus it would place on the field is taken back here and given to the entry
+   * the pane's own name points at.
+   */
+  function opened(event: Event): void {
+    event.preventDefault()
+    document.getElementById(TAB_IDS[selected])?.focus()
+  }
+
   /** A key that walks the rail also selects the entry it lands on, and focuses it. */
   function keyed(event: KeyboardEvent, from: Section): void {
-    const next = sectionAfter(event.key, from)
+    const next = sectionAfter(event.key, from, drawn)
     if (next === null) return
     event.preventDefault()
     selected = next
     document.getElementById(TAB_IDS[next])?.focus()
+  }
+
+  /**
+   * Escape in the field empties it and stops there: the field is a search, not a
+   * way out of the dialog, so the key must not reach the primitive that closes
+   * the card. With nothing to clear the key keeps its own meaning and closes.
+   */
+  function searchKeys(event: KeyboardEvent): void {
+    if (event.key !== 'Escape' || query === '') return
+    event.preventDefault()
+    event.stopPropagation()
+    query = ''
   }
 </script>
 
@@ -107,28 +156,55 @@
     <!-- A press on the backdrop does NOT close the dialog: closing is the Close
      button's job (and Escape's, which the primitive keeps for the keyboard).
      A mis-click outside must not throw away what the user was reading. -->
-    <Dialog.Content class="dlg settings" interactOutsideBehavior="ignore">
+    <Dialog.Content class="dlg settings" interactOutsideBehavior="ignore" onOpenAutoFocus={opened}>
       <Dialog.Title class="dt">{copy.settings}</Dialog.Title>
 
       <div class="settings-body">
-        <!-- The rail (L4): one entry per section, the selected one highlighted.
-             The entry's word is its name; the glyph is decoration. -->
-        <div class="settings-rail" role="tablist" aria-label={copy.railLabel} aria-orientation="vertical">
-          {#each SECTIONS as entry (entry.id)}
-            <button
-              type="button"
-              role="tab"
-              id={TAB_IDS[entry.id]}
-              aria-controls={PANEL_ID}
-              aria-selected={selected === entry.id}
-              tabindex={selected === entry.id ? 0 : -1}
-              onclick={() => (selected = entry.id)}
-              onkeydown={(event) => keyed(event, entry.id)}
+        <!-- The rail (L4) and the field above it: the field NARROWS the rail to
+             the entries a query reaches and changes nothing else, so the pane
+             below keeps the section the user opened. -->
+        <div class="settings-side">
+          <div class="settings-find">
+            <Icon name="search" size={14} />
+            <input
+              type="search"
+              aria-label={copy.searchLabel}
+              placeholder={copy.searchPlaceholder}
+              bind:value={query}
+              onkeydown={searchKeys}
+            />
+          </div>
+          {#if drawn.length > 0}
+            <!-- One entry per section the query reaches, the selected one
+                 highlighted. The entry's word is its name; the glyph is
+                 decoration. -->
+            <div
+              class="settings-rail"
+              role="tablist"
+              aria-label={copy.railLabel}
+              aria-orientation="vertical"
             >
-              <Icon name={entry.icon} size={16} />
-              <span>{copy.titles[entry.id]}</span>
-            </button>
-          {/each}
+              {#each drawn as entry (entry.id)}
+                <button
+                  type="button"
+                  role="tab"
+                  id={TAB_IDS[entry.id]}
+                  aria-controls={PANEL_ID}
+                  aria-selected={selected === entry.id}
+                  tabindex={entry.id === tabStop ? 0 : -1}
+                  onclick={() => (selected = entry.id)}
+                  onkeydown={(event) => keyed(event, entry.id)}
+                >
+                  <Icon name={entry.icon} size={16} />
+                  <span>{copy.titles[entry.id]}</span>
+                </button>
+              {/each}
+            </div>
+          {:else}
+            <!-- One quiet line instead of an empty rail: the pane keeps the
+                 section the user opened, and searching never moves it. -->
+            <p class="settings-none">{copy.noMatches}</p>
+          {/if}
         </div>
 
         <!-- The pane: the selected section only. Its hint is also the dialog's
@@ -143,7 +219,7 @@
               <Dialog.Description class="hint">{copy.hints[selected]}</Dialog.Description>
 
               {#if selected === 'appearance'}
-                <ThemePicker {theme} />
+                <ThemeCards {theme} />
               {:else if selected === 'home'}
                 <p class="why">{copy.homeExplain}</p>
                 {#if shell !== null}

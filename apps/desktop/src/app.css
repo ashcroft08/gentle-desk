@@ -1956,10 +1956,6 @@ p {
   transform: none;
 }
 
-/* The theme control (01a's `#theme-btn` and `#theme-list`, `.tp` and `.tpl`): it
-   lives in the Settings dialog's Appearance section now (settings-dialog S3), and
-   the list is drawn in the page's own colors, so it follows the theme it offers.
-   No native popup is involved. */
 /* Bottom-anchored, so the footer stays put when the middle of the sidebar is
    short, such as the empty state before any workspace exists. */
 .foot {
@@ -2006,10 +2002,6 @@ p {
   border-radius: 999px;
   background: var(--accent);
   pointer-events: none;
-}
-
-.tp {
-  position: relative;
 }
 
 /* The home setting (shell-choice S5), drawn in the Settings dialog's Shell home
@@ -2060,62 +2052,6 @@ p {
   padding: 1px 8px;
   font-size: 12px;
   cursor: pointer;
-}
-
-.tpl {
-  position: absolute;
-  left: 0;
-  bottom: 38px;
-  z-index: 25;
-  margin: 0;
-  padding: 4px;
-  list-style: none;
-  min-width: 180px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  box-shadow: var(--shadow);
-}
-
-.tpl li {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 10px;
-  border-radius: 6px;
-  font-size: 13px;
-  color: var(--text);
-  background: transparent;
-  cursor: pointer;
-  transition:
-    background-color 120ms ease,
-    color 120ms ease;
-}
-
-/* The theme's accent as a small dot beside its name. The dot is decoration:
-   the option's name is still its word, and `system` draws the two halves it
-   follows (the component fills it in). */
-.tpl .swatch {
-  flex: none;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--swatch, var(--accent));
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
-}
-
-.tpl li:hover {
-  background: var(--surface2);
-  box-shadow: inset 0 0 0 1px var(--border);
-}
-
-.tpl li[aria-selected='true'] {
-  background: var(--tint);
-  color: var(--accent);
-}
-
-.tpl li[aria-selected='true']:hover {
-  box-shadow: inset 0 0 0 1px var(--border);
 }
 
 /* The New workspace menu: the artboard's rules for it (01a, `.menu`), except
@@ -2335,14 +2271,69 @@ p {
   max-height: calc(100vh - var(--settings-chrome));
 }
 
-.settings-rail {
+.settings-side {
   flex: none;
   width: 184px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 8px;
   padding: 2px 14px 0 0;
   border-right: 1px solid var(--border);
+}
+
+/* The search field above the rail (the reference's "Find a setting…"): the rail's
+   own width and one line high, so the seven entries start where they always
+   did. The wrapper draws the field's border and its focus ring, which is why the
+   input itself draws neither. */
+.settings-find {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface2);
+  color: var(--faint);
+}
+
+.settings-find:focus-within {
+  border-color: var(--accent);
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.settings-find input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  outline: none;
+}
+
+.settings-find input::placeholder {
+  color: var(--faint);
+}
+
+/* One quiet line where the entries would be when the query leaves none: never a
+   box, never an empty rail with nothing to say. */
+.settings-none {
+  margin: 0;
+  padding: 0 10px;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+/* The rail's entries under the field: the column's width and edge are the row's
+   above, so this only stacks what the search leaves. */
+.settings-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 /* One rail entry: its glyph and its word, quiet until it is the selected one or
@@ -2436,13 +2427,6 @@ p {
   line-height: 1.5;
 }
 
-/* The theme list opens DOWN from its button inside the dialog: the footer's own
-   rule draws it above, which in a card would leave it over the backdrop. */
-.dlg .tpl {
-  bottom: auto;
-  top: 38px;
-}
-
 /* About (settings-dialog S5): the name and the version this run runs as on one
    line. What is installed, and whether something newer is out, is the Updates
    section's own card (0.1.12). */
@@ -2469,6 +2453,147 @@ p {
   transition:
     border-color 120ms ease,
     background-color 120ms ease;
+}
+
+/* The theme cards, the Appearance section's choice (the reference's theme_cards):
+   a grid of six miniatures, four to a row on a wide window. */
+.tc-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  width: 100%;
+}
+
+/* One card: the miniature, then the drawn name with its check. Quiet until it is
+   the chosen one, or the pointer is over it. */
+.tc {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 7px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease;
+}
+
+.tc:hover {
+  background: var(--surface2);
+}
+
+.tc[aria-pressed='true'] {
+  border-color: var(--accent);
+  background: var(--tint);
+  color: var(--text);
+}
+
+.tc:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+
+/* The miniature: a picture of this theme's terminal. It carries the theme's own
+   `data-theme` attribute, so every colour below is that theme's token from
+   `theme.css` - a card never holds a colour of its own. */
+.tc-shot {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: ui-monospace, 'SF Mono', Consolas, monospace;
+  font-size: 9px;
+  line-height: 1.4;
+  overflow: hidden;
+}
+
+.tc-line {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.tc-prompt {
+  color: var(--accent);
+}
+
+.tc-text {
+  color: var(--text);
+}
+
+.tc-ok {
+  color: var(--success);
+}
+
+.tc-path {
+  color: var(--muted);
+}
+
+.tc-dots {
+  display: flex;
+  gap: 4px;
+}
+
+/* One palette dot: the token the card names inline, so the palette is the
+   theme's own and never a list of colours written here. */
+.tc-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--dot);
+}
+
+.tc-meta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 2px;
+}
+
+.tc-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11.5px;
+}
+
+.tc-check {
+  flex: none;
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* The grid on a medium window: two miniatures to a row, where four would be too
+   narrow to read. */
+@media (max-width: 900px) {
+  .tc-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ...and on a narrow one: the whole width for each card. */
+@media (max-width: 640px) {
+  .tc-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 /* --- the 0.1.12 panes (S1-S4) ------------------------------------------- */
