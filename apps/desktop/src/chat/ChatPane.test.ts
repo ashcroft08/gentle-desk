@@ -108,7 +108,7 @@ describe('the hero of a new session', () => {
     expect(screen.getByRole('heading', { level: 2, name: copy.newSessionTitle })).toBeTruthy()
     expect(screen.getByRole('img', { name: copy.roseLabel })).toBeTruthy()
     expect(screen.getByText(copy.inFolder(FOLDER.name))).toBeTruthy()
-    expect(container.querySelector('.chat-pane')?.className).toBe('chat-pane new')
+    expect(container.querySelector('.chat-pane')?.className).toBe('chat-pane is-fresh')
   })
 
   it('draws no hero for a stored chat that has no rows yet', () => {
@@ -165,7 +165,7 @@ describe('the hero of a new session', () => {
     )
     expect(screen.getByText('en gentle-desk')).toBeTruthy()
     expect(screen.getByRole('img', { name: 'La rosa de gentle shell' })).toBeTruthy()
-    expect(container.querySelector('.chat-pane')?.className).toBe('chat-pane new')
+    expect(container.querySelector('.chat-pane')?.className).toBe('chat-pane is-fresh')
   })
 })
 
@@ -201,11 +201,11 @@ describe('the move to the bottom', () => {
     const first = slices({ foreground_chat: 'new-1' })
     const { container, rerender } = render(ChatPane, { props: first })
     const pane = container.querySelector('.chat-pane') as HTMLElement
-    const dock = container.querySelector('.pane-dock') as HTMLElement
+    const dock = container.querySelector('.chat-pane-dock') as HTMLElement
     // jsdom lays nothing out, so the dock's top follows the state the pane is in -
     // which also pins the ORDER: measured while the class is still there, and
     // again once it is gone.
-    dock.getBoundingClientRect = () => rect(pane.classList.contains('new') ? 200 : 440)
+    dock.getBoundingClientRect = () => rect(pane.classList.contains('is-fresh') ? 200 : 440)
 
     await rerender(slices({ foreground_chat: 'new-1', messages: [MESSAGE], items: ITEMS }))
 
@@ -226,8 +226,8 @@ describe('the move to the bottom', () => {
       props: slices({ foreground_chat: 'new-1' }),
     })
     const pane = container.querySelector('.chat-pane') as HTMLElement
-    const dock = container.querySelector('.pane-dock') as HTMLElement
-    dock.getBoundingClientRect = () => rect(pane.classList.contains('new') ? 200 : 440)
+    const dock = container.querySelector('.chat-pane-dock') as HTMLElement
+    dock.getBoundingClientRect = () => rect(pane.classList.contains('is-fresh') ? 200 : 440)
 
     await rerender(slices({ foreground_chat: 'new-1', messages: [MESSAGE], items: ITEMS }))
     await frame()
@@ -240,7 +240,7 @@ describe('the move to the bottom', () => {
   it('moves nothing on the first paint, when there is no place to come from', async () => {
     mediaWindow(1200, 900)
     const { container } = render(ChatPane, { props: slices({ foreground_chat: 'new-1' }) })
-    const dock = container.querySelector('.pane-dock') as HTMLElement
+    const dock = container.querySelector('.chat-pane-dock') as HTMLElement
     dock.getBoundingClientRect = () => rect(200)
 
     await frame()
@@ -252,7 +252,7 @@ describe('the move to the bottom', () => {
 
 describe('the pane’s geometry', () => {
   it('centres the column a little above the middle, and scrolls its overflow', () => {
-    const centred = rule('.chat-pane.new')
+    const centred = rule('.chat-pane.is-fresh')
 
     expect(centred).toContain('align-items: center')
     // `safe` keeps the centre for the ordinary case and falls back to the start
@@ -263,15 +263,15 @@ describe('the pane’s geometry', () => {
   })
 
   it('caps the composer’s column at 560 px', () => {
-    expect(rule('.chat-pane.new .composer-dock')).toContain('width: min(560px, 100%)')
+    expect(rule('.chat-pane.is-fresh .composer-dock')).toContain('width: min(560px, 100%)')
   })
 
   it('takes the thread’s place while the chat has no rows, keeping it mounted', () => {
-    expect(rule('.chat-pane.new .pane-body')).toContain('display: none')
+    expect(rule('.chat-pane.is-fresh .chat-pane-body')).toContain('display: none')
   })
 
   it('starts a short window at the top, with tighter paddings, still scrolling', () => {
-    const short = scoped('max-height: 600px', '.chat-pane.new')
+    const short = scoped('max-height: 600px', '.chat-pane.is-fresh')
 
     expect(short).toContain('justify-content: flex-start')
     expect(short).toMatch(/(?:^|[;{\s])padding\s*:/)
@@ -279,18 +279,42 @@ describe('the pane’s geometry', () => {
   })
 
   it('gives a narrow window 16 px at the sides', () => {
-    expect(scoped('max-width: 640px', '.chat-pane.new')).toContain('padding-inline: 16px')
+    expect(scoped('max-width: 640px', '.chat-pane.is-fresh')).toContain('padding-inline: 16px')
   })
 
   it('keeps the composer’s dock inside the pane at any size', () => {
     // The dock is the pane's own child now: it spans the column, and the box
     // inside it decides its own width (560 px here, the thread's 880 px after).
-    expect(rule('.pane-dock')).toContain('width: 100%')
+    expect(rule('.chat-pane-dock')).toContain('width: 100%')
   })
 
   it('leaves the dock’s own width alone once the chat has rows', () => {
     // PRESERVE: the 560 px column is view B's. With rows the box keeps the rule it
     // always had, so it still lines up with the thread's messages.
     expect(rule('.composer-dock')).toContain('width: min(var(--chat-max), calc(100% - 48px))')
+  })
+
+  it('names the pane’s state with a class no other rule of the app owns (L: the sidebar’s `.new`)', () => {
+    // The pane's first class for "a new session" was `new`, which the sidebar's New
+    // session BUTTON already owns (`.new`: a 100%-wide box with a surface background,
+    // a border and an accent border on hover). The whole pane inherited it and drew
+    // as one giant card. A state class of this pane must appear in the stylesheet
+    // only as `.chat-pane.<state>`, never alone.
+    const alone = APP_CSS.match(/(^|[^\w.-])\.is-fresh\b/g) ?? []
+    const scopedToPane = APP_CSS.match(/\.chat-pane\.is-fresh\b/g) ?? []
+    expect(alone.length).toBe(0)
+    expect(scopedToPane.length).toBeGreaterThan(0)
+    expect(rule('.new')).toContain('height: 38px')
+  })
+
+  it('gives the pane’s containers class names of their own, so the Settings dialog’s `.pane-body` is untouched', () => {
+    // `SettingsDialog` styles its own `.pane-body` (`.settings-pane .pane-body`). The
+    // chat pane's body and dock first took that generic name, which put the chat's
+    // `flex: 1 1 0` and `min-height: 0` on the Settings body. No rule of this
+    // stylesheet may style a bare `.pane-body` or `.pane-dock`.
+    expect(APP_CSS).not.toMatch(/(^|\n)\.pane-body\b/)
+    expect(APP_CSS).not.toMatch(/(^|\n)\.pane-dock\b/)
+    expect(APP_CSS).toMatch(/\.settings-pane \.pane-body \{/)
+    expect(rule('.chat-pane-body')).toContain('flex: 1 1 0')
   })
 })

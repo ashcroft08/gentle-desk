@@ -226,7 +226,7 @@ p {
 }
 
 /* The thread takes what the composer leaves inside the pane's body. */
-.pane-body > .thread {
+.chat-pane-body > .thread {
   flex: 1 1 0;
   min-height: 0;
 }
@@ -246,7 +246,7 @@ p {
 
 /* What holds the thread: it takes what the composer leaves, as the view did
    before the pane existed. */
-.pane-body {
+.chat-pane-body {
   display: flex;
   flex-direction: column;
   flex: 1 1 0;
@@ -256,7 +256,7 @@ p {
 /* The composer's own row in the tree: it spans the pane and the dock inside it
    decides its width (the thread's max, 560 px in view B). This is the element the
    move is applied to, so the whole dock travels as one piece. */
-.pane-dock {
+.chat-pane-dock {
   width: 100%;
 }
 
@@ -264,7 +264,7 @@ p {
    bottom padding is the bigger one - so the box reads as the protagonist and not
    as a box that fell to the floor. `safe` keeps that centre for the ordinary case
    and falls back to the start when the content is taller than the pane. */
-.chat-pane.new {
+.chat-pane.is-fresh {
   align-items: center;
   justify-content: safe center;
   padding: 24px 24px clamp(24px, 8vh, 96px);
@@ -273,13 +273,13 @@ p {
 
 /* The thread's place is the hero's while the chat has no rows: the thread keeps
    its element - its mount, its reader's place - and simply draws nothing there. */
-.chat-pane.new .pane-body {
+.chat-pane.is-fresh .chat-pane-body {
   display: none;
 }
 
 /* The composer is the protagonist in view B, so it is narrower than the column it
    lines up with once there are rows. */
-.chat-pane.new .composer-dock {
+.chat-pane.is-fresh .composer-dock {
   width: min(560px, 100%);
 }
 
@@ -1744,7 +1744,7 @@ p {
     margin-bottom: 20px;
   }
 
-  .chat-pane.new {
+  .chat-pane.is-fresh {
     justify-content: flex-start;
     padding: 16px 16px 24px;
     overflow-y: auto;
@@ -1776,7 +1776,7 @@ p {
     justify-content: center;
   }
 
-  .chat-pane.new {
+  .chat-pane.is-fresh {
     padding-inline: 16px;
   }
 }

@@ -109,12 +109,12 @@
   $effect(() => () => cancelAnimationFrame(waiting))
 </script>
 
-<div class="chat-pane" class:new={fresh}>
+<div class="chat-pane" class:is-fresh={fresh}>
   {#if fresh}
     <!-- The thread's place, while it has nothing to hold. -->
     <NewSession folder={chat.folder} />
   {/if}
-  <div class="pane-body">
+  <div class="chat-pane-body">
     <Thread
       messages={thread.messages}
       items={thread.items}
@@ -126,7 +126,7 @@
       bind:scrollTop
     />
   </div>
-  <div class="pane-dock" bind:this={dock}>
+  <div class="chat-pane-dock" bind:this={dock}>
     <Composer
       chat={chat.chat}
       mark={chat.mark}
