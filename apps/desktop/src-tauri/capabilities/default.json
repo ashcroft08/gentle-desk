@@ -7,6 +7,8 @@
   "permissions": [
     "core:default",
     "updater:default",
-    "notification:default"
+    "notification:allow-is-permission-granted",
+    "notification:allow-request-permission",
+    "notification:allow-notify"
   ]
 }
