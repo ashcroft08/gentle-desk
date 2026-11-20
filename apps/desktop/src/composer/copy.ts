@@ -19,7 +19,7 @@
 // a word: the DOM id the reason line is named by, the tallest the box grows, the
 // dash the context chip draws and the token detail (`tokens` is the same word in
 // both languages, so it is a format, not copy).
-import type { LanguageView } from '../contract/bindings'
+import type { AttachmentRejectView, LanguageView } from '../contract/bindings'
 
 /** The composer's own words for one language. */
 export interface ComposerCopy {
@@ -44,6 +44,20 @@ export interface ComposerCopy {
   dropHint: string
   /** The accessible name of the button that takes one attached image away. */
   removeImage: string
+  /**
+   * The file attachments of design/composer-dock T4: the clip, the row it fills,
+   * the file outside the chat's folder (R5), and the one line a refused path
+   * draws. `attachFiles` names the clip AND the dialog it opens, so one word
+   * covers both. The rest are functions because each carries a name or a count.
+   */
+  attachFiles: string
+  attachedFiles: string
+  removeFile: string
+  outsideWorkspace: string
+  outsideWarning: string
+  showMore: (hidden: number) => string
+  showMoreLabel: (hidden: number) => string
+  attachFailed: (name: string, reason: AttachmentRejectView) => string
   /** The custom dropdown's filter box and its empty result (S7). */
   searchPlaceholder: string
   nothingMatches: string
@@ -76,8 +90,26 @@ const ENGLISH: ComposerCopy = {
   stop: 'Stop',
   openingReason: 'Send is available once the chat is ready.',
   endedReason: "This chat's process exited. Restart it to keep talking.",
-  dropHint: 'Drop the images here to attach them.',
+  dropHint: 'Drop to attach',
   removeImage: 'Remove',
+  attachFiles: 'Attach files',
+  attachedFiles: 'Attached files',
+  removeFile: 'Remove',
+  outsideWorkspace: 'outside the workspace',
+  outsideWarning:
+    "Some files are outside this chat's folder; the agent may not be able to open them.",
+  showMore: (hidden) => `+${hidden} more`,
+  showMoreLabel: (hidden) => `Show the ${hidden} remaining files`,
+  attachFailed: (name, reason) => {
+    switch (reason) {
+      case 'IsDirectory':
+        return `Could not attach ${name}: it is a folder, not a file.`
+      case 'NotFound':
+        return `Could not attach ${name}: the file does not exist.`
+      case 'Unreadable':
+        return `Could not attach ${name}: the file could not be read.`
+    }
+  },
   searchPlaceholder: 'Search models...',
   nothingMatches: 'Nothing matches.',
   sidebarToggle: 'Toggle sidebar',
@@ -102,8 +134,26 @@ const SPANISH: typeof ENGLISH = {
   stop: 'Detener',
   openingReason: 'Enviar estará disponible cuando el chat esté listo.',
   endedReason: 'El proceso de este chat terminó. Reinícialo para seguir hablando.',
-  dropHint: 'Suelta las imágenes aquí para adjuntarlas.',
+  dropHint: 'Suelta para adjuntar',
   removeImage: 'Quitar',
+  attachFiles: 'Adjuntar archivos',
+  attachedFiles: 'Archivos adjuntos',
+  removeFile: 'Quitar',
+  outsideWorkspace: 'fuera del workspace',
+  outsideWarning:
+    'Hay archivos fuera de la carpeta de este chat; el agente puede no poder abrirlos.',
+  showMore: (hidden) => `+${hidden} más`,
+  showMoreLabel: (hidden) => `Ver los ${hidden} archivos restantes`,
+  attachFailed: (name, reason) => {
+    switch (reason) {
+      case 'IsDirectory':
+        return `No se pudo adjuntar ${name}: es una carpeta, no un archivo.`
+      case 'NotFound':
+        return `No se pudo adjuntar ${name}: el archivo no existe.`
+      case 'Unreadable':
+        return `No se pudo adjuntar ${name}: no se pudo leer el archivo.`
+    }
+  },
   searchPlaceholder: 'Buscar modelos...',
   nothingMatches: 'No hay coincidencias.',
   sidebarToggle: 'Mostrar u ocultar la barra lateral',

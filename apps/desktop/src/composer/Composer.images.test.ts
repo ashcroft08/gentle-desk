@@ -58,10 +58,17 @@ describe('Composer images', () => {
   const at = { x: 10, y: 10 }
 
   it('attaches the paths of a drop, and nothing else', async () => {
+    // Both are images, so both keep the road they had: their paths go to
+    // `attach_images` and no chip stands in for either (T4, R6).
+    setHandler('describe_attachments', () => [
+      { path: 'C:\\shots\\a.png', name: 'a.png', kind: { type: 'Image' }, outside: false },
+      { path: 'C:\\shots\\b.png', name: 'b.png', kind: { type: 'Image' }, outside: false },
+    ])
     draw({ chat: 'chat-1' })
     await tick()
 
     dragEvent({ type: 'drop', paths: ['C:\\shots\\a.png', 'C:\\shots\\b.png'], position: at })
+    await tick()
     await tick()
 
     expect(handlerArgs('attach_images')).toEqual([

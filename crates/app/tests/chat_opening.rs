@@ -113,7 +113,7 @@ fn a_prompt_to_an_opening_chat_is_refused_and_leaves_no_thread_message() {
             .chats
             .state(&chat("a"))
             .expect("chat a")
-            .messages
+            .messages()
             .is_empty(),
         "the prompt is not appended while the child is coming up"
     );

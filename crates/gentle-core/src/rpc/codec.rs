@@ -138,6 +138,15 @@ fn number(map: &Map<String, Value>, key: &str) -> Option<u64> {
     map.get(key).and_then(Value::as_u64)
 }
 
+/// A member the child sends as a free-form JSON value (a tool's arguments, a
+/// result content list), or `None` when the child left it out.
+///
+/// A JSON `null` is the child saying the member is empty, not absent, so it is
+/// kept as the value it is.
+fn payload(map: &Map<String, Value>, key: &str) -> Option<Value> {
+    map.get(key).cloned()
+}
+
 fn to_event(kind: &str, parsed: &Map<String, Value>) -> Option<RpcEvent> {
     match kind {
         "agent_start" => Some(RpcEvent::AgentStart),
@@ -153,14 +162,18 @@ fn to_event(kind: &str, parsed: &Map<String, Value>) -> Option<RpcEvent> {
         "tool_execution_start" => Some(RpcEvent::ToolExecutionStart {
             tool_call_id: string(parsed, "toolCallId")?,
             tool_name: string(parsed, "toolName")?,
+            args: payload(parsed, "args"),
         }),
         "tool_execution_update" => Some(RpcEvent::ToolExecutionUpdate {
             tool_call_id: string(parsed, "toolCallId")?,
             tool_name: string(parsed, "toolName")?,
+            args: payload(parsed, "args"),
+            partial_result: payload(parsed, "partialResult"),
         }),
         "tool_execution_end" => Some(RpcEvent::ToolExecutionEnd {
             tool_call_id: string(parsed, "toolCallId")?,
             tool_name: string(parsed, "toolName")?,
+            result: payload(parsed, "result"),
             is_error: parsed.get("isError").and_then(Value::as_bool) == Some(true),
         }),
         "extension_ui_request" => to_ui_request(parsed).map(RpcEvent::UiRequest),

@@ -1,0 +1,28 @@
+{
+  "title": "Welcome screen - what the app shows when no chat is open",
+  "brief": "The empty state \"Ningún chat abierto\" feels bare. Three directions for a welcome screen built only from data the app really has: the last workspace (the most recent session in the list), its recent chats, the app's own rose icon. Opening the app must not cost a chat process: A and C are pure view, B starts the process only when the box is focused. The rose is gentle-shell-gpui's own braille-art rose (crates/app/src/shared/banner.rs, MIT), ported to a canvas: it blooms once from its heart, floats a moment and rests.",
+  "artboards": [
+    {
+      "file": "01-resume.html",
+      "title": "A - Resume where you left off",
+      "tradeoff": "Text-led and honest: the last workspace, one primary action, its recent chats; no process is started, so opening the app costs nothing. Less visual drama than a centred composer, and the rose is the only decoration.",
+      "width": 920,
+      "height": 1500
+    },
+    {
+      "file": "02-hero-composer.html",
+      "title": "B - The composer in the centre",
+      "tradeoff": "Your reference: the screen is a new session with the box front and centre and it drops to the bottom on send. Most welcoming, but it needs the chat process to start on focus (never on open) and a layout transition; the biggest build.",
+      "width": 920,
+      "height": 1180
+    },
+    {
+      "file": "03-start-panel.html",
+      "title": "C - Start panel",
+      "tradeoff": "The most informative: workspaces as cards (folder, chat count, last activity) beside recents across all of them. Pure view, no process. Busier than A, and only worth it with several workspaces.",
+      "width": 920,
+      "height": 760
+    }
+  ],
+  "feature": "odd/tasks/welcome-screen.md"
+}

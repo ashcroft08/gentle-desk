@@ -140,7 +140,7 @@ pub(super) struct Asked {
 }
 
 impl Asked {
-    fn of(id: &str, method: &str, params: Value) -> Self {
+    pub(super) fn of(id: &str, method: &str, params: Value) -> Self {
         Self {
             id: id.to_owned(),
             method: method.to_owned(),

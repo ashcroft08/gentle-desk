@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="es" data-theme="dark">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Composer dock - modo de sesión</title>
+<style>
+:root,[data-theme="dark"]{--bg:#0e1116;--surface:#151a21;--surface2:#1c222b;--border:#2b333d;--text:#e4e8ee;--muted:#9aa4b2;--faint:#7d8593;--accent:#7aa2f7;--tint:rgba(122,162,247,.14);--success:#7edc9a;--warning:#e7b455;--danger:#ff8585}
+[data-theme="light"]{--bg:#f2f4f7;--surface:#ffffff;--surface2:#e9edf2;--border:#cfd5dd;--text:#17202a;--muted:#576272;--faint:#6b7686;--accent:#2e5bd7;--tint:rgba(46,91,215,.10);--success:#166e38;--warning:#8a5800;--danger:#c22f37}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+.page{max-width:900px;margin:0 auto;padding:22px 18px 60px}
+h2{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin:0 0 8px;font-weight:600}
+.note{color:var(--muted);font-size:12px;margin:0 0 12px;max-width:72ch}
+.note b{color:var(--text);font-weight:600}
+.sheet{margin:0 0 32px}
+.stage{border:1px solid var(--border);border-radius:10px;background:var(--bg);overflow:hidden;padding-bottom:14px}
+.talk{padding:14px 16px 0}
+.you{margin-left:auto;width:fit-content;background:var(--tint);border-radius:9px;padding:6px 11px;font-size:13.5px;max-width:46ch}
+
+/* the status row: the mode lives at its right edge, only while working */
+.state{position:relative;display:flex;align-items:center;gap:6px;padding:10px 16px 0;font-size:11.5px;color:var(--faint)}
+.state .spin{width:9px;height:9px;border:1.5px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .9s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation:none}*{transition:none!important}}
+.state .t{color:var(--muted)}
+.state .n{font-variant-numeric:tabular-nums}
+
+/* the mode control: a quiet text button with a caret, same 11px as the row */
+.mode{margin-left:auto;display:inline-flex;align-items:center;gap:4px;font:inherit;font-size:11px;color:var(--muted);background:none;border:1px solid transparent;border-radius:999px;padding:1px 7px;cursor:pointer}
+.mode:hover{color:var(--text);border-color:var(--border)}
+.mode:focus-visible,.opt:focus-visible,.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.mode svg{width:9px;height:9px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;opacity:.7}
+.mode.hot{color:var(--danger);border-color:currentColor}
+.mode.wait{color:var(--faint)}
+.mode.wait .dots{display:inline-block;width:9px;height:9px;border:1.5px solid var(--border);border-top-color:var(--muted);border-radius:50%;animation:spin .9s linear infinite}
+
+/* popover: opens upward-left from the control, never covers the composer */
+.pop{position:absolute;right:16px;top:100%;margin-top:4px;z-index:2;width:292px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:5px;box-shadow:0 8px 24px rgba(0,0,0,.35)}
+.pop .cap{font-size:10.5px;color:var(--faint);padding:5px 8px 6px;letter-spacing:.02em}
+.opt{display:grid;grid-template-columns:14px 1fr;column-gap:8px;width:100%;text-align:left;font:inherit;background:none;border:0;color:var(--text);border-radius:7px;padding:6px 8px;cursor:pointer}
+.opt:hover{background:var(--surface2)}
+.opt .ck{color:var(--accent);font-size:12px;line-height:1.5}
+.opt .nm{font-size:12.5px;font-weight:600}
+.opt .ds{grid-column:2;font-size:11px;color:var(--muted);line-height:1.35}
+.opt.hot .nm{color:var(--danger)}
+.opt .warn{font-weight:400;color:var(--faint);font-size:11px;margin-left:6px}
+.sep{height:1px;background:var(--border);margin:4px 6px}
+
+/* confirmation: replaces the list inside the same popover, no new modal */
+.conf{padding:8px 9px 9px}
+.conf .q{font-size:12.5px;font-weight:600;color:var(--text);margin:0 0 4px}
+.conf .why{font-size:11.5px;color:var(--muted);margin:0 0 10px;line-height:1.4}
+.conf .why b{color:var(--danger);font-weight:600}
+.acts{display:flex;gap:6px;justify-content:flex-end}
+.btn{font:inherit;font-size:12px;border-radius:7px;padding:4px 11px;cursor:pointer;border:1px solid var(--border);background:none;color:var(--text)}
+.btn:hover{background:var(--surface2)}
+.btn.go{border-color:var(--danger);color:var(--danger)}
+.btn.go:hover{background:rgba(255,133,133,.12)}
+
+/* failure: one line under the row, the mode keeps its old value */
+.fail{display:flex;gap:6px;align-items:baseline;margin:6px 16px 0;font-size:11px;color:var(--danger)}
+.fail code{font-family:ui-monospace,SFMono-Regular,"Cascadia Mono",Consolas,monospace;font-size:10.5px;background:var(--surface2);border-radius:4px;padding:0 4px;color:var(--muted)}
+.fail .keep{color:var(--faint)}
+
+/* idle: no work, no control. The row is just the composer, nothing here */
+.idle{margin:10px 16px 0;font-size:11px;color:var(--faint)}
+
+.dock{margin:12px 16px 0;border:1px solid var(--border);border-radius:12px;background:var(--surface)}
+.dock .in{padding:12px 14px 8px;color:var(--faint);font-size:14px}
+.row{display:flex;align-items:center;gap:10px;padding:0 12px 10px;font-size:12px;color:var(--muted)}
+.row .name{color:var(--text);font-weight:600}
+.row .grow{flex:1}
+.send{width:24px;height:24px;border-radius:50%;background:var(--accent);display:inline-block}
+
+/* sheet D: the mode as a PERMANENT chip in the context rail's corner */
+.state .mode{margin-left:auto;margin-right:4px}
+.state .mode{font-size:11px}
+.pop .cap{display:flex;justify-content:space-between}
+.opt .nm{display:inline-flex;align-items:center;gap:7px}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="sheet">
+    <h2>A · el modo cambia desde la fila de estado</h2>
+    <p class="note">El modo de la sesión es un <b>botón de texto con caret</b> en el borde derecho de la fila de estado. Sólo existe <b>mientras el agente trabaja</b>. Abre un menú con los cuatro modos que el canal conoce; el actual lleva ✓. <b>Normal</b> y <b>Auto</b> cambian al instante de elegirlos. <b>YOLO</b> y <b>Super YOLO</b> reemplazan la lista por una confirmación en el mismo menú. Sólo cambia el modo de <b>esta sesión</b>; el default no se toca.</p>
+    <div class="stage">
+      <div class="talk"><div class="you">cómo mejoro el header del proyecto</div></div>
+      <div class="state">
+        <span class="spin"></span><span class="t">trabajando…</span><span class="n">12s</span>
+        <button class="mode" aria-haspopup="menu" aria-expanded="true" aria-label="Modo de la sesión: Normal">Normal<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
+        <div class="pop" role="menu" aria-label="Modo de la sesión">
+          <div class="cap">Modo de esta sesión · el default no cambia</div>
+          <button class="opt" role="menuitemradio" aria-checked="true"><span class="ck">✓</span><span class="nm">Normal</span></button>
+          <button class="opt" role="menuitemradio" aria-checked="false"><span class="ck"></span><span class="nm">Auto</span></button>
+          <div class="sep"></div>
+          <button class="opt hot" role="menuitemradio" aria-checked="false"><span class="ck"></span><span class="nm">YOLO<span class="warn">pide confirmación</span></span><span class="ds">Sin preguntas de permiso (lo que informa el canal).</span></button>
+          <button class="opt hot" role="menuitemradio" aria-checked="false"><span class="ck"></span><span class="nm">Super YOLO<span class="warn">pide confirmación</span></span><span class="ds">Sin preguntas; las rutas privadas siguen bloqueadas.</span></button>
+        </div>
+      </div>
+      <div style="height:196px"></div>
+      <div class="dock"><div class="in">¿y el plan de migración?</div><div class="row"><span class="name">Kallari_Pagina_web</span><span class="grow"></span><span class="send"></span></div></div>
+    </div>
+  </div>
+
+  <div class="sheet">
+    <h2>B · confirmar YOLO y Super YOLO</h2>
+    <p class="note">Elegir uno de los dos <b>no envía nada</b>: el menú pasa a una pregunta con el efecto en una frase. <b>Cancelar</b> es el foco inicial y Esc también cancela; sólo el botón rojo envía. Mientras la respuesta no llega, el botón de la fila muestra el spinner y <b>sigue diciendo el modo anterior</b>.</p>
+    <div class="stage">
+      <div class="state">
+        <span class="spin"></span><span class="t">trabajando…</span><span class="n">12s</span>
+        <button class="mode" aria-haspopup="menu" aria-expanded="true">Normal<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
+        <div class="pop" role="dialog" aria-label="Confirmar Super YOLO">
+          <div class="conf">
+            <p class="q">¿Pasar esta sesión a Super YOLO?</p>
+            <p class="why"><b>El agente deja de pedir permiso</b> para ejecutar comandos y editar archivos. Vale sólo para esta sesión; las rutas privadas siguen bloqueadas.</p>
+            <div class="acts"><button class="btn" autofocus>Cancelar</button><button class="btn go">Pasar a Super YOLO</button></div>
+          </div>
+        </div>
+      </div>
+      <div style="height:128px"></div>
+    </div>
+    <p class="note" style="margin-top:12px">Esperando la respuesta del canal:</p>
+    <div class="stage">
+      <div class="state"><span class="spin"></span><span class="t">trabajando…</span><span class="n">13s</span>
+        <button class="mode wait" aria-busy="true" aria-label="Cambiando el modo; sigue en Normal hasta que el canal confirme">Normal<span class="dots"></span></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="sheet">
+    <h2>C · el estado confirmado, el rechazo y los casos sin control</h2>
+    <p class="note">El texto del botón cambia <b>sólo cuando el canal confirma</b> (la respuesta o <code>permission_mode_changed</code>); nunca de forma optimista. Si el canal rechaza el cambio, una línea dice el código y que el modo no cambió. Un cambio hecho desde la terminal llega como el mismo evento y se ve igual.</p>
+    <div class="stage" style="margin-bottom:10px">
+      <div class="state"><span class="spin"></span><span class="t">trabajando…</span><span class="n">15s</span>
+        <button class="mode hot" aria-haspopup="menu" aria-expanded="false">Super YOLO<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
+      </div>
+    </div>
+    <div class="stage" style="margin-bottom:10px">
+      <div class="state"><span class="spin"></span><span class="t">trabajando…</span><span class="n">15s</span>
+        <button class="mode" aria-haspopup="menu" aria-expanded="false">Normal<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
+      </div>
+      <div class="fail" role="alert"><span>No se pudo cambiar el modo</span><code>permission_denied</code><span class="keep">Sigue en Normal.</span></div>
+    </div>
+    <div class="stage" style="margin-bottom:10px">
+      <div class="state"><span class="spin"></span><span class="t">trabajando…</span><span class="n">15s</span>
+        <button class="mode" aria-haspopup="menu" aria-expanded="false" title="Valor tal como lo informa el canal">semi-auto<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
+      </div>
+      <div class="idle">Un valor que el mapa no conoce se muestra crudo, tal cual lo manda el canal.</div>
+    </div>
+    <div class="stage" style="margin-bottom:10px">
+      <div class="state"><span class="spin"></span><span class="t">trabajando…</span><span class="n">15s</span></div>
+      <div class="idle">Sin canal de escritorio (<code>supports()</code> falso) o sin lectura todavía: no hay botón, ni hueco, ni guion.</div>
+    </div>
+    <div class="stage">
+      <div class="idle" style="margin:12px 16px">Sin trabajo en curso no hay fila de estado y tampoco control. El modo se cambia mientras trabaja, no antes.</div>
+    </div>
+  </div>
+
+
+  <div class="sheet">
+    <h2>D · el modo siempre visible, en la esquina del contexto (reemplaza A en la fila de estado)</h2>
+    <p class="note">El modo ya no vive en la fila de estado: <b>la fila de arriba es permanente</b> — el reloj a la izquierda cuando hay turno, el modo <b>fijo a la derecha siempre</b>, encima del contexto. Se ve <b>siempre</b> — el estado existe aunque el agente no esté trabajando — y abre el mismo menú en cualquier momento. Las descripciones son <b>las que el canal informa</b>: YOLO y Super YOLO las tienen, Normal y Auto no (el canal no dice nada de ellas, y no se inventa). La confirmación de YOLO y Super YOLO y las reglas de nunca-cambiar-optimista siguen iguales.</p>
+    <div class="stage">
+      <div class="state">
+        <span class="spin"></span><span class="t">trabajando…</span><span class="n">12s</span>
+        <button class="mode hot" aria-haspopup="menu" aria-expanded="true">Super YOLO<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
+      </div>
+      <div class="ctx"><div class="lab"><span class="l"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2"/></svg>6%</span><span>1M</span></div><div class="rail"><i></i></div></div>
+      <div class="dock"><div class="in">¿y el plan de migración?</div><div class="row"><span class="name">Kallari_Pagina_web</span><span class="grow"></span><span class="send"></span></div></div>
+      <div class="pop" role="menu" aria-label="Modo de la sesión" style="position:absolute;right:40px;top:38px">
+        <div class="cap"><span>Modo de esta sesión · el default no cambia</span></div>
+        <button class="opt" role="menuitemradio" aria-checked="false"><span class="ck"></span><span class="nm">Normal</span><span class="ds">Canal sin descripción.</span></button>
+        <button class="opt" role="menuitemradio" aria-checked="false"><span class="ck"></span><span class="nm">Auto</span><span class="ds">Canal sin descripción.</span></button>
+        <div class="sep"></div>
+        <button class="opt hot" role="menuitemradio" aria-checked="false"><span class="nm">YOLO</span><span class="ds">destructive confirmations remain</span></button>
+        <button class="opt hot" role="menuitemradio" aria-checked="true"><span class="nm">Super YOLO</span><span class="ds">no permission prompts; private paths stay blocked</span></button>
+      </div>
+      <div style="height:210px"></div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

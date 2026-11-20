@@ -287,16 +287,84 @@ mod decode {
             ),
             RpcEvent::ToolExecutionStart {
                 tool_call_id: "t1".into(),
-                tool_name: "bash".into()
+                tool_name: "bash".into(),
+                args: None,
             }
         );
         assert_eq!(
             event("{\"type\":\"tool_execution_end\",\"toolCallId\":\"t1\",\"toolName\":\"bash\",\"isError\":true}"),
-            RpcEvent::ToolExecutionEnd { tool_call_id: "t1".into(), tool_name: "bash".into(), is_error: true }
+            RpcEvent::ToolExecutionEnd { tool_call_id: "t1".into(), tool_name: "bash".into(), result: None, is_error: true }
         );
         assert!(is_unknown(
             "{\"type\":\"tool_execution_start\",\"toolName\":\"bash\"}"
         ));
+    }
+
+    /// The three tool-execution events carry what a tool card is drawn from:
+    /// the call's arguments, the output the tool has produced so far and the
+    /// result it ended with. Until L5 of `odd/tasks/chat-transcript.md` the
+    /// codec parsed them out of the line and dropped them, so a tool item could
+    /// carry a command but never an output.
+    #[test]
+    fn tool_execution_start_carries_the_arguments_of_the_call() {
+        assert_eq!(
+            event(
+                "{\"type\":\"tool_execution_start\",\"toolCallId\":\"t1\",\"toolName\":\"bash\",\"args\":{\"command\":\"ls\"}}"
+            ),
+            RpcEvent::ToolExecutionStart {
+                tool_call_id: "t1".into(),
+                tool_name: "bash".into(),
+                args: Some(json!({"command": "ls"})),
+            }
+        );
+    }
+
+    #[test]
+    fn tool_execution_update_carries_its_partial_result() {
+        assert_eq!(
+            event(
+                "{\"type\":\"tool_execution_update\",\"toolCallId\":\"t1\",\"toolName\":\"bash\",\"args\":{\"command\":\"ls\"},\"partialResult\":{\"content\":[{\"type\":\"text\",\"text\":\"a\\nb\\n\"}]}}"
+            ),
+            RpcEvent::ToolExecutionUpdate {
+                tool_call_id: "t1".into(),
+                tool_name: "bash".into(),
+                args: Some(json!({"command": "ls"})),
+                partial_result: Some(json!({"content": [{"type": "text", "text": "a\nb\n"}]})),
+            }
+        );
+    }
+
+    #[test]
+    fn tool_execution_end_carries_the_result_it_ended_with() {
+        assert_eq!(
+            event(
+                "{\"type\":\"tool_execution_end\",\"toolCallId\":\"t1\",\"toolName\":\"bash\",\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"a\\nb\\n\"}]},\"isError\":false}"
+            ),
+            RpcEvent::ToolExecutionEnd {
+                tool_call_id: "t1".into(),
+                tool_name: "bash".into(),
+                result: Some(json!({"content": [{"type": "text", "text": "a\nb\n"}]})),
+                is_error: false,
+            }
+        );
+    }
+
+    /// A member the child leaves out stays out: nothing is drawn from a guess.
+    #[test]
+    fn a_tool_execution_event_without_its_payload_carries_none() {
+        match event(
+            "{\"type\":\"tool_execution_update\",\"toolCallId\":\"t1\",\"toolName\":\"bash\"}",
+        ) {
+            RpcEvent::ToolExecutionUpdate {
+                args,
+                partial_result,
+                ..
+            } => {
+                assert_eq!(args, None);
+                assert_eq!(partial_result, None);
+            }
+            other => panic!("unexpected {other:?}"),
+        }
     }
 
     #[test]

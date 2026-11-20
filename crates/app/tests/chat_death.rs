@@ -165,7 +165,7 @@ fn a_prompt_to_an_ended_chat_is_a_notice_and_reaches_no_child() {
     let (state, effects) = prompt(state, "otra");
 
     assert_eq!(effects, Effects::default(), "there is no child to write to");
-    let messages = &state.chats.state(&chat("a")).expect("chat a").messages;
+    let messages = &state.chats.state(&chat("a")).expect("chat a").messages();
     assert_eq!(messages.len(), 1, "the prompt was not appended");
     assert_eq!(messages[0].text, "hola");
     let notice = state.notices.last().expect("a notice");

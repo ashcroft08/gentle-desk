@@ -1,5 +1,6 @@
-// The model chip's drawn behaviour (S7): the pills sit in their own row below
-// the composer form; each opens the app's own themed listbox (no native
+// The model chip's drawn behaviour (S7): the pills sit in the composer's own row
+// (design/composer-dock regrouped them there); each opens the app's own themed
+// listbox (no native
 // popup), the model list filters as one types, arrows move and Enter chooses,
 // Escape and a click outside close, and each choice dispatches the intent
 // Rust maps. The failure states are drawn, never guessed.
@@ -58,20 +59,20 @@ afterEach(() => {
 })
 
 describe('model chip', () => {
-  it('the pills share the keys-hint line below the composer form', () => {
+  it('the pills sit in the composer’s row, and the hints outside its border', () => {
     const { container } = chipProp(READY)
     const form = container.querySelector('form.composer')
-    const bottom = container.querySelector('.dock-bottom')
+    const row = container.querySelector('.composer .row')
     const chip = container.querySelector('.chip')
-    const keys = container.querySelector('.dock-bottom .keys')
+    const keys = container.querySelector('.composer-dock > .keys')
     expect(form).toBeTruthy()
-    expect(bottom).toBeTruthy()
+    expect(row).toBeTruthy()
     expect(chip).toBeTruthy()
     expect(keys).toBeTruthy()
-    // The row comes after the form, and the hints and the pills share it.
-    expect(form!.compareDocumentPosition(bottom as Node) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(bottom!.contains(keys as Node)).toBeTruthy()
-    expect(bottom!.contains(chip as Node)).toBeTruthy()
+    // The pills share the box's last row; the key hint is below the border.
+    expect(row!.contains(chip as Node)).toBeTruthy()
+    expect(form!.contains(row as Node)).toBeTruthy()
+    expect(form!.contains(keys as Node)).toBe(false)
   })
 
   it('the pills show the current model and level without a list open', () => {

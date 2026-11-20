@@ -369,21 +369,47 @@ p {
   text-align: left;
 }
 
+/* Copy is an icon that only exists under the pointer: the thread is where the
+   reader looks, so a word on every finished reply is furniture. It comes back for
+   the keyboard through :focus-visible, and its accessible name carries the word. */
 .copy {
   border: 0;
   background: transparent;
-  color: var(--muted);
-  font-size: 12px;
-  padding: 2px 6px;
-  margin-top: 6px;
-  border-radius: 6px;
+  color: var(--faint);
+  width: 24px;
+  height: 24px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  margin-top: 4px;
+  border-radius: 5px;
   cursor: pointer;
+  opacity: 0;
+  transition: opacity 100ms ease;
+}
+
+.copy svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.msg:hover .copy,
+.copy:focus-visible {
+  opacity: 1;
 }
 
 .copy:hover {
   background: var(--surface2);
   color: var(--text);
 }
+
+/* Copy's own transition needs no reduced-motion block of its own: the global one
+   at the end of this file already turns every transition off. */
 
 /* A model error replaces the reply: the iced danger box, drawn with the states
    board's error edge. */
@@ -402,6 +428,280 @@ p {
 
 .err .em {
   color: var(--text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* A tool call, drawn as ONE quiet card (chat-transcript T2b; the artboard is
+   `design/tool-card/01-quiet-cards.html`, the tokens are `design/system.md`):
+   the header's kind glyph, the tool's own name and the chip that name implies,
+   the monospace subject, the output folded to its tail behind a count, and a
+   footer that carries the state and the elapsed time - never a sentence.
+   Every value is a house token and the house monospace stack, so the six themes
+   draw the card with no colour of its own.
+   `overflow: hidden` here is not a scroll container: the fold is a slice of the
+   text (`thread/card.ts`), so the thread keeps the ONE scroll box it has. */
+.tool-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.tc-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  min-height: 34px;
+}
+
+.tc-tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* The kind's glyph: a house stroke mark, `currentColor`, no fill. */
+.tc-glyph {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* The language or kind chip: drawn only when the tool's name names one. */
+.tc-chip {
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  font-size: 11px;
+  line-height: 1;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  border-radius: 5px;
+  padding: 3px 6px;
+  background: var(--surface2);
+}
+
+.tc-grow {
+  flex: 1;
+}
+
+/* The two honest marks of a payload that did not arrive whole (L10 R3-2): the
+   output was cut at the bound, or a field of it was dropped. Different words,
+   because they are different facts - and a border only, so no colour is added. */
+.tc-cut {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--warning);
+  font-size: 11.5px;
+  border: 1px solid var(--warning);
+  border-radius: 6px;
+  padding: 1px 6px;
+}
+
+.tc-chev {
+  background: none;
+  border: 0;
+  color: var(--faint);
+  cursor: pointer;
+  padding: 2px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 4px;
+}
+
+.tc-chev:hover {
+  color: var(--text);
+  background: var(--surface2);
+}
+
+.tc-chev svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* The one thing a card always shows: the command of a shell-like tool, or the
+   tool and a bounded summary of its arguments. */
+.tc-cmd {
+  margin: 0;
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  font-size: 12.5px;
+  color: var(--text);
+  background: var(--surface2);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  padding: 8px 10px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* A shell command is drawn the way a prompt draws it; the glyph is not a word,
+   so no language rewrites it (the shell's own `$` is the same in both). */
+.tc-cmd.shell::before {
+  content: '$ ';
+  color: var(--faint);
+}
+
+.tc-out {
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  font-size: 12.2px;
+  color: var(--muted);
+  padding: 8px 10px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* One line of an output is its own block, so the count of hidden lines is the
+   count of elements the card decided to draw - no layout is measured. The
+   minimum height keeps an empty line of an output visible as the empty line it
+   is, without asking the browser how tall a line is. */
+.tc-line {
+  display: block;
+  min-height: 1.5em;
+}
+
+/* The first line of a failed call: the reason, never folded away. */
+.tc-line-error {
+  color: var(--danger);
+}
+
+.tc-more {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  background: none;
+  border: 0;
+  border-top: 1px solid var(--border);
+  color: var(--faint);
+  font: inherit;
+  font-size: 11.5px;
+  padding: 5px 10px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.tc-more:hover {
+  color: var(--text);
+  background: var(--surface2);
+}
+
+/* The footer: the state and the time, tabular so the numbers do not shift. */
+.tc-foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-top: 1px solid var(--border);
+  font-size: 11.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* `.mark` gives the stroke; the card's own footer only sizes and tones it. */
+.tc-foot .tc-mark {
+  width: 13px;
+  height: 13px;
+  color: var(--success);
+}
+
+.tc-foot.bad .tc-mark {
+  color: var(--danger);
+}
+
+.tc-spin {
+  width: 11px;
+  height: 11px;
+  flex: none;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: tc-spin 0.9s linear infinite;
+}
+
+@keyframes tc-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* The reasoning row: NOT a card. One quiet line - a spark, the word, the
+   duration chip and a chevron - and the text behind a hairline, so a thought
+   never competes with the tool call beside it (T2b, the artboard's tradeoff). */
+.think-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.think {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  align-self: flex-start;
+  width: fit-content;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.think .spark {
+  color: var(--accent);
+  font-size: 13px;
+  line-height: 1;
+}
+
+.think .dur {
+  font-variant-numeric: tabular-nums;
+  color: var(--faint);
+  font-size: 12px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 0 5px;
+}
+
+.think .chev {
+  color: var(--faint);
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 120ms ease;
+}
+
+.think[aria-expanded='true'] .chev {
+  transform: rotate(90deg);
+}
+
+.think-text {
+  margin: 0 0 0 20px;
+  color: var(--muted);
+  font-size: 13px;
+  border-left: 2px solid var(--border);
+  padding-left: 10px;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -548,12 +848,12 @@ p {
 
 .composer {
   display: flex;
-  align-items: flex-end;
-  gap: 8px;
+  flex-direction: column;
+  gap: 6px;
   border: 1px solid var(--border);
   border-radius: 18px;
   background: var(--surface);
-  padding: 10px 10px 10px 16px;
+  padding: 10px 12px 8px 16px;
 }
 
 .composer:focus-within {
@@ -562,7 +862,9 @@ p {
 }
 
 .composer textarea {
-  flex: 1;
+  flex: none;
+  width: 100%;
+  min-width: 0;
   border: 0;
   background: transparent;
   resize: none;
@@ -599,6 +901,116 @@ p {
   color: var(--danger);
 }
 
+/* The composer's one row, under the input (design/composer-dock): what the
+   message runs ON (the two selects), then where it runs (the folder and the
+   branch it is on), the flexible space and Send.
+
+   The class `row` is ALSO the sidebar's (`.row` below: fixed height, padding, a
+   radius and a hover that paints a background and an outline), and it reaches
+   this element too. That inherited hover is the one big rectangle the maintainer
+   kept pointing at (L16): the composer's row is not a list row, so it resets
+   everything the sidebar rule gives it and keeps only its own layout. The
+   individual controls inside it keep their own hover. */
+.composer .row,
+.composer .row:hover {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  height: auto;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  cursor: default;
+}
+
+/* The row's groups: each group keeps its own tight 6px rhythm, and wears its own
+   text again, not boxes: a border inside the dock's border read as a card
+   inside a card (the maintainer's screenshot, L14). The groups separate by the
+   row's 12px gap and the 1px hairline between runs-on and runs-in; the
+   individual controls keep their own hover, no group hover (L15). */
+.composer .row .grp {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.composer .row .vsep {
+  width: 1px;
+  height: 14px;
+  flex: none;
+  background: var(--border);
+}
+
+.composer .row .grow {
+  flex: 1;
+  min-width: 6px;
+}
+
+/* The folder name is the only bold thing in the row, the way the artboard draws
+   it; the whole path lives in the hover and is never the text (R4). */
+.composer .row .folder {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.composer .row .folder .t {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The branch on that folder (design/composer-dock S2, R3, R4): the folder's own
+   anatomy - glyph, then one line of text - in the quiet colour, because the
+   folder's name is the only bold thing in the row. It carries no hairline of its
+   own: the one before the group is the folder's, and a chat with no branch leaves
+   nothing behind it. */
+.composer .row .branch {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.composer .row .branch .t {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Its glyph, in the artboard's own four shapes and the composer's stroke: the
+   named-icon registry is not this slice's, so the one branch glyph the composer
+   needs is drawn by the chip itself. */
+.composer .row .branch .g {
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* The two selects' own glyphs (design/composer-dock): the model wears the accent,
+   the effort the quiet colour of its pill. Decoration: the caret beside the value
+   is what says "select", and the accessible name says which one. */
+.pill .g {
+  display: inline-flex;
+  flex: none;
+}
+
+.pill .g-model {
+  color: var(--accent);
+}
+
 /* The reason line under the box: the states board's `.why`, offset to the box
    the way the `New session` reason is offset from its button. */
 .composer-dock .why {
@@ -606,16 +1018,14 @@ p {
   padding-left: 16px;
 }
 
-/* The model chip (0.1.11, S7): the two pill dropdowns sit at the right of the
-   bottom row under the composer form, sharing it with the key hints (`.dock-bottom`),
-   and open the themed popover listbox upward (the row is at the window's bottom
-   edge). */
+/* The model chip (0.1.11, S7): the two pill dropdowns now sit IN the composer's
+   row, after what surrounds them (design/composer-dock), and open the themed
+   popover listbox upward (the row is at the window's bottom edge). */
 .chip {
-  display: flex;
-  justify-content: flex-end;
+  display: inline-flex;
   align-items: center;
-  flex-wrap: nowrap;
   gap: 4px;
+  min-width: 0;
 }
 
 .pill-select {
@@ -780,9 +1190,159 @@ p {
   border-color: var(--danger);
 }
 
-/* The composer takes a drag: the box says so while the files are in the air. */
+/* The composer takes a drag: the box says so while the files are in the air.
+   The accent tints it, the way the artboard draws the drop (sheet B). */
 .composer.over {
   border-color: var(--accent);
+  background: var(--tint);
+}
+
+/* The clip (design/composer-dock/03-attachments.html, sheet A): the artboard's
+   26px quiet button, the row's first part, mute until it is reached. */
+.composer .att {
+  width: 26px;
+  height: 26px;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  border: 0;
+  padding: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--faint);
+  cursor: pointer;
+}
+
+.composer .att:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--surface2);
+}
+
+.composer .att:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.composer .att svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* The attached FILES are content, not chrome (sheet A): their own row above the
+   text, the name drawn and the whole path only in the hover. */
+.composer .chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 2px;
+}
+
+.composer .chips .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 260px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px 4px 2px 6px;
+  font-size: 11px;
+  color: var(--muted);
+  background: var(--surface);
+}
+
+.composer .chips .chip svg {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.composer .chips .chip .t {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+/* A file outside the chat's folder is amber and says so (R5, sheet B). It is
+   never refused: the message carries its path like any other. */
+.composer .chips .chip.out {
+  border-color: color-mix(in srgb, var(--warning) 45%, transparent);
+  color: var(--warning);
+}
+
+.composer .chips .chip.out .t,
+.composer .chips .chip.out .why {
+  color: var(--warning);
+}
+
+.composer .chips .chip.out .why {
+  opacity: 0.85;
+  white-space: nowrap;
+}
+
+.composer .chips .chip .x {
+  background: none;
+  border: 0;
+  padding: 0 3px;
+  border-radius: 4px;
+  color: var(--faint);
+  cursor: pointer;
+  line-height: 1;
+  font: inherit;
+}
+
+.composer .chips .chip .x:hover {
+  color: var(--text);
+  background: var(--surface2);
+}
+
+/* The collapsed row's "+N more" (sheet D): quiet, dashed, and a control, not a
+   chip of its own. */
+.composer .chips .more {
+  background: none;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  color: var(--faint);
+  font: inherit;
+  font-size: 11px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+
+.composer .chips .more:hover {
+  color: var(--text);
+}
+
+.composer .att:focus-visible,
+.composer .chips .chip .x:focus-visible,
+.composer .chips .more:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ONE line under the chips while any file is outside the chat's folder (R5),
+   and ONE line in place of a refused path's chip (sheet D). */
+.composer .warn {
+  margin: 0 0 2px;
+  font-size: 11px;
+  color: var(--warning);
+}
+
+.composer .attach-failed {
+  margin: 0 0 2px;
+  font-size: 11px;
+  color: var(--danger);
 }
 
 .composer-dock .drop {
@@ -800,23 +1360,8 @@ p {
   font-size: 12px;
 }
 
-/* The bottom row under the box: the key hints take the left, the chip's pills
-   take the right, so no blank row is left under the box (S7 feedback). */
-.composer-dock .dock-bottom {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 4px 12px;
-  margin-top: 8px;
-}
-
-.composer-dock .dock-bottom .keys {
-  margin: 0;
-}
-
-/* The key hints under the box: quiet, left-aligned with the box's text, never
-   competing with it. */
+/* The key hints under the box: quiet, left-aligned with the box's text, BELOW the
+   composer's border and never competing with it (design/composer-dock). */
 .composer-dock .keys {
   margin: 8px 0 0;
   padding-left: 16px;
@@ -825,67 +1370,58 @@ p {
   font-size: 12px;
 }
 
-/* The context chip (0.1.12, S5): how full this chat's window is, in the bottom
-   row between the key hints and the model pills. One number and one tiny bar;
-   the tokens behind it are the hover. Its tone is the reader's own scale - quiet
-   until 75%, the warning token from there, the danger token from 95% - so the
-   colour never carries the meaning alone: the number is drawn too. */
-.ctx {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 4px 10px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  color: var(--text);
-  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1;
-  white-space: nowrap;
-  cursor: default;
+/* The context rail ABOVE the box and outside its border (design/composer-dock S1,
+   S5): a 2px line narrower than the composer, the percent at its left with a
+   clock and the window at its right. It is a measure, not a chip - no box, no
+   border. Its tone is the reader's own scale, the one the chip already used
+   (`composer/context.ts`): quiet until 75%, the warning token from there - so the
+   percentage is always drawn too and colour never carries the meaning alone. */
+.composer-dock .ctx-rail {
+  /* Clear of the composer's own focus ring: the ring draws 2px outside the
+     dock, so the rail needs more than the old 3px or the ring crosses it
+     (maintainer's test note, 2026-11-19). */
+  margin: 0 10px 10px;
 }
 
-.ctx .bar {
-  display: inline-block;
-  width: 46px;
-  height: 5px;
-  border-radius: 3px;
+.composer-dock .ctx-rail .lab {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 4px;
+  font-size: 10.5px;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.composer-dock .ctx-rail .lab .l {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.composer-dock .ctx-rail .rail {
+  height: 2px;
+  border-radius: 1px;
   background: var(--border);
   overflow: hidden;
 }
 
-.ctx .bar i {
+.composer-dock .ctx-rail .rail i {
   display: block;
   height: 100%;
   /* A small share still shows a sliver: at 6% the fill is under a pixel
-     otherwise, and the bar would read as empty. */
+     otherwise, and the rail would read as empty. */
   min-width: 4px;
-  border-radius: 3px;
+  border-radius: 1px;
   background: var(--accent);
 }
 
-.ctx.warning {
-  color: var(--warning);
-  border-color: var(--warning);
-}
-
-.ctx.warning .bar i {
+.composer-dock .ctx-rail.warning .rail i {
   background: var(--warning);
 }
 
-.ctx.danger {
-  color: var(--danger);
-  border-color: var(--danger);
-}
-
-.ctx.danger .bar i {
+.composer-dock .ctx-rail.danger .rail i {
   background: var(--danger);
-}
-
-/* No percentage: a dash, quiet, and no bar to pretend there is a reading. */
-.ctx.unknown {
-  color: var(--faint);
 }
 
 .placeholder {
@@ -1424,17 +1960,27 @@ p {
    is wider than the other dialogs' 440px to hold both, about 680px. */
 .dlg.settings {
   width: min(680px, calc(100vw - 32px));
+  /* What the card's OWN chrome takes out of the window: the title above and the
+     Close button below, with slack. Named here so the body's bound below never
+     holds a number nobody can trace (native review R2-2). */
+  --settings-chrome: 200px;
   display: flex;
   flex-direction: column;
   gap: 14px;
 }
 
 /* The rail and the pane, side by side: the rail is fixed and the pane takes the
-   rest, with the one section drawn there. */
+   rest, with the one section drawn there.
+
+   The body is BOUNDED against the window (ui-density T1): a section can be long
+   - Usage draws every provider, limit and window - and with nothing holding it
+   the card grew past the bottom of the window, pushing its own Close button out
+   of reach. The room left over is what the card's own chrome does not use. */
 .settings-body {
   display: flex;
   gap: 18px;
   min-height: 240px;
+  max-height: calc(100vh - var(--settings-chrome));
 }
 
 .settings-rail {
@@ -1489,10 +2035,15 @@ p {
 .settings-pane {
   flex: 1;
   min-width: 0;
+  /* The thing that scrolls inside the body's bound. `min-height: 0` is what lets
+     a flex child shrink below its content; without it the pane overflows anyway
+     and the bound above does nothing (ui-density T1). */
+  min-height: 0;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  padding: 2px 2px 0 2px;
+  padding: 2px 8px 0 2px;
 }
 
 .settings-pane .pane-body {
@@ -2388,6 +2939,259 @@ p {
 
 .activity .dot:nth-child(3) {
   animation-delay: 0.4s;
+}
+
+/* The status row at the end of the thread (design/composer-dock S1, sheet D of
+   02-mode-picker): ONE faint row sharing the reasoning row's anatomy - a 9px
+   spinner, the working word and the seconds it has been working - never a card,
+   never a second visual language. The row is PERMANENT: its left side is the
+   clock (drawn only while the turn runs) and its right side is the session mode
+   control (T3c, L7/L8), which is there whether the chat is working or idle, so
+   the row may be empty when nothing answered the read. Reduced motion leaves
+   both rings still, through the shared rule at the end of this file. */
+.work {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.work-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0 4px;
+  font-size: 11.5px;
+  color: var(--faint);
+}
+
+.work-line .spin {
+  width: 9px;
+  height: 9px;
+  flex: none;
+  border: 1.5px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: tc-spin 0.9s linear infinite;
+}
+
+.work-line .t {
+  color: var(--muted);
+}
+
+.work-line .n {
+  font-variant-numeric: tabular-nums;
+}
+
+/* The session mode (design/composer-dock/02-mode-picker.html, sheets A and D): a
+   quiet text button with a caret at the right edge of the row. YOLO and Super
+   YOLO wear the danger tone, a sent change keeps its old text and adds a ring. */
+.work-line .mode {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font: inherit;
+  font-size: 11px;
+  color: var(--muted);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 1px 7px;
+  cursor: pointer;
+}
+
+.work-line .mode:hover {
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.work-line .mode:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.work-line .mode.hot {
+  color: var(--danger);
+  border-color: currentColor;
+}
+
+.work-line .mode.wait {
+  color: var(--faint);
+}
+
+.work-line .mode .dots {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border: 1.5px solid var(--border);
+  border-top-color: var(--muted);
+  border-radius: 50%;
+  animation: tc-spin 0.9s linear infinite;
+}
+
+/* The menu: pinned to the control, never clipped by the thread's own scroll, so
+   it covers nothing of the message it was opened from. */
+.mode-pop {
+  position: fixed;
+  z-index: 30;
+  width: 292px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 5px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.mode-pop .cap {
+  margin: 0;
+  padding: 5px 8px 6px;
+  font-size: 10.5px;
+  letter-spacing: 0.02em;
+  color: var(--faint);
+}
+
+.mode-opt {
+  display: grid;
+  grid-template-columns: 14px 1fr;
+  column-gap: 8px;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: var(--text);
+  background: none;
+  border: 0;
+  border-radius: 7px;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+
+.mode-opt:hover,
+.mode-opt:focus-visible {
+  background: var(--surface2);
+}
+
+.mode-opt:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.mode-opt .ck {
+  color: var(--accent);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.mode-opt .nm {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.mode-opt .warn {
+  margin-left: 6px;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--faint);
+}
+
+.mode-opt .ds {
+  grid-column: 2;
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--muted);
+}
+
+.mode-opt.hot .nm {
+  color: var(--danger);
+}
+
+.mode-sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--border);
+}
+
+/* The confirmation of sheet B: the same popover, one question and two buttons. */
+.mode-conf {
+  padding: 8px 9px 9px;
+}
+
+.mode-conf .q {
+  margin: 0 0 4px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.mode-conf .why {
+  margin: 0 0 10px;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+.mode-conf .why strong {
+  font-weight: 600;
+  color: var(--danger);
+}
+
+.mode-conf .acts {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.mode-btn {
+  font: inherit;
+  font-size: 12px;
+  color: var(--text);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 4px 11px;
+  cursor: pointer;
+}
+
+.mode-btn:hover {
+  background: var(--surface2);
+}
+
+.mode-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.mode-btn.go {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.mode-btn.go:hover {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+}
+
+/* The refusal of sheet C: one line under the row, and the mode it kept. */
+.mode-fail {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  margin: 0;
+  padding: 0 4px;
+  font-size: 11px;
+  color: var(--danger);
+}
+
+.mode-fail code {
+  font-family: var(--mono, ui-monospace, SFMono-Regular, 'Cascadia Mono', Consolas, monospace);
+  font-size: 10.5px;
+  padding: 0 4px;
+  color: var(--muted);
+  background: var(--surface2);
+  border-radius: 4px;
+}
+
+.mode-fail .keep {
+  color: var(--faint);
 }
 
 @keyframes activity-pulse {

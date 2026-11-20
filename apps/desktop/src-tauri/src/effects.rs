@@ -20,6 +20,7 @@ use std::time::Duration;
 
 use gentle_app::{ChatCommand, ChatId, Input};
 use gentle_backend::chat_host::Opened;
+use gentle_core::rpc::permission::{PermissionOutcome, SessionMode};
 use gentle_runtime::chat_runtime::{
     request_after_open, ChainWriteResult, ChatConfigRead, ChatProfileApply, ModeWriteResult,
     Outcome, PinWriteResult,
@@ -69,6 +70,11 @@ pub struct Ran {
     /// like the three above: whether the pin write failed is a state of the tab's
     /// own, not the reducer's.
     pub chat_pin: Vec<(ChatId, PinWriteResult, ChatConfigRead)>,
+    /// Every session permission mode a run read, or asked to change, with the
+    /// chat it belongs to and what the owner answered (composer-dock T3b, L7).
+    /// Shell-owned like the five above: the reducer knows nothing about a
+    /// permission mode.
+    pub session_mode: Vec<(ChatId, Option<SessionMode>, PermissionOutcome)>,
     /// A fresh child's start only proved its process was created, which takes
     /// milliseconds while the child takes seconds to speak. Its opening phase
     /// therefore ends with the chat's own first event, and the caller arms
@@ -151,6 +157,15 @@ fn run_into(command: ChatCommand, executor: &dyn ChatExecutor, ran: &mut Ran) {
         // chain's, kept apart so the pin editor's notice never lights another
         // control's.
         Outcome::ChatPin { chat, result, read } => ran.chat_pin.push((chat, result, *read)),
+        // One chat's session permission mode was read, or one change of it was
+        // answered (composer-dock T3b, L7): the shell's own state, kept whole so
+        // the label draws the owner's own string and the refusal of an attempt
+        // that wrote nothing.
+        Outcome::SessionMode {
+            chat,
+            change,
+            outcome,
+        } => ran.session_mode.push((chat, change, outcome)),
     }
 }
 

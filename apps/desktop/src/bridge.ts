@@ -6,7 +6,7 @@
 // that is gone, a name Windows would not take) or `ViewState.config_notice`
 // (what became of the config file) in the next push, which the sidebar draws.
 
-import { commands, type TerminalActionView, type UiIntent } from './contract/bindings'
+import { commands, type AttachmentView, type TerminalActionView, type UiIntent } from './contract/bindings'
 
 /** Sends one user intent; the answer is drawn through the next pushed state. */
 export async function dispatchIntent(intent: UiIntent): Promise<void> {
@@ -96,6 +96,44 @@ export async function createWorkspace(name: string): Promise<void> {
     await commands.createWorkspace(name)
   } catch {
     // Same as above: `workspace_notice` says why no folder was created.
+  }
+}
+
+/**
+ * The file dialog the composer's clip opens (design/composer-dock T4, S3): the
+ * paths the human picked, and the empty list for a cancel so nothing changes.
+ * `title` is the composer's own word for the dialog, in the language it is drawn
+ * in, so one dictionary names both the button and what it opens. A dialog that
+ * could not open is the same as a cancel: nothing is attached and nothing is
+ * said on top of the line the composer already has.
+ */
+export async function pickFiles(title: string): Promise<string[]> {
+  try {
+    const answer = await commands.pickFiles(title)
+    // The command answers `ViewState`-style errors in the envelope, so a refusal
+    // is the same as a cancel here: nothing is attached.
+    return answer.status === 'ok' ? answer.data : []
+  } catch {
+    return []
+  }
+}
+
+/**
+ * What each path the clip or a drop named is (design/composer-dock T4, R5, R6):
+ * an image is handed on to the image command, every other file becomes a chip,
+ * and a refused path carries its reason. `folder` is the foreground chat's own
+ * working directory, which is what makes a file "outside" it. A call that fails
+ * attaches nothing: it is the shell's own command, so a refusal has nothing to
+ * say that the composer could draw.
+ */
+export async function describeAttachments(
+  paths: string[],
+  folder: string | null,
+): Promise<AttachmentView[]> {
+  try {
+    return await commands.describeAttachments(paths, folder)
+  } catch {
+    return []
   }
 }
 

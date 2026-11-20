@@ -252,8 +252,7 @@ fn copy_message(state: &AppState, id: &str) -> Option<Vec<Command>> {
     let message = state
         .chats
         .state(chat)?
-        .messages
-        .iter()
+        .text_items()
         .find(|message| message.id == id)?;
     Some(vec![Command::CopyToClipboard(message.text.clone())])
 }

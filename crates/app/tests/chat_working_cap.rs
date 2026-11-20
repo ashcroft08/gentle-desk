@@ -137,7 +137,7 @@ fn the_thread_of_a_queued_chat_already_shows_its_message() {
 
     let (state, _) = prompt(state, "hola");
 
-    let thread = &state.chats.state(&chat("b")).expect("chat b").messages;
+    let thread = &state.chats.state(&chat("b")).expect("chat b").messages();
     assert_eq!(thread.len(), 1);
     assert_eq!(thread[0].text, "hola");
     assert_eq!(thread[0].id, "msg-0");
@@ -156,7 +156,7 @@ fn a_chat_with_a_queued_prompt_takes_no_second_prompt() {
         Vec::new(),
         "one turn at a time, and a queued prompt counts as one"
     );
-    let thread = &state.chats.state(&chat("b")).expect("chat b").messages;
+    let thread = &state.chats.state(&chat("b")).expect("chat b").messages();
     assert_eq!(thread.len(), 1, "the second prompt is not in the thread");
 }
 
@@ -209,7 +209,7 @@ fn another_freed_slot_releases_the_next_fifo_prompt() {
         Some(ChatActivity::Working),
         "the second queued prompt went out with it"
     );
-    let thread = &state.chats.state(&chat("c")).expect("chat c").messages;
+    let thread = &state.chats.state(&chat("c")).expect("chat c").messages();
     assert_eq!(thread[0].text, "segundo");
 }
 

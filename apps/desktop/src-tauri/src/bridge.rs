@@ -38,7 +38,8 @@ use gentle_runtime::clock::now_ms;
 
 use crate::config::{ConfigSnapshot, ConfigWriter};
 use crate::contract::{
-    AuthView, ChatProfileView, SessionsWindow, UiIntent, UpdatesView, UsageView, ViewState,
+    AuthView, BranchView, ChatProfileView, SessionsWindow, UiIntent, UpdatesView, UsageView,
+    ViewState,
 };
 use crate::images::Images;
 use crate::sessions::cache::TreeCache;
@@ -52,15 +53,18 @@ use crate::workspace;
 mod chat_profile;
 
 pub use chat_profile::ChatWork;
+pub use transcript::{SessionRead, SessionRows, TranscriptPush};
 mod config;
 mod fatal;
 mod images;
 mod language;
 mod notice;
+mod session_mode;
 mod session_notice;
 mod settings;
 mod shell;
 mod theme;
+mod transcript;
 mod whats_new;
 
 /// What runs one shared command the reducer asked for. `Command::RefreshSessions`
@@ -77,6 +81,11 @@ pub type CommandSink = Arc<dyn Fn(Command) + Send + Sync>;
 /// the bridge installs starts one `chat-command` worker thread per command,
 /// exactly as the intent path does with the commands it is answered.
 pub type ChatCommandSink = Arc<dyn Fn(Vec<gentle_app::ChatCommand>) + Send + Sync>;
+
+/// Installed once at startup: what pushes the slice a branch read answered on a
+/// worker thread ([`AppStateHolder::arm_branch_push`]). Before it exists the
+/// answer is still cached, and the next fold pushes it.
+pub type BranchPush = Arc<dyn Fn() + Send + Sync>;
 
 /// The app state the Tauri shell owns. Created at startup, managed by Tauri;
 /// nothing else anywhere holds an `AppState`.
@@ -163,6 +172,29 @@ pub struct AppStateHolder {
     /// ([`AppStateHolder::dispatch_commands`],
     /// [`AppStateHolder::deliver_chat_commands`]).
     profile_work: Mutex<std::collections::HashMap<String, chat_profile::ProfileWork>>,
+    /// Each chat's SESSION permission mode (composer-dock T3b, L7), one entry per
+    /// chat that answered: the mode its own child last reported, the refusal of
+    /// the last attempt that wrote nothing, and how many writes it answered.
+    /// Shell-owned, and dropped with the chat (`bridge::session_mode`).
+    session_modes: Mutex<session_mode::SessionModes>,
+    /// The folder a chat was opened in before it has a session row (composer-dock
+    /// L12): a NEW chat in a workspace lives in the workspace's folder from the
+    /// start, so its chip names it until the session row takes over. Shell-owned,
+    /// and dropped with the chat.
+    folder_hints: Mutex<std::collections::BTreeMap<String, crate::contract::FolderView>>,
+    /// How many times each chat's session mode was forgotten, so a command that
+    /// started before a close and answers after a reopen is told apart from one
+    /// of the new chat (`bridge::session_mode`).
+    session_epochs: Mutex<std::collections::BTreeMap<String, u64>>,
+    /// The rows read from each stored chat's session FILE, painted while that
+    /// chat's child is still starting and dropped the moment the child's answer
+    /// is folded (`bridge::transcript`, chat-open-latency T1). Shell-owned, like
+    /// the session mode: the reducer's transcript is the authority and this is
+    /// the frame that fills the seconds before it arrives.
+    transcripts: Mutex<transcript::Transcripts>,
+    /// Installed once at startup: what pushes the answer of a file read that
+    /// ran on its own thread ([`AppStateHolder::arm_transcript_push`]).
+    transcript_push: Mutex<Option<TranscriptPush>>,
     /// The Account pane's slice (0.1.12, T3): the provider names the shell's
     /// store lists and what its own check said about each.
     auth: Mutex<AuthView>,
@@ -174,6 +206,11 @@ pub struct AppStateHolder {
     /// The run's one fatal failure, as `ViewState.fatal` carries it: the
     /// launcher could not be resolved, so no chat can start (`bridge::fatal`).
     fatal: Mutex<Option<String>>,
+    /// The branch each working directory was on, read once per directory off the
+    /// window's thread and reused by every push after it (`crate::git`), with
+    /// the push a late answer travels on.
+    branches: Arc<crate::git::Branches>,
+    branch_push: Mutex<Option<BranchPush>>,
 }
 
 impl AppStateHolder {
@@ -212,6 +249,86 @@ impl AppStateHolder {
         *lock(&self.chat_commands) = Some(sink);
     }
 
+    /// Installs what pushes the slice a branch read answered (design/composer-dock
+    /// S2, R3, R4). The read runs on its own thread so no push ever waits for a
+    /// `git` process; this is how what it found reaches the window.
+    pub fn arm_branch_push(&self, push: BranchPush) {
+        *lock(&self.branch_push) = Some(push);
+    }
+
+    /// The branch cache, for a caller outside a fold: the tests seed it so an
+    /// answer can be asserted without a repository or a process.
+    pub fn branches(&self) -> &crate::git::Branches {
+        &self.branches
+    }
+
+    /// Records the folder the workspace handed a NEW chat (composer-dock L12):
+    /// the hint is what its folder chip names until its own session row exists,
+    /// and answers `true` when at least one open took it.
+    fn note_folder_hints(&self, folder: &str, commands: &[gentle_app::ChatCommand]) -> bool {
+        let name = folder
+            .rsplit(['\\', '/'])
+            .find(|segment| !segment.is_empty())
+            .unwrap_or(folder)
+            .to_owned();
+        let view = crate::contract::FolderView {
+            name,
+            path: folder.to_owned(),
+        };
+        let mut hints = lock(&self.folder_hints);
+        let mut any = false;
+        for command in commands {
+            if let gentle_app::ChatCommand::OpenProcess { chat } = command {
+                hints.insert(chat.as_str().to_owned(), view.clone());
+                any = true;
+            }
+        }
+        any
+    }
+
+    /// The folder hint the FOREGROUND chat carries, `None` when it has none:
+    /// a hint is only a stand-in for the chat's own session row.
+    fn folder_hint_for(&self, app: &gentle_app::AppState) -> Option<crate::contract::FolderView> {
+        let chat = app.chats.foreground()?;
+        lock(&self.folder_hints).get(chat.as_str()).cloned()
+    }
+
+    /// The folder hint as the slice's shell part carries it: the chat it belongs
+    /// to, and the view. The foreground gate is `view_state`'s.
+    fn folder_hint(&self) -> Option<(String, crate::contract::FolderView)> {
+        let chat = {
+            let app = lock(&self.app);
+            app.chats.foreground()?.as_str().to_owned()
+        };
+        let hint = lock(&self.folder_hints).get(&chat)?.clone();
+        Some((chat, hint))
+    }
+
+    /// Drops a chat's folder hint with the chat: its session row, or the next
+    /// chat, names the folder from now on.
+    fn forget_folder_hint(&self, chat: &gentle_app::ChatId) {
+        lock(&self.folder_hints).remove(chat.as_str());
+    }
+
+    /// Asks the branch question again for the foreground chat's folder, and
+    /// answers whether the cache really held an answer to drop (composer-dock
+    /// L12). The next slice starts the fresh read, which pushes on its own.
+    fn refresh_branch(&self) -> bool {
+        let folder = {
+            let app = lock(&self.app);
+            crate::state_view::foreground_folder(&app)
+                .or_else(|| self.folder_hint_for(&app))
+                .map(|folder| folder.path)
+        };
+        let Some(folder) = folder else {
+            return false;
+        };
+        self.branches.forget(&folder);
+        true
+    }
+
+    /// Folds one intent of the contract through the reducer and answers the
+    /// slice to push. Also the path the `state-changed` event payload takes.
     /// Folds one intent of the contract through the reducer and answers the
     /// slice to push. Also the path the `state-changed` event payload takes.
     pub fn dispatch(&self, intent: UiIntent) -> ViewState {
@@ -351,8 +468,76 @@ impl AppStateHolder {
             }
             return (self.view(), vec![command]);
         }
-        match crate::intent::to_intent(&state, intent) {
-            Some(intent) => self.apply(gentle_app::Input::Intent(intent)),
+        // The session permission mode (composer-dock T3b, L7) is the same kind of
+        // per-chat command: the mode belongs to the child of the chat it names,
+        // so it is asked of that chat's own child and no other. One read draws no
+        // control until it answers, and one write's shown mode changes only on
+        // the confirmed answer the run folds back.
+        //
+        // One session-mode command per chat is in flight at most (the same cap
+        // the profile commands keep): a second ask is DROPPED with the slice as
+        // it stands rather than queued against that chat's child.
+        if let UiIntent::ReadSessionMode { chat_id } = &intent {
+            let chat = crate::intent::chat_for(&state, chat_id);
+            let command = gentle_app::ChatCommand::SessionMode { chat, change: None };
+            if !self.begin_chat_command(&command) {
+                return (self.view(), Vec::new());
+            }
+            return (self.view(), vec![command]);
+        }
+        // A change of that mode is the same command with the mode in it: the
+        // closed choice of the contract maps to the channel's own wire string,
+        // and the saved default is never touched because `persist` is never sent
+        // (L7).
+        if let UiIntent::SetSessionMode { chat_id, mode } = &intent {
+            let chat = crate::intent::chat_for(&state, chat_id);
+            let command = gentle_app::ChatCommand::SessionMode {
+                chat,
+                change: Some(crate::intent::session_mode_of(*mode)),
+            };
+            if !self.begin_chat_command(&command) {
+                return (self.view(), Vec::new());
+            }
+            return (self.view(), vec![command]);
+        }
+        match crate::intent::to_intent(&state, &intent) {
+            Some(reduced) => {
+                let opened = opens_a_chat(&reduced);
+                // A NEW chat in a workspace lives in that folder from the start
+                // (composer-dock L12): the hint is what its folder chip names
+                // until its own session row exists, and what the branch is read
+                // from. Recorded only for the chats the fold opens, never one
+                // more.
+                let hint = match (&intent, &reduced) {
+                    (UiIntent::NewChatInWorkspace { path }, gentle_app::Intent::OpenNewChat)
+                        if !path.trim().is_empty() =>
+                    {
+                        Some(path.clone())
+                    }
+                    _ => None,
+                };
+                let answer = self.apply(gentle_app::Input::Intent(reduced));
+                let hinted = hint.map(|folder| self.note_folder_hints(&folder, &answer.1));
+                // Opening a stored chat paints its thread from its session file
+                // while its child starts (chat-open-latency T1): the read is
+                // claimed here and run on a worker, because this path is
+                // synchronous and a file is the last thing it may wait for.
+                if opened {
+                    self.start_transcript_read();
+                }
+                // An open also asks the branch question again (composer-dock
+                // L12): the answer the cache holds may name a branch the user
+                // changed outside this app, and opening the chat is when the
+                // user looks.
+                let refreshed = opened && self.refresh_branch();
+                if hinted == Some(true) || refreshed {
+                    // The hint or the fresh read change what the slice draws,
+                    // so the slice this intent answers is built AFTER them.
+                    (self.view(), answer.1)
+                } else {
+                    answer
+                }
+            }
             // Every intent has an answer: the reducer's, or the config's above.
             None => (self.view(), Vec::new()),
         }
@@ -455,6 +640,49 @@ impl AppStateHolder {
             .and_then(|chat| chat.session_path().map(str::to_owned))
     }
 
+    /// The branch the foreground chat's folder is on (design/composer-dock S2,
+    /// R3, R4), from the cache the one read left.
+    ///
+    /// It never runs `git` on the caller's thread: a directory nobody has read
+    /// yet claims its one read here and a worker thread runs it, so this answers
+    /// `None` for exactly one push and the read's answer arrives on its own
+    /// ([`Self::arm_branch_push`]).
+    fn branch_view(&self) -> Option<BranchView> {
+        let cwd = {
+            // The directory comes from the same session row the folder chip
+            // reads - or, for a chat opened before its session existed, from
+            // the workspace folder hint (composer-dock L12) - under one short
+            // lock: the read itself happens with none.
+            let app = lock(&self.app);
+            crate::state_view::foreground_folder(&app)
+                .or_else(|| self.folder_hint_for(&app))
+                .map(|folder| folder.path)
+        }?;
+        match self.branches.lookup(&cwd) {
+            crate::git::Lookup::Read(branch) => branch,
+            crate::git::Lookup::Waiting => None,
+            crate::git::Lookup::Missing => {
+                self.start_branch_read(cwd);
+                None
+            }
+        }
+    }
+
+    /// Starts the ONE read of a working directory's branch, off this thread and
+    /// with no lock held: a `git` process is the last thing a push should wait
+    /// for. What it answers is cached and pushed.
+    fn start_branch_read(&self, cwd: String) {
+        let branches = Arc::clone(&self.branches);
+        let push = lock(&self.branch_push).clone();
+        std::thread::spawn(move || {
+            let branch = crate::git::read(std::path::Path::new(&cwd));
+            branches.record(&cwd, branch);
+            if let Some(push) = push {
+                push();
+            }
+        });
+    }
+
     /// The label the sidebar draws for the workspace `key` names, when the tree
     /// of the current revision carries it: the delete's notice names the
     /// workspace that vanished, and the naming rule is the tree's (T4).
@@ -489,6 +717,17 @@ impl AppStateHolder {
     }
 
     fn apply(&self, input: gentle_app::Input) -> (ViewState, Vec<gentle_app::ChatCommand>) {
+        // A chat the user CLOSED leaves the open set, and it takes the rows read
+        // from its session file with it, together with the incarnation those rows
+        // were read for (chat-open-latency T1, S4): the same id coming back is a
+        // NEW chat, so a read of the old one may never be installed on it
+        // (R3-001 of `chat-transcript.md`). It is acted on after the fold, not
+        // before it, because a close the reducer REFUSES - a chat mid-turn - keeps
+        // the chat open and keeps its rows.
+        let closing = match &input {
+            gentle_app::Input::Intent(gentle_app::Intent::CloseChat(chat)) => Some(chat.clone()),
+            _ => None,
+        };
         // A chat that closes takes the Profile tab's view with it (profiles-editor
         // T2b-2, L11-4): the view is that chat's, and a read still in flight for
         // it may not leave a stale one behind for the next frame to draw. Done
@@ -496,6 +735,12 @@ impl AppStateHolder {
         // no view of it.
         if let gentle_app::Input::ChatClosed { chat, .. } = &input {
             self.forget_chat_profile(chat);
+            // The session mode is that chat's own reading of its own child, and
+            // it may not outlive it either (composer-dock T3b, L7).
+            self.forget_session_mode(chat);
+            // Nor does the folder the workspace handed it before its session
+            // existed (composer-dock L12).
+            self.forget_folder_hint(chat);
         }
         // One lock for the fold and the slice it answers: a revision read here
         // describes exactly the state it is pushed with. Everything the shell
@@ -517,6 +762,9 @@ impl AppStateHolder {
             (view, effects.chat_commands, effects.commands)
         };
         self.run_shared(commands);
+        if let Some(chat) = closing.filter(|chat| !self.is_open(chat)) {
+            self.forget_transcript(&chat);
+        }
         (view, chat_commands)
     }
 
@@ -534,6 +782,10 @@ impl AppStateHolder {
             language: self.language_value(),
             shell: self.shell_view(),
             chat_profile: self.chat_profile(),
+            session_mode: self.session_mode(),
+            transcript: self.provisional_transcript(),
+            branch: self.branch_view(),
+            folder_hint: self.folder_hint(),
             auth: self.auth(),
             updates: self.updates(),
             usage: self.usage(),
@@ -627,7 +879,6 @@ impl AppStateHolder {
 }
 
 /// Gives `state` the language this run speaks, read off the config.
-///
 /// This is the ONE place the reducer learns the language (0.2.0, S3): every
 /// notice `crates/app` produces is worded through the field this sets, so
 /// nothing there reads a config or a locale. `None` — no stored preference — is
@@ -635,6 +886,17 @@ impl AppStateHolder {
 /// the stored choice wins from then on).
 fn speak(state: &mut gentle_app::AppState, language: Option<Language>) {
     state.language = language;
+}
+
+/// Whether one intent is an OPENING of a chat: the two the web sends that put a
+/// chat (and its session file) on screen, which is when the thread's first frame
+/// is claimed (`bridge::transcript`). A fresh chat is one of them and has no file
+/// yet, so its claim answers nothing.
+fn opens_a_chat(intent: &gentle_app::Intent) -> bool {
+    matches!(
+        intent,
+        gentle_app::Intent::OpenChat(_) | gentle_app::Intent::RestartChat(_)
+    )
 }
 
 /// A lock that survives a poisoned mutex: nothing here may panic because a

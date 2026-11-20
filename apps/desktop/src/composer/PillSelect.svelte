@@ -17,6 +17,7 @@
     options,
     filterable = false,
     faint = false,
+    glyph = null,
     onchange,
   }: {
     /** The accessible name of the pill and of its listbox. */
@@ -28,6 +29,12 @@
     filterable?: boolean
     /** The level pill reads fainter than the model pill. */
     faint?: boolean
+    /**
+     * The select's own glyph, drawn before its value (design/composer-dock): a
+     * select wears a mark of what it chooses AND a caret, so it reads as a select
+     * instead of as a colour dot and a word. Decoration: the label names it.
+     */
+    glyph?: 'model' | 'effort' | null
     onchange: (value: string) => void
   } = $props()
 
@@ -147,6 +154,9 @@
     onclick={() => (open = !open)}
     onkeydown={buttonKeyed}
   >
+    {#if glyph !== null}
+      <span class="g g-{glyph}" data-glyph={glyph}><Icon name={glyph} size={12} /></span>
+    {/if}
     <span class="pill-value">{selected?.label ?? label}</span>
     <Icon name="chevronDown" size={12} />
   </button>

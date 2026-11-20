@@ -51,9 +51,23 @@
 {#if chip !== null}
   <div class="chip">
     {#if chip?.status.type === 'Ready' && models.length > 0}
-      <PillSelect label={copy.modelLabel} value={current} options={models} filterable onchange={choseModel} />
+      <PillSelect
+        label={copy.modelLabel}
+        value={current}
+        options={models}
+        filterable
+        glyph="model"
+        onchange={choseModel}
+      />
       {#if levels.length > 0}
-        <PillSelect label={copy.levelLabel} value={level} options={levels} faint onchange={choseLevel} />
+        <PillSelect
+          label={copy.levelLabel}
+          value={level}
+          options={levels}
+          faint
+          glyph="effort"
+          onchange={choseLevel}
+        />
       {/if}
     {:else if status === 'Loading' || status === 'Unknown'}
       <p class="state">{copy.modelsLoading}</p>

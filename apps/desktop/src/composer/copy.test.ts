@@ -21,8 +21,14 @@ const ENGLISH = {
   send: 'Send',
   stop: 'Stop',
   openingReason: 'Send is available once the chat is ready.',
-  dropHint: 'Drop the images here to attach them.',
+  dropHint: 'Drop to attach',
   removeImage: 'Remove',
+  removeFile: 'Remove',
+  attachFiles: 'Attach files',
+  attachedFiles: 'Attached files',
+  outsideWorkspace: 'outside the workspace',
+  outsideWarning:
+    "Some files are outside this chat's folder; the agent may not be able to open them.",
   searchPlaceholder: 'Search models...',
   nothingMatches: 'Nothing matches.',
   sidebarToggle: 'Toggle sidebar',
@@ -45,8 +51,14 @@ const SPANISH = {
   send: 'Enviar',
   stop: 'Detener',
   openingReason: 'Enviar estará disponible cuando el chat esté listo.',
-  dropHint: 'Suelta las imágenes aquí para adjuntarlas.',
+  dropHint: 'Suelta para adjuntar',
   removeImage: 'Quitar',
+  removeFile: 'Quitar',
+  attachFiles: 'Adjuntar archivos',
+  attachedFiles: 'Archivos adjuntos',
+  outsideWorkspace: 'fuera del workspace',
+  outsideWarning:
+    'Hay archivos fuera de la carpeta de este chat; el agente puede no poder abrirlos.',
   searchPlaceholder: 'Buscar modelos...',
   nothingMatches: 'No hay coincidencias.',
   sidebarToggle: 'Mostrar u ocultar la barra lateral',
@@ -101,5 +113,34 @@ describe('the composer copy', () => {
     expect(composerCopy('es').contextLabel(35)).toBe(
       'Contexto usado: 35 por ciento de la ventana del modelo',
     )
+  })
+
+  it('says why a file was not attached, in the language of the moment', () => {
+    // The folder's line is the approved artboard's own words (sheet D).
+    expect(composerCopy('es').attachFailed('assets', 'IsDirectory')).toBe(
+      'No se pudo adjuntar assets: es una carpeta, no un archivo.',
+    )
+    expect(composerCopy('en').attachFailed('assets', 'IsDirectory')).toBe(
+      'Could not attach assets: it is a folder, not a file.',
+    )
+    expect(composerCopy('en').attachFailed('gone.md', 'NotFound')).toBe(
+      'Could not attach gone.md: the file does not exist.',
+    )
+    expect(composerCopy('es').attachFailed('gone.md', 'NotFound')).toBe(
+      'No se pudo adjuntar gone.md: el archivo no existe.',
+    )
+    expect(composerCopy('en').attachFailed('locked.md', 'Unreadable')).toBe(
+      'Could not attach locked.md: the file could not be read.',
+    )
+    expect(composerCopy('es').attachFailed('locked.md', 'Unreadable')).toBe(
+      'No se pudo adjuntar locked.md: no se pudo leer el archivo.',
+    )
+  })
+
+  it('counts the chips a collapsed row hides, in the language of the moment', () => {
+    expect(composerCopy('en').showMore(9)).toBe('+9 more')
+    expect(composerCopy('es').showMore(9)).toBe('+9 más')
+    expect(composerCopy('en').showMoreLabel(9)).toBe('Show the 9 remaining files')
+    expect(composerCopy('es').showMoreLabel(9)).toBe('Ver los 9 archivos restantes')
   })
 })

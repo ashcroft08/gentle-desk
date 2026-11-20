@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "chosen": "03-attachments.html",
+  "handoffs": {
+    "01-dock.html": {
+      "status": "in_progress",
+      "queued": false,
+      "sentAt": "2026-11-19T00:45:16.070Z",
+      "startedAt": "2026-11-19T00:45:35.942Z",
+      "implementedAt": null,
+      "feature": "odd/tasks/composer-dock.md",
+      "note": "Implementing the dock in slices: first the status line (working + elapsed + folder), the context rail above the composer, the row regrouping and the hint below. The branch, the mode and the attachments need new data and follow."
+    },
+    "02-mode-picker.html": {
+      "status": "implemented",
+      "queued": false,
+      "sentAt": "2026-11-19T18:04:22.011Z",
+      "startedAt": null,
+      "implementedAt": "2026-11-19T18:04:24.407Z",
+      "feature": "odd/tasks/composer-dock.md",
+      "note": "Implemented in commits d04cae2 (shell), 1cf3988 (core client), 0c67ad4 (web control) plus fixes 9ebc01c and 2841b1a. npm run check 0 errors; web 331 tests; gentle-desk-app 581 tests. Not seen in the running app: the popover placement was only exercised in jsdom."
+    },
+    "03-attachments.html": {
+      "status": "implemented",
+      "queued": false,
+      "sentAt": "2026-11-19T18:04:54.404Z",
+      "startedAt": "2026-11-19T18:05:06.291Z",
+      "implementedAt": "2026-11-19T18:32:13.513Z",
+      "feature": "odd/tasks/composer-dock.md",
+      "note": "T4 implemented: pick_files (rfd), describe_attachments, chips, outside-workspace warning, paths appended on send. npm run check 0 errors; web 350 tests; gentle-desk-app 590 tests. Not seen in the running app (jsdom and fakes only)."
+    }
+  }
+}

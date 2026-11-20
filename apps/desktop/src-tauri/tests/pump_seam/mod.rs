@@ -172,8 +172,10 @@ pub fn settled_input(chat: &ChatId) -> Input {
     }
 }
 
-/// One event of `chat`'s child, as the translating thread reports it.
-fn event_at(chat: &ChatId, event: RpcEvent, now_ms: u64) -> Converted {
+/// One event of `chat`'s child at the wall-clock time it arrived, as the
+/// translating thread reports it: a test that needs the stamps a duration is
+/// computed from builds its turn with this.
+pub fn event_at(chat: &ChatId, event: RpcEvent, now_ms: u64) -> Converted {
     Converted::Input(Input::ChatEventAt {
         chat: chat.clone(),
         event,

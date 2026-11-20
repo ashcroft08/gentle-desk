@@ -73,6 +73,12 @@ export type IconName =
   | 'chevronDown'
   // The sidebar collapse toggle (responsive-sidebar S1): Lucide's `menu`.
   | 'menu'
+  // The composer dock's three (design/composer-dock): Lucide's `clock` for the
+  // context rail, the approved artboard's four-point spark for the model select
+  // and its ascending bars for the effort select.
+  | 'clock'
+  | 'model'
+  | 'effort'
 
 const FOLDER = 'M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z'
 const FOLDER_OPEN =
@@ -134,6 +140,14 @@ export const ICON_SHAPES: Record<IconName, IconShape[]> = {
   ],
   // The rail's Usage entry (0.1.12): Lucide's `gauge`, the needle and the arc.
   gauge: [path('m12 14 4-4'), path('M3.34 19a10 10 0 1 1 17.32 0')],
+  // The context rail's clock (design/composer-dock): Lucide's `clock`, the ring
+  // and its two hands.
+  clock: [circle(12, 12, 9), path('M12 7.5V12l3 2')],
+  // The model select's mark: the approved artboard's four-point spark, the one
+  // path it draws in the accent colour.
+  model: [path('M12 3l2.1 6.9L21 12l-6.9 2.1L12 21l-2.1-6.9L3 12l6.9-2.1z')],
+  // The effort select's mark: the artboard's three ascending bars.
+  effort: [path('M4 19h3v-5H4zM10.5 19h3V9h-3zM17 19h3V5h-3z')],
 }
 
 /** The six chat states a session row can mark, as the contract names them. */

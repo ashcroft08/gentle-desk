@@ -42,6 +42,15 @@ impl Chats {
         self.entries.get(chat).is_some_and(|entry| entry.ended)
     }
 
+    /// Whether that chat's child has answered `get_messages`, so what its thread
+    /// holds IS its history (chat-open-latency T1). `false` for a chat the app
+    /// never opened.
+    pub fn history_loaded(&self, chat: &ChatId) -> bool {
+        self.entries
+            .get(chat)
+            .is_some_and(|entry| entry.history_loaded)
+    }
+
     /// Whether a child is being started for that chat right now: it cannot take
     /// a prompt yet (composer disabled, prompt kept), like a working or queued
     /// chat.

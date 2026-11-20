@@ -2,7 +2,7 @@
 
 use serde_json::Value;
 
-use super::state::{ChatMessage, ChatRole, ChatState, Dialog};
+use super::state::{ChatItem, ChatMessage, ChatRole, ChatState, Dialog, ToolPayload};
 use crate::helpers::fold_widget;
 use crate::i18n::{messages, Language};
 use crate::rpc::{AssistantMessageEvent, RpcEvent, RpcMessage, UiRequest};
@@ -17,7 +17,12 @@ pub fn reduce_chat(language: Language, state: ChatState, event: &RpcEvent) -> Ch
 }
 
 /// [`reduce_chat`] with the wall-clock time (epoch ms) the event arrived at,
-/// which the caller supplies so this stays pure. Only helper bookkeeping uses it.
+/// which the caller supplies so this stays pure.
+///
+/// The clock stamps a reasoning block and a tool execution so their rows can
+/// answer how long they ran; with no clock they carry no stamps and no
+/// duration, because nothing may be guessed (`prompt-turn.jsonl` has no
+/// timestamps). Helper bookkeeping reads it the same way.
 ///
 /// The language comes first, as every catalog message does: the one text this
 /// fold words itself is the provider's unspoken error
@@ -25,125 +30,478 @@ pub fn reduce_chat(language: Language, state: ChatState, event: &RpcEvent) -> Ch
 /// it in (0.2.0, S3).
 pub fn reduce_chat_at(
     language: Language,
-    state: ChatState,
+    mut state: ChatState,
     event: &RpcEvent,
     now_ms: Option<u64>,
 ) -> ChatState {
     match event {
-        RpcEvent::AgentStart => ChatState {
-            working: true,
-            ..state
-        },
-        RpcEvent::AgentEnd { .. } | RpcEvent::AgentSettled => ChatState {
-            working: false,
-            ..state
-        },
-        RpcEvent::MessageStart(message) => open_assistant_message(state, message),
-        RpcEvent::MessageUpdate(delta) => apply_assistant_message_event(state, delta),
-        RpcEvent::MessageEnd(message) => close_assistant_message(language, state, message),
-        RpcEvent::ToolExecutionStart { .. }
-        | RpcEvent::ToolExecutionUpdate { .. }
-        | RpcEvent::ToolExecutionEnd { .. } => ChatState {
-            activity: state.activity + 1,
-            ..state
-        },
-        RpcEvent::UiRequest(request) => apply_extension_ui_request(state, request, now_ms),
-        RpcEvent::ExtensionError { error, .. } => ChatState {
-            last_error: Some(error.clone()),
-            ..state
-        },
+        RpcEvent::AgentStart => state.working = true,
+        RpcEvent::AgentEnd { .. } | RpcEvent::AgentSettled => state.working = false,
+        RpcEvent::MessageStart(message) => state = open_assistant_message(state, message),
+        RpcEvent::MessageUpdate(delta) => {
+            state = apply_assistant_message_event(state, delta, now_ms)
+        }
+        RpcEvent::MessageEnd(message) => state = close_assistant_message(language, state, message),
+        RpcEvent::ToolExecutionStart {
+            tool_call_id,
+            tool_name,
+            args,
+        } => start_tool_execution(&mut state, tool_call_id, tool_name, args.as_ref(), now_ms),
+        RpcEvent::ToolExecutionUpdate {
+            tool_call_id,
+            args,
+            partial_result,
+            ..
+        } => update_tool_execution(
+            &mut state,
+            tool_call_id,
+            args.as_ref(),
+            partial_result.as_ref(),
+        ),
+        RpcEvent::ToolExecutionEnd {
+            tool_call_id,
+            result,
+            is_error,
+            ..
+        } => end_tool_execution(&mut state, tool_call_id, result.as_ref(), *is_error, now_ms),
+        RpcEvent::UiRequest(request) => state = apply_extension_ui_request(state, request, now_ms),
+        RpcEvent::ExtensionError { error, .. } => state.last_error = Some(error.clone()),
         // turn_start/turn_end and command responses carry nothing the chat view
         // needs: `working` is driven by the agent_* events and the assistant
         // text by message_*/text_* deltas.
-        RpcEvent::TurnStart | RpcEvent::TurnEnd | RpcEvent::Response(_) => state,
+        RpcEvent::TurnStart | RpcEvent::TurnEnd | RpcEvent::Response(_) => {}
     }
+    state
 }
 
-fn open_assistant_message(state: ChatState, message: &RpcMessage) -> ChatState {
+fn open_assistant_message(mut state: ChatState, message: &RpcMessage) -> ChatState {
     if message.role != "assistant" {
         return state;
     }
-    let mut messages = state.messages;
-    messages.push(ChatMessage {
-        id: format!("msg-{}", messages.len()),
-        role: ChatRole::Assistant,
-        text: String::new(),
-        streaming: true,
-        error: None,
-    });
-    ChatState { messages, ..state }
+    state.push_message(ChatRole::Assistant, String::new(), true);
+    state
 }
 
-fn apply_assistant_message_event(state: ChatState, delta: &AssistantMessageEvent) -> ChatState {
+fn apply_assistant_message_event(
+    mut state: ChatState,
+    delta: &AssistantMessageEvent,
+    now_ms: Option<u64>,
+) -> ChatState {
     match delta {
-        AssistantMessageEvent::TextDelta { delta, .. } => append_to_last_assistant(state, delta),
+        AssistantMessageEvent::TextDelta { delta, .. } => append_text(&mut state, delta),
         // text_start/text_end carry nothing new: the running text is assembled
         // from text_delta and finalized from `message_end`.
-        AssistantMessageEvent::ThinkingStart { .. }
-        | AssistantMessageEvent::ThinkingDelta { .. }
-        | AssistantMessageEvent::ThinkingEnd { .. }
-        | AssistantMessageEvent::ToolcallStart { .. }
-        | AssistantMessageEvent::ToolcallDelta { .. }
-        | AssistantMessageEvent::ToolcallEnd { .. } => ChatState {
-            activity: state.activity + 1,
-            ..state
-        },
-        AssistantMessageEvent::TextStart { .. } | AssistantMessageEvent::TextEnd { .. } => state,
+        AssistantMessageEvent::TextStart { .. } | AssistantMessageEvent::TextEnd { .. } => {}
+        AssistantMessageEvent::ThinkingStart { .. } => open_thinking(&mut state, now_ms),
+        AssistantMessageEvent::ThinkingDelta { delta, .. } => append_thinking(&mut state, delta),
+        AssistantMessageEvent::ThinkingEnd { content, .. } => {
+            close_thinking(&mut state, content, now_ms)
+        }
+        AssistantMessageEvent::ToolcallStart { id, tool_name, .. } => {
+            open_tool_call(&mut state, id, tool_name)
+        }
+        AssistantMessageEvent::ToolcallEnd { tool_call, .. } => {
+            finish_tool_call(&mut state, tool_call)
+        }
+        // The arguments object arrives as text; the tool row keeps the parsed
+        // object `toolcall_end` and `tool_execution_start` carry, so this delta
+        // reaches no row and stays activity.
+        AssistantMessageEvent::ToolcallDelta { .. } => bump(&mut state),
+    }
+    state
+}
+
+/// Counts one event whose content the transcript keeps nowhere.
+fn bump(state: &mut ChatState) {
+    state.activity += 1;
+}
+
+/// Appends a delta to the assistant text row the message is still writing.
+///
+/// The row is looked up, never assumed last: a tool call or a reasoning block
+/// the message produced sits after it, and the text that arrives afterwards is
+/// still that message's text (R2-001).
+fn append_text(state: &mut ChatState, delta: &str) {
+    let Some(message) = open_assistant_mut(&mut state.items) else {
+        return;
+    };
+    message.text.push_str(delta);
+}
+
+/// The assistant text row this turn is still writing, mutable, wherever it
+/// sits: text the child said before a tool call stays above that tool's row,
+/// and the deltas that follow land in it.
+///
+/// The `None` arm is the real answer for a user row, a closed message, a
+/// reasoning row and a tool row (R2-002).
+fn open_assistant_mut(items: &mut [ChatItem]) -> Option<&mut ChatMessage> {
+    items.iter_mut().rev().find_map(|item| match item {
+        ChatItem::Text(message) if message.role == ChatRole::Assistant && message.streaming => {
+            Some(message)
+        }
+        _ => None,
+    })
+}
+
+/// Adds a row at the end of the transcript, ahead of an empty open assistant
+/// bubble.
+///
+/// `message_start` opens an empty bubble before the thinking and the tool calls
+/// of the same message arrive, and an empty bubble says nothing about where it
+/// belongs: the rows that arrive meanwhile take its place. Once the bubble holds
+/// text it keeps its place, and from then on the text is found by search rather
+/// than assumed to be last (R2-001), so no row's position depends on this.
+fn push_row(state: &mut ChatState, row: ChatItem) {
+    let placeholder = (state.items.len())
+        .checked_sub(1)
+        .filter(|&last| is_empty_open_assistant(&state.items[last]));
+    match placeholder {
+        Some(at) => state.items.insert(at, row),
+        None => state.items.push(row),
     }
 }
 
-fn append_to_last_assistant(state: ChatState, delta: &str) -> ChatState {
-    let mut messages = state.messages;
-    match messages.last_mut() {
-        Some(last) if last.role == ChatRole::Assistant => last.text.push_str(delta),
-        _ => return ChatState { messages, ..state },
+fn is_empty_open_assistant(item: &ChatItem) -> bool {
+    matches!(
+        item,
+        ChatItem::Text(message)
+            if message.role == ChatRole::Assistant
+                && message.streaming
+                && message.text.trim().is_empty()
+    )
+}
+
+fn open_thinking(state: &mut ChatState, now_ms: Option<u64>) {
+    let id = format!("think-{}", count_thinking(&state.items));
+    push_row(
+        state,
+        ChatItem::Thinking {
+            id,
+            text: String::new(),
+            streaming: true,
+            started_at_ms: now_ms,
+            ended_at_ms: None,
+            duration_ms: None,
+        },
+    );
+}
+
+fn count_thinking(items: &[ChatItem]) -> usize {
+    items
+        .iter()
+        .filter(|item| matches!(item, ChatItem::Thinking { .. }))
+        .count()
+}
+
+fn append_thinking(state: &mut ChatState, delta: &str) {
+    let Some(row) = open_thinking_mut(&mut state.items) else {
+        return bump(state);
+    };
+    row.text.push_str(delta);
+}
+
+fn close_thinking(state: &mut ChatState, content: &str, now_ms: Option<u64>) {
+    let Some(row) = open_thinking_mut(&mut state.items) else {
+        return bump(state);
+    };
+    // `thinking_end` is authoritative for the block's text, exactly as
+    // `message_end` is for the message's.
+    *row.text = content.to_owned();
+    *row.streaming = false;
+    *row.ended_at_ms = now_ms;
+    *row.duration_ms = elapsed(*row.started_at_ms, now_ms);
+}
+
+/// The parts of a reasoning row the events write.
+struct ThinkingRow<'a> {
+    text: &'a mut String,
+    streaming: &'a mut bool,
+    started_at_ms: &'a mut Option<u64>,
+    ended_at_ms: &'a mut Option<u64>,
+    duration_ms: &'a mut Option<u64>,
+}
+
+/// The reasoning block that is still open, mutable: `thinking_delta` grows it
+/// and `thinking_end` closes it. The match is total and its `None` arm is the
+/// real answer for every row that is not an open block (R2-002).
+fn open_thinking_mut(items: &mut [ChatItem]) -> Option<ThinkingRow<'_>> {
+    items.iter_mut().rev().find_map(|item| {
+        let ChatItem::Thinking {
+            text,
+            streaming,
+            started_at_ms,
+            ended_at_ms,
+            duration_ms,
+            ..
+        } = item
+        else {
+            return None;
+        };
+        if !*streaming {
+            return None;
+        }
+        Some(ThinkingRow {
+            text,
+            streaming,
+            started_at_ms,
+            ended_at_ms,
+            duration_ms,
+        })
+    })
+}
+
+fn tool_row(
+    tool_call_id: &str,
+    tool_name: &str,
+    args: Option<ToolPayload>,
+    running: bool,
+    started_at_ms: Option<u64>,
+) -> ChatItem {
+    ChatItem::Tool {
+        id: format!("tool-{tool_call_id}"),
+        tool_call_id: tool_call_id.to_owned(),
+        tool_name: tool_name.to_owned(),
+        args,
+        partial_result: None,
+        result: None,
+        is_error: false,
+        running,
+        started_at_ms,
+        ended_at_ms: None,
+        duration_ms: None,
     }
-    ChatState { messages, ..state }
+}
+
+/// The parts of a tool row the events write.
+struct ToolRow<'a> {
+    tool_name: &'a mut String,
+    args: &'a mut Option<ToolPayload>,
+    partial_result: &'a mut Option<ToolPayload>,
+    result: &'a mut Option<ToolPayload>,
+    is_error: &'a mut bool,
+    running: &'a mut bool,
+    started_at_ms: &'a mut Option<u64>,
+    ended_at_ms: &'a mut Option<u64>,
+    duration_ms: &'a mut Option<u64>,
+}
+
+/// Starts a tool row, which the model's own `toolcall_start` announces before
+/// the tool runs: it carries no timing and no output until the tool does.
+fn open_tool_call(state: &mut ChatState, tool_call_id: &str, tool_name: &str) {
+    // The execution may have opened the row already, and two rows for one call
+    // would be two truths about it.
+    if tool_at(&state.items, tool_call_id).is_some() {
+        return;
+    }
+    push_row(state, tool_row(tool_call_id, tool_name, None, false, None));
+}
+
+/// Fills in the arguments the model finished streaming (`toolcall_end`).
+fn finish_tool_call(state: &mut ChatState, tool_call: &Value) {
+    // The model's `toolcall_end` is the one event that may carry no call id, so
+    // the guard lives here: without an id there is no row this event can be
+    // shown to mean, and the event only counts (R3-001).
+    let Some(tool_call_id) = tool_call.get("id").and_then(Value::as_str) else {
+        return bump(state);
+    };
+    let Some(row) = tool_row_mut(&mut state.items, tool_call_id) else {
+        return bump(state);
+    };
+    if let Some(name) = tool_call.get("name").and_then(Value::as_str) {
+        *row.tool_name = name.to_owned();
+    }
+    if let Some(args) = tool_call.get("arguments") {
+        *row.args = Some(ToolPayload::new(args));
+    }
+}
+
+/// The tool row an event names: the one whose call id is the id the event
+/// carries.
+///
+/// An event that names no tool call must NEVER touch a row it cannot identify
+/// (R3-001). Such an event reaches no row and only counts, exactly as an event
+/// naming an unknown id does. There is no name matching, no "the only
+/// candidate" special case and no "the last row nothing has described yet"
+/// fallback: two calls in flight make any such guess wrong, and a wrong
+/// attribution is written into the transcript as fact. The lookup therefore
+/// takes an id it was given, rather than an id it might have to infer.
+fn tool_at(items: &[ChatItem], tool_call_id: &str) -> Option<usize> {
+    items.iter().rposition(|item| match item {
+        ChatItem::Tool {
+            tool_call_id: row, ..
+        } => row.as_str() == tool_call_id,
+        ChatItem::Text(_) | ChatItem::Thinking { .. } => false,
+    })
+}
+
+/// [`tool_at`]'s row, mutable, so an event writes its own fields instead of
+/// destructuring the enum at every site. Its `None` arm is the real answer for
+/// every row that is not a tool row and for every row the event does not name
+/// (R2-002).
+fn tool_row_mut<'a>(items: &'a mut [ChatItem], tool_call_id: &str) -> Option<ToolRow<'a>> {
+    items.iter_mut().rev().find_map(|item| {
+        let ChatItem::Tool {
+            tool_call_id: row,
+            tool_name,
+            args,
+            partial_result,
+            result,
+            is_error,
+            running,
+            started_at_ms,
+            ended_at_ms,
+            duration_ms,
+            ..
+        } = item
+        else {
+            return None;
+        };
+        // Same rule as `tool_at`: only the row the event's id names is it.
+        if row.as_str() != tool_call_id {
+            return None;
+        }
+        Some(ToolRow {
+            tool_name,
+            args,
+            partial_result,
+            result,
+            is_error,
+            running,
+            started_at_ms,
+            ended_at_ms,
+            duration_ms,
+        })
+    })
+}
+
+fn start_tool_execution(
+    state: &mut ChatState,
+    tool_call_id: &str,
+    tool_name: &str,
+    args: Option<&Value>,
+    now_ms: Option<u64>,
+) {
+    let args = args.map(ToolPayload::new);
+    // One lookup decides where the execution lands (R2-003): the row the model
+    // already announced, or - when no row names the call yet - the row pushed
+    // below, which is created already carrying what the execution knows.
+    if let Some(row) = tool_row_mut(&mut state.items, tool_call_id) {
+        *row.tool_name = tool_name.to_owned();
+        if args.is_some() {
+            *row.args = args;
+        }
+        *row.running = true;
+        *row.started_at_ms = now_ms;
+        return;
+    }
+    push_row(state, tool_row(tool_call_id, tool_name, args, true, now_ms));
+}
+
+fn update_tool_execution(
+    state: &mut ChatState,
+    tool_call_id: &str,
+    args: Option<&Value>,
+    partial_result: Option<&Value>,
+) {
+    let Some(row) = tool_row_mut(&mut state.items, tool_call_id) else {
+        return bump(state);
+    };
+    if let Some(args) = args {
+        *row.args = Some(ToolPayload::new(args));
+    }
+    if let Some(partial_result) = partial_result {
+        *row.partial_result = Some(ToolPayload::new(partial_result));
+    }
+}
+
+fn end_tool_execution(
+    state: &mut ChatState,
+    tool_call_id: &str,
+    result: Option<&Value>,
+    is_error: bool,
+    now_ms: Option<u64>,
+) {
+    let Some(row) = tool_row_mut(&mut state.items, tool_call_id) else {
+        return bump(state);
+    };
+    if let Some(result) = result {
+        *row.result = Some(ToolPayload::new(result));
+        // The result says everything the running output did, so the partial one
+        // goes: a call keeps one output, not a growing pair (R1).
+        *row.partial_result = None;
+    }
+    *row.is_error = is_error;
+    *row.running = false;
+    *row.ended_at_ms = now_ms;
+    *row.duration_ms = elapsed(*row.started_at_ms, now_ms);
+}
+
+/// How long something ran, when both ends of it are known.
+fn elapsed(started_at_ms: Option<u64>, ended_at_ms: Option<u64>) -> Option<u64> {
+    Some(ended_at_ms?.saturating_sub(started_at_ms?))
 }
 
 fn close_assistant_message(
     language: Language,
-    state: ChatState,
+    mut state: ChatState,
     message: &RpcMessage,
 ) -> ChatState {
     if message.role != "assistant" {
         return state;
     }
-    let mut messages = state.messages;
-    let Some(last) = messages.last_mut() else {
-        return ChatState { messages, ..state };
+    let Some((index, empty)) = close_open_assistant(
+        &mut state.items,
+        extract_text(message),
+        model_error(language, message),
+    ) else {
+        return state;
     };
-    if last.role != ChatRole::Assistant {
-        return ChatState { messages, ..state };
-    }
 
-    // `message_end.message` is authoritative per rpc.md: resync from its text
-    // content blocks when `content` is an array, otherwise keep what
-    // text_delta accumulated.
-    if let Some(authoritative) = extract_text(message) {
-        last.text = authoritative;
+    // A message that only carried thinking/toolCall parts has nothing to show,
+    // so its bubble is dropped wherever it sits (R3-002), and the `msg-<n>` it
+    // held becomes a gap in the numbering: ids are identity and are never
+    // reused (R3-1), so the next message takes the counter's next value instead
+    // of the freed one.
+    // The thinking and the tool calls it produced stay: they are rows of their
+    // own.
+    if empty {
+        state.items.remove(index);
     }
+    state
+}
 
-    // A provider failure arrives as an ordinary-looking assistant message;
-    // flag it (and keep it even when empty) so the UI can show it as a failure.
-    if let Some(error) = model_error(language, message) {
-        last.error = Some(error);
-        last.streaming = false;
-        return ChatState { messages, ..state };
+/// Writes the authoritative end of a message into the open assistant text row,
+/// wherever that row sits, and answers where it is and whether it finalizes
+/// with nothing to show.
+fn close_open_assistant(
+    items: &mut [ChatItem],
+    authoritative: Option<String>,
+    error: Option<String>,
+) -> Option<(usize, bool)> {
+    for (index, item) in items.iter_mut().enumerate().rev() {
+        let ChatItem::Text(message) = item else {
+            continue;
+        };
+        if message.role != ChatRole::Assistant || !message.streaming {
+            continue;
+        }
+        // `message_end.message` is authoritative per rpc.md: resync from its
+        // text content blocks when `content` is an array, otherwise keep what
+        // text_delta accumulated.
+        if let Some(authoritative) = authoritative {
+            message.text = authoritative;
+        }
+        message.streaming = false;
+        // A provider failure arrives as an ordinary-looking assistant message;
+        // flag it (and keep it even when empty) so the UI can show it as a
+        // failure.
+        if let Some(error) = error {
+            message.error = Some(error);
+            return Some((index, false));
+        }
+        return Some((index, message.text.trim().is_empty()));
     }
-
-    // A message that only ever carried thinking/toolCall parts has nothing to
-    // show, so drop it instead of leaving an empty bubble in the thread.
-    // Dropping the last element shrinks `messages.len()` back, which is what
-    // reassigns the freed `msg-<n>` id to the next assistant message with no
-    // gap and no extra bookkeeping.
-    if last.text.trim().is_empty() {
-        messages.pop();
-        return ChatState { messages, ..state };
-    }
-
-    last.streaming = false;
-    ChatState { messages, ..state }
+    None
 }
 
 /// The provider's error text when this message ended with `stopReason: "error"`.

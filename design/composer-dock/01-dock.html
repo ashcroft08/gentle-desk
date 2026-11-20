@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="es" data-theme="dark">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Composer dock - B: apretado, sin cajas</title>
+<style>
+:root,[data-theme="dark"]{--bg:#0e1116;--surface:#151a21;--surface2:#1c222b;--border:#2b333d;--text:#e4e8ee;--muted:#9aa4b2;--faint:#7d8593;--accent:#7aa2f7;--tint:rgba(122,162,247,.14);--success:#7edc9a;--warning:#e7b455;--danger:#ff8585}
+[data-theme="light"]{--bg:#f2f4f7;--surface:#ffffff;--surface2:#e9edf2;--border:#cfd5dd;--text:#17202a;--muted:#576272;--faint:#6b7686;--accent:#2e5bd7;--tint:rgba(46,91,215,.10);--success:#166e38;--warning:#8a5800;--danger:#c22f37}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+.page{max-width:900px;margin:0 auto;padding:22px 18px 60px}
+h2{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin:0 0 8px;font-weight:600}
+.note{color:var(--muted);font-size:12px;margin:0 0 12px;max-width:70ch}
+.note b{color:var(--text);font-weight:600}
+.mono{font-family:ui-monospace,SFMono-Regular,"Cascadia Mono",Consolas,monospace}
+.sheet{margin:0 0 32px}
+.stage{border:1px solid var(--border);border-radius:10px;background:var(--bg);padding:0;overflow:hidden}
+
+/* ---- one message column, no card around the state */
+.talk{padding:14px 16px 0}
+.you{margin-left:auto;width:fit-content;background:var(--tint);border-radius:9px;padding:6px 11px;font-size:13.5px;max-width:46ch}
+
+/* the state: ONE faint line, 11.5px, no box, no glyph soup */
+.state{display:flex;align-items:center;gap:6px;padding:10px 16px 0;font-size:11.5px;color:var(--faint)}
+.state .spin{width:9px;height:9px;border:1.5px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .9s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation:none}*{transition:none!important}}
+.state .t{color:var(--muted)}
+.state .n{font-variant-numeric:tabular-nums}
+.think{padding:6px 16px 0;font-size:11.5px;color:var(--faint);display:flex;align-items:center;gap:6px}
+.think .spark{color:var(--accent);font-size:11px}
+.think em{font-style:normal;color:var(--muted);font-size:12.5px;display:block;margin:3px 0 0 16px;border-left:1px solid var(--border);padding-left:9px}
+
+/* ---- the dock: ONE border, everything inside is text */
+.dock{margin:14px 16px 0;border:1px solid var(--border);border-radius:12px;background:var(--surface)}
+.dock .in{padding:12px 14px 8px;color:var(--faint);font-size:14px}
+
+/* context: the line ABOVE the box, filling as the context grows (maintainer's screenshot) */
+.ctx{margin:0 26px 10px;padding:0}
+.ctx .rail{height:2px;background:var(--border);border-radius:1px;overflow:hidden}
+.ctx .rail i{display:block;height:100%;width:6%;background:var(--accent);border-radius:1px}
+.ctx.near .rail i{background:var(--warning)}
+.ctx .lab{display:flex;justify-content:space-between;align-items:center;font-size:10.5px;color:var(--faint);padding-bottom:4px;font-variant-numeric:tabular-nums}
+.ctx .lab .l{display:inline-flex;align-items:center;gap:4px}
+.ctx .lab svg{width:11px;height:11px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+
+/* the row: borderless, 12px, the folder name is the only bold thing; the row is
+   grouped in three acts the eye tells apart (clip / runs-on / runs-in), and the
+   context rail keeps 10px of air above the dock so the focus ring never crosses it */
+.row{display:flex;align-items:center;gap:12px;padding:0 12px 10px;min-width:0}
+.grp{display:inline-flex;align-items:center;gap:6px;min-width:0;border-radius:8px;padding:2px 8px}
+.vsep2{width:1px;height:14px;background:var(--border);flex:none}
+.seg{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);white-space:nowrap;min-width:0;background:none;border:0;padding:0;font-family:inherit;cursor:pointer}
+.seg:hover{color:var(--text)}
+.seg .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.seg svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.seg .car{width:9px;height:9px;opacity:.65}
+.seg .dot{width:6px;height:6px;border-radius:50%;background:var(--warning);flex:none}
+/* a hairline between the two groups: what the message runs ON, and where it runs */
+.vsep{display:none}
+.seg.name{color:var(--text);font-weight:600}
+.seg.name .pre{color:var(--faint);font-weight:400}
+.att{width:26px;height:26px;display:inline-grid;place-items:center;border:0;background:none;color:var(--faint);cursor:pointer;border-radius:6px;flex:none;padding:0}
+.att:hover{color:var(--text);background:var(--surface2)}
+.att svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.grow{flex:1;min-width:6px}
+.send{width:24px;height:24px;border-radius:50%;border:0;background:var(--accent);color:var(--bg);display:inline-grid;place-items:center;cursor:pointer;flex:none;padding:0}
+.send svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.hint{display:flex;justify-content:flex-start;gap:12px;color:var(--faint);font-size:10.5px;padding:6px 16px 0}
+.hint b{color:var(--muted);font-weight:400}
+
+/* the right side of the state line: quiet pills only where they matter */
+.right{margin-left:auto;display:inline-flex;align-items:center;gap:10px;font-size:11px;color:var(--faint)}
+.tag{display:inline-flex;align-items:center;gap:4px;color:var(--muted)}
+.tag.hot{color:var(--danger);border:1px solid currentColor;border-radius:999px;padding:0 7px;font-size:10.5px}
+.tag svg{width:11px;height:11px;fill:none;stroke:currentColor;stroke-width:1.8}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="sheet">
+    <h2>B · el dock, sin cajas</h2>
+    <p class="note">Lo único con borde es el composer. Adentro todo es <b>texto de 12px</b>: el nombre de la carpeta es lo único en blanco y semibold, con la cola de la ruta atenuada. El contexto es <b>una línea de 2px arriba</b>, con el número a la izquierda y la ventana a la derecha — no un chip.</p>
+
+    <div class="stage">
+
+      <div class="talk">
+        <div class="you">cómo mejoro el header del proyecto</div>
+      </div>
+
+      <div class="think">
+        <span class="spark">✳</span><span>Pensamiento</span><span class="n">1.2s</span>
+        <em>Antes de proponer nada miro cómo está armado el header hoy.</em>
+      </div>
+
+      <div class="state">
+        <span class="spin"></span>
+        <span class="t">trabajando…</span>
+        <span class="n">12s</span>
+        <span class="right">
+          <span class="tag hot"><svg viewBox="0 0 24 24"><path d="M12 3l7 17-7-4-7 4z"/></svg>Super YOLO</span>
+        </span>
+      </div>
+
+      <div class="ctx"><div class="lab"><span class="l"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2"/></svg>6%</span><span>1M</span></div><div class="rail"><i></i></div></div>
+      <div class="dock">
+        <div class="in">¿y el plan de migración?</div>
+        <div class="row">
+          <button class="att" title="Adjuntar archivos"><svg viewBox="0 0 24 24"><path d="M21 11l-8.5 8.5a5 5 0 01-7-7L14 4a3.5 3.5 0 015 5l-8.5 8.5a2 2 0 01-3-3L15 6"/></svg></button>
+          <button class="seg" title="Modelo"><svg viewBox="0 0 24 24" style="color:var(--accent)"><path d="M12 3l2.1 6.9L21 12l-6.9 2.1L12 21l-2.1-6.9L3 12l6.9-2.1z"/></svg><span class="t">Claude Sonnet 5</span><svg class="car" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
+          <button class="seg" title="Esfuerzo"><svg viewBox="0 0 24 24"><path d="M4 19h3v-5H4zM10.5 19h3V9h-3zM17 19h3V5h-3z"/></svg><span class="t">medium</span><svg class="car" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
+          <span class="vsep"></span>
+          <button class="seg name" title="C:\Users\josep\OneDrive\Desktop\Proyectos\Kallari_Pagina_web"><svg viewBox="0 0 24 24"><path d="M3 7h6l2 2h10v10H3z"/></svg>Kallari_Pagina_web</button>
+          <button class="seg" title="rama actual"><svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="12" r="2"/><path d="M8 6h6a2 2 0 012 2v2M8 18h6a2 2 0 002-2v-2"/></svg><span class="t">master</span></button>
+          <span class="grow"></span>
+          <button class="send" title="Enviar"><svg viewBox="0 0 24 24"><path d="M12 19V5"/><path d="M6 11l6-6 6 6"/></svg></button>
+        </div>
+      </div>
+      <div class="hint"><span><b>Enter</b> para enviar</span><span>·</span><span><b>Shift+Enter</b> para una línea nueva</span><span>·</span><span><b>Esc</b> para detener</span></div>
+      <div style="height:14px"></div>
+    </div>
+  </div>
+
+  <div class="sheet">
+    <h2>C · los dos bordes que importan</h2>
+    <p class="note">Los grupos de la fila vuelven a ser <b>texto sin caja</b> — el borde dentro del borde leía a caja dentro de caja (el maintainer, 2026-11-19): separan el aire de 12px, la línea fina entre lo que corre y dónde corre, sin hover de grupo: los controles individuales conservan el propio. Sin repo: el segmento de rama <b>no existe</b>, no queda hueco. Contexto al 82%: la línea pasa a ámbar, sin agregar ningún chip. El archivo adjunto es la única cosa que gana una fila propia, porque es contenido, no cromo.</p>
+    <div class="stage">
+      <div class="state"><span class="spin"></span><span class="t">trabajando…</span><span class="n">4s</span>
+        <span class="right"><span class="tag">Normal</span></span>
+      </div>
+      <div class="ctx near"><div class="lab"><span class="l"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2"/></svg>82%</span><span>200k</span></div><div class="rail"><i style="width:82%"></i></div></div>
+      <div class="dock">
+        <div style="padding:10px 12px 0;display:flex;gap:6px;flex-wrap:wrap">
+          <span class="seg" style="border:1px solid var(--border);border-radius:6px;padding:2px 6px;font-size:11px"><svg viewBox="0 0 24 24"><path d="M14 3v5h5"/><path d="M6 3h8l5 5v13H6z"/></svg><span class="t">cv_es.tex</span><button type="button" aria-label="Quitar cv_es.tex" style="background:none;border:0;color:var(--faint);cursor:pointer;font:inherit;padding:0 2px">×</button></span>
+          <span class="seg" style="border:1px solid rgba(231,180,85,.45);color:var(--warning);border-radius:6px;padding:2px 6px;font-size:11px"><svg viewBox="0 0 24 24"><path d="M14 3v5h5"/><path d="M6 3h8l5 5v13H6z"/></svg><span class="t">C:\Users\josep\Desktop\notas.md</span><span style="color:var(--warning);opacity:.85">fuera del workspace</span><button type="button" aria-label="Quitar C:\\Users\\josep\\Desktop\\notas.md" style="background:none;border:0;color:inherit;cursor:pointer;font:inherit;padding:0 2px">×</button></span>
+        </div>
+        <div class="row">
+          <button class="att"><svg viewBox="0 0 24 24"><path d="M21 11l-8.5 8.5a5 5 0 01-7-7L14 4a3.5 3.5 0 015 5l-8.5 8.5a2 2 0 01-3-3L15 6"/></svg></button>
+          <button class="seg" title="Modelo"><svg viewBox="0 0 24 24" style="color:var(--accent)"><path d="M12 3l2.1 6.9L21 12l-6.9 2.1L12 21l-2.1-6.9L3 12l6.9-2.1z"/></svg><span class="t">DeepSeek V4.1 Flash</span><svg class="car" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
+          <button class="seg" title="Esfuerzo"><svg viewBox="0 0 24 24"><path d="M4 19h3v-5H4zM10.5 19h3V9h-3zM17 19h3V5h-3z"/></svg><span class="t">high</span><svg class="car" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
+          <span class="vsep"></span>
+          <button class="seg name"><svg viewBox="0 0 24 24"><path d="M3 7h6l2 2h10v10H3z"/></svg>Scarlet</button>
+          <span class="grow"></span>
+          <button class="send"><svg viewBox="0 0 24 24"><path d="M12 19V5"/><path d="M6 11l6-6 6 6"/></svg></button>
+        </div>
+      </div>
+      <div class="hint"><span><b>Enter</b> para enviar</span><span>·</span><span><b>Shift+Enter</b> para una línea nueva</span><span>·</span><span><b>Esc</b> para detener</span></div>
+      <div style="height:14px"></div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

@@ -42,6 +42,13 @@ pub(crate) struct Entry {
     /// cleared when the child is up (or the start failed). Cleared the same way
     /// when the chat's child goes away, so it can never stick.
     pub(crate) opening: bool,
+    /// The chat's child has answered `get_messages` (chat-open-latency T1):
+    /// whether its history has arrived, which is a fact emptiness cannot carry -
+    /// an empty answer is an answer, and a chat that never answered and a chat
+    /// that answered with nothing hold the same empty thread. The shell reads it
+    /// before it paints rows read from the session FILE, because those rows may
+    /// never outlive the answer that supersedes them.
+    pub(crate) history_loaded: bool,
     /// The chat's child exited and was not restarted (S3). Cleared by opening or
     /// restarting the chat, which is what asks the host for a fresh child.
     pub(crate) ended: bool,

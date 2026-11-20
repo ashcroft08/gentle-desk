@@ -6,6 +6,7 @@ pub mod codec;
 pub mod config_store;
 pub mod desktop;
 pub mod helper_stop;
+pub mod permission;
 pub mod profile_apply;
 pub mod types;
 

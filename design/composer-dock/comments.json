@@ -1,0 +1,91 @@
+{
+  "version": 1,
+  "comments": [
+    {
+      "id": "qq96ah12",
+      "file": "01-dock.html",
+      "selector": "body > div > div:nth-of-type(1) > div > div:nth-of-type(4) > div:nth-of-type(4)",
+      "excerpt": "↵ envía ⇧↵ salto ! comando / comandos Ctrl+N sesión",
+      "comment": "esto va debajo es el texto que tenemos nosotros que dice \"Enter para enviar · Shift+Enter para una línea nueva · Esc para detener\"",
+      "createdAt": "2026-11-19T00:28:12.334Z",
+      "status": "resolved",
+      "sentAt": "2026-11-19T00:28:12.389Z",
+      "resolvedAt": "2026-11-19T00:35:06.427Z",
+      "resolution": "The footer now uses our own copy: \"Enter para enviar · Shift+Enter para una línea nueva · Esc para detener\", with the keys emphasised and the separators kept."
+    },
+    {
+      "id": "yax1661e",
+      "file": "01-dock.html",
+      "selector": "body > div > div:nth-of-type(1) > div > div:nth-of-type(4) > div:nth-of-type(3) > button:nth-of-type(4)",
+      "excerpt": "…Desktop\\Proyectos\\ Kallari_Pagina_web",
+      "comment": "aqui vamos a enseñar solo el nombre del workspace que es como manejamos nosotros en el sidebar",
+      "createdAt": "2026-11-19T00:28:36.200Z",
+      "status": "resolved",
+      "sentAt": "2026-11-19T00:28:36.239Z",
+      "resolvedAt": "2026-11-19T00:35:25.342Z",
+      "resolution": "The folder chip now shows only the workspace name, the same as the sidebar does; the full path stays in the tooltip."
+    },
+    {
+      "id": "djtvjqll",
+      "file": "01-dock.html",
+      "selector": "body > div > div:nth-of-type(1) > div > div:nth-of-type(3) > span:nth-of-type(4)",
+      "excerpt": "kallari_pagina_web · listo 43 Super YOLO",
+      "comment": "solo deja eso de Super Yolo , elimina lo demas",
+      "createdAt": "2026-11-19T00:31:50.277Z",
+      "status": "resolved",
+      "sentAt": "2026-11-19T00:31:50.324Z",
+      "resolvedAt": "2026-11-19T00:35:46.220Z",
+      "resolution": "The right side of the status line now carries only the mode (Super YOLO / Normal); the project name and the elapsed-tag are gone."
+    },
+    {
+      "id": "v1fyfgkl",
+      "file": "01-dock.html",
+      "selector": "body > div > div:nth-of-type(1) > div > div:nth-of-type(4) > div:nth-of-type(4)",
+      "excerpt": "Enter para enviar · Shift+Enter para una línea nueva · Esc para detener",
+      "comment": "este texto va afuera del cuadro donde se escribe te esstoy diciendo",
+      "createdAt": "2026-11-19T00:36:54.454Z",
+      "status": "resolved",
+      "sentAt": "2026-11-19T00:36:54.498Z",
+      "resolvedAt": "2026-11-19T00:39:07.839Z",
+      "screenshot": ".screenshots/v1fyfgkl.png",
+      "resolution": "The key-hint line now sits BELOW the composer's border, left-aligned, in both examples; the bordered box holds only the input and the chip row."
+    },
+    {
+      "id": "wv9d2gvr",
+      "file": "01-dock.html",
+      "selector": "body > div > div:nth-of-type(1) > div > div:nth-of-type(4) > div:nth-of-type(2) > div:nth-of-type(2)",
+      "excerpt": "6% 1M",
+      "comment": "y esto va encima del cuadro donde se escribe como una linea que se va cargando dependiendo el contexto",
+      "createdAt": "2026-11-19T00:37:51.632Z",
+      "status": "resolved",
+      "sentAt": "2026-11-19T00:37:51.675Z",
+      "resolvedAt": "2026-11-19T00:39:44.117Z",
+      "screenshot": ".screenshots/wv9d2gvr.png",
+      "resolution": "The context moved ABOVE the composer box: a 2px rail spanning its width that fills as the context grows, with the clock icon and the percent on the left and the window size on the right, outside the border in both examples."
+    },
+    {
+      "id": "nsi4d4ij",
+      "file": "01-dock.html",
+      "selector": "body > div > div:nth-of-type(1) > div > div:nth-of-type(4) > div:nth-of-type(1)",
+      "excerpt": "6% 1M",
+      "comment": "pero mira la imagen que te envie, es un poco menos ancho que el cuadro de texto y ademas va mas pegado al cuadro de texto",
+      "createdAt": "2026-11-19T00:40:35.206Z",
+      "status": "resolved",
+      "sentAt": "2026-11-19T00:40:35.221Z",
+      "resolvedAt": "2026-11-19T00:41:06.789Z",
+      "resolution": "The context rail is now inset ~10px on each side (narrower than the box) and sits 3px above it instead of 6px, so it reads as a measure attached to the composer."
+    },
+    {
+      "id": "mf3kk990",
+      "file": "01-dock.html",
+      "selector": "body > div > div:nth-of-type(1) > div > div:nth-of-type(5) > div:nth-of-type(2)",
+      "excerpt": "Claude Sonnet 5 medium Kallari_Pagina_web master",
+      "comment": "me gusta que haya iconos, en el modelo pon un mejor icono ese punto de color amarillo no me convence, en donde dice medium falta la flecha para que se sepa que es un select y tambien ponle un mejor icono. otra cosa mira la organizacion y dime si esta bien como estan puestos y separados si tienes una mejor idea hazlo",
+      "createdAt": "2026-11-19T00:43:07.574Z",
+      "status": "resolved",
+      "sentAt": "2026-11-19T00:43:07.590Z",
+      "resolvedAt": "2026-11-19T00:43:30.415Z",
+      "resolution": "Model now wears a four-point spark (accent, not a colour dot); effort wears ascending bars AND a caret so both read as selects; a hairline separates \"what it runs on\" (model, effort) from \"where it runs\" (folder, branch)."
+    }
+  ]
+}

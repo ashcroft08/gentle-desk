@@ -363,6 +363,32 @@ pub enum UiIntent {
         /// A profile name the store defines, or `null` to clear that layer.
         profile: Option<String>,
     },
+    /// Read the SESSION permission mode of one chat (composer-dock T3b, L7):
+    /// `get_permission_mode` over that chat's OWN child, which is the only one
+    /// that knows the mode of the session it runs. Nothing is written.
+    ///
+    /// The answer travels back on [`ViewState::session_mode`], for that chat
+    /// alone, and it is the owner's own string, never a name this app coined.
+    /// A read that did not answer draws no mode at all: the control is absent
+    /// rather than guessed at.
+    ReadSessionMode {
+        chat_id: String,
+    },
+    /// Ask the SESSION permission mode of one chat to change (composer-dock T3b,
+    /// L7): `set_permission_mode { mode }` over that chat's own child, and never
+    /// `persist` - this changes the mode of THIS session and leaves the saved
+    /// default exactly as it was.
+    ///
+    /// The shown mode changes only on the confirmed answer, never optimistically
+    /// (L7), so the answer that travels back on [`ViewState::session_mode`] is
+    /// the state the owner re-read after the attempt. A refused or unanswered
+    /// write keeps the mode it had and leaves its own `refusal`, which the page
+    /// shows; `yolo` and `super-yolo` are the page's confirmation step to ask
+    /// for, never this intent's.
+    SetSessionMode {
+        chat_id: String,
+        mode: SessionModeChoice,
+    },
     /// Re-read the provider names and re-run one `auth check` per provider
     /// (0.1.12, T3). The answer travels back on [`ViewState::auth`].
     RefreshAuth,
@@ -377,6 +403,53 @@ pub enum UiIntent {
     /// Nothing of it reads a chat, so no open chat can hold it back. The answer
     /// travels back on [`ViewState::usage`].
     RefreshUsage,
+}
+
+/// One mode the page may ask the session to switch to (composer-dock T3b, S1).
+///
+/// A closed set, named exactly as the channel's own wire spells the four modes
+/// (`normal`, `auto`, `yolo`, `super-yolo`), so neither side translates a value
+/// and no string a page sends can become a mode nobody offers. Which of them
+/// needs a confirmation step first is the page's business and its design's
+/// (`yolo` and `super-yolo`), never this enum's.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub enum SessionModeChoice {
+    /// Asks before a tool the mode would otherwise allow.
+    #[serde(rename = "normal")]
+    Normal,
+    /// Chooses by the owner's own rules without asking.
+    #[serde(rename = "auto")]
+    Auto,
+    /// Never asks: the session runs unattended.
+    #[serde(rename = "yolo")]
+    Yolo,
+    /// The widest of the four: never asks, and takes the owner's own widest
+    /// permission set. The status text reads `SUPER-YOLO`; the wire is
+    /// `super-yolo`.
+    #[serde(rename = "super-yolo")]
+    SuperYolo,
+}
+
+/// The session's permission mode as the slice carries it (composer-dock T3b,
+/// L7): what the chat's own child reported, and what became of the last attempt
+/// to change it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub struct SessionModeView {
+    /// The mode in effect, in the channel's OWN string, exactly as it arrived.
+    /// A value this build does not know is shown as-is, never hidden and never
+    /// mapped onto a mode the app does know, so an upstream mode the page has
+    /// not learned yet still says what the session really runs.
+    pub mode: String,
+    /// The owner's own code for the last attempt that did not happen
+    /// (`permission_denied`, `permission_unavailable`, `invalid_request`, ...),
+    /// or `no_answer`/`unsupported` when the child did not answer at all. `None`
+    /// while nothing was refused, and cleared by the next answered exchange.
+    /// The mode above is left exactly as it was: a failure shows its code and
+    /// changes nothing (L7).
+    pub refusal: Option<String>,
+    /// How many WRITE attempts this chat has answered since it opened. A read is
+    /// no attempt, and the page tells one confirmed change from the next by it.
+    pub attempt: u32,
 }
 
 /// One model pi offers, flattened for the chip's dropdown.
@@ -983,6 +1056,41 @@ pub struct ContextUsageView {
     pub window: Option<u32>,
 }
 
+/// The folder the foreground chat runs in (design/composer-dock S2, R4): the
+/// last segment of its working directory - the name its sidebar row draws - and
+/// the whole directory, which is only ever the hover.
+///
+/// The name is the app's own rule ([`SessionItem::project`](gentle_app::SessionItem::project)),
+/// the one the session rows use, so the composer's chip and the sidebar row can
+/// never name the same folder differently.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub struct FolderView {
+    /// The last segment of the chat's working directory, as the sidebar draws it.
+    pub name: String,
+    /// The whole working directory: the chip's `title`, never its text.
+    pub path: String,
+}
+
+/// The branch the foreground chat's working directory is on (design/composer-dock
+/// S2, R3, R4): the branch's name, and the directory it was read from, which is
+/// only ever the hover.
+///
+/// There is no "no repository" variant on purpose: a folder outside a work tree,
+/// a bare one, a machine without git and every other refusal are all `None` on
+/// [`ViewState::foreground_branch`], and a `None` draws no chip at all - no
+/// gap, no dash, no placeholder (R3).
+///
+/// A detached HEAD carries the SHORT sha as its name, because the word git
+/// answers there (`HEAD`) names no branch and the chip never lies.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub struct BranchView {
+    /// The branch's name as git spells it, or the short sha of a detached HEAD.
+    pub name: String,
+    /// The working directory the branch was read from: the chip's `title`, never
+    /// its text. It is also what ties the answer to the folder beside it.
+    pub path: String,
+}
+
 /// How complete the session list is, matching `gentle_app::ListStatus` one to
 /// one. `Loading` carries how far the first pass got, so the sidebar can say it
 /// is still reading; only `Complete` lets an empty list call itself empty.
@@ -1115,6 +1223,54 @@ pub struct ImageView {
     pub preview_url: String,
 }
 
+/// Where one file the composer attached stands (design/composer-dock T4, R5,
+/// R6): an image still travels as an image, every other file travels as a path,
+/// and one that cannot be attached says why instead of becoming a chip.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
+#[serde(tag = "type", content = "data")]
+pub enum AttachmentKindView {
+    /// One of the four image types a message carries: it goes to
+    /// `attach_images`, so it still travels as an image and not as a path (R6).
+    Image,
+    /// Every other file: it becomes a chip, and its absolute path is what the
+    /// message carries.
+    File,
+    /// A path that cannot be attached at all, and the reason, which is the one
+    /// line the composer draws in place of a chip.
+    Rejected(AttachmentRejectView),
+}
+
+/// Why one path the user chose or dropped was not attached.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Type)]
+pub enum AttachmentRejectView {
+    /// Nothing exists at that path.
+    NotFound,
+    /// A folder, which is not a file to open.
+    IsDirectory,
+    /// Something is there but could not be read.
+    Unreadable,
+}
+
+/// One file the composer attached, as the web side draws it: the whole path
+/// (absolute, as the app shows paths elsewhere), the name the chip draws, what
+/// it is, and whether it lives outside the chat's folder (R5).
+///
+/// Nothing here is decided twice: the image rule is [`crate::images::Mime`]'s own
+/// and the path is classified once, in [`crate::attachments`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Type)]
+pub struct AttachmentView {
+    /// The absolute path, with no Windows verbatim prefix: what the message
+    /// carries and what the agent's own tools open. It is also the chip's hover.
+    pub path: String,
+    /// The last segment of that path: what the chip draws.
+    pub name: String,
+    /// What this file is, or why it was not attached.
+    pub kind: AttachmentKindView,
+    /// Whether the file lives outside the chat's folder, so the agent may not be
+    /// able to open it. A path with no chat folder is never outside.
+    pub outside: bool,
+}
+
 /// One message of the foreground chat's thread, flattened for display.
 ///
 /// The three fields after the text are what a streamed thread needs and the
@@ -1137,6 +1293,98 @@ pub struct MessageView {
     /// composer showed (S2). Empty for every message that carried none, which
     /// is every assistant reply and every prompt typed without a drop.
     pub images: Vec<ImageView>,
+}
+
+/// One row of the foreground chat's transcript, in the order the child produced
+/// it: the text messages, the reasoning blocks and the tool calls the core keeps
+/// as ONE ordered list (chat-transcript T2a, L4, S3).
+///
+/// It is a list of rows and not a tree, and every variant carries the id a keyed
+/// view keys the row by. The text variant carries exactly the [`MessageView`]
+/// this same push puts in [`ViewState::messages`], built by the same rule, so the
+/// field the web reads today and the ordered list can never disagree about a row
+/// they both carry while T2 moves the web from one to the other.
+///
+/// A tool's arguments and output stay the child's own untyped JSON: each tool's
+/// shape is its own, and how to show a command or an output is the card's
+/// decision, never this contract's.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+#[serde(tag = "kind", content = "data")]
+pub enum ChatItemView {
+    /// A text row: a prompt or a reply, exactly as [`MessageView`] carries it.
+    Message(MessageView),
+    /// A reasoning block, drawn as a collapsible row of its own.
+    Thinking(ThinkingItemView),
+    /// One tool call, drawn as one card.
+    Tool(ToolCallItemView),
+}
+
+/// One reasoning block of the transcript: its text, whether it is still
+/// arriving, and how long it ran when the child's clock was known.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+pub struct ThinkingItemView {
+    /// `think-<n>` in the chat's own scheme: the key a list keys the row by.
+    pub id: String,
+    /// The reasoning text the child wrote.
+    pub text: String,
+    /// True between the block's start and its end: the row is open while it is,
+    /// because the text is still growing.
+    pub streaming: bool,
+    /// How long the block ran, in milliseconds, from its own start and end
+    /// stamps. `None` when either stamp is missing (the `prompt-turn` fixture
+    /// carries no timestamps), because a row never invents the duration it has
+    /// no evidence for.
+    ///
+    /// An `f64` rather than the core's `u64` because the generated bindings
+    /// refuse a 64-bit integer on the wire - a `number` could lose precision -
+    /// and every real millisecond count is exact in a double.
+    pub duration_ms: Option<f64>,
+}
+
+/// One tool call of the transcript, as its card draws it: the tool's own name,
+/// the arguments it was given, the output it had produced while running, the
+/// result it ended with, how it stands, and the two marks that say a payload did
+/// not arrive whole.
+///
+/// The three payloads are the child's JSON, untyped and NOT flattened into text:
+/// how to show a command, an output or an argument is the card's decision. Each
+/// of them is `null` when the call carried none, which the generated bindings
+/// state as `unknown` - the wire carries the JSON value itself, and `null` is a
+/// value of it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+pub struct ToolCallItemView {
+    /// `tool-<toolCallId>`: the key a list keys the row by.
+    pub id: String,
+    /// The tool's own name ("bash", "read", ...), as the child sent it.
+    pub tool_name: String,
+    /// The arguments the call was made with, when it carried any.
+    #[specta(type = specta_typescript::Unknown)]
+    pub args: Option<serde_json::Value>,
+    /// The output the tool had produced at its last update, dropped the moment
+    /// the `result` that supersedes it arrives: one call keeps one output, so
+    /// this is what a RUNNING call has to show and `null` once it ends.
+    #[specta(type = specta_typescript::Unknown)]
+    pub partial_result: Option<serde_json::Value>,
+    /// The result the tool ended with, `null` until it ends.
+    #[specta(type = specta_typescript::Unknown)]
+    pub result: Option<serde_json::Value>,
+    /// The child's own verdict on the result: the card's failure mark.
+    pub is_error: bool,
+    /// True between the execution's start and its end: the card's "Running"
+    /// instead of its "Done".
+    pub running: bool,
+    /// How long the execution ran, in milliseconds, from its own two stamps;
+    /// `None` while it runs and when the clock was not supplied. A `f64` for the
+    /// reason [`ThinkingItemView::duration_ms`] gives.
+    pub duration_ms: Option<f64>,
+    /// True when a payload of this call had a string longer than the core keeps
+    /// and was cut to the bound: the card says the output was cut short instead
+    /// of drawing the head as the whole of it.
+    pub truncated: bool,
+    /// True when a FIELD of a payload was lost - cutting one of an object's keys
+    /// made it collide with another - which [`truncated`](Self::truncated)
+    /// cannot say: the card words the two losses differently.
+    pub dropped: bool,
 }
 
 /// The first blocking dialog the foreground chat's extension is waiting on,
@@ -1404,6 +1652,19 @@ pub struct ViewState {
     /// named [`NEW_CHAT_TITLE`](crate::sessions::view::NEW_CHAT_TITLE), and no
     /// foreground chat has no title.
     pub foreground_title: Option<String>,
+    /// The folder the foreground chat runs in (design/composer-dock S2, R4): the
+    /// last segment of its working directory and the whole path, which the
+    /// composer draws as its folder chip. Read from the same session row the
+    /// header's title reads, so the two can never name one folder differently.
+    /// `None` for a chat whose session is not listed yet: an unknown folder is
+    /// absent rather than a placeholder.
+    pub foreground_folder: Option<FolderView>,
+    /// The branch that folder is on (design/composer-dock S2, R3, R4), read once
+    /// per working directory by the shell (`git`) and kept only while it was read
+    /// from the very directory `foreground_folder` names. `None` when there is no
+    /// branch to draw - no repository, a bare one, git not installed, an answer
+    /// that has not landed yet - and the composer then draws no chip at all.
+    pub foreground_branch: Option<BranchView>,
     /// How complete the session list is. It starts `Loading`, so the sidebar
     /// never claims there are no chats before the first pass ends.
     pub list_status: ListStatusView,
@@ -1427,6 +1688,32 @@ pub struct ViewState {
     /// [`MESSAGES_PUSHED`](crate::view::MESSAGES_PUSHED) of them and never a
     /// whole long session.
     pub messages: Vec<MessageView>,
+    /// The foreground chat's transcript, oldest row first: every row the chat
+    /// keeps - the text messages, the reasoning blocks and the tool calls - in
+    /// the order the child produced them (chat-transcript T2a, L4).
+    ///
+    /// It is the tail, and the SAME limit [`messages`](Self::messages) uses:
+    /// the last [`MESSAGES_PUSHED`](crate::view::MESSAGES_PUSHED) rows of ANY
+    /// kind, so a chat of hundreds of tool calls pushes a bounded list and the
+    /// payloads the core keeps cannot turn one refresh into megabytes. A text
+    /// row that both lists carry is the same row: `messages` is this list's text
+    /// rows out of one builder, which is what lets the web move from the one to
+    /// the other without the two disagreeing on the way.
+    pub items: Vec<ChatItemView>,
+    /// Whether [`items`](Self::items) and [`messages`](Self::messages) are the
+    /// PROVISIONAL rows read from the chat's own session FILE, painted while its
+    /// child is still starting (`chat-open-latency.md` T1, T2).
+    ///
+    /// True only while the thread draws those rows, and those rows are drawn only
+    /// for the foreground chat, only while its child has answered nothing and its
+    /// thread holds no row of its own. The child's `get_messages` answer replaces
+    /// them and always wins (S4), so this flag turns false in the same push that
+    /// carries the real rows - never one frame later.
+    ///
+    /// While it is true a row may be DRAWN but not ACTED on: the rows are the
+    /// file's, not the child's, so the thread gives them no Copy and nothing else
+    /// that assumes the chat owns them.
+    pub transcript_provisional: bool,
     pub notices: Vec<NoticeView>,
     /// The foreground chat's first pending blocking dialog, if an extension is
     /// waiting for an answer. `None` when no chat is foreground or nothing is
@@ -1491,6 +1778,18 @@ pub struct ViewState {
     /// that is not the foreground one, and for every chat without a view of its
     /// own.
     pub chat_profile: Option<ChatProfileView>,
+    /// The SESSION permission mode of the FOREGROUND chat (composer-dock T3b,
+    /// L7): the mode that chat's own child reported, in the channel's own string,
+    /// with the refusal of the last attempt that wrote nothing and the number of
+    /// write attempts answered so far.
+    ///
+    /// Shell-owned, like [`chat_profile`](Self::chat_profile): the reducer knows
+    /// nothing about a permission mode. It is carried only while its mode is
+    /// KNOWN and the chat it was read for is the foreground one, so a late answer
+    /// never draws on the wrong chat and a chat nothing answered draws no control
+    /// at all. `None` until an exchange answers, and for every chat that is not
+    /// the foreground one.
+    pub session_mode: Option<SessionModeView>,
     /// Where the shell's authentication stands (0.1.12, T3): provider names and
     /// their own check, never a key.
     pub auth: AuthView,

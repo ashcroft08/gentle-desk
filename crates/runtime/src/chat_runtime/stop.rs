@@ -26,7 +26,10 @@ use std::sync::{Arc, Mutex};
 use gentle_app::ChatId;
 use gentle_backend::chat_host::HostDesktopChannel;
 use gentle_core::rpc::helper_stop::{stop_helper, StopOutcome};
-use gentle_core::rpc::DesktopClient;
+use gentle_core::rpc::permission::{
+    read_permission, write_permission, PermissionOutcome, SessionMode,
+};
+use gentle_core::rpc::{DesktopClient, NoAnswer};
 
 use super::{lock, ChatRuntime};
 
@@ -60,6 +63,31 @@ impl ChatRuntime {
                 );
                 false
             }
+        }
+    }
+
+    /// Reads `chat`'s session permission mode, or asks that chat's own child to
+    /// change it, and answers what the owner reported (composer-dock T3b, L7).
+    ///
+    /// `change: None` reads the state and writes nothing; `Some(mode)` asks for
+    /// that mode and answers the state the owner re-read AFTER the attempt,
+    /// never an echo of the request. Only the session's mode is ever touched:
+    /// `persist` is never sent, so the saved default stays as it was (L7).
+    ///
+    /// Blocking: the exchange waits for the child's answer under the channel's
+    /// own deadline (5 s), so the shell runs it off the window's thread. A chat
+    /// the host does not know has no child, and answers the not-connected
+    /// reason without writing anything.
+    pub fn session_mode(&self, chat: &ChatId, change: Option<SessionMode>) -> PermissionOutcome {
+        let Some(client) = self.desktop_client(chat) else {
+            return PermissionOutcome::NoAnswer(NoAnswer::NotConnected);
+        };
+        // One exchange per chat at a time, which is what makes its request ids
+        // meaningful; another chat's read or write runs in parallel.
+        let mut client = lock(&client);
+        match change {
+            Some(mode) => write_permission(&mut client, mode),
+            None => read_permission(&mut client),
         }
     }
 

@@ -93,12 +93,20 @@ fn the_view_state_slice_has_no_invented_fields() {
             foreground_chat: None,
             // No chat is open, so no header title is drawn either.
             foreground_title: None,
+            // And no chat means no folder for the composer's chip.
+            foreground_folder: None,
+            // Nor a branch for the chip beside it (design/composer-dock S2, R3).
+            foreground_branch: None,
             list_status: ListStatusView::Loading { done: 0, total: 0 },
             sessions_revision: 0,
             total_sessions: 0,
             // No chat was started, so the Updates pane's gate is free (S4).
             open_chats: 0,
             messages: Vec::new(),
+            // No chat is open, so the transcript holds no row either.
+            items: Vec::new(),
+            // And no row was read from a session file: nothing is provisional.
+            transcript_provisional: false,
             notices: Vec::new(),
             // No chat is open, so no extension is waiting for an answer.
             dialog: None,
@@ -131,6 +139,9 @@ fn the_view_state_slice_has_no_invented_fields() {
             // answered, so the Profile tab has nothing of its own to draw
             // (profiles-editor T2b-2).
             chat_profile: None,
+            // Nor has any chat answered for its session mode, so there is no
+            // mode label to draw (design/composer-dock T3b).
+            session_mode: None,
             auth: AuthView::default(),
             updates: UpdatesView::default(),
             // Nothing asked the shell's usage sources anything yet, so the

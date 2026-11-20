@@ -28,12 +28,21 @@ export function viewState(overrides: Partial<ViewState_Serialize> = {}): ViewSta
     },
     foreground_chat: null,
     foreground_title: null,
+    // A chat whose session is not listed yet has no folder to name (S2, R4).
+    foreground_folder: null,
+    // And no branch on it either: nothing read this run's git yet, and a folder
+    // no repository holds never has one (S2, R3).
+    foreground_branch: null,
     list_status: { type: 'Complete' },
     sessions_revision: 1,
     total_sessions: 0,
     // No chat open: the Updates pane's gate is free (S4).
     open_chats: 0,
     messages: [],
+    // No chat open, so the transcript holds no row either.
+    items: [],
+    // And no row was read from a session file: nothing is provisional.
+    transcript_provisional: false,
     notices: [],
     dialog: null,
     helpers: null,
@@ -54,6 +63,9 @@ export function viewState(overrides: Partial<ViewState_Serialize> = {}): ViewSta
     // Nothing read this chat's profile yet: the Profile tab (T2c) reads it when
     // it opens, and until an answer lands it says it is reading.
     chat_profile: null,
+    // No chat answered for its session mode yet: with no mode there is no
+    // control to draw (composer-dock T3b, L7).
+    session_mode: null,
     // The Settings panes before their first read (0.1.12): nothing known yet.
     auth: { status: { type: 'Unknown' }, providers: [] },
     updates: {

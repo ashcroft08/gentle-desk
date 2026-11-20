@@ -6,6 +6,7 @@
 //! commands the reducer answers are run by `effects`, off the window's thread,
 //! from the command layer in `commands`.
 
+pub mod attachments;
 pub mod bridge;
 pub mod chat_delete;
 pub mod chat_rename;
@@ -18,6 +19,7 @@ pub mod dialogs;
 pub mod effects;
 pub mod events;
 pub mod folder_name;
+pub mod git;
 pub mod helper_thread;
 pub mod helpers;
 pub mod images;
@@ -69,6 +71,8 @@ pub fn contract_builder() -> Builder<tauri::Wry> {
             workspace_remove::remove_workspace,
             commands::attach_images,
             commands::remove_image,
+            commands::pick_files,
+            commands::describe_attachments,
             commands::store_last_run_version,
             terminal_commands::open_terminal,
         ])

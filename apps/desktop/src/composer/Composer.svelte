@@ -10,20 +10,22 @@
   //   commits an IME composition belongs to the candidate list;
   // - the focus: the box takes it when a chat opens and keeps it after a send,
   //   and Escape never touches the draft;
-  // - the drop: files dragged over the window land here, and the composer hands
-  //   Rust their PATHS so it can read them (`./drop`). Attaching never sends, and
-  //   a thumbnail is drawn from the URL Rust answers with, never from a byte the
-  //   page holds.
-  import { attachImages, dispatchIntent, removeImage } from '../bridge'
-  import type {
-    ChatActivityMark,
-    ContextUsageView_Serialize as ContextUsageView,
-    ImageView,
-    ModelChipView,
-  } from '../contract/bindings'
-  import Icon from '../icons/Icon.svelte'
+  // - the attachments: the clip and the drop name PATHS, Rust says what each one
+  //   is, an image keeps the road it already had (a thumbnail served from Rust)
+  //   and every other file becomes a chip whose path the send appends below the
+  //   text (`./attach`, `./drop`). Attaching never sends, and a file outside the
+  //   chat's folder attaches anyway and says so (R5).
+  import { dispatchIntent, removeImage } from '../bridge'
   import { language } from '../i18n/language.svelte'
-  import ContextChip from './ContextChip.svelte'
+  import { promptWithPaths } from './attach'
+  import { emptyDraft, attachPaths, withoutPath, type AttachmentDraft } from './attachment-draft'
+  import type { ComposerProps } from './props'
+  import AttachButton from './AttachButton.svelte'
+  import ImageShots from './ImageShots.svelte'
+  import Attachments from './Attachments.svelte'
+  import BranchChip from './BranchChip.svelte'
+  import ContextRail from './ContextRail.svelte'
+  import FolderChip from './FolderChip.svelte'
   import ModelChip from './ModelChip.svelte'
   import { SEND_WHY_ID, composerCopy } from './copy'
   import { watchDrops } from './drop'
@@ -32,28 +34,7 @@
   import { composerStateOf } from './state'
   import StopButton from './StopButton.svelte'
 
-  let {
-    chat,
-    mark = null,
-    images = [],
-    imagesNotice = null,
-    chip = null,
-    contextUsage = null,
-  }: {
-    /** The foreground chat: which draft is shown, and where a send goes. */
-    chat: string | null
-    /** Its mark, `null` when it is idle; it decides Send, Stop and the reason. */
-    mark?: ChatActivityMark | null
-    /** The images the chat holds, as Rust pushes them: a name, a preview URL and
-     * the id the remove names back. The page never holds a byte of an image. */
-    images?: ImageView[]
-    /** Why the last drop was refused, as one plain line, or `null`. */
-    imagesNotice?: string | null
-    /** What the model chip shows, as Rust pushes it, or `null`. */
-    chip?: ModelChipView | null
-    /** How full this chat's context is (0.1.12, S5), as Rust pushes it. */
-    contextUsage?: ContextUsageView | null
-  } = $props()
+  let { chat, mark = null, images = [], imagesNotice = null, chip = null, contextUsage = null, folder = null, branch = null }: ComposerProps = $props()
 
   /** The composer's own words in the language the app holds (0.2.0, S3/D4). */
   const copy = $derived(composerCopy(language.current))
@@ -66,6 +47,11 @@
   let shown: string | null = null
   /** Whether files are being dragged over the window: the composer says so. */
   let dropping = $state(false)
+  /** The chips of the message being written, and why the last attach refused
+   * anything, as one draft (`./attachment-draft`). */
+  let draft = $state<AttachmentDraft>(emptyDraft())
+  /** The chat the chips belong to, so a switch clears them once. */
+  let attachedFor: string | null = null
 
   const rule = $derived(composerStateOf(mark, copy))
   const text = $derived(chat === null ? '' : (drafts[chat] ?? ''))
@@ -77,8 +63,21 @@
    * draft stays where it is for the turn after (the reducer would drop it).
    */
   const sendable = $derived(
-    chat !== null && rule.mode === 'send' && !rule.disabled && text.trim() !== '',
+    chat !== null &&
+      rule.mode === 'send' &&
+      !rule.disabled &&
+      (text.trim() !== '' || draft.attached.length > 0),
   )
+
+  // A chat change drops the chips: they belong to the message being written in
+  // THIS chat, exactly as the images Rust holds do. It runs only on the change,
+  // never on an attach, so a chip is never lost by anything but its own chat.
+  $effect(() => {
+    const open = chat
+    if (open === attachedFor) return
+    attachedFor = open
+    draft = emptyDraft()
+  })
 
   // Opening a chat, or starting one, puts the cursor where the user will type.
   // It runs only when the chat changes, never on every keystroke.
@@ -97,7 +96,7 @@
     let live = true
     void watchDrops((action) => {
       dropping = action.kind === 'over'
-      if (action.kind === 'drop' && action.paths.length > 0) void attachImages(action.paths)
+      if (action.kind === 'drop' && action.paths.length > 0) void attach(action.paths)
     }).then((off) => {
       if (live) stop = off
       else off()
@@ -131,7 +130,7 @@
     // nothing running it keeps the meaning the box gives it.
     if (event.key === 'Escape' && rule.mode === 'stop') {
       event.preventDefault()
-      stop()
+      void dispatchIntent({ type: 'Abort' })
       return
     }
     // Only a send takes the Enter: with nothing to send, or a chat that cannot
@@ -145,18 +144,42 @@
     event.preventDefault()
     send()
   }
-
-  /** Sends the trimmed draft and keeps the cursor in the box; nothing else happens. */
-  function send(): void {
-    if (!sendable || chat === null) return
-    const value = text.trim()
-    drafts = { ...drafts, [chat]: '' }
-    void dispatchIntent({ type: 'SendPrompt', data: { text: value } })
-    box?.focus()
+  /** The clip and the drop both land here (T4, S3, R6): Rust says what each
+   * path is, an image keeps the road it already had, every other file becomes a
+   * chip, and a refused path draws ONE line instead. A picker or drop that
+   * arrives after the chat changed attaches nothing: the chips belong to the
+   * message of the chat they were chosen for. */
+  async function attach(paths: string[]): Promise<void> {
+    if (chat === null || paths.length === 0) return
+    const chosenFor = chat
+    const next = await attachPaths(draft, chat, paths, folder?.path ?? null, copy.attachFailed)
+    if (chat !== chosenFor || next === null) return
+    draft = next
   }
 
-  function stop(): void {
-    void dispatchIntent({ type: 'Abort' })
+  /** Takes one chip away before the send. Nothing is sent and nothing is read;
+   * a file outside the chat's folder is attached like any other (R5). */
+  function remove(path: string): void {
+    draft = withoutPath(draft, path)
+  }
+
+  /**
+   * Sends the trimmed draft with the chips' whole paths below it, one per line
+   * (T4, S3, R6), and clears both. A message with no text and only files is a
+   * send like any other; the chips are cleared once it is dispatched, never on
+   * an attach.
+   */
+  function send(): void {
+    if (!sendable || chat === null) return
+    const value = promptWithPaths(
+      text,
+      draft.attached.map((view) => view.path),
+    )
+    if (value === '') return
+    drafts = { ...drafts, [chat]: '' }
+    draft = emptyDraft()
+    void dispatchIntent({ type: 'SendPrompt', data: { text: value } })
+    box?.focus()
   }
 
   /** Takes one attached image away. Nothing is sent; Rust answers the slice. */
@@ -173,23 +196,19 @@
   {#if images.length > 0}
     <!-- What the chat holds before the send: the same thumbnails the sent
          message draws, each one with its own way to take it away. -->
-    <ul class="shots">
-      {#each images as image (image.id)}
-        <li class="shot">
-          <img class="thumb" src={image.preview_url} alt={image.name} title={image.name} />
-          <button
-            class="take"
-            type="button"
-            aria-label={`${copy.removeImage} ${image.name}`}
-            onclick={() => take(image.id)}
-          >
-            <Icon name="x" size={12} />
-          </button>
-        </li>
-      {/each}
-    </ul>
+    <ImageShots {images} {copy} onTake={take} />
   {/if}
+  <!-- The context rail ABOVE the box and outside its border (design/composer-dock
+       S1, S5): it replaced the chip that used to share the row with the pills. -->
+  <ContextRail usage={contextUsage} />
   <form class="composer" class:over={dropping} onsubmit={submitted}>
+    <!-- The attached FILES are content, not chrome: their own row above the
+         text, with the one line a refused path and the one line an outside file
+         draw (design/composer-dock/03-attachments.html, sheets A, B, D). -->
+    <Attachments attachments={draft.attached} onRemove={remove} />
+    {#if draft.attachNotice !== null}
+      <p class="attach-failed" role="alert">{draft.attachNotice}</p>
+    {/if}
     <textarea
       id="msg"
       rows="1"
@@ -200,11 +219,27 @@
       oninput={typed}
       onkeydown={keyed}
     ></textarea>
-    {#if rule.mode === 'stop'}
-      <StopButton onStop={stop} />
-    {:else}
-      <SendButton disabled={rule.disabled} describedBy={SEND_WHY_ID} />
-    {/if}
+    <!-- The row, regrouped in THREE groups the eye can tell apart (maintainer's
+         test note, 2026-11-19): the clip is its own act, the model and its
+         effort are what the message runs ON, then where it runs (the folder,
+         and the branch that folder is on - absent when there is no repository to
+         name), the flexible space and Send. Since the maintainer's screenshot
+         (L11) each group wears its own quiet border in app.css: the 12px gap
+         between them was not enough on its own, because sharing the dock's
+         background made the three groups read as one big rectangle. -->
+    <div class="row">
+      <span class="grp"><AttachButton label={copy.attachFiles} disabled={chat === null} onPick={attach} /></span>
+      <span class="grp"><ModelChip {chip} /></span>
+      <span class="grp"><FolderChip {folder} /><BranchChip {branch} /></span>
+      <span class="grow"></span>
+      {#if rule.mode === 'stop'}
+        <StopButton
+          onStop={() => dispatchIntent({ type: 'Abort' })}
+        />
+      {:else}
+        <SendButton disabled={rule.disabled} describedBy={SEND_WHY_ID} />
+      {/if}
+    </div>
   </form>
   {#if rule.reason !== null}
     <!-- The visible reason for a disabled Send, which Send is described by. -->
@@ -214,13 +249,8 @@
     <!-- Why the last drop attached nothing, in the words Rust refused it with. -->
     <p class="refused" role="status">{imagesNotice}</p>
   {/if}
-  <!-- The chip shares the keys-hint line (S7): the hints take the left, the
-       context chip sits beside the model pills (0.1.12, S5), and the pills take
-       the right, so no blank row is left under the box. Stop mode is Working or
-       Queued, where Enter sends nothing, so the hint stops promising it. -->
-  <div class="dock-bottom">
-    <p class="keys">{rule.mode === 'stop' ? copy.keysHintWorking : copy.keysHint}</p>
-    <ContextChip usage={contextUsage} />
-    <ModelChip {chip} />
-  </div>
+  <!-- The keys BELOW the box's border, left-aligned, in the app's own words (S7):
+       Stop mode is Working or Queued, where Enter sends nothing, so the hint stops
+       promising a send the composer will not do. -->
+  <p class="keys">{rule.mode === 'stop' ? copy.keysHintWorking : copy.keysHint}</p>
 </div>

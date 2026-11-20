@@ -16,6 +16,12 @@
 // - the images the chat holds and the line that says why a drop was refused,
 //   which are the shell's own: it reads the files, so it is what answers with a
 //   thumbnail's URL or with a refusal (S1, S4);
+// - the folder the chat runs in (design/composer-dock S2, R4): Rust projects its
+//   working directory as the last segment plus the whole path, and the
+//   composer's chip draws the name with the path in the hover;
+// - the branch that folder is on (design/composer-dock S2, R3, R4): the shell
+//   reads it once per working directory and the chip draws it after the folder,
+//   or not at all when there is no repository to name;
 // - the run's one fatal failure, which belongs to no chat and outlives all of
 //   them: a launcher that cannot be resolved means no chat can start at all;
 // - the notes of the version this run follows, which the what's-new modal draws
@@ -29,15 +35,18 @@
 // behind. The fatal bar is the exception, because it is not about a chat.
 
 import type {
+  BranchView,
   ChatActivityMark,
   ChatProfileView_Serialize as ChatProfileView,
   ContextUsageView_Serialize as ContextUsageView,
   DialogView,
+  FolderView,
   ImageView,
   HelperThreadView as HelperThreadView,
   HelpersView_Serialize as HelpersView,
   ModelChipView_Serialize as ModelChipView,
   NoticeView,
+  SessionModeView_Serialize as SessionModeView,
   ShellView_Serialize as ShellView,
   ViewState_Serialize as ViewState,
   WhatsNewView,
@@ -72,9 +81,23 @@ export type ChatViewState = {
   /** How full this chat's context is (0.1.12, S5): pi's own reading, every
    * field null when there is none. `null` while no chat is open. */
   contextUsage: ContextUsageView | null
+  /** The folder this chat runs in (design/composer-dock S2, R4): the last
+   * segment of its working directory and the whole path, `null` for a chat whose
+   * session is not listed yet - absent, never a placeholder. */
+  folder: FolderView | null
+  /** The branch that folder is on (design/composer-dock S2, R3, R4): its name
+   * and the directory it was read from, `null` whenever there is no branch to
+   * draw - no repository, a bare one, no git on this machine, or an answer that
+   * has not landed yet. `null` draws no chip at all (R3). */
+  branch: BranchView | null
   /** The profile view the shell holds for this chat (profiles-editor T2c), or
    * `null` until a read answered and after a chat closes. */
   chatProfile: ChatProfileView | null
+  /** The session permission mode of this chat (composer-dock T3c): the mode its
+   * own child reported, the refusal of the last attempt that wrote nothing and
+   * the count of answered writes. `null` until an exchange answers, which is
+   * exactly when the status row draws no control at all. */
+  sessionMode: SessionModeView | null
   /** The run's fatal launcher failure, or `null`; not about any one chat. */
   fatal: string | null
   /** The notes of the version this run follows, or `null`; not about a chat. */
@@ -132,7 +155,10 @@ export function chatOf(view: ViewState | null): ChatViewState {
       imagesNotice: null,
       modelChip: null,
       contextUsage: null,
+      folder: null,
+      branch: null,
       chatProfile: null,
+      sessionMode: null,
       fatal,
       whatsNew,
       shell,
@@ -151,7 +177,10 @@ export function chatOf(view: ViewState | null): ChatViewState {
     imagesNotice: view?.images_notice ?? null,
     modelChip: view?.model_chip ?? null,
     contextUsage: view?.context_usage ?? null,
+    folder: view?.foreground_folder ?? null,
+    branch: view?.foreground_branch ?? null,
     chatProfile: view?.chat_profile ?? null,
+    sessionMode: view?.session_mode ?? null,
     fatal,
     whatsNew,
     shell,
@@ -172,6 +201,16 @@ function sameShell(a: ShellView, b: ShellView): boolean {
     a.restart_needed === b.restart_needed &&
     JSON.stringify(a.install) === JSON.stringify(b.install)
   )
+}
+
+/**
+ * Whether two pushes say the same about the session mode. By value, because the
+ * shell builds the slice afresh on every push and it is three plain fields
+ * (composer-dock T3c).
+ */
+function sameSessionMode(a: SessionModeView | null, b: SessionModeView | null): boolean {
+  if (a === null || b === null) return a === b
+  return a.mode === b.mode && a.refusal === b.refusal && a.attempt === b.attempt
 }
 
 /**
@@ -202,7 +241,10 @@ export function createChatView(deps: ChatViewDeps = {}): ChatView {
     imagesNotice: null,
     modelChip: null,
     contextUsage: null,
+    folder: null,
+    branch: null,
     chatProfile: null,
+    sessionMode: null,
     fatal: null,
     whatsNew: null,
     shell: NO_SHELL,
@@ -230,7 +272,10 @@ export function createChatView(deps: ChatViewDeps = {}): ChatView {
       next.images === state.images &&
       next.imagesNotice === state.imagesNotice &&
       next.contextUsage === state.contextUsage &&
+      next.folder === state.folder &&
+      next.branch === state.branch &&
       next.chatProfile === state.chatProfile &&
+      sameSessionMode(next.sessionMode, state.sessionMode) &&
       next.fatal === state.fatal &&
       next.whatsNew === state.whatsNew &&
       sameShell(next.shell, state.shell)

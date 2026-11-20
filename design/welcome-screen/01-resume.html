@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="es" data-theme="dark">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Bienvenida - A: sigue donde lo dejaste</title>
+<style>
+:root,[data-theme="dark"]{--bg:#0e1116;--surface:#151a21;--surface2:#1c222b;--border:#2b333d;--text:#e4e8ee;--muted:#9aa4b2;--faint:#7d8593;--accent:#7aa2f7;--tint:rgba(122,162,247,.14);--success:#7edc9a;--warning:#e7b455;--danger:#ff8585}
+[data-theme="light"]{--bg:#f2f4f7;--surface:#ffffff;--surface2:#e9edf2;--border:#cfd5dd;--text:#17202a;--muted:#576272;--faint:#6b7686;--accent:#2e5bd7;--tint:rgba(46,91,215,.10);--success:#166e38;--warning:#8a5800;--danger:#c22f37}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+.page{max-width:900px;margin:0 auto;padding:22px 18px 60px}
+h2.s{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin:0 0 8px;font-weight:600}
+.note{color:var(--muted);font-size:12px;margin:0 0 12px;max-width:74ch}
+.note b{color:var(--text);font-weight:600}
+.sheet{margin:0 0 34px}
+.stage{border:1px solid var(--border);border-radius:10px;background:var(--bg);overflow:hidden;position:relative}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+svg{fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+
+/* the pane: the chat header strip, then the welcome */
+.bar{display:flex;align-items:center;gap:12px;height:44px;padding:0 16px;border-bottom:1px solid var(--border);color:var(--muted);font-size:13px}
+.bar svg{width:16px;height:16px}
+.bar b{color:var(--text);font-weight:600}
+.ico{width:14px;height:14px;flex:none}
+
+/* the rose: the app's own icon, with a veil of dots behind it. It rises slowly and
+   the veil drifts; one motion each, both off for reduced motion. */
+.rosebox{position:relative;width:132px;height:132px;display:grid;place-items:center;margin:0 auto}
+.veil{position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle,var(--accent) 1px,transparent 1.6px) 0 0/9px 9px;opacity:.35;
+  -webkit-mask:radial-gradient(circle,#000 28%,transparent 72%);mask:radial-gradient(circle,#000 28%,transparent 72%);animation:drift 14s linear infinite}
+.rose{position:relative;width:76px;height:auto;animation:rise 5s ease-in-out infinite;filter:drop-shadow(0 0 14px var(--tint))}
+@keyframes rise{50%{transform:translateY(-5px)}}
+@keyframes drift{to{background-position:9px 9px}}
+@media (prefers-reduced-motion:reduce){.rose,.veil{animation:none}}
+
+/* actions */
+.primary{display:inline-flex;align-items:center;gap:8px;border:0;border-radius:10px;background:var(--accent);color:var(--bg);font-weight:600;padding:9px 16px;cursor:pointer}
+.primary:hover{filter:brightness(1.08)}
+.primary[disabled]{background:var(--surface2);color:var(--faint);cursor:not-allowed;filter:none}
+.quiet{background:none;border:0;color:var(--muted);cursor:pointer;padding:2px 4px;border-radius:6px}
+.quiet:hover{color:var(--text);background:var(--surface2)}
+.ws{display:inline-flex;align-items:center;gap:6px;color:var(--text);font-weight:600}
+.dim{color:var(--muted);font-weight:400}
+.list{list-style:none;margin:0;padding:0}
+.list li{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:8px;cursor:pointer;color:var(--text);font-size:13px}
+.list li:hover{background:var(--surface2)}
+.list .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.list .ago{color:var(--faint);font-size:11.5px;font-variant-numeric:tabular-nums}
+.tag{font-size:10.5px;color:var(--muted);border:1px solid var(--border);border-radius:999px;padding:0 7px}
+.warn{color:var(--warning);font-size:12px}
+.kicker{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);margin:0 0 6px;font-weight:600}
+</style>
+</head>
+<body>
+<div class="page">
+
+<div class="sheet">
+  <h2 class="s">A · Sigue donde lo dejaste</h2>
+  <p class="note">Una pantalla <b>de texto y de datos reales</b>: el último espacio en el que trabajaste (el de la sesión más reciente de la lista, sin guardar nada nuevo), una sola acción principal y sus chats recientes. <b>No levanta ningún proceso</b>: es sólo vista, así que abrir la app cuesta lo mismo que hoy. La rosa es <b>la de gentle-shell-gpui, portada tal cual</b> (arte braille más su mapa de sombras): florece una sola vez desde el centro, flota un instante y <b>queda quieta, sin pedir más cuadros</b>; con "reducir movimiento" aparece ya florecida. Clic en la rosa para repetirla. Los otros espacios quedan como enlaces discretos.</p>
+  <div class="stage"><div class="bar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg><b>Nueva sesión</b></div>
+    <main style="padding:34px 24px 40px;display:grid;justify-items:center;text-align:center">
+      <canvas class="rosecv" data-h="108" role="img" aria-label="La rosa de Gentle Shell, florece una vez" title="Clic para repetir la animación" style="display:block;margin:0 auto"></canvas>
+      <h1 style="font-size:22px;margin:6px 0 4px;font-weight:600">Sigue donde lo dejaste</h1>
+      <p style="margin:0 0 18px;color:var(--muted)"><span class="ws"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h6l2 2h10v10H3z"/></svg>Curriculum</span> <span class="dim">· última actividad hace 21 min</span></p>
+      <button class="primary" type="button"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Nueva sesión en Curriculum</button>
+      <section aria-labelledby="rec" style="width:min(460px,100%);margin-top:28px;text-align:left">
+        <h2 class="kicker" id="rec">Chats recientes de Curriculum</h2>
+        <ul class="list">
+          <li><span class="t">corré ls en la raíz del repo y contame qué hay</span><span class="ago">21 min</span></li>
+          <li><span class="t">que puedo borrar de mi …</span><span class="ago">2 d</span></li>
+          <li><span class="t">Ahora si podemos mejor…</span><span class="ago">2 d</span></li>
+        </ul>
+      </section>
+      <p style="margin:26px 0 0;font-size:12px;color:var(--faint)">Otros espacios: <button class="quiet" type="button">Proyecto</button><button class="quiet" type="button">gentle-desk</button><button class="quiet" type="button">Kallari_Pagina_web</button></p>
+    </main>
+  </div>
+</div>
+
+<div class="sheet">
+  <h2 class="s">A2 · los dos bordes que importan</h2>
+  <p class="note">Un espacio <b>sin chats todavía</b> dice eso y deja la acción principal sola, sin lista vacía. Si la carpeta <b>ya no existe</b> (el mismo texto que ya dibuja la barra lateral), la acción principal queda desactivada <b>con su motivo a la vista</b>, y no se inventa ninguna otra acción.</p>
+  <div class="stage" style="margin-bottom:12px"><div class="bar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg><b>Nueva sesión</b></div>
+    <main style="padding:26px 24px 30px;display:grid;justify-items:center;text-align:center">
+      <h1 style="font-size:20px;margin:0 0 4px;font-weight:600">Sigue donde lo dejaste</h1>
+      <p style="margin:0 0 16px;color:var(--muted)"><span class="ws"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h6l2 2h10v10H3z"/></svg>gentle-desk</span> <span class="dim">· sin chats todavía</span></p>
+      <button class="primary" type="button">Nueva sesión en gentle-desk</button>
+    </main>
+  </div>
+  <div class="stage"><div class="bar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg><b>Nueva sesión</b></div>
+    <main style="padding:26px 24px 30px;display:grid;justify-items:center;text-align:center">
+      <h1 style="font-size:20px;margin:0 0 4px;font-weight:600">Sigue donde lo dejaste</h1>
+      <p style="margin:0 0 4px;color:var(--muted)"><span class="ws"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h6l2 2h10v10H3z"/></svg>tmp.cblyG8CFAR</span></p>
+      <p class="warn" style="margin:0 0 14px">Esta carpeta ya no existe.</p>
+      <button class="primary" type="button" disabled aria-describedby="why">Nueva sesión</button>
+      <p id="why" style="margin:10px 0 0;font-size:12px;color:var(--faint)">Elige otro espacio en la barra lateral.</p>
+    </main>
+  </div>
+</div>
+
+</div>
+<script>
+/* The rose of gentle-shell-gpui (crates/app/src/shared/banner.rs, MIT): braille art
+   plus a 0-9 shade map, and the same procedural animation ported to a canvas - it
+   blooms from its heart outward over 2.6 s, floats and sways while it does, a glint
+   crosses the petals, and it comes to REST: a finished rose draws no more frames.
+   Reduced motion draws it already open. Click it here to replay. */
+(function () {
+  var ROSE = ["            ⣠⣿⣿⣶⣶⣤⣤⣤⣤⣤⣤⣤⣀    ⢀⡀","         ⢀⣴⣾⣿⣿⠟⠝⢙⣙⣙⣙⣙⢙⣿⣷⢿⢿⢿⢿⢿⣿⣷⣄⡀","      ⣀⣠⣴⣿⣿⣿⠟⢡⣶⡿⠟⢟⡽⣿⣿⣿⣿⡟⢶⣤⣤⣄⣁⠁⠙⢿⣿⣦","   ⢀⣴⣿⣿⠅⣿⣿⣿⠅⢀⣿⠏ ⢰⡏⢹⢯⡤⢖⣯⣍⠻⡍⢻⡌⢽⣷⠄ ⢿⣿⡷⢶⣤⣤","⢀⣀⣴⣿⣿⣿⠟ ⠹⣿⣿  ⢻⣇ ⠘⠻⣦⣈⢙⣻⣿⣷⣾⡥⠜⢁⣼⠟⠁⢴⣿⡿⠁⢽⣿⣿⣄","⢻⣿⢿⣿⣿⣟⠅  ⠘⢿⣧ ⠘⠙⢦⣀  ⠙⠳⢤  ⢀⡴⠞⠛⠝⢀⣴⣿⠟  ⢽⣿⣿⢿⡆"," ⣿⢝⢿⣿⣧⠁   ⢸⠍⠳⣄  ⠉⠓⠦⢄⢀⣀⣁⣤⣥⣤⣤⣶⠿⢿⡟⠁   ⣽⣿⢿⣽⡇"," ⢿⣟⠝⢿⣿⣷⣄  ⠝⠕⠅⠈⠂ ⢀⡤⠖⠛⠉⠉⡁⣀   ⢀⠅⢽⠇  ⢀⣽⣿⣿⣿⠏"," ⠈⠻⢷⣝⣝⣿⢿⢷⣤⣄    ⠴⠉⠄⢔⢴⢾⢿⢿⢿⢗⠔⠔⠄⠁ ⢁⢄⣵⣿⡿⠟⢉⢽⣷⡄","    ⠈⠉⠉⢿⡛⠿⢿⣿⣶⣤⣀⡁  ⠁⠁⠙⠅⠙⠁⠁⠁ ⣀⣴⣾⢿⠿⠛⠉ ⢤⣽⣿⣿⣇","       ⠈⢿⣧⡄ ⠁⠉⠛⠿⠿⢷⣶⣤⣀   ⢀⡴⠛⠉⠁ ⠁ ⢀⣴⢿⢿⣽⠟⠉⠁","         ⠙⠻⣷⣥⣄⢀    ⠈⠙⢷⡄ ⠁ ⢀⢄⣴⣴⢵⠿⢟⣭⣽⠟⠁","            ⢉⢙⣛⣿⠷⢤⣄⡀  ⢿⢠⠔⢓⣛⠿⠿⠷⠷⠟⠛⠉⠁","            ⠈⠙⠛⠛⠓⠒⢖⠙⠷⡄⢈⡴⠟⢅⢴⣶⣤⣤⠄","                   ⢷⡄⠱⢍⡤⠐⠉⠉⠉⠉","                   ⠈⣷ ⠍","                    ⣿⢄"], SHADE = ["            7767687656668    66","         678755455455555564566796","      6757654566556666656555433478","   687536652366 665666665565563 476675","3887663 465  65 56666666666666045563479","8656642  565 5666  666  656536566  35477"," 835643   4566  6665666566655556   45367"," 7435643  22266 66666653   0026  335556"," 3866545555    26033454333300 2344555575","    666665655662  03222300 6565566 24468","       6755 356655555   66563 0 34347886","         776543    3656 3 33444344686","            76765553  5335555556780","            6965564445565346896","                   5532433565","                   36 2","                    62"]
+  var BITS = [[0,0],[0,1],[0,2],[1,0],[1,1],[1,2],[0,3],[1,3]]
+  var dots = [], shades = [], W = 0
+  ROSE.forEach(function (line, row) {
+    var sh = SHADE[row] || ''
+    Array.from(line).forEach(function (ch, col) {
+      var code = ch.codePointAt(0)
+      if (code < 0x2800 || code > 0x28ff) return
+      var bits = code - 0x2800, d = sh[col]
+      var f = 0.55 + 0.075 * (d >= '0' && d <= '9' ? +d : 6)
+      BITS.forEach(function (b, i) {
+        if (bits & (1 << i)) { dots.push([col * 2 + b[0], row * 4 + b[1]]); shades.push(f); W = Math.max(W, col * 2 + b[0] + 1) }
+      })
+    })
+  })
+  var H = ROSE.length * 4, CX = W * 0.5, CY = H * 0.32
+  var dist = function (d) { return Math.hypot(d[0] - CX, d[1] - CY) }
+  var far = Math.max.apply(null, [1].concat(dots.map(dist)))
+  var at = dots.map(function (d) { return dist(d) / far })
+  var WRITE = 2600, BASE = { h: 326, s: 1, l: 0.731 }
+  var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches
+  function smooth(t) { t = Math.min(1, Math.max(0, t)); return t * t * (3 - 2 * t) }
+  function draw(cv, reveal, still) {
+    var hpx = +cv.dataset.h || 96, dot = hpx / H, scale = dot * 2, pad = 8
+    var wpx = W * dot, dpr = window.devicePixelRatio || 1
+    cv.style.width = wpx + pad * 2 + 'px'; cv.style.height = hpx + pad * 2 + 'px'
+    cv.width = Math.ceil((wpx + pad * 2) * dpr); cv.height = Math.ceil((hpx + pad * 2) * dpr)
+    var ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    var t = reveal * WRITE / 1000, TAU = Math.PI * 2
+    var fl = still ? 0 : 1 - smooth((reveal - 0.6) / 0.4)
+    var bob = Math.sin(t * TAU / 5.2) * 0.9 * scale * fl, sway = Math.sin(t * TAU / 7.3) * 0.022 * fl
+    var sin = Math.sin(sway), cos = Math.cos(sway), glint = reveal * 1.8 - 0.4
+    var bloom = reveal / 0.5, side = Math.max(1, dot * 0.55)
+    for (var i = 0; i < dots.length; i++) {
+      var x = dots[i][0], y = dots[i][1]
+      var open = smooth((bloom - at[i] * 0.75) / 0.25)
+      if (open <= 0) continue
+      var unfold = 0.82 + 0.18 * open, dx = (x - CX) * unfold, dy = (y - CY) * unfold
+      var rx = CX + dx * cos - dy * sin, ry = CY + dx * sin + dy * cos
+      var along = (x / W + y / H) * 0.5
+      var shine = still ? 0 : Math.pow(Math.max(0, 1 - Math.abs((along - glint) / 0.12)), 2) * 0.35
+      var l = Math.min(0.95, BASE.l * shades[i]), s = BASE.s
+      l = l + (0.97 - l) * shine; s = s * (1 - 0.35 * shine)
+      ctx.fillStyle = 'hsla(' + BASE.h + ',' + s * 100 + '%,' + l * 100 + '%,' + open + ')'
+      ctx.fillRect(pad + rx * dot, pad + ry * dot + bob, side, side)
+    }
+  }
+  function play(cv) {
+    cancelAnimationFrame(cv._raf)
+    if (reduce) { draw(cv, 1, true); return }
+    var t0 = performance.now()
+    ;(function frame(now) {
+      var r = Math.min(1, (now - t0) / WRITE)
+      draw(cv, r, false)
+      if (r < 1) cv._raf = requestAnimationFrame(frame)
+    })(t0)
+  }
+  document.querySelectorAll('canvas.rosecv').forEach(function (cv) {
+    cv.addEventListener('click', function () { play(cv) }); play(cv)
+  })
+  window.__rose = { dots: dots.length, w: W, h: H }
+})()
+</script>
+</body>
+</html>

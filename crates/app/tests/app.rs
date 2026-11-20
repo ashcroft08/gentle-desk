@@ -53,10 +53,10 @@ mod prompts {
             AppState::default(),
             intent(Intent::SendPrompt("hola".into())),
         );
-        assert_eq!(state.chat.messages.len(), 1);
-        assert_eq!(state.chat.messages[0].role, ChatRole::User);
-        assert_eq!(state.chat.messages[0].text, "hola");
-        assert_eq!(state.chat.messages[0].id, "msg-0");
+        assert_eq!(state.chat.messages().len(), 1);
+        assert_eq!(state.chat.messages()[0].role, ChatRole::User);
+        assert_eq!(state.chat.messages()[0].text, "hola");
+        assert_eq!(state.chat.messages()[0].id, "msg-0");
         assert_eq!(
             commands,
             vec![Command::Send(RpcCommand::Prompt {
@@ -86,16 +86,19 @@ mod prompts {
     #[test]
     fn ids_stay_contiguous_across_user_and_assistant_messages() {
         let state = after_one_reply();
-        let ids: Vec<_> = state.chat.messages.iter().map(|m| m.id.as_str()).collect();
+        // The projection answers a fresh vector on every call, so it is bound
+        // once here: the ids taken below borrow from it.
+        let thread = state.chat.messages();
+        let ids: Vec<_> = thread.iter().map(|m| m.id.as_str()).collect();
         assert_eq!(ids, ["msg-0", "msg-1"]);
         let (state, _) = update(state, intent(Intent::SendPrompt("dos".into())));
-        assert_eq!(state.chat.messages[2].id, "msg-2");
+        assert_eq!(state.chat.messages()[2].id, "msg-2");
     }
 
     #[test]
     fn rpc_events_still_fold_into_the_chat() {
         let state = after_one_reply();
-        assert_eq!(state.chat.messages[1].text, "**hola**");
+        assert_eq!(state.chat.messages()[1].text, "**hola**");
         assert!(!state.chat.working);
     }
 
@@ -343,7 +346,7 @@ mod sessions {
             after_one_reply(),
             intent(Intent::OpenSession("C:/s/a.jsonl".into())),
         );
-        assert!(state.chat.messages.is_empty());
+        assert!(state.chat.messages().is_empty());
         assert_eq!(state.current_session.as_deref(), Some("C:/s/a.jsonl"));
         assert_eq!(
             commands,
@@ -380,12 +383,8 @@ mod sessions {
     #[test]
     fn the_history_response_fills_the_thread() {
         let (state, _) = update(AppState::default(), event(HISTORY));
-        let texts: Vec<_> = state
-            .chat
-            .messages
-            .iter()
-            .map(|m| (m.role, m.text.as_str()))
-            .collect();
+        let thread = state.chat.messages();
+        let texts: Vec<_> = thread.iter().map(|m| (m.role, m.text.as_str())).collect();
         assert_eq!(
             texts,
             [(ChatRole::User, "hola"), (ChatRole::Assistant, "**ey**")]
@@ -417,7 +416,7 @@ mod sessions {
         let (state, _) = update(state, intent(Intent::NewChat));
         assert_eq!(state.sessions.len(), 1);
         assert_eq!(state.current_session, None);
-        assert!(state.chat.messages.is_empty());
+        assert!(state.chat.messages().is_empty());
     }
 }
 

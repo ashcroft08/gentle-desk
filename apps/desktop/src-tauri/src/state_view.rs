@@ -14,14 +14,16 @@
 //! version this run runs as, and the notes it follows (`bridge::whats_new`).
 
 use gentle_app::{AppState, ModelsStatus};
+use gentle_core::chat::ChatMessage;
 use gentle_core::i18n::Language;
 use gentle_runtime::app_config::Theme;
 use gentle_runtime::badge::{Badge, BadgeMark};
 
 use crate::contract::{
-    AuthView, ChatActivityMark, ChatActivityView, ChatProfileView, ContextUsageView, ImageView,
-    LanguageView, ModelChipView, ModelChoiceView, ModelListStatusView, NoticeActionView,
-    NoticeLevel, NoticeView, ShellView, ThemeView, UpdatesView, UsageView, ViewState, WhatsNewView,
+    AuthView, BranchView, ChatActivityMark, ChatActivityView, ChatProfileView, ContextUsageView,
+    FolderView, ImageView, LanguageView, ModelChipView, ModelChoiceView, ModelListStatusView,
+    NoticeActionView, NoticeLevel, NoticeView, SessionModeView, ShellView, ThemeView, UpdatesView,
+    UsageView, ViewState, WhatsNewView,
 };
 use crate::images::Images;
 use crate::{dialogs, helper_thread, helpers, sessions, view};
@@ -59,6 +61,21 @@ pub struct ShellParts<'a> {
     /// The Profile tab's view of one chat (profiles-editor T2b-2, L11), as the
     /// shell holds it: it belongs to the chat its own `chat_id` names.
     pub chat_profile: Option<ChatProfileView>,
+    /// The session permission mode of one chat (composer-dock T3b, L7), as the
+    /// shell holds it: the chat it was read for, and what that chat's own child
+    /// answered. The chat is carried beside the view for the same reason
+    /// [`chat_profile`](Self::chat_profile) carries its own: the two are compared
+    /// to the foreground chat here before anything is drawn.
+    pub session_mode: Option<(String, SessionModeView)>,
+    /// The rows read from the foreground chat's session FILE while its child
+    /// starts (`bridge::transcript`, chat-open-latency T1), with the chat they
+    /// were read for. Whether they may be drawn is this module's rule, below.
+    pub transcript: Option<(String, Vec<ChatMessage>)>,
+    /// The branch the foreground chat's folder is on (design/composer-dock S2,
+    /// R3, R4), as the shell's git cache holds it. It arrives with the directory
+    /// it was read from, so a read that lands after the user moved to another
+    /// chat is dropped instead of labelling the wrong folder.
+    pub branch: Option<BranchView>,
     /// Where the shell's authentication stands (0.1.12, T3).
     pub auth: AuthView,
     /// The versions this machine runs (0.1.12, S2, S7).
@@ -68,6 +85,11 @@ pub struct ShellParts<'a> {
     pub usage: UsageView,
     /// The images each chat holds or sent.
     pub images: &'a Images,
+    /// The folder a NEW chat was opened in (composer-dock L12), with the chat it
+    /// belongs to: the chip names the workspace's folder while the chat's own
+    /// session row does not exist yet. The chat is carried for the same gate the
+    /// other per-chat slices keep here.
+    pub folder_hint: Option<(String, crate::contract::FolderView)>,
 }
 
 /// The slice of `state` as it stands now, carrying the revision the holder
@@ -85,10 +107,14 @@ pub fn view_state(state: &AppState, sessions_revision: u32, shell: ShellParts<'_
         language,
         shell,
         chat_profile,
+        session_mode,
+        transcript,
+        branch,
         auth,
         updates,
         usage,
         images,
+        folder_hint,
     } = shell;
     let helpers_view = helpers::helpers(state);
     let foreground = state
@@ -102,6 +128,42 @@ pub fn view_state(state: &AppState, sessions_revision: u32, shell: ShellParts<'_
         (Some(view), Some(chat)) if view.chat_id == chat => Some(view),
         _ => None,
     };
+    // The session mode is the foreground chat's and nobody else's, by the same
+    // rule (composer-dock T3b, L7): an answer that lands after the user moved to
+    // another chat never labels the wrong one.
+    let session_mode = match (session_mode, foreground.as_deref()) {
+        (Some((chat_id, view)), Some(chat)) if chat_id == chat => Some(view),
+        _ => None,
+    };
+    // The folder and the branch it is on are one answer (design/composer-dock S2,
+    // R3, R4): the branch is kept only while it was read from the very directory
+    // the folder chip names, so a read still in flight for the chat the user just
+    // left never labels the one they are looking at.
+    let foreground_folder = foreground_folder(state).or_else(|| {
+        // A chat opened before its session exists names the folder the
+        // workspace handed it (composer-dock L12): the hint is the fallback,
+        // only for the chat it belongs to.
+        match (&folder_hint, foreground.as_deref()) {
+            (Some((chat, view)), Some(foreground)) if chat == foreground => Some(view.clone()),
+            _ => None,
+        }
+    });
+    let foreground_branch = branch_of(foreground_folder.as_ref(), branch);
+    // The rows read from the chat's session file are the thread only while that
+    // chat's child has answered nothing and the reducer holds no row of its own:
+    // the child's answer always wins (S4, chat-open-latency T1).
+    let provisional = provisional_rows(state, transcript);
+    let (messages, items, transcript_provisional) = match provisional {
+        Some(rows) => {
+            let (messages, items) = view::provisional(&rows);
+            (messages, items, true)
+        }
+        None => (
+            view::messages(state, images),
+            view::items(state, images),
+            false,
+        ),
+    };
     ViewState {
         theme: view_theme(theme),
         language: view_language(language),
@@ -111,13 +173,17 @@ pub fn view_state(state: &AppState, sessions_revision: u32, shell: ShellParts<'_
             .chats
             .foreground()
             .map(|chat| sessions::view::header_title(state, chat)),
+        foreground_folder,
+        foreground_branch,
         list_status: sessions::view::status(state),
         sessions_revision,
         total_sessions: sessions::view::total(state),
         // Every chat whose child this run started, idle ones included: the
         // Updates pane's chats-closed gate reads exactly this (0.1.12, S4).
         open_chats: u32::try_from(state.chats.len()).unwrap_or(u32::MAX),
-        messages: view::messages(state, images),
+        messages,
+        items,
+        transcript_provisional,
         notices: state.notices.iter().map(NoticeView::of).collect(),
         dialog: dialogs::dialog(state),
         helpers: helpers_view,
@@ -137,6 +203,7 @@ pub fn view_state(state: &AppState, sessions_revision: u32, shell: ShellParts<'_
         model_chip: model_chip_view(state),
         context_usage: context_usage_view(state),
         chat_profile,
+        session_mode,
         auth,
         updates,
         usage,
@@ -147,6 +214,42 @@ pub fn view_state(state: &AppState, sessions_revision: u32, shell: ShellParts<'_
         app_version,
         fatal,
     }
+}
+
+/// The folder the foreground chat runs in (design/composer-dock S2, R4), read
+/// from the session row the header's title also reads.
+///
+/// The name is `SessionItem::project`, the very rule a sidebar row applies, so
+/// the composer's chip and the row can never name the same folder differently;
+/// the whole directory travels beside it, for the hover only. A chat whose
+/// session file is not listed yet (one started a moment ago) has no folder to
+/// name, so it has none - absent, never a placeholder (R3's rule).
+///
+/// `pub(crate)` because the shell reads the same directory to ask git about it
+/// (`bridge::AppStateHolder::branch_view`): one lookup, so the branch chip and the
+/// folder chip can never name two different folders.
+pub(crate) fn foreground_folder(state: &AppState) -> Option<FolderView> {
+    let chat = state.chats.foreground()?;
+    let session = state
+        .sessions
+        .iter()
+        .find(|session| Some(session.path.as_str()) == chat.session_path())?;
+    Some(FolderView {
+        name: session.project().to_owned(),
+        path: session.cwd.clone(),
+    })
+}
+
+/// The branch chip's slice: the cached answer, kept only while it was read from
+/// the very directory the folder chip beside it names (design/composer-dock S2,
+/// R3, R4).
+///
+/// Both strings come from one field of one session row, so comparing them for
+/// equality is exact: an answer whose directory is not the folder's is a read
+/// that landed after the user moved on, and it is dropped rather than drawn.
+fn branch_of(folder: Option<&FolderView>, branch: Option<BranchView>) -> Option<BranchView> {
+    let folder = folder?;
+    branch.filter(|branch| branch.path == folder.path)
 }
 
 /// The composer's model chip from the app state, one to one. A no-foreground
@@ -258,6 +361,41 @@ fn view_mark(mark: BadgeMark) -> ChatActivityMark {
         BadgeMark::NeedsAttention => ChatActivityMark::NeedsAttention,
         BadgeMark::Ended => ChatActivityMark::Ended,
     }
+}
+
+/// The rows read from the foreground chat's session FILE, kept only while they
+/// may be drawn (chat-open-latency T1, S4).
+///
+/// Four things have to hold at once, and all four are the app state's own (read
+/// here, in the one place that has it):
+///
+/// - the rows were read for the chat that is on screen NOW, so a read that landed
+///   after the user moved to another chat never draws on the wrong one;
+/// - they hold something to draw;
+/// - the chat's thread holds NO row of its own, because a row the reducer has is
+///   the chat's own truth and the file's is a fallback;
+/// - the chat's child has not answered `get_messages`, because that answer IS the
+///   history and a file read that lands after it is never drawn - nor, further
+///   back, re-installed ([`AppStateHolder::note_transcript`]).
+fn provisional_rows(
+    state: &AppState,
+    transcript: Option<(String, Vec<ChatMessage>)>,
+) -> Option<Vec<ChatMessage>> {
+    let (chat_id, rows) = transcript?;
+    if rows.is_empty() {
+        return None;
+    }
+    let chat = state
+        .chats
+        .foreground()
+        .filter(|chat| chat.as_str() == chat_id)?;
+    if state.chats.history_loaded(chat) {
+        return None;
+    }
+    if !state.chats.state(chat)?.items.is_empty() {
+        return None;
+    }
+    Some(rows)
 }
 
 impl NoticeView {

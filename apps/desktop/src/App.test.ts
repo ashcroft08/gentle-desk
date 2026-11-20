@@ -33,6 +33,23 @@ const MESSAGE = {
   images: [],
 }
 
+/** One tool row of the pushed transcript: the only shape `messages` cannot carry. */
+const TOOL = {
+  kind: 'Tool' as const,
+  data: {
+    id: 'tool-call-1',
+    tool_name: 'bash',
+    args: { command: 'ls node_modules' },
+    partial_result: null,
+    result: 'mocker.d.ts',
+    is_error: false,
+    running: false,
+    duration_ms: 200,
+    truncated: false,
+    dropped: false,
+  },
+}
+
 afterEach(cleanup)
 
 beforeEach(() => {
@@ -43,13 +60,150 @@ describe('App', () => {
 
   it('draws the foreground chat thread instead of the placeholder', async () => {
     serveSidebar({
-      view: viewState({ foreground_chat: 'chat-1', messages: [MESSAGE] }),
+      view: viewState({
+        foreground_chat: 'chat-1',
+        messages: [MESSAGE],
+        items: [{ kind: 'Message', data: MESSAGE }, TOOL],
+      }),
     })
     render(App)
 
     expect(await screen.findByText(MESSAGE.text)).toBeTruthy()
     expect(screen.queryByText('No chat open')).toBeNull()
     expect(screen.getByRole('region', { name: 'Chat thread' })).toBeTruthy()
+    // The shell hands the thread the ROWS, not only the messages: a tool row is
+    // drawn as its card, which `messages` alone could never produce (T2b).
+    expect(screen.getByText('ls node_modules')).toBeTruthy()
+  })
+
+  it('draws the rows a session file painted, with no Copy, and then the chat’s own', async () => {
+    // chat-open-latency T1/T2: a stored chat opens on the rows its file holds,
+    // and the child's answer replaces them in the SAME slice - the flag travels
+    // with the rows, so the thread never draws a frame without them.
+    const FILE_ROW = { ...MESSAGE, id: 'prov-0', text: 'a pregunta' }
+    const FILED = [
+      { kind: 'Message' as const, data: FILE_ROW },
+      {
+        kind: 'Message' as const,
+        data: { ...MESSAGE, id: 'prov-1', role: 'Assistant' as const, text: 'a resposta' },
+      },
+    ]
+    const fixture = serveSidebar({
+      view: viewState({
+        foreground_chat: 'chat-1',
+        messages: [FILE_ROW],
+        items: FILED,
+        transcript_provisional: true,
+        // The chat is opening: that is exactly when the file's rows are drawn.
+        activity: [activity('chat-1', 'Opening')],
+      }),
+    })
+    render(App)
+
+    expect(await screen.findByText('a resposta')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Copy' })).toBeNull()
+    expect(screen.getByText('Opening chat')).toBeTruthy()
+
+    // The child's answer: the same turns under its own ids, and Copy is back.
+    fixture.view = viewState({
+      foreground_chat: 'chat-1',
+      messages: [{ ...MESSAGE, id: 'msg-0', text: 'a pregunta' }, { ...MESSAGE, id: 'msg-1', role: 'Assistant', text: 'a resposta' }],
+      items: [
+        { kind: 'Message', data: { ...MESSAGE, id: 'msg-0', text: 'a pregunta' } },
+        { kind: 'Message', data: { ...MESSAGE, id: 'msg-1', role: 'Assistant', text: 'a resposta' } },
+      ],
+      transcript_provisional: false,
+    })
+    fixture.push()
+
+    expect(await screen.findByRole('button', { name: 'Copy' })).toBeTruthy()
+    expect(screen.getByText('a resposta')).toBeTruthy()
+    expect(screen.queryByText('Opening chat')).toBeNull()
+  })
+
+  it('draws the composer’s folder chip for the folder Rust pushed', async () => {
+    const path = 'C:\\Users\\josep\\dev\\gentle-desk'
+    serveSidebar({
+      view: viewState({
+        foreground_chat: 'chat-1',
+        foreground_title: 'Gentle desk',
+        messages: [MESSAGE],
+        foreground_folder: { name: 'gentle-desk', path },
+      }),
+    })
+    const { container } = render(App)
+
+    const chip = (await waitFor(() => {
+      const found = container.querySelector('.composer .row .folder')
+      expect(found).toBeTruthy()
+      return found as HTMLElement
+    })) as HTMLElement
+
+    // The last segment only, with the whole path in the hover (S2, R4).
+    expect(chip.textContent?.trim()).toBe('gentle-desk')
+    expect(chip.textContent).not.toContain('Users')
+    expect(chip.getAttribute('title')).toBe(path)
+  })
+
+  it('draws the composer’s branch chip for the branch Rust pushed, after the folder', async () => {
+    const path = 'C:\\Users\\josep\\dev\\gentle-desk'
+    serveSidebar({
+      view: viewState({
+        foreground_chat: 'chat-1',
+        foreground_title: 'Gentle desk',
+        messages: [MESSAGE],
+        foreground_folder: { name: 'gentle-desk', path },
+        foreground_branch: { name: 'feat/0.7.0-transcript', path },
+      }),
+    })
+    const { container } = render(App)
+
+    const chip = (await waitFor(() => {
+      const found = container.querySelector('.composer .row .branch')
+      expect(found).toBeTruthy()
+      return found as HTMLElement
+    })) as HTMLElement
+
+    // The branch name only, with the directory it was read from in the hover.
+    expect(chip.textContent?.trim()).toBe('feat/0.7.0-transcript')
+    expect(chip.getAttribute('title')).toBe(path)
+    // It sits AFTER the folder, inside the group the one hairline opens.
+    expect(chip.previousElementSibling?.className).toBe('folder')
+  })
+
+  it('draws no branch chip for a folder no repository holds, and no gap either', async () => {
+    const path = 'C:\\Users\\josep\\dev\\gentle-desk'
+    serveSidebar({
+      view: viewState({
+        foreground_chat: 'chat-1',
+        foreground_title: 'Gentle desk',
+        messages: [MESSAGE],
+        foreground_folder: { name: 'gentle-desk', path },
+        foreground_branch: null,
+      }),
+    })
+    const { container } = render(App)
+
+    const folder = (await waitFor(() => {
+      const found = container.querySelector('.composer .row .folder')
+      expect(found).toBeTruthy()
+      return found as HTMLElement
+    })) as HTMLElement
+
+    // R3: the folder is drawn and the branch is simply not there - the row
+    // moves on to its flexible space, with nothing standing in the gap.
+    expect(container.querySelector('.composer .row .branch')).toBeNull()
+    expect(folder.closest('.grp')!.nextElementSibling?.className).toBe('grow')
+  })
+
+  it('draws no folder chip for a chat whose folder Rust did not name', async () => {
+    serveSidebar({
+      view: viewState({ foreground_chat: 'chat-1', foreground_title: 'Fresh one', messages: [MESSAGE] }),
+    })
+    const { container } = render(App)
+
+    expect(await screen.findByRole('region', { name: 'Chat thread' })).toBeTruthy()
+    expect(container.querySelector('.composer .row .folder')).toBeNull()
   })
 
   it('draws the open chat as its header, its thread and its composer', async () => {

@@ -191,8 +191,11 @@
         >
           <Thread
             messages={model.messages}
+            items={model.items}
             foregroundChat={model.chat}
             mark={chat.mark}
+            sessionMode={chat.sessionMode}
+            provisional={model.provisional}
             visible={tab === 'chat'}
             bind:scrollTop={threadScroll}
           />
@@ -203,6 +206,8 @@
             imagesNotice={chat.imagesNotice}
             chip={chat.modelChip}
             contextUsage={chat.contextUsage}
+            folder={chat.folder}
+            branch={chat.branch}
           />
         </div>
         <div class="view" id="p-helpers" role="tabpanel" aria-labelledby="t-help" hidden={tab !== 'helpers'}>
