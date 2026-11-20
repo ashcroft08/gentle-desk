@@ -5,9 +5,8 @@
   // the composer's row, and clicking a folder has nowhere to go in this slice.
   //
   // It draws the folder and nothing else. The 1px hairline it used to lead with
-  // is gone: each group of the row wears its own quiet border since the
-  // maintainer read the row as one big rectangle (L11, artboard C), so a
-  // separator here would only double the border it sits inside.
+  // is back (L14): the groups went back to text, so the hairline between
+  // runs-on and runs-in is the only separator again.
   import type { FolderView } from '../contract/bindings'
   import Icon from '../icons/Icon.svelte'
 
@@ -15,6 +14,7 @@
 </script>
 
 {#if folder !== null && folder.name !== ''}
+  <span class="vsep" role="presentation"></span>
   <span class="folder" title={folder.path}>
     <Icon name="folder" size={12} />
     <span class="t">{folder.name}</span>

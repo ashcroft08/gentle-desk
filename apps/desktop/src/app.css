@@ -912,18 +912,28 @@ p {
 }
 
 /* The row's groups: each group keeps its own tight 6px rhythm, and wears its own
-   quiet border so the three acts read as three chips instead of one big
-   rectangle (the maintainer's screenshot, L11, artboard C). The 12px gap of the
-   row separates clip / runs-on / runs-in; with a border per group the old 1px
-   hairline is gone - it would only double the border it sat next to. */
+   text again, not boxes: a border inside the dock's border read as a card
+   inside a card (the maintainer's screenshot, L14). The groups separate by the
+   row's 12px gap, the 1px hairline between runs-on and runs-in, and a soft
+   background under the cursor only. */
 .composer .row .grp {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   min-width: 0;
-  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 2px 8px;
+}
+
+.composer .row .grp:hover {
+  background: var(--surface2);
+}
+
+.composer .row .vsep {
+  width: 1px;
+  height: 14px;
+  flex: none;
+  background: var(--border);
 }
 
 .composer .row .grow {

@@ -95,7 +95,7 @@ describe('the dock', () => {
 
     // No hairline (the groups wear their own borders now), one folder, nothing
     // between them and the send but the flexible space.
-    expect(row.querySelectorAll('.vsep')).toHaveLength(0)
+    expect(row.querySelectorAll('.vsep')).toHaveLength(1)
     expect(row.querySelector('.grp .branch')).toBeNull()
     expect(row.querySelector('[data-glyph="branch"]')).toBeNull()
   })
@@ -113,7 +113,7 @@ describe('the dock', () => {
     const place = row.querySelectorAll('.grp')[2] as HTMLElement
     expect(place.querySelector('.folder')).not.toBeNull()
     expect(place.querySelector('.branch')).not.toBeNull()
-    expect(row.querySelectorAll('.vsep')).toHaveLength(0)
+    expect(row.querySelectorAll('.vsep')).toHaveLength(1)
     expect((place.querySelector('.branch') as HTMLElement).textContent?.trim()).toBe(BRANCH.name)
   })
 
@@ -128,24 +128,23 @@ describe('the dock', () => {
 
     expect(parts).toEqual(['grp', 'grp', 'grp', 'grow', 'ic fill tip-r'])
     expect(row.querySelector('.grp .branch')).toBeNull()
-    expect(row.querySelectorAll('.vsep')).toHaveLength(0)
+    expect(row.querySelectorAll('.vsep')).toHaveLength(1)
   })
 
   // The maintainer's screenshot (L11): the row read as one big rectangle, so each
   // of its three acts is a quiet chip with its own border. jsdom lays nothing
   // out, so the rule is read as TEXT, the way `chat/chrome-styles.test.ts` does.
-  it('gives each group its own quiet border, and no hairline doubles them', () => {
+  it('keeps the groups as text with the one hairline between runs-on and runs-in', () => {
     const { container } = draw()
     const groups = container.querySelectorAll('.composer .row > .grp')
 
     expect(groups).toHaveLength(3)
-    const grp = rule('.composer .row .grp')
-    expect(grp).toContain('border: 1px solid var(--border)')
-    expect(grp).toContain('border-radius: 8px')
-    expect(grp).toContain('padding: 2px 8px')
-    // The 12px gap between the groups stays, and the old hairline is gone.
+    expect(rule('.composer .row .grp:hover')).toContain('background: var(--surface2)')
+    expect(rule('.composer .row .grp')).toContain('border-radius: 8px')
+    expect(rule('.composer .row .grp')).toContain('padding: 2px 8px')
+    // The 12px gap between the groups stays, and the hairline is back.
     expect(rule('.composer .row')).toContain('gap: 12px')
-    expect(rule('.composer .row .vsep')).toBe('')
+    expect(rule('.composer .row .vsep')).toContain('background: var(--border)')
   })
 
   it('draws no context chip in the row any more: the rail is the only reading', () => {

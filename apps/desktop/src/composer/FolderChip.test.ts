@@ -28,12 +28,11 @@ describe('the folder chip', () => {
     expect(container.querySelector('[tabindex]')).toBeNull()
   })
 
-  it('draws the folder alone: the group’s border is the only separator now', () => {
+  it('draws the folder and its leading hairline, the only separator again', () => {
     const { container } = render(FolderChip, { props: { folder: FOLDER } })
     const parts = Array.from(container.children).map((child) => child.className)
 
-    expect(parts).toEqual(['folder'])
-    expect(container.querySelector('.vsep')).toBeNull()
+    expect(parts).toEqual(['vsep', 'folder'])
   })
 
   it('draws nothing at all when there is no folder', () => {
