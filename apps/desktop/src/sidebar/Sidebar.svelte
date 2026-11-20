@@ -25,9 +25,9 @@
   import { language } from '../i18n/language.svelte'
   import {
     EMPTY_WHY_ID,
-    NEW_SESSION_WHY_ID,
     sidebarCopy,
   } from './copy'
+  import { newSessionTarget } from './new-session'
   import { chatTitles, REMOVAL_HOST, removeWorkspace } from './removal'
 
   const sessions = createSessionsView()
@@ -70,9 +70,15 @@
   const reading = $derived(
     status?.type === 'Loading' ? copy.reading(status.data.done, status.data.total) : null,
   )
-  const reason = $derived(currentPath !== null || empty ? null : copy.noWorkspaceReason)
-  const describedBy = $derived(
-    currentPath !== null ? null : empty ? EMPTY_WHY_ID : NEW_SESSION_WHY_ID,
+  // The workspace view A's primary action names (welcome-screen T1/R1), read the
+  // way `list_status` is: it is Some exactly while no chat is in the foreground,
+  // which is exactly when a workspace of their own was missing here.
+  const lastWorkspace = $derived(model.view?.welcome?.last ?? null)
+  // New session's folder, its line and the element that describes it: with no
+  // selected workspace it falls back to the last one, so the button is not left
+  // mute beside a main pane that already offers to open a session.
+  const start = $derived(
+    newSessionTarget(currentPath, empty, lastWorkspace, copy.noWorkspaceReason),
   )
   // The gear's dot (0.1.14): an update is waiting for one of the rows a terminal
   // updates. The dot is decoration; the gear's own name carries the same news in
@@ -178,16 +184,16 @@
   )
 
   function newSession(): void {
-    if (currentPath !== null) newChatAt(currentPath)
+    if (start.path !== null) newChatAt(start.path)
   }
 </script>
 
 <aside class="side" aria-label={copy.workspaces}>
   <WordMark />
   <NewSessionButton
-    enabled={currentPath !== null}
-    reason={reason}
-    describedBy={describedBy}
+    enabled={start.path !== null}
+    reason={start.reason}
+    describedBy={start.describedBy}
     onNewSession={newSession}
   />
   <SidebarHeader bind:menuOpen={newWorkspaceOpen} />
