@@ -149,3 +149,13 @@ those chips are cheap, one needs a new command, and one cannot be built at all.
   10px of air above the dock, because the focus ring crossed it; (b) the row is grouped in
   three acts (clip / model+effort / hairline / folder+branch) with a 12px gap between
   groups, because the row read as one control. Artboard 01 updated with both.
+- L13 (2026-11-19, maintainer's pick after testing): the mode control leaves the working
+  line and becomes PERMANENT in the top status row - clock at the left only while
+  working, the mode fixed at the right ALWAYS (sheet D; the idle row shows only the
+  control). The menu descriptions are the ones the channel reports (yolo: "destructive
+  confirmations remain"; super-yolo: "no permission prompts; private paths stay
+  blocked"); normal and auto carry none because the channel has none - not copied from
+  the other app. And the composer row's three groups (clip / model+effort /
+  folder+branch) each carry their own quiet border now (1px border, 8px radius), because
+  they shared the dock's background and read as one rectangle; FolderChip's internal
+  vsep is gone with it. Probed the channel for the details (all four modes).
