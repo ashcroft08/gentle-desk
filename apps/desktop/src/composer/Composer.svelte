@@ -228,7 +228,6 @@
     <div class="row">
       <span class="grp"><AttachButton label={copy.attachFiles} disabled={chat === null} onPick={attach} /></span>
       <span class="grp"><ModelChip {chip} /></span>
-      <span class="vsep" role="presentation"></span>
       <span class="grp"><FolderChip {folder} /><BranchChip {branch} /></span>
       <span class="grow"></span>
       {#if rule.mode === 'stop'}

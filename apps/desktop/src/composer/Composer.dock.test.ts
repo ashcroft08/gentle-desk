@@ -71,7 +71,13 @@ describe('the dock', () => {
     const row = container.querySelector('.composer .row') as HTMLElement
     const parts = Array.from(row.children).map((child) => child.className)
 
-    expect(parts).toEqual(['att', 'chip', 'vsep', 'folder', 'grow', 'ic fill tip-r'])
+    // The row's three acts, each a group with its own tight rhythm: the clip,
+    // what the message runs ON, the hairline, where it runs, and Send.
+    expect(parts).toEqual(['grp', 'grp', 'grp', 'grow', 'ic fill tip-r'])
+    const clip = row.querySelector('.grp .att')
+    expect(clip).not.toBeNull()
+    expect(row.querySelector('.grp .chip')).not.toBeNull()
+    expect(row.querySelector('.grp .folder')).not.toBeNull()
   })
 
   it('leaves the gap that is not a group empty: no branch and no placeholder', () => {
@@ -81,7 +87,7 @@ describe('the dock', () => {
     // One hairline (the model group's), one folder, nothing between them and the
     // send but the flexible space.
     expect(row.querySelectorAll('.vsep')).toHaveLength(1)
-    expect(row.querySelector('.branch')).toBeNull()
+    expect(row.querySelector('.grp .branch')).toBeNull()
     expect(row.querySelector('[data-glyph="branch"]')).toBeNull()
   })
 
@@ -93,10 +99,13 @@ describe('the dock', () => {
     const parts = Array.from(row.children).map((child) => child.className)
 
     // What the message runs ON, the hairline, then where it runs - the folder
-    // and the branch on it, in that order - and Send.
-    expect(parts).toEqual(['att', 'chip', 'vsep', 'folder', 'branch', 'grow', 'ic fill tip-r'])
+    // and the branch on it, in that order, inside ONE group - and Send.
+    expect(parts).toEqual(['grp', 'grp', 'grp', 'grow', 'ic fill tip-r'])
+    const place = row.querySelectorAll('.grp')[2] as HTMLElement
+    expect(place.querySelector('.folder')).not.toBeNull()
+    expect(place.querySelector('.branch')).not.toBeNull()
     expect(row.querySelectorAll('.vsep')).toHaveLength(1)
-    expect((row.querySelector('.branch') as HTMLElement).textContent?.trim()).toBe(BRANCH.name)
+    expect((place.querySelector('.branch') as HTMLElement).textContent?.trim()).toBe(BRANCH.name)
   })
 
   it('leaves the branch out for a folder no repository holds, with no gap either', () => {
@@ -108,8 +117,8 @@ describe('the dock', () => {
     const row = container.querySelector('.composer .row') as HTMLElement
     const parts = Array.from(row.children).map((child) => child.className)
 
-    expect(parts).toEqual(['att', 'chip', 'vsep', 'folder', 'grow', 'ic fill tip-r'])
-    expect(row.querySelector('.branch')).toBeNull()
+    expect(parts).toEqual(['grp', 'grp', 'grp', 'grow', 'ic fill tip-r'])
+    expect(row.querySelector('.grp .branch')).toBeNull()
     expect(row.querySelectorAll('.vsep')).toHaveLength(1)
   })
 
@@ -125,7 +134,7 @@ describe('the dock', () => {
     const row = container.querySelector('.composer .row') as HTMLElement
     const parts = Array.from(row.children).map((child) => child.className)
 
-    expect(parts).toEqual(['att', 'chip', 'grow', 'ic fill tip-r'])
-    expect(container.querySelector('.folder')).toBeNull()
+    expect(parts).toEqual(['grp', 'grp', 'grp', 'grow', 'ic fill tip-r'])
+    expect(container.querySelector('.grp .folder')).toBeNull()
   })
 })
