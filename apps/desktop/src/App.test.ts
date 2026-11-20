@@ -297,7 +297,8 @@ describe('App', () => {
     render(App)
 
     expect(await screen.findByRole('heading', { level: 2, name: 'New session' })).toBeTruthy()
-    expect(screen.getByText('in gentle-desk')).toBeTruthy()
+    // The folder line is the composer row's; the hero does not repeat it.
+    expect(screen.queryByText('in gentle-desk')).toBeNull()
     const box = screen.getByRole('textbox', { name: 'Message' }) as HTMLTextAreaElement
     await fireEvent.input(box, { target: { value: 'hola' } })
 

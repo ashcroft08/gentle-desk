@@ -22,8 +22,8 @@ const ENGLISH = {
   renameReason: 'No chat is open to rename.',
 }
 
-/** The new-session view's words (welcome-screen T3): the hero's title, the rose's
- * name and the one line under them, which names the folder. */
+/** The new-session view's words (welcome-screen T3): the hero's title and the
+ *  rose's name. The composer's row names the folder; the hero does not repeat it. */
 const ENGLISH_HERO = {
   newSessionTitle: 'New session',
   roseLabel: 'The gentle-shell rose',
@@ -60,13 +60,13 @@ function words(language: 'en' | 'es'): unknown {
   }
 }
 
-/** The hero's words of one language, the folder line built from a label. */
+/** The hero's words of one language: the title and the rose's name alone (the
+ *  composer's row already names the folder; the maintainer called it redundant). */
 function heroWords(language: 'en' | 'es'): unknown {
   const copy = chatCopy(language)
   return {
     newSessionTitle: copy.newSessionTitle,
     roseLabel: copy.roseLabel,
-    inFolder: copy.inFolder('Curriculum'),
   }
 }
 
@@ -105,17 +105,15 @@ describe('the chat copy', () => {
     expect(chatCopy('es').workingBadge(3)).toBe('3 ayudantes trabajando')
   })
 
-  // View B's own words (welcome-screen T3): the centred composer's title, the rose
-  // above it, and the line that says which folder the session will run in.
+  // View B's own words (welcome-screen T3): the centred composer's title and the
+  // rose above it. The folder line is the composer row's, not the hero's.
   it('draws the new session’s words, in both languages', () => {
-    expect(heroWords('en')).toEqual({ ...ENGLISH_HERO, inFolder: 'in Curriculum' })
-    expect(heroWords('es')).toEqual({ ...SPANISH_HERO, inFolder: 'en Curriculum' })
+    expect(heroWords('en')).toEqual(ENGLISH_HERO)
+    expect(heroWords('es')).toEqual(SPANISH_HERO)
   })
 
   it('translates the hero too: nothing of it is left in English', () => {
     expect(chatCopy('es').newSessionTitle).not.toBe(chatCopy('en').newSessionTitle)
     expect(chatCopy('es').roseLabel).not.toBe(chatCopy('en').roseLabel)
-    // The line is a sentence around the folder's own name, which does not move.
-    expect(chatCopy('es').inFolder('X')).not.toBe(chatCopy('en').inFolder('X'))
   })
 })

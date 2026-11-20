@@ -1,6 +1,6 @@
 <script lang="ts">
   // View B's hero (welcome-screen T3, S1, S3): the rose, the session's title and
-  // the folder it will run in - the three things sheet B of
+  // the folder it will run in - the two things sheet B of
   // design/welcome-screen/02-hero-composer.html draws over the centred composer.
   // It is the thread's place, not a screen of its own: the pane swaps THIS for the
   // thread while the chat still has no rows, and the composer below it never moves
@@ -8,21 +8,14 @@
   //
   // No mode chip, no context rail and no "pick up with" line here, on purpose: the
   // mode is read from a process that does not exist yet (R2) and the recents are
-  // not in the state while a chat is open (R4). The folder is the one real fact -
-  // a new chat in a workspace names it from the start (composer-dock L12) - and a
-  // chat with no folder yet says nothing instead of inventing a line.
+  // not in the state while a chat is open (R4). The composer's own row already
+  // names it, so the hero carries nothing that repeats it (the maintainer called
+  // the folder line redundant).
   import { onMount } from 'svelte'
   import Rose from '../brand/Rose.svelte'
-  import Icon from '../icons/Icon.svelte'
-  import type { FolderView } from '../contract/bindings'
   import { language } from '../i18n/language.svelte'
   import { NEW_SESSION_ROSE_MAX, ROSE_FALLBACK, watchRoseHeight } from '../home/rose-height'
   import { chatCopy } from './copy'
-
-  let { folder = null }: {
-    /** The folder this chat runs in, or `null` while Rust has not named one. */
-    folder?: FolderView | null
-  } = $props()
 
   const copy = $derived(chatCopy(language.current))
 
@@ -39,11 +32,4 @@
     <Rose label={copy.roseLabel} height={rosePx} />
   </div>
   <h2 class="new-session-title">{copy.newSessionTitle}</h2>
-  {#if folder !== null}
-    <!-- The one line of real data: the folder, as the composer's chip names it. -->
-    <p class="new-session-where">
-      <Icon name="folder" size={14} />
-      <span>{copy.inFolder(folder.name)}</span>
-    </p>
-  {/if}
 </div>

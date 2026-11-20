@@ -107,7 +107,6 @@ describe('the hero of a new session', () => {
     const copy = chatCopy('en')
     expect(screen.getByRole('heading', { level: 2, name: copy.newSessionTitle })).toBeTruthy()
     expect(screen.getByRole('img', { name: copy.roseLabel })).toBeTruthy()
-    expect(screen.getByText(copy.inFolder(FOLDER.name))).toBeTruthy()
     expect(container.querySelector('.chat-pane')?.className).toBe('chat-pane is-fresh')
   })
 
@@ -163,7 +162,8 @@ describe('the hero of a new session', () => {
     await waitFor(() =>
       expect(screen.getByRole('heading', { level: 2, name: 'Nueva sesión' })).toBeTruthy(),
     )
-    expect(screen.getByText('en gentle-desk')).toBeTruthy()
+    // The folder line is the composer row's; the hero does not repeat it.
+    expect(screen.queryByText('en gentle-desk')).toBeNull()
     expect(screen.getByRole('img', { name: 'La rosa de gentle shell' })).toBeTruthy()
     expect(container.querySelector('.chat-pane')?.className).toBe('chat-pane is-fresh')
   })

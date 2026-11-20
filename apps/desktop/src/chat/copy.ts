@@ -50,13 +50,6 @@ export interface ChatCopy {
   newSessionTitle: string
   /** The rose's accessible name in that view: decoration, with a name (R5). */
   roseLabel: string
-  /**
-   * The muted line under the title, naming the folder the session runs in. It is
-   * built from the folder's label - the last segment of the working directory,
-   * exactly as the composer's chip draws it - and is drawn only when there is one
-   * (`ViewState.foreground_folder` answers `null` early in a chat's life).
-   */
-  inFolder: (label: string) => string
 }
 
 /** English: the words 01b already drew. */
@@ -67,11 +60,10 @@ const ENGLISH: ChatCopy = {
   chatName: 'Chat name',
   renameReason: 'No chat is open to rename.',
   workingBadge: (running) => (running === 1 ? '1 helper working' : `${running} helpers working`),
-  // Sheet B of design/welcome-screen/02-hero-composer.html: the title over the
-  // folder the session will run in.
+  // Sheet B of design/welcome-screen/02-hero-composer.html: the title alone; the
+  // composer's own row already names the folder (the maintainer: redundant).
   newSessionTitle: 'New session',
   roseLabel: 'The gentle-shell rose',
-  inFolder: (label) => `in ${label}`,
 }
 
 /** Neutral Spanish: no voseo, no regionalisms, nothing left in English. */
@@ -86,7 +78,6 @@ const SPANISH: typeof ENGLISH = {
     running === 1 ? '1 ayudante trabajando' : `${running} ayudantes trabajando`,
   newSessionTitle: 'Nueva sesión',
   roseLabel: 'La rosa de gentle shell',
-  inFolder: (label) => `en ${label}`,
 }
 
 /**

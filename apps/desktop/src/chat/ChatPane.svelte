@@ -112,7 +112,7 @@
 <div class="chat-pane" class:is-fresh={fresh}>
   {#if fresh}
     <!-- The thread's place, while it has nothing to hold. -->
-    <NewSession folder={chat.folder} />
+    <NewSession />
   {/if}
   <div class="chat-pane-body">
     <Thread
