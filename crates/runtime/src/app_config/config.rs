@@ -10,7 +10,10 @@
 //! same way, so the document version does not move (`CONFIG_VERSION`). The version
 //! the last run of the app was ([`AppConfig::last_run_version`]) is additive the
 //! same way, and so is the chosen language ([`AppConfig::language`]), which is
-//! absent until the user chooses one.
+//! absent until the user chooses one. The notifications setting
+//! ([`AppConfig::notifications`]) is additive too: a file written before it
+//! existed loads with the default, and a value this version does not know loads
+//! the same way.
 
 use serde::{Deserialize, Deserializer, Serialize};
 
@@ -18,6 +21,7 @@ use gentle_backend::home::HomeChoice;
 use gentle_core::i18n::Language;
 
 use super::last_run;
+use super::notifications::{self, Notifications};
 use super::shell_home;
 use super::theme::{self, Theme};
 use super::window::{self, WindowState};
@@ -48,6 +52,14 @@ pub struct AppConfig {
     /// field carries no `skip_serializing_if` of its own.
     #[serde(default, deserialize_with = "language_or_none")]
     pub language: Option<Language>,
+    /// When the app notifies the user about a chat that needs them
+    /// ([`Notifications`]): a tone and a system notification while the window is
+    /// not in front (the default), or nothing. An ADDITIVE field like the theme,
+    /// read leniently: absent, or a value this version does not know, is the
+    /// default and never a damaged file, so the workspaces below are never
+    /// discarded for it.
+    #[serde(default, deserialize_with = "notifications::or_default")]
+    pub notifications: Notifications,
     /// Which home the user chose on the welcome screen, `None` until they do.
     /// An ADDITIVE field like the theme, read leniently: a value this version
     /// does not know is `None`, never a damaged file.
@@ -80,6 +92,7 @@ impl Default for AppConfig {
             version: CONFIG_VERSION,
             theme: Theme::default(),
             language: None,
+            notifications: Notifications::default(),
             shell_home: None,
             window: None,
             last_run_version: None,
@@ -137,6 +150,16 @@ impl AppConfig {
             return false;
         }
         self.language = Some(language);
+        true
+    }
+
+    /// Sets when the app notifies the user. Answers whether it changed: the same
+    /// mode again changes nothing, so nothing is saved and no revision moves.
+    pub fn set_notifications(&mut self, mode: Notifications) -> bool {
+        if self.notifications == mode {
+            return false;
+        }
+        self.notifications = mode;
         true
     }
 

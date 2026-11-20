@@ -289,3 +289,44 @@ fn the_six_themes_are_named_the_way_the_stylesheet_names_them() {
     assert_eq!(Theme::from_name("Neon"), None);
     assert_eq!(Theme::from_name("gentle"), None, "the names are exact");
 }
+
+#[test]
+fn a_default_config_notifies_when_the_window_is_not_in_front() {
+    // The maintainer's proposal (notifications S4, L3): on, and only while the
+    // window is not in front, until they choose otherwise.
+    assert_eq!(
+        AppConfig::default().notifications,
+        Notifications::WhenUnfocused
+    );
+}
+
+#[test]
+fn setting_the_notifications_mode_reports_whether_it_changed() {
+    let mut config = AppConfig::default();
+    assert!(config.set_notifications(Notifications::Off));
+    assert_eq!(config.notifications, Notifications::Off);
+    assert!(
+        !config.set_notifications(Notifications::Off),
+        "the same mode changes nothing, so nothing is saved"
+    );
+    assert!(config.set_notifications(Notifications::WhenUnfocused));
+    assert_eq!(config.notifications, Notifications::WhenUnfocused);
+}
+
+#[test]
+fn the_two_notification_modes_are_named_the_way_the_file_stores_them() {
+    let names: Vec<&str> = Notifications::ALL
+        .iter()
+        .map(|mode| mode.as_str())
+        .collect();
+    assert_eq!(names, ["when-unfocused", "off"]);
+    for mode in Notifications::ALL {
+        assert_eq!(Notifications::from_name(mode.as_str()), Some(mode));
+    }
+    assert_eq!(
+        Notifications::from_name("always"),
+        None,
+        "the names are exact"
+    );
+    assert_eq!(Notifications::from_name("WhenUnfocused"), None);
+}

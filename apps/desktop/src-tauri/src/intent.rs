@@ -10,8 +10,9 @@ use crate::contract::UiIntent;
 
 /// Maps one intent of the contract to the reducer's intent, `None` for the ones
 /// the reducer has no answer for: folding a workspace's chats away, choosing the
-/// theme and choosing the language are the config's business (D8), so the holder
-/// answers them before asking this (`bridge::AppStateHolder::config_intent`).
+/// theme, the language and the notifications mode are the config's business
+/// (D8), so the holder answers them before asking this
+/// (`bridge::AppStateHolder::config_intent`).
 pub fn to_intent(state: &gentle_app::AppState, intent: &UiIntent) -> Option<gentle_app::Intent> {
     Some(match intent {
         UiIntent::SendPrompt { text } => gentle_app::Intent::SendPrompt(text.clone()),
@@ -36,6 +37,9 @@ pub fn to_intent(state: &gentle_app::AppState, intent: &UiIntent) -> Option<gent
         // So is the chosen language (0.2.0, S4): a field of the config, answered
         // by `bridge::language` and re-emitted as the slice the web side draws.
         UiIntent::SetLanguage { .. } => return None,
+        // So is the notifications mode (notifications S4): a field of the config,
+        // answered by `bridge::notifications` the same way.
+        UiIntent::SetNotifications { .. } => return None,
         // So is the chosen home (shell-choice): a field of the config.
         UiIntent::SetShellHome { .. } => return None,
         // The relaunch is the bridge's: it needs the window handle.

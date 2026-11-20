@@ -875,6 +875,7 @@ impl Bridge {
         let config = SettingsConfig {
             theme: view.theme,
             language: view.language,
+            notifications: view.notifications,
             shell: view.shell,
             app_version: view.app_version,
             open_chats: view.open_chats,

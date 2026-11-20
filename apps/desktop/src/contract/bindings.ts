@@ -1682,6 +1682,20 @@ export type NoticeView_Serialize = {
 };
 
 /**
+ *  When the app notifies the user about a chat that needs them (notifications
+ *  S4), named exactly as the config file stores it: one spelling for the stored
+ *  value, the contract and the Settings pane, so no side translates a mode.
+ */
+export type NotificationsMode = 
+/**
+ *  A tone and a system notification, only while the window is not in front.
+ *  The mode of a run that chose none.
+ */
+"when-unfocused" | 
+/**  Nothing: no tone, no system notification, whatever the window is doing. */
+"off";
+
+/**
  *  How the orchestrator runs a turn, named exactly as gentle-pi's
  *  `profiles.json` `workflow.<profile>.orchestratorMode` names them (`organic`,
  *  `full-delegation`), so neither side translates a value. The value a view
@@ -1967,6 +1981,11 @@ export type SettingsSnapshot_Deserialize = {
 	 */
 	language?: LanguageView | null,
 	/**
+	 *  When the app notifies the user, live like the theme and carried for the
+	 *  same reason: the Settings pane draws the mode this run holds.
+	 */
+	notifications: NotificationsMode,
+	/**
 	 *  The shell, its home and where installing it stands: what the Home section
 	 *  draws. Live, like the theme.
 	 */
@@ -2024,6 +2043,11 @@ export type SettingsSnapshot_Serialize = {
 	 *  reason.
 	 */
 	language: LanguageView | null,
+	/**
+	 *  When the app notifies the user, live like the theme and carried for the
+	 *  same reason: the Settings pane draws the mode this run holds.
+	 */
+	notifications: NotificationsMode,
 	/**
 	 *  The shell, its home and where installing it stands: what the Home section
 	 *  draws. Live, like the theme.
@@ -2474,6 +2498,16 @@ export type UiIntent_Deserialize = { type: "SendPrompt"; data: {
 	language: LanguageView,
 } } | 
 /**
+ *  Choose when the app notifies the user about a chat that needs them
+ *  (notifications S4): while the window is not in front (the default), or
+ *  never. The choice is remembered in the app config, so it survives the
+ *  run, and re-emitted as the slice this call answers with. The same mode
+ *  again changes nothing and saves nothing ([`NotificationsMode`]).
+ */
+{ type: "SetNotifications"; data: {
+	mode: NotificationsMode,
+} } | 
+/**
  *  Choose which home `gentle-shell` runs on (the welcome screen and the
  *  sidebar footer). Remembered in the app config; it applies from the next
  *  start of the app.
@@ -2817,6 +2851,16 @@ export type UiIntent_Serialize = { type: "SendPrompt"; data: {
  */
 { type: "SetLanguage"; data: {
 	language: LanguageView,
+} } | 
+/**
+ *  Choose when the app notifies the user about a chat that needs them
+ *  (notifications S4): while the window is not in front (the default), or
+ *  never. The choice is remembered in the app config, so it survives the
+ *  run, and re-emitted as the slice this call answers with. The same mode
+ *  again changes nothing and saves nothing ([`NotificationsMode`]).
+ */
+{ type: "SetNotifications"; data: {
+	mode: NotificationsMode,
 } } | 
 /**
  *  Choose which home `gentle-shell` runs on (the welcome screen and the
@@ -3383,6 +3427,14 @@ export type ViewState_Deserialize = {
 	 *  through the same re-emit, so switching needs no restart.
 	 */
 	language?: LanguageView | null,
+	/**
+	 *  When the app notifies the user about a chat that needs them, as the app
+	 *  config remembers it ([`NotificationsMode`]): `WhenUnfocused` while no
+	 *  choice is stored, which is the maintainer's default. The web side reads
+	 *  it before it decides whether to play a tone or send a toast
+	 *  (notifications S4, S1).
+	 */
+	notifications: NotificationsMode,
 	/**  The shell and home this run sees (shell-choice). */
 	shell: ShellView_Deserialize,
 	foreground_chat?: string | null,
@@ -3670,6 +3722,14 @@ export type ViewState_Serialize = {
 	 *  through the same re-emit, so switching needs no restart.
 	 */
 	language: LanguageView | null,
+	/**
+	 *  When the app notifies the user about a chat that needs them, as the app
+	 *  config remembers it ([`NotificationsMode`]): `WhenUnfocused` while no
+	 *  choice is stored, which is the maintainer's default. The web side reads
+	 *  it before it decides whether to play a tone or send a toast
+	 *  (notifications S4, S1).
+	 */
+	notifications: NotificationsMode,
 	/**  The shell and home this run sees (shell-choice). */
 	shell: ShellView_Serialize,
 	foreground_chat: string | null,

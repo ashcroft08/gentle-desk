@@ -10,6 +10,7 @@ use gentle_backend::home::HomeChoice;
 use gentle_core::i18n::Language;
 
 use super::super::config::{AppConfig, WorkspaceEntry, CONFIG_VERSION};
+use super::super::notifications::Notifications;
 use super::super::theme::Theme;
 use super::super::window::WindowState;
 use super::ConfigProblem;
@@ -25,6 +26,9 @@ struct DocumentRef<'a> {
     /// absent the web side starts from the system's own language.
     #[serde(skip_serializing_if = "Option::is_none")]
     language: Option<Language>,
+    /// Always written, like the theme: the choice has a default the user can
+    /// read back as the document's own value.
+    notifications: Notifications,
     /// Written only once the user chose, so a file of a user who never saw the
     /// welcome screen stays byte-for-byte what older builds wrote.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -49,6 +53,7 @@ pub(super) fn bytes(config: &AppConfig) -> std::io::Result<Vec<u8>> {
         version: CONFIG_VERSION,
         theme: config.theme,
         language: config.language,
+        notifications: config.notifications,
         shell_home: config.shell_home,
         window: config.window,
         last_run_version: config.last_run_version.as_deref(),

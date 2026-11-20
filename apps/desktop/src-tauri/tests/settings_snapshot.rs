@@ -11,8 +11,9 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use gentle_core::i18n::Language;
 use gentle_desk_lib::contract::{
-    AuthStatusView, HomeChoiceView, InstallView, LanguageView, ProviderStatusView, ShellView,
-    ThemeView, UpdatesStatusView, UsageProviderStatusView, UsageStatusView,
+    AuthStatusView, HomeChoiceView, InstallView, LanguageView, NotificationsMode,
+    ProviderStatusView, ShellView, ThemeView, UpdatesStatusView, UsageProviderStatusView,
+    UsageStatusView,
 };
 use gentle_desk_lib::settings::{
     FileRead, NodeProbe, ProviderAnswer, ProviderProbe, VersionProbe, WebGet,
@@ -57,6 +58,7 @@ fn config() -> SettingsConfig {
     SettingsConfig {
         theme: ThemeView::Gentle,
         language: Some(LanguageView::Es),
+        notifications: NotificationsMode::Off,
         shell: ShellView {
             pi_path: Some("C:/pi/agent".to_owned()),
             choice: Some(HomeChoiceView::Link),
@@ -219,6 +221,7 @@ fn one_load_answers_every_section_of_the_dialog() {
     // theme, language, home, version and gate it had before the load answered.
     assert_eq!(read.theme, ThemeView::Gentle);
     assert_eq!(read.language, Some(LanguageView::Es));
+    assert_eq!(read.notifications, NotificationsMode::Off);
     assert_eq!(read.shell.pi_path.as_deref(), Some("C:/pi/agent"));
     assert_eq!(read.shell.choice, Some(HomeChoiceView::Link));
     assert_eq!(read.app_version.as_deref(), Some("0.1.9"));

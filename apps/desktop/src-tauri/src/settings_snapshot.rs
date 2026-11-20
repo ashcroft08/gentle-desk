@@ -11,8 +11,9 @@
 //! What it carries is the plain data of the five sections that show the machine:
 //!
 //! - the part of the slice [`ViewState`](crate::contract::ViewState) already
-//!   holds (theme, language, home, running version, the open-chat gate and what
-//!   became of the config file), which costs no read at all;
+//!   holds (theme, language, the notifications mode, home, running version, the
+//!   open-chat gate and what became of the config file), which costs no read at
+//!   all;
 //! - the Account pane's auth view, the Usage pane's usage view and the Updates
 //!   pane's update view, each of which IS a read.
 //!
@@ -34,12 +35,13 @@ use specta::Type;
 
 use gentle_core::i18n::Language;
 
-use crate::contract::{AuthView, LanguageView, ShellView, ThemeView, UpdatesView, UsageView};
+use crate::contract::{
+    AuthView, LanguageView, NotificationsMode, ShellView, ThemeView, UpdatesView, UsageView,
+};
 use crate::settings::{self, FileRead, NodeProbe, ProviderProbe, VersionProbe, WebGet};
 
-/// The half of the snapshot this run already holds in memory: the five things
-/// the dialog draws that cost no read, taken from the slice the last push
-/// carried.
+/// The half of the snapshot this run already holds in memory: the things the
+/// dialog draws that cost no read, taken from the slice the last push carried.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SettingsConfig {
     /// The appearance of the whole window, as the app config remembers it.
@@ -47,6 +49,9 @@ pub struct SettingsConfig {
     /// The language the app's own words are written in, `None` while no
     /// preference is stored.
     pub language: Option<LanguageView>,
+    /// When the app notifies the user about a chat that needs them, as the app
+    /// config remembers it.
+    pub notifications: NotificationsMode,
     /// The shell and the home this run sees, which the Home section draws.
     pub shell: ShellView,
     /// The version this run RUNS as, which the About section draws.
@@ -106,6 +111,9 @@ pub struct SettingsSnapshot {
     /// preference is stored. Live, like the theme, and carried for the same
     /// reason.
     pub language: Option<LanguageView>,
+    /// When the app notifies the user, live like the theme and carried for the
+    /// same reason: the Settings pane draws the mode this run holds.
+    pub notifications: NotificationsMode,
     /// The shell, its home and where installing it stands: what the Home section
     /// draws. Live, like the theme.
     pub shell: ShellView,
@@ -142,6 +150,7 @@ pub fn gather(config: SettingsConfig, reads: &Reads) -> SettingsSnapshot {
     SettingsSnapshot {
         theme: config.theme,
         language: config.language,
+        notifications: config.notifications,
         shell: config.shell,
         app_version: config.app_version,
         open_chats: config.open_chats,

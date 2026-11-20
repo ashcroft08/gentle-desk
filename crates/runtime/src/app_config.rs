@@ -23,6 +23,7 @@
 
 mod config;
 mod last_run;
+mod notifications;
 mod paths;
 mod shell_home;
 mod status;
@@ -32,6 +33,7 @@ mod window;
 
 pub(crate) use config::canonical_path;
 pub use config::{folder_key, AppConfig, WorkspaceEntry, CONFIG_VERSION};
+pub use notifications::Notifications;
 pub use paths::config_path;
 pub use status::{workspace_status, WorkspaceStatus};
 pub use store::{load, save, ConfigNotice, ConfigProblem, Loaded};

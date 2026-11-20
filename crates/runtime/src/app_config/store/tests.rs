@@ -321,3 +321,121 @@ fn choosing_the_same_shell_home_again_changes_nothing() {
     assert!(!config.set_shell_home(gentle_backend::home::HomeChoice::Link));
     assert!(config.set_shell_home(gentle_backend::home::HomeChoice::Isolated));
 }
+
+/// A v1 document as the version BEFORE the notifications setting wrote it.
+const WITHOUT_NOTIFICATIONS: &[u8] = br#"{"version":1,"theme":"dark","language":"es","workspaces":[{"path":"C:/dev/p","collapsed":true}]}"#;
+
+#[test]
+fn a_config_without_the_notifications_field_falls_back_to_the_default() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = config_file(dir.path());
+    write_damaged(&path, WITHOUT_NOTIFICATIONS);
+
+    let loaded = load(&path);
+
+    assert_eq!(loaded.notice, None, "an older file is still this document");
+    assert_eq!(
+        loaded.config.notifications,
+        crate::app_config::Notifications::WhenUnfocused
+    );
+    assert_eq!(loaded.config.theme, crate::app_config::Theme::Dark);
+    assert_eq!(
+        loaded.config.language,
+        Some(gentle_core::i18n::Language::Es)
+    );
+    assert_eq!(
+        loaded.config.workspaces.len(),
+        1,
+        "the workspaces of the file are kept"
+    );
+    assert!(loaded.config.workspaces[0].collapsed);
+}
+
+#[test]
+fn every_notifications_mode_round_trips_through_the_file() {
+    for mode in crate::app_config::Notifications::ALL {
+        let dir = tempfile::tempdir().unwrap();
+        let path = config_file(dir.path());
+        let mut config = AppConfig::default();
+        assert!(config.add_workspace(r"C:\dev\p"));
+        // The default needs no set: what matters is that it is written back.
+        config.set_notifications(mode);
+
+        save(&path, &config).unwrap();
+
+        let loaded = load(&path);
+        assert_eq!(loaded.notice, None);
+        assert_eq!(loaded.config, config, "{mode:?} did not survive the file");
+        assert_eq!(loaded.config.notifications, mode);
+    }
+}
+
+#[test]
+fn an_unknown_notifications_value_loads_as_the_default_and_keeps_the_rest_of_the_file() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = config_file(dir.path());
+    let document = br#"{"version":1,"theme":"Gentle","language":"es","shell_home":"isolated","notifications":"always","workspaces":[{"path":"C:/dev/p","collapsed":false}]}"#;
+    write_damaged(&path, document);
+
+    let loaded = load(&path);
+
+    assert_eq!(loaded.notice, None, "an unknown mode is not a damaged file");
+    assert_eq!(
+        loaded.config.notifications,
+        crate::app_config::Notifications::WhenUnfocused,
+        "a value this version does not know reads as the default"
+    );
+    assert_eq!(loaded.config.theme, crate::app_config::Theme::Gentle);
+    assert_eq!(
+        loaded.config.language,
+        Some(gentle_core::i18n::Language::Es)
+    );
+    assert_eq!(
+        loaded.config.shell_home,
+        Some(gentle_backend::home::HomeChoice::Isolated)
+    );
+    assert_eq!(
+        loaded.config.workspaces.len(),
+        1,
+        "the rest of the file survives the unknown mode"
+    );
+    assert!(path.exists(), "the file is not moved aside");
+}
+
+#[test]
+fn the_saved_document_carries_the_notifications_mode_the_setting_names() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = config_file(dir.path());
+    let mut config = AppConfig::default();
+    assert!(config.set_notifications(crate::app_config::Notifications::Off));
+
+    save(&path, &config).unwrap();
+
+    let document: serde_json::Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    assert_eq!(document["notifications"], serde_json::json!("off"));
+    assert_eq!(document["version"], serde_json::json!(CONFIG_VERSION));
+}
+
+#[test]
+fn a_rewrite_for_the_notifications_field_keeps_every_other_setting() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = config_file(dir.path());
+    write_damaged(&path, WITHOUT_NOTIFICATIONS);
+    let mut loaded = load(&path).config;
+
+    assert!(loaded.set_notifications(crate::app_config::Notifications::Off));
+    save(&path, &loaded).unwrap();
+
+    // What another key of the file held is still there after the rewrite, and
+    // the new mode is beside it, not instead of it.
+    let back = load(&path);
+    assert_eq!(back.notice, None);
+    assert_eq!(
+        back.config.notifications,
+        crate::app_config::Notifications::Off
+    );
+    assert_eq!(back.config.theme, crate::app_config::Theme::Dark);
+    assert_eq!(back.config.language, Some(gentle_core::i18n::Language::Es));
+    assert_eq!(back.config.workspaces.len(), 1);
+    assert!(back.config.workspaces[0].collapsed);
+}
