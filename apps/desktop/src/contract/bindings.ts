@@ -3762,7 +3762,12 @@ export type WelcomeChat = {
 	 *  prefixes it once).
 	 */
 	chat_id: string,
-	/**  The title the sidebar row draws for that session. */
+	/**
+	 *  The session's stored title, whole: the name the sidebar row beside it
+	 *  draws for the same session, uncut here because this column is wider - the
+	 *  page ellipsizes it for the width it really has, so a long name keeps the
+	 *  room it is given instead of the truncation a narrow sidebar row makes.
+	 */
 	title: string,
 	/**
 	 *  When the session was last written, in epoch milliseconds: the same value

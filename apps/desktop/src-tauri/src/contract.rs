@@ -1684,7 +1684,10 @@ pub struct WelcomeChat {
     /// file path, never the id `gentle_app::ChatId` builds from it (the intent
     /// prefixes it once).
     pub chat_id: String,
-    /// The title the sidebar row draws for that session.
+    /// The session's stored title, whole: the name the sidebar row beside it
+    /// draws for the same session, uncut here because this column is wider - the
+    /// page ellipsizes it for the width it really has, so a long name keeps the
+    /// room it is given instead of the truncation a narrow sidebar row makes.
     pub title: String,
     /// When the session was last written, in epoch milliseconds: the same value
     /// a chat row's `modified_ago` is worded from, carried as the number so the

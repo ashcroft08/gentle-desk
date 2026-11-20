@@ -5,8 +5,15 @@
 //! list (the very one [`crate::sessions::tree::Tree`] flattens into rows) and the
 //! session list that list was built from. No grouping, no naming and no order is
 //! decided here - the labels, the paths and the membership of a session in a
-//! workspace are the runtime's, so the welcome can never name a workspace or a
-//! chat differently from the row beside it.
+//! workspace are the runtime's, so the welcome can never name a workspace
+//! differently from the row beside it, nor list a chat the row beside it does not
+//! list.
+//!
+//! A chat is named here by the title its session STORES, whole: the screen's
+//! column is wider than a sidebar row's and the page cuts the name for the width
+//! it really has (CSS ellipsis), so the cut a sidebar row makes
+//! ([`row_title`](view::row_title), its own 32 characters) is not applied here.
+//! It is the same session the sidebar row names, only given room to say its name.
 //!
 //! The one thing this module asks the outside world is whether a workspace's
 //! folder can host a new chat, through the probe the caller brings: the same
@@ -116,7 +123,9 @@ fn recents(workspace: &Workspace, sessions: &[SessionItem]) -> Vec<WelcomeChat> 
             // The RAW session path: `UiIntent::OpenChat` takes exactly this
             // string and `ChatId::of_session` prefixes it once, over there.
             chat_id: session.path.clone(),
-            title: view::row_title(session),
+            // The stored title WHOLE, never the sidebar row's cut: this column is
+            // wider and the page ellipsizes it for the width it really has.
+            title: session.title.clone(),
             modified_ms: millis(session.modified_ms),
         })
         .collect()

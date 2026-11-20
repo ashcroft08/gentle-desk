@@ -57,10 +57,12 @@ pub fn row(session: &SessionItem, now_ms: u64, language: Language) -> SessionRow
     }
 }
 
-/// The title a row draws for `session`: its stored title cut to the length the
-/// sidebar row holds ([`TITLE_CHARS`]). [`row`] uses it, and so does the welcome
-/// view's recent chats (welcome-screen T1), so a chat is named the same way in
-/// both places.
+/// The title a sidebar row draws for `session`: its stored title cut to the
+/// length that row holds ([`TITLE_CHARS`]). [`row`] is the only caller: the rows
+/// are drawn in the sidebar's own narrow column, so the cut belongs to that
+/// column. The welcome view's recent chats carry the stored title whole instead
+/// (welcome-screen T1 follow-up): their column is wider and the page ellipsizes
+/// it for the width it really has.
 pub fn row_title(session: &SessionItem) -> String {
     truncate(&session.title, TITLE_CHARS)
 }

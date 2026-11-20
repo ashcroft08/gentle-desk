@@ -16,7 +16,8 @@ use gentle_core::i18n::{messages, Language};
 use gentle_desk_lib::bridge::AppStateHolder;
 use gentle_desk_lib::config::ConfigSnapshot;
 use gentle_desk_lib::contract::{
-    SessionTreeRow, UiIntent, WelcomeChat, WelcomeLink, WelcomeView, WorkspaceRowView,
+    SessionRowView, SessionTreeRow, UiIntent, WelcomeChat, WelcomeLink, WelcomeView,
+    WorkspaceRowView,
 };
 use gentle_desk_lib::sessions::window::MAX_WINDOW;
 use gentle_runtime::app_config::AppConfig;
@@ -101,6 +102,25 @@ fn sidebar(holder: &AppStateHolder, path: &str) -> WorkspaceRowView {
         .unwrap_or_else(|| panic!("the sidebar serves a row for {path}"))
 }
 
+/// The chat row the sidebar serves for the session at `path`: the row of the
+/// tree a view A recent names, drawn the width a chat row really has.
+fn chat_row(holder: &AppStateHolder, path: &str) -> SessionRowView {
+    holder
+        .sessions_window(0, MAX_WINDOW)
+        .rows
+        .into_iter()
+        .find_map(|row| match row {
+            SessionTreeRow::Chat(row) if row.id == path => Some(row),
+            _ => None,
+        })
+        .unwrap_or_else(|| panic!("the sidebar serves a chat row for {path}"))
+}
+
+/// A stored title longer than a sidebar chat row holds: the 32 characters that
+/// row keeps, and this one has 115.
+const LONG_TITLE: &str = "Retomar gentle-desk en la rama feat/0.8.0-welcome con la pantalla \
+                          de bienvenida y los chats recientes del workspace";
+
 #[test]
 fn with_no_configured_workspace_view_a_names_no_last_workspace() {
     let home = tempfile::tempdir().unwrap();
@@ -148,8 +168,8 @@ fn the_workspace_of_the_newest_session_is_the_last_one_with_its_three_newest_cha
     assert_eq!(
         welcome.recents,
         vec![recent(500), recent(400), recent(300)],
-        "the three newest chats, newest first, with the row's title and the raw \
-         session path the web sends back"
+        "the three newest chats, newest first, with the session's own title and \
+         the raw session path the web sends back"
     );
     assert_eq!(
         welcome.others,
@@ -267,6 +287,48 @@ fn a_quiet_link_says_whether_its_folder_can_still_host_a_chat() {
             quiet.label
         );
     }
+}
+
+#[test]
+fn a_long_title_reaches_view_a_whole_where_the_sidebar_row_cuts_it() {
+    let home = tempfile::tempdir().unwrap();
+    let workspace = folder(home.path(), "workspace");
+    let path = "sessions/500.jsonl".to_owned();
+    let holder = holder(
+        &[&workspace],
+        vec![SessionItem {
+            path: path.clone(),
+            title: LONG_TITLE.to_owned(),
+            cwd: workspace.clone(),
+            modified_ms: 500,
+            message_count: 1,
+        }],
+    );
+
+    // View A's column is wide enough for the name the session stores, and the
+    // page cuts it for the width it really has: the slice carries it whole.
+    assert_eq!(
+        welcome(&holder).recents,
+        vec![WelcomeChat {
+            chat_id: path.clone(),
+            title: LONG_TITLE.to_owned(),
+            modified_ms: 500.0,
+        }],
+        "the stored title whole and unchanged, never the sidebar row's cut"
+    );
+
+    // The same session beside it in the sidebar: one chat, and the title that
+    // row's own narrow column still holds.
+    let cut: String = LONG_TITLE
+        .chars()
+        .take(32)
+        .chain(std::iter::once('…'))
+        .collect();
+    assert_eq!(
+        chat_row(&holder, &path).title,
+        cut,
+        "the sidebar row keeps the width it has"
+    );
 }
 
 #[test]
