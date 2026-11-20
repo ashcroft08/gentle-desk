@@ -19,6 +19,12 @@ pub fn to_intent(state: &gentle_app::AppState, intent: &UiIntent) -> Option<gent
         UiIntent::NewChat => gentle_app::Intent::NewChat,
         UiIntent::OpenChat { chat_id } => gentle_app::Intent::OpenChat(chat_for(state, chat_id)),
         UiIntent::OpenNewChat => gentle_app::Intent::OpenNewChat,
+        // The composer's own ask for a new chat's child (welcome-screen T4, R2).
+        // It names a chat the state already allocated, and the reducer is what
+        // makes it fire once: a second ask for the same chat answers nothing.
+        UiIntent::EnsureStarted { chat_id } => {
+            gentle_app::Intent::EnsureStarted(chat_for(state, chat_id))
+        }
         // The folder is not the reducer's business: `crates/app` carries no
         // folder at all (S2), so it travels beside the command in the bridge's
         // pending-folder table (`pending`), keyed by the chat allocated here.

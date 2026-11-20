@@ -621,19 +621,20 @@ impl Bridge {
             return Ok(self.holder.view());
         }
         // The folder of a chat that starts in a workspace travels BESIDE the
-        // command: the reducer names the chat and `crates/app` carries no folder
-        // at all (S2). A blank path names none, so nothing is opened for it.
+        // state: the reducer names the chat and `crates/app` carries no folder
+        // at all (S2). A blank path names none, so nothing is opened for it, and
+        // the chat it belongs to is the one the answered slice names - a new chat
+        // asks for no child until its composer does (welcome-screen T4, R2), so
+        // the folder waits for that ask.
         let folder = match &intent {
             UiIntent::NewChatInWorkspace { path } => Some(path.clone()),
             _ => None,
         };
         let (view, commands) = self.holder.dispatch_commands(intent);
-        emit_view(&emit, &view)?;
         if let Some(folder) = folder {
-            // Before the first command runs on its thread: the executor takes it
-            // from here, once.
-            workspace::remember_folder(&self.folders, &commands, &folder);
+            workspace::remember_folder(&self.folders, view.foreground_chat.as_deref(), &folder);
         }
+        emit_view(&emit, &view)?;
         self.run_chat_commands(commands);
         Ok(view)
     }

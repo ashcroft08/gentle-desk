@@ -265,8 +265,16 @@ impl AppStateHolder {
 
     /// Records the folder the workspace handed a NEW chat (composer-dock L12):
     /// the hint is what its folder chip names until its own session row exists,
-    /// and answers `true` when at least one open took it.
-    fn note_folder_hints(&self, folder: &str, commands: &[gentle_app::ChatCommand]) -> bool {
+    /// and answers `true` when the chat the answered slice names took it.
+    ///
+    /// The chat is the SLICE's foreground one and no longer a command: since
+    /// welcome-screen T4 (R2) a new chat asks for no child when it is allocated,
+    /// so the fold that opens it answers no `OpenProcess` to read the chat off,
+    /// and the slice it answers is where that chat is named.
+    fn note_folder_hint(&self, folder: &str, chat: Option<&str>) -> bool {
+        let Some(chat) = chat else {
+            return false;
+        };
         let name = folder
             .rsplit(['\\', '/'])
             .find(|segment| !segment.is_empty())
@@ -276,15 +284,8 @@ impl AppStateHolder {
             name,
             path: folder.to_owned(),
         };
-        let mut hints = lock(&self.folder_hints);
-        let mut any = false;
-        for command in commands {
-            if let gentle_app::ChatCommand::OpenProcess { chat } = command {
-                hints.insert(chat.as_str().to_owned(), view.clone());
-                any = true;
-            }
-        }
-        any
+        lock(&self.folder_hints).insert(chat.to_owned(), view);
+        true
     }
 
     /// The folder hint the FOREGROUND chat carries, `None` when it has none:
@@ -507,7 +508,7 @@ impl AppStateHolder {
                 // A NEW chat in a workspace lives in that folder from the start
                 // (composer-dock L12): the hint is what its folder chip names
                 // until its own session row exists, and what the branch is read
-                // from. Recorded only for the chats the fold opens, never one
+                // from. Recorded only for the chat the fold opens, never one
                 // more.
                 let hint = match (&intent, &reduced) {
                     (UiIntent::NewChatInWorkspace { path }, gentle_app::Intent::OpenNewChat)
@@ -518,7 +519,9 @@ impl AppStateHolder {
                     _ => None,
                 };
                 let answer = self.apply(gentle_app::Input::Intent(reduced));
-                let hinted = hint.map(|folder| self.note_folder_hints(&folder, &answer.1));
+                let hinted = hint.map(|folder| {
+                    self.note_folder_hint(&folder, answer.0.foreground_chat.as_deref())
+                });
                 // Opening a stored chat paints its thread from its session file
                 // while its child starts (chat-open-latency T1): the read is
                 // claimed here and run on a worker, because this path is

@@ -42,6 +42,12 @@ pub(crate) struct Entry {
     /// cleared when the child is up (or the start failed). Cleared the same way
     /// when the chat's child goes away, so it can never stick.
     pub(crate) opening: bool,
+    /// The chat's child was asked for in this run (welcome-screen T4): a chat is
+    /// ALLOCATED when it opens and its child starts on the composer's own ask,
+    /// so the two facts are separate. Set by the ask itself (an open of a stored
+    /// chat asks at once, a new chat asks when its box is focused) and dropped
+    /// with the chat, so a chat that left the open set has no start behind it.
+    pub(crate) started: bool,
     /// The chat's child has answered `get_messages` (chat-open-latency T1):
     /// whether its history has arrived, which is a fact emptiness cannot carry -
     /// an empty answer is an answer, and a chat that never answered and a chat

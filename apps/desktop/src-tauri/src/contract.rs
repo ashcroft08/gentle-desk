@@ -148,6 +148,23 @@ pub enum UiIntent {
     },
     /// The same for a chat that did not exist before.
     OpenNewChat,
+    /// Start the child of that chat, if this run never started one for it
+    /// (welcome-screen T4, R2).
+    ///
+    /// A new chat is ALLOCATED when it opens and its process starts on this ask:
+    /// the composer sends it the first time its box is focused for that chat, or
+    /// when the first key lands in it, so opening a new session (or the app
+    /// itself) starts no child and costs no process. Until the child answers, the
+    /// chat is Opening and its composer is disabled with the reason it has today;
+    /// the draft is kept and an Enter sends nothing.
+    ///
+    /// The ask is IDEMPOTENT by the state: a chat whose child was asked for
+    /// already - Opening, working, queued, idle or ended - sends no command and
+    /// changes nothing, so a focus and a keystroke can never start two children.
+    /// A stored chat starts its child when it is opened, so it never needs this.
+    EnsureStarted {
+        chat_id: String,
+    },
     /// Start a NEW chat in the workspace at `path`: what the header's New
     /// session button (D2) and a workspace's own new-chat icon (D3) send. The
     /// web side decides which workspace is the current one and names it; the

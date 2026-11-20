@@ -191,13 +191,18 @@ fn working_still_wins_over_opening() {
 
 #[test]
 fn a_new_chat_is_opening_from_its_first_click() {
-    let (state, _) = update_chats(AppState::default(), Input::Intent(Intent::OpenNewChat));
+    let (state, effects) = update_chats(AppState::default(), Input::Intent(Intent::OpenNewChat));
 
     let fresh = state
         .chats
         .foreground()
         .cloned()
         .expect("the new chat is the foreground one");
+    assert_eq!(
+        effects.chat_commands,
+        Vec::new(),
+        "no child is asked for on the click (welcome-screen T4, R2)"
+    );
     assert_eq!(state.chats.activity(&fresh), Some(ChatActivity::Opening));
     // And it follows its chat through the rekey to the stored chat.
     let stored = ChatId::of_session("/s/new.jsonl");
@@ -210,4 +215,44 @@ fn a_new_chat_is_opening_from_its_first_click() {
     )
     .0;
     assert_eq!(state.chats.activity(&stored), Some(ChatActivity::Opening));
+}
+
+#[test]
+fn a_prompt_to_a_new_chat_waits_for_the_composer_that_starts_it() {
+    // Option 1 of welcome-screen T4: the composer of a chat whose process has
+    // not answered stays disabled with the reason it has today, and an Enter in
+    // it sends nothing - the draft is kept by the view. Nothing here changes
+    // because the start is lazy: the chat is Opening from its allocation.
+    let (state, _) = update_chats(AppState::default(), Input::Intent(Intent::OpenNewChat));
+    let fresh = state
+        .chats
+        .foreground()
+        .cloned()
+        .expect("a foreground chat");
+
+    let (state, effects) = prompt(state, "hola");
+
+    assert_eq!(effects, Effects::default(), "there is no child to write to");
+    assert!(
+        state
+            .chats
+            .state(&fresh)
+            .expect("the new chat")
+            .messages()
+            .is_empty(),
+        "the prompt is not appended before the child is asked for"
+    );
+    assert_eq!(
+        state.chats.activity(&fresh),
+        Some(ChatActivity::Opening),
+        "the refusal changes nothing the composer reads"
+    );
+
+    // The trigger the composer sends, and then the same prompt: the reducer
+    // still refuses it (the child has not answered), so the view and the state
+    // tell the user the same story until the first event.
+    let (state, _) = update_chats(state, Input::Intent(Intent::EnsureStarted(fresh.clone())));
+    let (state, effects) = prompt(state, "hola");
+    assert_eq!(effects, Effects::default(), "the child is still coming up");
+    assert_eq!(state.chats.activity(&fresh), Some(ChatActivity::Opening));
 }

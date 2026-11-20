@@ -15,11 +15,18 @@
   // a first paint, where there is no earlier place to come from, and nothing keeps
   // running once it arrives: the one frame it asked for is cancelled on the way
   // out and the listener that tidies the element fires once.
+  //
+  // This pane is also where a NEW chat's process is asked for (welcome-screen T4,
+  // R2): opening a session allocates the chat and starts nothing, and the ask
+  // travels from here - see [`ensureStarted`] - so the seconds a child takes to
+  // come up are spent when the box is in front of the user, never while the app
+  // opens.
+  import { dispatchIntent } from '../bridge'
   import Composer from '../composer/Composer.svelte'
   import Thread from '../thread/Thread.svelte'
   import type { ThreadViewState } from '../thread/view'
   import NewSession from './NewSession.svelte'
-  import { DOCK_MOVE_MS, flipOffset, isNewSession } from './new-session'
+  import { DOCK_MOVE_MS, flipOffset, isFreshChat, isNewSession } from './new-session'
   import type { ChatViewState } from './view'
 
   let {
@@ -40,6 +47,44 @@
 
   /** View B is this chat with no row at all yet (welcome-screen T3). */
   const fresh = $derived(isNewSession(chat.chat, thread.messages, thread.items))
+
+  /**
+   * The chats whose child this pane already asked Rust to start (welcome-screen
+   * T4, R2), kept for as long as the pane is on screen: the ask is per chat and
+   * it happens once, whatever brings the same chat back through this render.
+   */
+  const startedFor = new Set<string>()
+
+  /**
+   * The lazy start of a new chat (welcome-screen T4, R2). The click that opens a
+   * new session ALLOCATES the chat and starts nothing; its process is asked for
+   * when the box it is typed into comes to the front - which is this very
+   * render, because the composer puts the cursor in that box on every chat
+   * change (`Composer`'s focus effect) - or when the first key lands in it,
+   * whichever comes first.
+   *
+   * Only a NEW chat asks. A stored chat started its child when it was opened, so
+   * it never needs this, and that is also what keeps a reopen of the chat on
+   * screen from asking twice: Rust's own rule answers a second ask for a chat it
+   * already started with nothing.
+   */
+  function ensureStarted(): void {
+    const open = chat.chat
+    if (open === null || !isFreshChat(open) || startedFor.has(open)) return
+    startedFor.add(open)
+    void dispatchIntent({ type: 'EnsureStarted', data: { chat_id: open } })
+  }
+
+  // The chat that arrives here is the chat being looked at, and its box is about
+  // to take the cursor: that is the first of the two triggers. The second - the
+  // first key landing in the box - is the dock's own `oninput` below, and the set
+  // above is what makes the two of them one ask.
+  $effect(() => {
+    // Reading the chat is what makes this follow the change, and only it: a push
+    // that names the same chat asks nothing new.
+    void chat.chat
+    ensureStarted()
+  })
 
   /** The dock that travels, and the frame it is waiting for. */
   let dock = $state<HTMLElement | null>(null)
@@ -126,7 +171,10 @@
       bind:scrollTop
     />
   </div>
-  <div class="chat-pane-dock" bind:this={dock}>
+  <!-- The dock is also where the second trigger of a new chat's start lives
+       (welcome-screen T4): an `input` event bubbles out of the box, so the first
+       key typed in it asks Rust for the child. -->
+  <div class="chat-pane-dock" bind:this={dock} oninput={ensureStarted}>
     <Composer
       chat={chat.chat}
       mark={chat.mark}

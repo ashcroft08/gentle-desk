@@ -39,6 +39,19 @@ impl Chats {
         entry.refresh(foreground);
     }
 
+    /// [`Chats::mark_opening`] for a chat whose child is asked for HERE: the
+    /// Opening mark and the record that this chat's start is behind it
+    /// (welcome-screen T4). This is what makes the lazy start fire once: a chat
+    /// the state has started answers no second ask, whatever it is doing by
+    /// then.
+    pub(crate) fn mark_started(&mut self, chat: &ChatId) {
+        let foreground = self.foreground.as_ref() == Some(chat);
+        let entry = self.entries.entry(chat.clone()).or_default();
+        entry.opening = true;
+        entry.started = true;
+        entry.refresh(foreground);
+    }
+
     /// Records that `chat` has a child again: an expected stop, or a restart the
     /// host honoured. The chat is idle and its thread is untouched.
     pub(crate) fn clear_ended(&mut self, chat: &ChatId) {

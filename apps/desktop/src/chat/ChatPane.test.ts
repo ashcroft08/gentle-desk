@@ -18,7 +18,7 @@ import type { ViewState_Serialize } from '../contract/bindings'
 import APP_CSS from '../app.css?raw'
 import { setLanguage } from '../i18n/language.svelte'
 import { mediaWindow } from '../test-support/media'
-import { resetTauriMock, setHandler, viewState } from '../test-support/tauri-mock'
+import { handlerArgs, resetTauriMock, setHandler, viewState } from '../test-support/tauri-mock'
 import { threadOf } from '../thread/view'
 import ChatPane from './ChatPane.svelte'
 import { chatCopy } from './copy'
@@ -166,6 +166,60 @@ describe('the hero of a new session', () => {
     expect(screen.queryByText('en gentle-desk')).toBeNull()
     expect(screen.getByRole('img', { name: 'La rosa de gentle shell' })).toBeTruthy()
     expect(container.querySelector('.chat-pane')?.className).toBe('chat-pane is-fresh')
+  })
+})
+
+describe('the lazy start of a new chat', () => {
+  /** The intents the pane sent, oldest first. */
+  function intents(): unknown[] {
+    return handlerArgs('dispatch_intent').map((args) => args.intent)
+  }
+
+  /** The one ask Rust starts a new chat's child with (welcome-screen T4, R2). */
+  function started(chat: string) {
+    return { type: 'EnsureStarted', data: { chat_id: chat } }
+  }
+
+  it('asks Rust for the child of a new chat, once, as its box comes to the front', async () => {
+    const { rerender } = render(ChatPane, { props: slices({ foreground_chat: 'new-1' }) })
+    const box = screen.getByRole('textbox', { name: 'Message' }) as HTMLTextAreaElement
+
+    expect(intents()).toEqual([started('new-1')])
+
+    // A push that names the same chat, and the user's own typing in the box: the
+    // ask is behind the chat, so none of it asks again.
+    await rerender(slices({ foreground_chat: 'new-1' }))
+    await fireEvent.input(box, { target: { value: 'una idea' } })
+    await fireEvent.input(box, { target: { value: 'una idea entera' } })
+
+    expect(intents()).toEqual([started('new-1')])
+  })
+
+  it('asks nothing for a stored chat, however much is typed in it', async () => {
+    // A stored chat started its child when its row was opened: the trigger is a
+    // NEW chat's, and a session path is not one.
+    const { rerender } = render(ChatPane, { props: slices({ foreground_chat: STORED }) })
+    const box = screen.getByRole('textbox', { name: 'Message' }) as HTMLTextAreaElement
+
+    await fireEvent.input(box, { target: { value: 'hola' } })
+    await rerender(slices({ foreground_chat: STORED }))
+
+    expect(intents()).toEqual([])
+  })
+
+  it('asks for the second new chat too, and never for the first one twice', async () => {
+    const { rerender } = render(ChatPane, { props: slices({ foreground_chat: 'new-1' }) })
+
+    await rerender(slices({ foreground_chat: 'new-2' }))
+    await rerender(slices({ foreground_chat: 'new-2' }))
+
+    expect(intents()).toEqual([started('new-1'), started('new-2')])
+  })
+
+  it('asks nothing while no chat is open', () => {
+    render(ChatPane, { props: slices() })
+
+    expect(intents()).toEqual([])
   })
 })
 
