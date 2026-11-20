@@ -58,17 +58,17 @@ what is left, to be taken after the 0.7.0 release.
 
 ## Tasks
 
-- [ ] T1 (S1, S3, R3, R4) Rust: derive the last workspace and its recent chats for the
+- [x] T1 (S1, S3, R3, R4) Rust: derive the last workspace and its recent chats for the
   view from the session list; handle no sessions, a missing folder, and a workspace
   with no chats. A new `ViewState` field, bindings regenerated.
-- [ ] T2 (S2, S3, R1) web: view A replaces "Ningún chat abierto" (rose, title, the last
+- [x] T2 (S2, S3, R1) web: view A replaces "Ningún chat abierto" (rose, title, the last
   workspace, one primary action, recents, other workspaces as quiet links).
-- [ ] T3 (S1, S3, R1) web: view B, the centred layout for a chat with no messages and
+- [x] T3 (S1, S3, R1) web: view B, the centred layout for a chat with no messages and
   the move of the existing composer to the bottom on the first send (about 240 ms,
   instant under reduced motion).
 - [ ] T4 (R2) runtime: start the chat's process on focus or first keystroke instead of
   on open. The riskiest task: it touches the open path of every new chat.
-- [ ] T5 (S4, R5, R6) the rose: port `ROSE`/`ROSE_SHADE` and the bloom, float, sway and glint
+- [x] T5 (S4, R5, R6) the rose: port `ROSE`/`ROSE_SHADE` and the bloom, float, sway and glint
   to a canvas component (the artboard script is the reference), still once it has
   bloomed, drawn open under reduced motion. Unblocked. Optional later: the same banner
   also writes the "Gentle Shell" wordmark with a pen (`pen_times`); the sidebar draws that
@@ -95,3 +95,24 @@ what is left, to be taken after the 0.7.0 release.
   kisses) - a different screen from ours - and the rose lives in `shared/banner.rs`. The
   three artboards now use a canvas port of it (verified: the script parses, the data
   decodes to 1,779 dots; NOT seen rendered by me - the canvas is for the maintainer to look at).
+
+- L4 (2026-11-20, T1-T5 landed, all on `feat/0.8.0-welcome`): T1/T1b/T1c (`96380e5`,
+  `7c184e0`, `50992cf`), T2/T2b (`3e22794`, `3ba3fa4`), T3 (`052853f`, plus the giant-card fix
+  `4a831d4` and the redundant folder line `a888afe`), T5 (`f915997`), the sidebar fallback
+  (`526db7b`), the `Inicio` header (`3f1acb3`), the window minimum 800x560 (`b36526c`) and T4
+  (`736cfc4`). T4 landed as option 1 (the maintainer's choice): `OpenNewChat` allocates the chat
+  and marks Opening but spawns nothing; `EnsureStarted` (dispatched from the composer's focus and
+  its first keystroke, once per fresh chat) runs the same `OpenProcess` path, so the opening net,
+  request_after_open and the folder hints are unchanged. While the process has not answered the
+  composer stays disabled with today's reason - a first Enter sends nothing and the draft stays.
+  Verified: `gentle-app` 246, the seven shell binaries green, clippy 0 warnings, fmt clean, web
+  chat/App 127. Behaviour NOT yet seen in a running window: the process really waiting for the
+  focus, and the view B composer travelling to the bottom on the first send.
+- L5 (2026-11-20, Configuration work started from gentle-shell-gpui's dialog, MIT, read from a
+  clone at `C:/Users/josep/dev/gentle-shell-gpui`): the search field over the panes and the theme
+  library as preview cards (no app instance per theme) landed in `47864f3`, retiring the old
+  `sidebar/ThemePicker`. Its own way of working that we still owe: ONE snapshot loaded off-thread
+  per dialog open (their `settings/services/snapshot.rs`), which is the real performance fix, and
+  the setup probe behind their General page. Notifications with sound: their `features/alerts`
+  synthesises WAVs and plays them with the OS player; ours would be a WebAudio tone plus the
+  official Tauri notification plugin, and the real work is the policy.
