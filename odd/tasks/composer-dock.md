@@ -159,3 +159,11 @@ those chips are cheap, one needs a new command, and one cannot be built at all.
   folder+branch) each carry their own quiet border now (1px border, 8px radius), because
   they shared the dock's background and read as one rectangle; FolderChip's internal
   vsep is gone with it. Probed the channel for the details (all four modes).
+- L14 (2026-11-19, maintainer's screenshot after L13): the groups' own borders read as a
+  card inside a card. They go back to text: the row separates by its 12px gap, the 1px
+  hairline between runs-on and runs-in returns (FolderChip leads with it again), and a
+  group lights a soft background only under the cursor.
+- L14 (2026-11-19, maintainer's screenshot after L13): the groups' own borders read as a
+  card inside a card. They go back to text: the row separates by its 12px gap, the 1px
+  hairline between runs-on and runs-in returns (FolderChip leads with it again), and a
+  group lights a soft background only under the cursor.
