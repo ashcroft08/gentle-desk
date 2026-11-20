@@ -2455,6 +2455,18 @@ p {
     background-color 120ms ease;
 }
 
+/* A button that is dead but stays reachable (the Notifications pane's Try it
+   while the setting is off, 03-off): `aria-disabled` keeps it in the tab order
+   so the reason under it can be read, so it has to LOOK dead and do nothing. */
+.dlg.settings .btn[aria-disabled='true'] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.dlg.settings .btn[aria-disabled='true']:hover {
+  border-color: var(--border);
+}
+
 /* The theme cards, the Appearance section's choice (the reference's theme_cards):
    a grid of six miniatures, four to a row on a wide window. */
 .tc-grid {
@@ -2607,6 +2619,12 @@ p {
   line-height: 1.5;
 }
 
+/* A quiet line that opens with a tag (the Notifications pane's result, 02): the
+   tag keeps its own space from the sentence it introduces. */
+.settings-pane .quiet .tag {
+  margin-right: 6px;
+}
+
 /* The pane's action row and the note under it: the button is the one action a
    pane has, and the note says what it opens. */
 .settings-pane .acts {
@@ -2728,6 +2746,12 @@ p {
 .settings-pane .seg [role='radio']:focus-visible {
   outline: 1px solid var(--text);
   outline-offset: -2px;
+}
+
+/* The explanation under a choice row (the Notifications pane, 01-pane): one
+   breath under the segmented control, the artboard's own 10px. */
+.settings-pane .seg + .why {
+  margin-top: 10px;
 }
 
 .settings-pane .profile {

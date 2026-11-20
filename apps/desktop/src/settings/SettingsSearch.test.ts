@@ -27,8 +27,17 @@ const FIND_ES = 'Buscar un ajuste'
 const NONE = 'No settings match.'
 const NONE_ES = 'Ningún ajuste coincide.'
 
-/** The seven entries in the order the dialog draws them, per language. */
-const RAIL_EN = ['Appearance', 'Shell home', 'Updates', 'Account', 'Usage', 'Language', 'About']
+/** The eight entries in the order the dialog draws them, per language. */
+const RAIL_EN = [
+  'Appearance',
+  'Shell home',
+  'Updates',
+  'Account',
+  'Usage',
+  'Language',
+  'Notifications',
+  'About',
+]
 const RAIL_ES = [
   'Apariencia',
   'Home del shell',
@@ -36,6 +45,7 @@ const RAIL_ES = [
   'Cuenta',
   'Uso',
   'Idioma',
+  'Notificaciones',
   'Acerca de',
 ]
 
@@ -148,6 +158,23 @@ describe('the Settings search field', () => {
     expect(names(dialog)).toEqual([])
   })
 
+  it('finds the Notifications section by the words of its own sound, either way round', async () => {
+    const dialog = await openSettings()
+
+    // English drawn, Spanish query: 'sonido' is the keyword both columns carry.
+    await search(dialog, 'sonido')
+    expect(names(dialog)).toEqual(['Notifications'])
+
+    setLanguage('es')
+    await tick()
+
+    // Spanish drawn, English query, the way the field is meant to work.
+    await search(dialog, 'sound')
+    expect(names(dialog)).toEqual(['Notificaciones'])
+
+    setLanguage('en')
+  })
+
   it('says so in one quiet line when nothing is left, sending nothing', async () => {
     const dialog = await openSettings()
 
@@ -216,7 +243,7 @@ describe('the Settings search field', () => {
       'true',
     )
 
-    // The rail wraps inside the two it is drawing, not across the seven.
+    // The rail wraps inside the two it is drawing, not across the eight.
     await fireEvent.keyDown(within(dialog).getByRole('tab', { name: 'About' }), {
       key: 'ArrowDown',
     })

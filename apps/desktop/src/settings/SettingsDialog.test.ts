@@ -1,5 +1,5 @@
 // The Settings dialog (settings-dialog S2-S6, L4; 0.1.12 S1-S7): a rail of
-// seven sections on the left and the selected section's content in the pane on
+// eight sections on the left and the selected section's content in the pane on
 // the right - the two controls that left the footer (the theme picker and the
 // home setting), the Updates and Account panes (0.1.12), Usage and About: the
 // app's name and the version this run runs as. Profiles left the dialog
@@ -9,8 +9,9 @@
 import '../test-support/dom-env'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, within } from '@testing-library/svelte'
-import { intents, openSettings, pane, pick, rail } from '../test-support/settings'
-import { resetTauriMock } from '../test-support/tauri-mock'
+import { tick } from 'svelte'
+import { intents, openSettings, pane, pick, rail, shell } from '../test-support/settings'
+import { pushEvent, resetTauriMock, viewState } from '../test-support/tauri-mock'
 
 vi.mock('@tauri-apps/api/core', () => import('../test-support/tauri-mock').then((m) => m.coreModule()))
 vi.mock('@tauri-apps/api/event', () => import('../test-support/tauri-mock').then((m) => m.eventModule()))
@@ -23,15 +24,18 @@ const UPDATES = 'Updates'
 const ACCOUNT = 'Account'
 const USAGE = 'Usage'
 const ABOUT = 'About'
-/** The rail's seven entries, in the order the dialog draws them (0.1.12; 0.2.0;
- * T2d dropped Profiles). */
-const RAIL = [APPEARANCE, HOME, UPDATES, ACCOUNT, USAGE, 'Language', ABOUT]
+/** The rail's eight entries, in the order the dialog draws them (0.1.12; 0.2.0;
+ * T2d dropped Profiles; notifications T4 added Notifications after Language). */
+const RAIL = [APPEARANCE, HOME, UPDATES, ACCOUNT, USAGE, 'Language', 'Notifications', ABOUT]
 const APPEARANCE_HINT = 'The look of this window.'
 const HOME_HINT = 'Which pi this shell runs on.'
 const UPDATES_HINT = 'What this machine runs, and whether something newer is out.'
 const ACCOUNT_HINT = 'Which providers are signed in, and where to sign in or out.'
 const USAGE_HINT = "What each subscription has used, as the shell's own sources report it."
 const ABOUT_HINT = 'Which build this is.'
+/** The Notifications section's own line (notifications T4, the approved artboard). */
+const NOTIFICATIONS = 'Notifications'
+const NOTIFICATIONS_HINT = 'A tone and a system notification while the window is not in front.'
 /** The generic line the stacked dialog drew under its title: it is gone now. */
 const OLD_HINT = 'The look of this window, and the home gentle shell runs on.'
 const EXPLAIN =
@@ -50,14 +54,14 @@ beforeEach(() => {
 })
 
 describe('the Settings dialog', () => {
-  it('opens from the footer gear with the seven sections in its rail and Appearance first', async () => {
+  it('opens from the footer gear with the eight sections in its rail and Appearance first', async () => {
     const dialog = await openSettings()
 
     expect(within(dialog).getByRole('heading', { level: 2, name: TITLE })).toBeTruthy()
     expect(rail(dialog).map((entry) => entry.textContent?.trim())).toEqual(RAIL)
     expect(
       rail(dialog).map((entry) => entry.getAttribute('aria-selected')),
-    ).toEqual(['true', 'false', 'false', 'false', 'false', 'false', 'false'])
+    ).toEqual(['true', 'false', 'false', 'false', 'false', 'false', 'false', 'false'])
     expect(within(dialog).getAllByRole('tabpanel')).toHaveLength(1)
     expect(within(dialog).getByRole('tabpanel', { name: APPEARANCE })).toBeTruthy()
   })
@@ -73,6 +77,7 @@ describe('the Settings dialog', () => {
       [UPDATES, UPDATES_HINT],
       [ACCOUNT, ACCOUNT_HINT],
       [USAGE, USAGE_HINT],
+      [NOTIFICATIONS, NOTIFICATIONS_HINT],
       [ABOUT, ABOUT_HINT],
     ]) {
       await pick(dialog, name)
@@ -88,7 +93,7 @@ describe('the Settings dialog', () => {
   it('no longer offers a Profiles section: profiles live in the chat', async () => {
     const dialog = await openSettings()
 
-    expect(rail(dialog)).toHaveLength(7)
+    expect(rail(dialog)).toHaveLength(8)
     expect(within(dialog).queryByRole('tab', { name: 'Profiles' })).toBeNull()
     expect(within(dialog).queryByText('Your agent profiles, as the terminal keeps them.')).toBeNull()
     // The pane's read is gone with it: no intent left the dialog.
@@ -180,6 +185,39 @@ describe('the Settings dialog', () => {
     await pick(dialog, ABOUT)
 
     expect(within(pane(dialog)).getByText(VERSION_UNKNOWN)).toBeTruthy()
+  })
+
+  // notifications T4 (S4, S5): the section draws what the PUSH says - the same
+  // live slice the theme follows - so it needs no reopen and no restart when the
+  // setting moves on the Rust side, and the pane's own words are the artboards'.
+  it('draws the notifications mode the push carries, and follows the push', async () => {
+    const dialog = await openSettings({}, VERSION, { notifications: 'off' })
+
+    await pick(dialog, NOTIFICATIONS)
+    const choices = within(pane(dialog)).getAllByRole('radio')
+    const tryIt = () => within(pane(dialog)).getByRole('button', { name: 'Try it' })
+
+    expect(choices.map((choice) => choice.textContent?.trim())).toEqual([
+      'When the window is not in front',
+      'Off',
+    ])
+    expect(choices.map((choice) => choice.getAttribute('aria-checked'))).toEqual(['false', 'true'])
+    expect(tryIt().getAttribute('aria-disabled')).toBe('true')
+    expect(within(pane(dialog)).getByText(/There is nothing to try/)).toBeTruthy()
+
+    // One push, no reopen: the dialog hands the new mode down in the same tick.
+    pushEvent(
+      'state-changed',
+      viewState({ shell: shell(), total_sessions: 1, notifications: 'when-unfocused' }),
+    )
+    await tick()
+
+    expect(
+      within(pane(dialog))
+        .getAllByRole('radio')
+        .map((choice) => choice.getAttribute('aria-checked')),
+    ).toEqual(['true', 'false'])
+    expect(tryIt().getAttribute('aria-disabled')).toBe('false')
   })
 
   it('draws the pushed usage, which no open chat can hold back', async () => {

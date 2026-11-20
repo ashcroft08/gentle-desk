@@ -46,6 +46,7 @@
   import { Dialog } from 'bits-ui'
   import type {
     AuthView_Serialize as AuthView,
+    NotificationsMode,
     ShellView_Serialize as ShellView,
     ThemeView,
     UpdatesView_Serialize as UpdatesView,
@@ -56,6 +57,7 @@
   import HomeSetting from '../sidebar/HomeSetting.svelte'
   import AccountPane from './AccountPane.svelte'
   import LanguagePane from './LanguagePane.svelte'
+  import NotificationsPane from './NotificationsPane.svelte'
   import ThemeCards from './ThemeCards.svelte'
   import UpdatesPane from './UpdatesPane.svelte'
   import UsagePane from './UsagePane.svelte'
@@ -74,6 +76,7 @@
     open = $bindable(false),
     theme,
     shell,
+    notifications,
     version = null,
     auth = null,
     updates = null,
@@ -86,6 +89,12 @@
     theme: ThemeView
     /** The shell's home, or null while the first view is still on its way. */
     shell: ShellView | null
+    /**
+     * When the app notifies, as the live push carries it (notifications T4): the
+     * user changes it from inside this card, so it follows the push like the
+     * theme does and never the one read of the open.
+     */
+    notifications: NotificationsMode
     /** The version this run runs as (S5), or null while the bridge named none. */
     version?: string | null
     /** The Account pane's names, until the one read of this open answers. */
@@ -281,6 +290,10 @@
                 <!-- The app's own words (0.2.0, S2): the two languages, each named
                      in its own language, and the current one marked. -->
                 <LanguagePane />
+              {:else if selected === 'notifications'}
+                <!-- The tone and the toast (notifications S4, S5): the one setting,
+                     which follows the live push, and the Try it action. -->
+                <NotificationsPane {notifications} />
               {:else}
                 <!-- About (S5): the name and the version this run runs as. What
                      is installed, and whether something newer is out, is the

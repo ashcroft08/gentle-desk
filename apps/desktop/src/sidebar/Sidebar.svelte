@@ -253,6 +253,7 @@
     bind:open={settingsOpen}
     theme={model.view?.theme ?? 'system'}
     shell={model.view?.shell ?? null}
+    notifications={model.view?.notifications ?? 'when-unfocused'}
     version={model.view?.app_version ?? null}
     auth={model.view?.auth ?? null}
     updates={model.view?.updates ?? null}
