@@ -139,9 +139,9 @@ describe('the dock', () => {
     const groups = container.querySelectorAll('.composer .row > .grp')
 
     expect(groups).toHaveLength(3)
-    expect(rule('.composer .row .grp:hover')).toContain('background: var(--surface2)')
-    expect(rule('.composer .row .grp')).toContain('border-radius: 8px')
-    expect(rule('.composer .row .grp')).toContain('padding: 2px 8px')
+    expect(rule('.composer .row .grp')).not.toContain('background')
+    expect(rule('.composer .row .grp')).not.toContain('border-radius')
+    expect(rule('.composer .row .grp')).not.toContain('padding')
     // The 12px gap between the groups stays, and the hairline is back.
     expect(rule('.composer .row')).toContain('gap: 12px')
     expect(rule('.composer .row .vsep')).toContain('background: var(--border)')

@@ -48,7 +48,6 @@ h2{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint
    context rail keeps 10px of air above the dock so the focus ring never crosses it */
 .row{display:flex;align-items:center;gap:12px;padding:0 12px 10px;min-width:0}
 .grp{display:inline-flex;align-items:center;gap:6px;min-width:0;border-radius:8px;padding:2px 8px}
-.grp:hover{background:var(--surface2)}
 .vsep2{width:1px;height:14px;background:var(--border);flex:none}
 .seg{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);white-space:nowrap;min-width:0;background:none;border:0;padding:0;font-family:inherit;cursor:pointer}
 .seg:hover{color:var(--text)}
@@ -124,7 +123,7 @@ h2{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint
 
   <div class="sheet">
     <h2>C · los dos bordes que importan</h2>
-    <p class="note">Los grupos de la fila vuelven a ser <b>texto sin caja</b> — el borde dentro del borde leía a caja dentro de caja (el maintainer, 2026-11-19): separan el aire de 12px, la línea fina entre lo que corre y dónde corre, y un fondo suave sólo al pasar el mouse. Sin repo: el segmento de rama <b>no existe</b>, no queda hueco. Contexto al 82%: la línea pasa a ámbar, sin agregar ningún chip. El archivo adjunto es la única cosa que gana una fila propia, porque es contenido, no cromo.</p>
+    <p class="note">Los grupos de la fila vuelven a ser <b>texto sin caja</b> — el borde dentro del borde leía a caja dentro de caja (el maintainer, 2026-11-19): separan el aire de 12px, la línea fina entre lo que corre y dónde corre, sin hover de grupo: los controles individuales conservan el propio. Sin repo: el segmento de rama <b>no existe</b>, no queda hueco. Contexto al 82%: la línea pasa a ámbar, sin agregar ningún chip. El archivo adjunto es la única cosa que gana una fila propia, porque es contenido, no cromo.</p>
     <div class="stage">
       <div class="state"><span class="spin"></span><span class="t">trabajando…</span><span class="n">4s</span>
         <span class="right"><span class="tag">Normal</span></span>

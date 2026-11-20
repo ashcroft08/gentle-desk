@@ -914,19 +914,13 @@ p {
 /* The row's groups: each group keeps its own tight 6px rhythm, and wears its own
    text again, not boxes: a border inside the dock's border read as a card
    inside a card (the maintainer's screenshot, L14). The groups separate by the
-   row's 12px gap, the 1px hairline between runs-on and runs-in, and a soft
-   background under the cursor only. */
+   row's 12px gap and the 1px hairline between runs-on and runs-in; the
+   individual controls keep their own hover, no group hover (L15). */
 .composer .row .grp {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   min-width: 0;
-  border-radius: 8px;
-  padding: 2px 8px;
-}
-
-.composer .row .grp:hover {
-  background: var(--surface2);
 }
 
 .composer .row .vsep {
