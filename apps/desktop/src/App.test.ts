@@ -331,9 +331,52 @@ describe('App', () => {
     expect(
       await screen.findByRole('heading', { level: 2, name: 'Pick up where you left off' }),
     ).toBeTruthy()
-    expect(screen.getByRole('heading', { level: 1, name: 'No chat open' })).toBeTruthy()
+    expect(screen.getByRole('heading', { level: 1, name: 'Home' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'New session in Curriculum' })).toBeTruthy()
     expect(screen.queryByText('Choose a chat in the workspace tree, or start a new session.')).toBeNull()
+  })
+
+  it('names view A in the page\u2019s one h1, in either language, with no old words left', async () => {
+    // R1: what is on screen is view A, so the header says where the reader is
+    // (the home dictionary's own word) instead of that no chat is open.
+    setLanguage('en')
+    serveSidebar({
+      view: viewState({
+        foreground_chat: null,
+        welcome: welcomeView({
+          last: welcomeWorkspace({ path: 'C:\\dev\\curriculum', label: 'Curriculum' }),
+        }),
+      }),
+    })
+    render(App)
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Home' })).toBeTruthy()
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1)
+    expect(screen.queryByText('No chat open')).toBeNull()
+    expect(screen.queryByText('Choose a chat in the workspace tree, or start a new session.')).toBeNull()
+
+    setLanguage('es')
+    await tick()
+
+    expect(screen.getByRole('heading', { level: 1, name: 'Inicio' })).toBeTruthy()
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1)
+    expect(screen.queryByText('Ningún chat abierto')).toBeNull()
+
+    setLanguage('en')
+  })
+
+  it('keeps the old header over the welcome with no configured workspace', async () => {
+    // The welcome's no-workspace face draws the rose and the old hint, but no
+    // view A title of its own, so the header still says no chat is open.
+    serveSidebar({
+      view: viewState({ foreground_chat: null, welcome: welcomeView({ last: null }) }),
+    })
+    render(App)
+
+    expect(await screen.findByText('No chat open')).toBeTruthy()
+    expect(await screen.findByRole('img', { name: 'The gentle-shell rose' })).toBeTruthy()
+    expect(screen.getByText('Choose a chat in the workspace tree, or start a new session.')).toBeTruthy()
+    expect(screen.queryByRole('heading', { level: 1, name: 'Home' })).toBeNull()
   })
 
   it('keeps today’s placeholder while the push carries no welcome at all', async () => {

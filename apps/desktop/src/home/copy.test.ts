@@ -12,6 +12,7 @@ import { homeCopy } from './copy'
 
 /** The English words, as sheet A draws them. */
 const ENGLISH = {
+  homeTitle: 'Home',
   title: 'Pick up where you left off',
   roseLabel: 'The gentle-shell rose',
   noChats: 'no chats yet',
@@ -21,6 +22,7 @@ const ENGLISH = {
 
 /** Neutral Spanish: no voseo, no regionalisms, accents kept. */
 const SPANISH: typeof ENGLISH = {
+  homeTitle: 'Inicio',
   title: 'Sigue donde lo dejaste',
   roseLabel: 'La rosa de gentle shell',
   noChats: 'sin chats todavía',

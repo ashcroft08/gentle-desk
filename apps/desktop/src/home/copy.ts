@@ -17,6 +17,11 @@ import type { LanguageView } from '../contract/bindings'
 
 /** The welcome's own words for one language. */
 export interface HomeCopy {
+  /**
+   * The word the page's one h1 names this screen with (R1), instead of "no chat
+   * open": view A is where the reader is, and the header says so.
+   */
+  homeTitle: string
   /** The view's title, the page's h2 under the header's h1. */
   title: string
   /** The rose's accessible name: the picture is decoration with a name. */
@@ -41,6 +46,7 @@ export interface HomeCopy {
 
 /** English: the words sheets A and A2 draw. */
 const ENGLISH: HomeCopy = {
+  homeTitle: 'Home',
   title: 'Pick up where you left off',
   roseLabel: 'The gentle-shell rose',
   noChats: 'no chats yet',
@@ -54,6 +60,7 @@ const ENGLISH: HomeCopy = {
 
 /** Neutral Spanish: no voseo, no regionalisms, nothing left in English. */
 const SPANISH: typeof ENGLISH = {
+  homeTitle: 'Inicio',
   title: 'Sigue donde lo dejaste',
   roseLabel: 'La rosa de gentle shell',
   noChats: 'sin chats todavía',

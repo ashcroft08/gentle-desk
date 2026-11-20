@@ -29,6 +29,7 @@
   import { createThreadView } from './thread/view'
   import MissingShell from './install/MissingShell.svelte'
   import Home from './home/Home.svelte'
+  import { homeCopy } from './home/copy'
   import Welcome from './welcome/Welcome.svelte'
   import WhatsNewDialog from './whats-new/WhatsNewDialog.svelte'
   import { appCopy } from './app-copy'
@@ -42,6 +43,14 @@
   const shownNotices = $derived(visibleNotices(chat.notices))
   // The shell's own words, in the language this run is set to (0.2.0, S3/D4).
   const copy = $derived(appCopy(language.current))
+  // View A's own word for the header (R1): the page's one h1 names the screen
+  // that is there whenever the welcome draws its rose and its actions - a
+  // welcome WITH a last workspace. Every other no-chat state keeps the old
+  // words, because view A's title is not on the page then.
+  const homeWords = $derived(homeCopy(language.current))
+  const noChatTitle = $derived(
+    chat.welcome !== null && chat.welcome.last !== null ? homeWords.homeTitle : copy.noChatOpen,
+  )
   // The update line's own words: the retry's reason is one of them (0.2.0, T9),
   // because the sentence it completes is the line's (`update/copy.ts`).
   const updateWords = $derived(updateCopy(language.current))
@@ -160,7 +169,7 @@
     {#if model.chat === null}
       <header class="mh">
         <SidebarToggle collapsed={sidebarCollapsed} onToggle={() => (manualCollapsed = !sidebarCollapsed)} />
-        <h1>{copy.noChatOpen}</h1>
+        <h1>{noChatTitle}</h1>
       </header>
       {#if chat.welcome === null}<p class="placeholder">{copy.noChatHint}</p>{:else}<Home welcome={chat.welcome} />{/if}
     {:else}
