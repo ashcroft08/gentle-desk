@@ -1,0 +1,28 @@
+{
+  "title": "Notifications — one Settings pane: a tone and a system toast when the window is not in front",
+  "brief": "The Notifications section of the 680px Settings dialog (odd/tasks/notifications.md, T4): one choice in the segmented row Language already uses (Cuando la ventana no está al frente / Desactivado), two honest lines on what it does, and a Try it button that plays the tone and sends one toast, with a result line for the two real outcomes. The new rail entry sits after Idioma and before Acerca de. Spanish is the language drawn; the English column is in each artboard's notes. The PowerShell note about development builds stays in the notes and never in the pane.",
+  "feature": "odd/tasks/notifications.md",
+  "artboards": [
+    {
+      "file": "01-pane.html",
+      "title": "01 · the pane, with the default choice",
+      "tradeoff": "The door before anything is tried: the choice is the pane's only control and Probar sits under it, quiet. Also draws the same card at 452px (one container query, and the app window's minWidth 800 means that state is not reachable today).",
+      "width": 900,
+      "height": 1320
+    },
+    {
+      "file": "02-try-denied.html",
+      "title": "02 · after Probar, with the toast denied by Windows",
+      "tradeoff": "The honest half: the tone played, the toast did not, so the result is one status line under the action plus the way to allow it in Windows Settings. The pane grows by two lines; no dialog inside the dialog.",
+      "width": 900,
+      "height": 640
+    },
+    {
+      "file": "03-off.html",
+      "title": "03 · turned off, with Probar disabled and its reason",
+      "tradeoff": "Turning it off costs one word and one look: the explanation stays readable, and Probar keeps its place with aria-disabled so the reason under it is still reachable from the keyboard.",
+      "width": 900,
+      "height": 640
+    }
+  ]
+}
