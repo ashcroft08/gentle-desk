@@ -65,6 +65,7 @@ mod settings;
 mod shell;
 mod theme;
 mod transcript;
+mod welcome;
 mod whats_new;
 
 /// What runs one shared command the reducer asked for. `Command::RefreshSessions`
@@ -790,7 +791,31 @@ impl AppStateHolder {
             updates: self.updates(),
             usage: self.usage(),
             images: &self.images,
+            welcome: self.welcome_view(),
         }
+    }
+
+    /// View A's data (welcome-screen T1, S1, S3, R3, R4): the last workspace, its
+    /// recent chats and the other configured workspaces, read from the config and
+    /// the tree of the revision the holder is at.
+    ///
+    /// No pass over the session list runs here: the grouping is the one the tree
+    /// already cached for this revision (welcome-screen T1), so a push pays the
+    /// workspaces of the config and three chat rows, never 50 000 sessions. The
+    /// one thing it asks the disk is whether the last workspace's folder is still
+    /// there - the same probe a served page runs for its headers, asked for ONE
+    /// folder - and it asks it with no lock held: the config, the tree and the
+    /// language are snapshots read before it.
+    fn welcome_view(&self) -> crate::contract::WelcomeView {
+        let config = self.config_snapshot();
+        let tree = self.tree();
+        let language = config.config.language.unwrap_or(Language::En);
+        welcome::welcome(
+            &config.config,
+            tree.workspaces(),
+            tree.sessions(),
+            &|path| folder_status(path, language),
+        )
     }
 
     /// Runs the shared commands of one fold through the sink, if any.

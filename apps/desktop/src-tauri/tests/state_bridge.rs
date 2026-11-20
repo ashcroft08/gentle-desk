@@ -10,7 +10,7 @@ use gentle_app::{ChatId, Input, Intent};
 use gentle_desk_lib::bridge::AppStateHolder;
 use gentle_desk_lib::contract::{
     AuthView, ContextUsageView, InstallView, ListStatusView, ModelChipView, ModelListStatusView,
-    NoticeLevel, ShellView, ThemeView, UiIntent, UpdatesView, UsageView, ViewState,
+    NoticeLevel, ShellView, ThemeView, UiIntent, UpdatesView, UsageView, ViewState, WelcomeView,
 };
 
 #[test]
@@ -163,6 +163,14 @@ fn the_view_state_slice_has_no_invented_fields() {
             // The launcher is resolved on the first command, so a run that has
             // asked for nothing yet has no fatal bar.
             fatal: None,
+            // View A of a run with no chat open and no configured workspace:
+            // there is nothing to have been last in, so it names no workspace
+            // and links to none (welcome-screen T1, R3).
+            welcome: Some(WelcomeView {
+                last: None,
+                recents: Vec::new(),
+                others: Vec::new(),
+            }),
         }
     );
 }

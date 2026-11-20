@@ -50,11 +50,19 @@ pub fn total(state: &AppState) -> u32 {
 pub fn row(session: &SessionItem, now_ms: u64, language: Language) -> SessionRowView {
     SessionRowView {
         id: session.path.clone(),
-        title: truncate(&session.title, TITLE_CHARS),
+        title: row_title(session),
         project: session.project().to_owned(),
         message_count: session.message_count,
         modified_ago: time_ago(language, now_ms, session.modified_ms),
     }
+}
+
+/// The title a row draws for `session`: its stored title cut to the length the
+/// sidebar row holds ([`TITLE_CHARS`]). [`row`] uses it, and so does the welcome
+/// view's recent chats (welcome-screen T1), so a chat is named the same way in
+/// both places.
+pub fn row_title(session: &SessionItem) -> String {
+    truncate(&session.title, TITLE_CHARS)
 }
 
 /// The title the chat header draws for `chat`: the stored session's own title,

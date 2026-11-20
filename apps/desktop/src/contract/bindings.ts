@@ -3451,6 +3451,17 @@ export type ViewState_Deserialize = {
 	 *  says it does not know instead of guessing.
 	 */
 	app_version?: string | null,
+	/**
+	 *  View A's data (welcome-screen T1, S1, S3, R3, R4): the workspace the user
+	 *  worked in last, its recent chats and the other configured workspaces.
+	 * 
+	 *  `Some` ONLY while no chat is in the foreground, which is the one state
+	 *  that draws the welcome at all: with a chat on screen the field costs
+	 *  nothing and the web side draws none of it. It is never `None` for a
+	 *  missing workspace or an empty list - those are cases of the view itself
+	 *  ([`WelcomeView::last`]), not an absent screen.
+	 */
+	welcome?: WelcomeView_Deserialize | null,
 };
 
 /**
@@ -3727,6 +3738,234 @@ export type ViewState_Serialize = {
 	 *  says it does not know instead of guessing.
 	 */
 	app_version: string | null,
+	/**
+	 *  View A's data (welcome-screen T1, S1, S3, R3, R4): the workspace the user
+	 *  worked in last, its recent chats and the other configured workspaces.
+	 * 
+	 *  `Some` ONLY while no chat is in the foreground, which is the one state
+	 *  that draws the welcome at all: with a chat on screen the field costs
+	 *  nothing and the web side draws none of it. It is never `None` for a
+	 *  missing workspace or an empty list - those are cases of the view itself
+	 *  ([`WelcomeView::last`]), not an absent screen.
+	 */
+	welcome: WelcomeView_Serialize | null,
+};
+
+/**
+ *  One recent chat of the last workspace (welcome-screen R4): a row of the
+ *  sidebar, with the id that opens it and the age the screen words itself.
+ */
+export type WelcomeChat = {
+	/**
+	 *  Exactly the string [`UiIntent::OpenChat`] takes back: the RAW session
+	 *  file path, never the id `gentle_app::ChatId` builds from it (the intent
+	 *  prefixes it once).
+	 */
+	chat_id: string,
+	/**  The title the sidebar row draws for that session. */
+	title: string,
+	/**
+	 *  When the session was last written, in epoch milliseconds: the same value
+	 *  a chat row's `modified_ago` is worded from, carried as the number so the
+	 *  screen can measure it against the clock it holds.
+	 * 
+	 *  An `f64` for the same reason [`WelcomeWorkspace::last_activity_ms`] is:
+	 *  the generated bindings refuse a 64-bit integer on the wire, and a real
+	 *  millisecond count is exact in a double.
+	 */
+	modified_ms: number | null,
+};
+
+/**
+ *  One other configured workspace, as the quiet link under the recents
+ *  (welcome-screen T1): the folder and the label the sidebar draws for it.
+ */
+export type WelcomeLink = {
+	/**
+	 *  The canonical spelling of the folder, as [`UiIntent::NewChatInWorkspace`]
+	 *  takes it back.
+	 */
+	path: string,
+	/**  The label the sidebar row draws. */
+	label: string,
+};
+
+/**
+ *  View A's data (welcome-screen T1, S1, S3, R3, R4): the workspace the user
+ *  worked in last, that workspace's recent chats and the other configured
+ *  workspaces as quiet links. It is the screen the app shows when NO chat is in
+ *  the foreground.
+ * 
+ *  Every field is read from what the sidebar already groups and draws - the
+ *  config's workspaces and the session list - so the welcome names no folder the
+ *  sidebar does not name, no chat the sidebar does not list, and counts nothing
+ *  of its own.
+ */
+export type WelcomeView = WelcomeView_Serialize | WelcomeView_Deserialize;
+
+/**
+ *  View A's data (welcome-screen T1, S1, S3, R3, R4): the workspace the user
+ *  worked in last, that workspace's recent chats and the other configured
+ *  workspaces as quiet links. It is the screen the app shows when NO chat is in
+ *  the foreground.
+ * 
+ *  Every field is read from what the sidebar already groups and draws - the
+ *  config's workspaces and the session list - so the welcome names no folder the
+ *  sidebar does not name, no chat the sidebar does not list, and counts nothing
+ *  of its own.
+ */
+export type WelcomeView_Deserialize = {
+	/**
+	 *  The workspace of the most recent session, `None` only when the config
+	 *  holds no workspace at all: there is nothing to be last in.
+	 */
+	last?: WelcomeWorkspace_Deserialize | null,
+	/**
+	 *  Up to three chats of [`last`](Self::last), newest first. Empty for a
+	 *  workspace with no chat, which says so instead of drawing an empty list.
+	 */
+	recents: WelcomeChat[],
+	/**
+	 *  The other CONFIGURED workspaces, in the order the config lists them,
+	 *  without [`last`](Self::last): the quiet links at the foot of the screen.
+	 */
+	others: WelcomeLink[],
+};
+
+/**
+ *  View A's data (welcome-screen T1, S1, S3, R3, R4): the workspace the user
+ *  worked in last, that workspace's recent chats and the other configured
+ *  workspaces as quiet links. It is the screen the app shows when NO chat is in
+ *  the foreground.
+ * 
+ *  Every field is read from what the sidebar already groups and draws - the
+ *  config's workspaces and the session list - so the welcome names no folder the
+ *  sidebar does not name, no chat the sidebar does not list, and counts nothing
+ *  of its own.
+ */
+export type WelcomeView_Serialize = {
+	/**
+	 *  The workspace of the most recent session, `None` only when the config
+	 *  holds no workspace at all: there is nothing to be last in.
+	 */
+	last: WelcomeWorkspace_Serialize | null,
+	/**
+	 *  Up to three chats of [`last`](Self::last), newest first. Empty for a
+	 *  workspace with no chat, which says so instead of drawing an empty list.
+	 */
+	recents: WelcomeChat[],
+	/**
+	 *  The other CONFIGURED workspaces, in the order the config lists them,
+	 *  without [`last`](Self::last): the quiet links at the foot of the screen.
+	 */
+	others: WelcomeLink[],
+};
+
+/**
+ *  The workspace the user worked in last (welcome-screen R3): the configured
+ *  workspace that owns the most recent session of the list, with what the
+ *  sidebar already draws for it and nothing more.
+ */
+export type WelcomeWorkspace = WelcomeWorkspace_Serialize | WelcomeWorkspace_Deserialize;
+
+/**
+ *  The workspace the user worked in last (welcome-screen R3): the configured
+ *  workspace that owns the most recent session of the list, with what the
+ *  sidebar already draws for it and nothing more.
+ */
+export type WelcomeWorkspace_Deserialize = {
+	/**
+	 *  The canonical spelling of the folder, which
+	 *  [`UiIntent::NewChatInWorkspace`] takes back: the same `path` a sidebar
+	 *  workspace row carries.
+	 */
+	path: string,
+	/**
+	 *  The label the sidebar row draws: the folder's name, extended with the
+	 *  parent segments it takes to tell two workspaces of the same name apart.
+	 */
+	label: string,
+	/**
+	 *  Whether new chats can start in this folder right now: the very
+	 *  `available` a sidebar workspace row carries
+	 *  ([`WorkspaceRowView::available`]), from the same probe. `false` is a
+	 *  folder that is gone and a path that holds something else instead, so the
+	 *  primary action is disabled exactly when the sidebar disables it.
+	 */
+	available: boolean,
+	/**
+	 *  Why it cannot, in the shell's own words, exactly as
+	 *  [`WorkspaceRowView::reason`] carries them for that same folder: the
+	 *  sidebar's "this folder no longer exists" line for a folder that is gone,
+	 *  and its other refusal for a path that is not a folder. `None` while the
+	 *  folder is available, which is when there is nothing to warn about.
+	 */
+	reason?: string | null,
+	/**
+	 *  How many sessions the sidebar's tree holds for this workspace, folded
+	 *  away or not.
+	 */
+	chat_count: number,
+	/**
+	 *  The most recent session's timestamp, in epoch milliseconds: what the
+	 *  screen turns into `hace 21 min`, `None` for a workspace with no chat.
+	 * 
+	 *  An `f64` rather than the session's `u64` because the generated bindings
+	 *  refuse a 64-bit integer on the wire - a `number` could lose precision -
+	 *  and every real millisecond count is exact in a double (the same rule
+	 *  [`ThinkingItemView::duration_ms`] follows).
+	 */
+	last_activity_ms?: number | null,
+};
+
+/**
+ *  The workspace the user worked in last (welcome-screen R3): the configured
+ *  workspace that owns the most recent session of the list, with what the
+ *  sidebar already draws for it and nothing more.
+ */
+export type WelcomeWorkspace_Serialize = {
+	/**
+	 *  The canonical spelling of the folder, which
+	 *  [`UiIntent::NewChatInWorkspace`] takes back: the same `path` a sidebar
+	 *  workspace row carries.
+	 */
+	path: string,
+	/**
+	 *  The label the sidebar row draws: the folder's name, extended with the
+	 *  parent segments it takes to tell two workspaces of the same name apart.
+	 */
+	label: string,
+	/**
+	 *  Whether new chats can start in this folder right now: the very
+	 *  `available` a sidebar workspace row carries
+	 *  ([`WorkspaceRowView::available`]), from the same probe. `false` is a
+	 *  folder that is gone and a path that holds something else instead, so the
+	 *  primary action is disabled exactly when the sidebar disables it.
+	 */
+	available: boolean,
+	/**
+	 *  Why it cannot, in the shell's own words, exactly as
+	 *  [`WorkspaceRowView::reason`] carries them for that same folder: the
+	 *  sidebar's "this folder no longer exists" line for a folder that is gone,
+	 *  and its other refusal for a path that is not a folder. `None` while the
+	 *  folder is available, which is when there is nothing to warn about.
+	 */
+	reason: string | null,
+	/**
+	 *  How many sessions the sidebar's tree holds for this workspace, folded
+	 *  away or not.
+	 */
+	chat_count: number,
+	/**
+	 *  The most recent session's timestamp, in epoch milliseconds: what the
+	 *  screen turns into `hace 21 min`, `None` for a workspace with no chat.
+	 * 
+	 *  An `f64` rather than the session's `u64` because the generated bindings
+	 *  refuse a 64-bit integer on the wire - a `number` could lose precision -
+	 *  and every real millisecond count is exact in a double (the same rule
+	 *  [`ThinkingItemView::duration_ms`] follows).
+	 */
+	last_activity_ms: number | null,
 };
 
 /**
