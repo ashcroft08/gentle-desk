@@ -219,16 +219,17 @@
       oninput={typed}
       onkeydown={keyed}
     ></textarea>
-    <!-- The row, regrouped (design/composer-dock): what the message runs ON
-         (model, effort), a hairline, then where it runs (the folder, and the
-         branch that folder is on - absent when there is no repository to name),
-         the flexible space, and Send. Every part is text: no box, no chip
-         border. -->
+    <!-- The row, regrouped in THREE groups the eye can tell apart (maintainer's
+         test note, 2026-11-19): the clip is its own act, the model and its
+         effort are what the message runs ON, a hairline, then where it runs
+         (the folder, and the branch that folder is on - absent when there is no
+         repository to name), the flexible space and Send. The wider gap between
+         the groups is what keeps them from reading as one control. -->
     <div class="row">
-      <AttachButton label={copy.attachFiles} disabled={chat === null} onPick={attach} />
-      <ModelChip {chip} />
-      <FolderChip {folder} />
-      <BranchChip {branch} />
+      <span class="grp"><AttachButton label={copy.attachFiles} disabled={chat === null} onPick={attach} /></span>
+      <span class="grp"><ModelChip {chip} /></span>
+      <span class="vsep" role="presentation"></span>
+      <span class="grp"><FolderChip {folder} /><BranchChip {branch} /></span>
       <span class="grow"></span>
       {#if rule.mode === 'stop'}
         <StopButton

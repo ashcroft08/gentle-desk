@@ -35,7 +35,7 @@ h2{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint
 .dock .in{padding:12px 14px 8px;color:var(--faint);font-size:14px}
 
 /* context: the line ABOVE the box, filling as the context grows (maintainer's screenshot) */
-.ctx{margin:0 26px 3px;padding:0}
+.ctx{margin:0 26px 10px;padding:0}
 .ctx .rail{height:2px;background:var(--border);border-radius:1px;overflow:hidden}
 .ctx .rail i{display:block;height:100%;width:6%;background:var(--accent);border-radius:1px}
 .ctx.near .rail i{background:var(--warning)}
@@ -43,8 +43,11 @@ h2{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint
 .ctx .lab .l{display:inline-flex;align-items:center;gap:4px}
 .ctx .lab svg{width:11px;height:11px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 
-/* the row: borderless, 12px, the folder name is the only bold thing */
-.row{display:flex;align-items:center;gap:10px;padding:0 12px 10px;min-width:0}
+/* the row: borderless, 12px, the folder name is the only bold thing; the row is
+   grouped in three acts the eye tells apart (clip / runs-on / runs-in), and the
+   context rail keeps 10px of air above the dock so the focus ring never crosses it */
+.row{display:flex;align-items:center;gap:12px;padding:0 12px 10px;min-width:0}
+.grp{display:inline-flex;align-items:center;gap:6px;min-width:0}
 .seg{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);white-space:nowrap;min-width:0;background:none;border:0;padding:0;font-family:inherit;cursor:pointer}
 .seg:hover{color:var(--text)}
 .seg .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}

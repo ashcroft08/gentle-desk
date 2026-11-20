@@ -144,3 +144,8 @@ those chips are cheap, one needs a new command, and one cannot be built at all.
   drag tint and chip layout were exercised only in jsdom and fakes. `Unreadable` has no
   test. Spanish copy uses the neutral column ("Suelta para adjuntar"), not the artboard's
   voseo. Format decision: absolute paths one per line after the text.
+- L11 (2026-11-19, maintainer's window test): the app ran in the real window and
+  every FEATURE works; two look fixes from his screenshots: (a) the context rail now keeps
+  10px of air above the dock, because the focus ring crossed it; (b) the row is grouped in
+  three acts (clip / model+effort / hairline / folder+branch) with a 12px gap between
+  groups, because the row read as one control. Artboard 01 updated with both.

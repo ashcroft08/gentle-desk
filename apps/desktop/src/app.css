@@ -908,6 +908,15 @@ p {
 .composer .row {
   display: flex;
   align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* The row's groups: each group keeps its own tight 6px rhythm, and the 12px
+   gap of the row plus the hairline are what separate clip / runs-on / runs-in. */
+.composer .row .grp {
+  display: inline-flex;
+  align-items: center;
   gap: 6px;
   min-width: 0;
 }
@@ -1352,7 +1361,10 @@ p {
    (`composer/context.ts`): quiet until 75%, the warning token from there - so the
    percentage is always drawn too and colour never carries the meaning alone. */
 .composer-dock .ctx-rail {
-  margin: 0 10px 3px;
+  /* Clear of the composer's own focus ring: the ring draws 2px outside the
+     dock, so the rail needs more than the old 3px or the ring crosses it
+     (maintainer's test note, 2026-11-19). */
+  margin: 0 10px 10px;
 }
 
 .composer-dock .ctx-rail .lab {
