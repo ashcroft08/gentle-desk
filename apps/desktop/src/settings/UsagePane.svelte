@@ -1,10 +1,12 @@
 <script lang="ts">
   // The Usage pane (settings-0.1.12 S6's deferred half): the subscription usage
-  // the shell's own sources report, one card per provider. It reads the slice
-  // Rust pushed and asks for its own read ONCE when it appears - a run of the
-  // sources takes seconds, so the cheap correct answer is one run when the user
-  // opens the section - and "Check again" asks for another. No timer, no
-  // spinner, no blocking.
+  // the shell's own sources report, one card per provider. It draws the slice the
+  // dialog's ONE load answered (settings-snapshot), and reads nothing when it
+  // appears: the run of the sources happens on the dialog's open, off the window's
+  // thread, once, whether the user walks to this section or not. "Check again"
+  // asks the dialog for another load, and `refreshing` is what makes that ask
+  // visible while it is on its way: the same quiet reading line the first read
+  // draws, never a frozen card.
   //
   // The numbers are the sources' own readings: one row per window with the share
   // used and the countdown to its reset, in the context chip's language (a small
@@ -15,13 +17,24 @@
   //
   // A package that is not installed is ONE line and one button: the install runs
   // in a terminal window the user reads, never silently from here.
-  import { dispatchIntent, openTerminal } from '../bridge'
+  import { openTerminal } from '../bridge'
   import type { UsageView_Serialize as UsageView } from '../contract/bindings'
   import { language } from '../i18n/language.svelte'
   import { paneOf } from './usage'
   import { usageCopy } from './usage-copy'
 
-  let { usage }: { usage: UsageView | null } = $props()
+  let {
+    usage,
+    refreshing = false,
+    onRefresh = () => {},
+  }: {
+    /** The usage as the dialog's one load answered, or null before any read. */
+    usage: UsageView | null
+    /** Whether a load the user asked for is in flight: the reading line. */
+    refreshing?: boolean
+    /** Asks the dialog for one more load: the pane's only read path. */
+    onRefresh?: () => void
+  } = $props()
 
   /** The pane's own words in the language the app holds (0.2.0, D4). */
   const copy = $derived(usageCopy(language.current))
@@ -31,33 +44,20 @@
 
   const pane = $derived(paneOf(usage))
 
-  /**
-   * The pane's one read, asked when the dialog draws this section: nothing runs
-   * the sources at app open (a run costs seconds, and a section the user never
-   * opens should cost nothing).
-   */
-  $effect(() => {
-    read()
-  })
-
-  function read(): void {
-    void dispatchIntent({ type: 'RefreshUsage' })
-  }
-
   async function install(): Promise<void> {
     terminalError = await openTerminal('InstallUsageSources')
   }
 </script>
 
-{#if pane.kind === 'reading'}
-  <!-- The quiet waiting line: the read runs on its own thread in the shell. -->
+{#if pane.kind === 'reading' || refreshing}
+  <!-- The quiet waiting line: the one read runs on the shell's own thread. -->
   <p class="quiet" role="status">{copy.reading}</p>
 {:else if pane.kind === 'missing'}
   <p class="quiet">{copy.missing}</p>
   <p class="why">{copy.missingWhy}</p>
   <div class="acts">
     <button class="btn accent" type="button" onclick={() => void install()}>{copy.install}</button>
-    <button class="btn" type="button" onclick={read}>{copy.checkAgain}</button>
+    <button class="btn" type="button" onclick={onRefresh}>{copy.checkAgain}</button>
   </div>
   <p class="note">{copy.installNote}</p>
 {:else if pane.kind === 'unreadable' || pane.kind === 'failed'}
@@ -65,7 +65,7 @@
        words, and offer the same safe retry. -->
   <p class="quiet" role="status">{copy.cannotRead(pane.reason)}</p>
   <div class="acts">
-    <button class="btn" type="button" onclick={read}>{copy.checkAgain}</button>
+    <button class="btn" type="button" onclick={onRefresh}>{copy.checkAgain}</button>
   </div>
   <p class="note">{copy.retrySafe}</p>
 {:else}
@@ -125,7 +125,7 @@
   {/if}
 
   <div class="acts">
-    <button class="btn" type="button" onclick={read}>{copy.checkAgain}</button>
+    <button class="btn" type="button" onclick={onRefresh}>{copy.checkAgain}</button>
   </div>
   <p class="note">{copy.note}</p>
 {/if}

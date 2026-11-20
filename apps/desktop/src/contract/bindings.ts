@@ -135,6 +135,17 @@ export const commands = {
 	 */
 	storeLastRunVersion: () => typedError<ViewState_Serialize, string>(__TAURI_INVOKE("store_last_run_version")),
 	/**
+	 *  The Settings dialog's one read (settings-snapshot): every page's data in
+	 *  one plain object, asked once when the dialog opens.
+	 * 
+	 *  It takes no argument and needs no window: the gather's seams and the half of
+	 *  the slice it carries all come from the bridge, and the answer is the same
+	 *  shape the web side draws. Nothing of a chat travels through it (a chat's
+	 *  profiles, session mode and images are read through that chat's own child), so
+	 *  opening Settings never waits on a child and never starts one.
+	 */
+	settingsSnapshot: () => typedError<SettingsSnapshot_Serialize, string>(__TAURI_INVOKE("settings_snapshot")),
+	/**
 	 *  Opens a visible terminal window on `action`: the shell's profiles screen, its
 	 *  login or logout, or its own update.
 	 * 
@@ -1919,6 +1930,133 @@ export type SettingsFilesChangedView = {
 	profiles: boolean,
 	/**  `auth.json` in the agent directory: the Account pane's file. */
 	account: boolean,
+};
+
+/**
+ *  One Settings dialog's whole content (settings-snapshot): the plain data
+ *  every page draws, gathered once per open and never on the window's thread.
+ * 
+ *  The dialog asks for it when it opens and draws what it already had until the
+ *  answer lands, so a section is never blank and no page reads anything on its
+ *  own. Every section is the contract's own view and every one of them carries
+ *  its own status: what failed says so there.
+ */
+export type SettingsSnapshot = SettingsSnapshot_Serialize | SettingsSnapshot_Deserialize;
+
+/**
+ *  One Settings dialog's whole content (settings-snapshot): the plain data
+ *  every page draws, gathered once per open and never on the window's thread.
+ * 
+ *  The dialog asks for it when it opens and draws what it already had until the
+ *  answer lands, so a section is never blank and no page reads anything on its
+ *  own. Every section is the contract's own view and every one of them carries
+ *  its own status: what failed says so there.
+ */
+export type SettingsSnapshot_Deserialize = {
+	/**
+	 *  The appearance of the whole window: the theme cards, and the
+	 *  `data-theme` the page paints. The dialog keeps drawing the live slice for
+	 *  this one, because it is what the user CHANGES from inside the card; the
+	 *  field says what the load saw.
+	 */
+	theme: ThemeView,
+	/**
+	 *  The language the app's own words are written in, `None` while no
+	 *  preference is stored. Live, like the theme, and carried for the same
+	 *  reason.
+	 */
+	language?: LanguageView | null,
+	/**
+	 *  The shell, its home and where installing it stands: what the Home section
+	 *  draws. Live, like the theme.
+	 */
+	shell: ShellView_Deserialize,
+	/**
+	 *  The version this run runs as, which the About section draws, or `None`
+	 *  for a run that never named one.
+	 */
+	app_version?: string | null,
+	/**  How many chats are open, which gates the Updates pane's Update button. */
+	open_chats: number,
+	/**
+	 *  What became of the app config file, when it was set aside or a save
+	 *  failed. `None` when it was read, or was not there, and every save worked.
+	 */
+	config_notice?: string | null,
+	/**
+	 *  Where the shell's authentication stands: one row per provider the store
+	 *  lists, with its own check's answer. Names only, never a key or a token.
+	 */
+	auth: AuthView_Deserialize,
+	/**
+	 *  What the machine runs and what is published for it: the desk, pi and
+	 *  gentle-shell, each row with its own answer and its own reason for having
+	 *  none.
+	 */
+	updates: UpdatesView_Deserialize,
+	/**
+	 *  The subscription usage the shell's own sources report, or the reason they
+	 *  could not be read. Nothing here touches a chat.
+	 */
+	usage: UsageView_Deserialize,
+};
+
+/**
+ *  One Settings dialog's whole content (settings-snapshot): the plain data
+ *  every page draws, gathered once per open and never on the window's thread.
+ * 
+ *  The dialog asks for it when it opens and draws what it already had until the
+ *  answer lands, so a section is never blank and no page reads anything on its
+ *  own. Every section is the contract's own view and every one of them carries
+ *  its own status: what failed says so there.
+ */
+export type SettingsSnapshot_Serialize = {
+	/**
+	 *  The appearance of the whole window: the theme cards, and the
+	 *  `data-theme` the page paints. The dialog keeps drawing the live slice for
+	 *  this one, because it is what the user CHANGES from inside the card; the
+	 *  field says what the load saw.
+	 */
+	theme: ThemeView,
+	/**
+	 *  The language the app's own words are written in, `None` while no
+	 *  preference is stored. Live, like the theme, and carried for the same
+	 *  reason.
+	 */
+	language: LanguageView | null,
+	/**
+	 *  The shell, its home and where installing it stands: what the Home section
+	 *  draws. Live, like the theme.
+	 */
+	shell: ShellView_Serialize,
+	/**
+	 *  The version this run runs as, which the About section draws, or `None`
+	 *  for a run that never named one.
+	 */
+	app_version: string | null,
+	/**  How many chats are open, which gates the Updates pane's Update button. */
+	open_chats: number,
+	/**
+	 *  What became of the app config file, when it was set aside or a save
+	 *  failed. `None` when it was read, or was not there, and every save worked.
+	 */
+	config_notice: string | null,
+	/**
+	 *  Where the shell's authentication stands: one row per provider the store
+	 *  lists, with its own check's answer. Names only, never a key or a token.
+	 */
+	auth: AuthView_Serialize,
+	/**
+	 *  What the machine runs and what is published for it: the desk, pi and
+	 *  gentle-shell, each row with its own answer and its own reason for having
+	 *  none.
+	 */
+	updates: UpdatesView_Serialize,
+	/**
+	 *  The subscription usage the shell's own sources report, or the reason they
+	 *  could not be read. Nothing here touches a chat.
+	 */
+	usage: UsageView_Serialize,
 };
 
 /**

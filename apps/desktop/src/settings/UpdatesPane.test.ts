@@ -1,8 +1,8 @@
 // The Updates pane (0.1.12, S2, S3, S4, S7): ONE status card, drawn from the
-// check the app ran when it opened. The Update button is the terminal's, and it
-// is dead while any chat is open (S4) with the reason said in place; "Check
-// again" only ever asks for a check. No test here reaches a registry: the check
-// is Rust's and arrives as the pushed slice.
+// check the dialog's one load ran (settings-snapshot). The Update button is
+// the terminal's, and it is dead while any chat is open (S4) with the reason
+// said in place; "Check again" only ever asks the dialog for another load. No
+// test here reaches a registry: the check is Rust's and arrives in the object.
 import '../test-support/dom-env'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, within } from '@testing-library/svelte'
@@ -44,13 +44,21 @@ function current(): UpdatesView {
   })
 }
 
-function draw(view: UpdatesView = updates(), openChats = 0): HTMLElement {
-  const { container } = render(UpdatesPane, { props: { updates: view, openChats } })
-  return container as HTMLElement
+/** One ask for the dialog's load, as the pane sends it. */
+function ask(): () => void {
+  return vi.fn()
 }
 
-function intents(): unknown[] {
-  return handlerArgs('dispatch_intent').map((args) => args.intent)
+function draw(
+  view: UpdatesView = updates(),
+  openChats = 0,
+  refreshing = false,
+  onRefresh: () => void = ask(),
+): HTMLElement {
+  const { container } = render(UpdatesPane, {
+    props: { updates: view, openChats, refreshing, onRefresh },
+  })
+  return container as HTMLElement
 }
 
 describe('the Updates pane', () => {
@@ -99,7 +107,7 @@ describe('the Updates pane', () => {
 
     expect(within(pane).getByRole('button', { name: copy.updateExtensions })).toBeTruthy()
     expect(within(pane).getByRole('button', { name: copy.checkAgain })).toBeTruthy()
-    expect(intents()).toEqual([])
+    expect(handlerArgs('dispatch_intent')).toEqual([])
   })
 
   it('opens the extensions update in a terminal window with every chat closed', async () => {
@@ -107,7 +115,7 @@ describe('the Updates pane', () => {
 
     await fireEvent.click(within(pane).getByRole('button', { name: copy.updateExtensions }))
     expect(handlerArgs('open_terminal')).toEqual([{ action: 'UpdateExtensions' }])
-    expect(intents()).toEqual([])
+    expect(handlerArgs('dispatch_intent')).toEqual([])
   })
 
   it('keeps Update extensions dead while a chat is open, and says why', () => {
@@ -152,9 +160,22 @@ describe('the Updates pane', () => {
   })
 
   it('checks nothing before the app has checked, and never calls the registry', () => {
-    const pane = draw(updates({ status: 'Unknown' }))
+    const again = ask()
+    const pane = draw(updates({ status: 'Unknown' }), 0, false, again)
     expect(pane.querySelector('.card')).toBeNull()
-    expect(intents()).toEqual([])
+    expect(within(pane).getByText(copy.notChecked)).toBeTruthy()
+    // Nothing of its own ran: the dialog's one load is where the check comes from.
+    expect(again).not.toHaveBeenCalled()
+  })
+
+  it("says the check is running while the user's own re-check is on its way", () => {
+    // The card the last load answered, and a re-check in flight: the checking
+    // line with the versions it already knew, so the click is never silent.
+    const pane = draw(updates(), 0, true)
+
+    expect(within(pane).getByText(copy.checking)).toBeTruthy()
+    expect(pane.querySelector('.updates')).toBeNull()
+    expect(pane.textContent).toContain('pi 1.5.2')
   })
 
   it('disables Update and says why while any chat is open', () => {
@@ -178,10 +199,14 @@ describe('the Updates pane', () => {
   })
 
   it('asks for a check again, and only ever a check', async () => {
-    const pane = draw()
+    const again = ask()
+    const pane = draw(updates(), 0, false, again)
 
     await fireEvent.click(within(pane).getByRole('button', { name: copy.checkAgain }))
-    expect(intents()).toEqual([{ type: 'CheckUpdates' }])
+
+    expect(again).toHaveBeenCalledTimes(1)
+    // A check, never an install: no terminal window opens and no intent leaves.
+    expect(handlerArgs('dispatch_intent')).toEqual([])
     expect(handlerArgs('open_terminal')).toEqual([])
   })
 })

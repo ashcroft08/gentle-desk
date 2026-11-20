@@ -33,6 +33,16 @@
   //
   // Closing sends nothing. Each section persists through the command it already
   // had, so Dismiss, Escape and the backdrop only close the card.
+  //
+  // ONE read per open (settings-snapshot): the card asks for the whole plain
+  // data of every section once - `settings_snapshot`, gathered off the window's
+  // thread - and each page draws from that one object instead of fetching for
+  // itself. Before this, walking the rail re-ran the Account pane's per-provider
+  // checks and the Usage pane's run of the sources on every visit; now a visit
+  // costs nothing, and "Check again" asks for the same one load again (coalesced:
+  // a burst of asks is one extra load, never one per ask). The push the dialog
+  // already receives is what it draws until the answer lands, so no section is
+  // ever blank while the load is on its way.
   import { Dialog } from 'bits-ui'
   import type {
     AuthView_Serialize as AuthView,
@@ -51,6 +61,7 @@
   import UsagePane from './UsagePane.svelte'
   import { settingsCopy } from './copy'
   import { visibleSections } from './search'
+  import { createSettingsRead } from './snapshot.svelte'
   import {
     DEFAULT_SECTION,
     PANEL_ID,
@@ -77,11 +88,11 @@
     shell: ShellView | null
     /** The version this run runs as (S5), or null while the bridge named none. */
     version?: string | null
-    /** The Account pane's slice (0.1.12, S1), or null before the first push. */
+    /** The Account pane's names, until the one read of this open answers. */
     auth?: AuthView | null
-    /** The Updates pane's slice (0.1.12, S2), or null before the first check. */
+    /** The Updates slice, until the one read of this open answers. */
     updates?: UpdatesView | null
-    /** The Usage pane's slice, or null before the first read. */
+    /** The Usage slice, until the one read of this open answers. */
     usage?: UsageView | null
     /** How many chats are open: the Updates pane's gate (S4). */
     openChats?: number
@@ -96,6 +107,41 @@
    * never moves what the user is reading (see `search.ts` for the match).
    */
   let query = $state('')
+
+  /**
+   * The one read of this open (settings-snapshot): the whole plain data of
+   * every section, gathered off the window's thread, asked once when the card
+   * opens. "Check again" asks the SAME read again, coalesced, so a burst of asks
+   * costs one extra load (`snapshot.svelte.ts`).
+   */
+  const read = createSettingsRead()
+
+  $effect(() => {
+    if (!open) return
+    return read.start()
+  })
+
+  /** Asks for the one read again: what every section's "Check again" calls. */
+  function again(): void {
+    read.again()
+  }
+
+  /**
+   * The pane data: the one read when it has answered, and the push the dialog
+   * already received before that. The theme, the home and the language are NOT
+   * taken from here: the user changes all three from inside this card, so they
+   * keep following the live slice (the snapshot carries them for the record).
+   */
+  const authView = $derived(read.snapshot?.auth ?? auth)
+  const updatesView = $derived(read.snapshot?.updates ?? updates)
+  const usageView = $derived(read.snapshot?.usage ?? usage)
+
+  /**
+   * Whether a load the USER asked for is in flight: the first load of the open
+   * does not count, because until it answers the sections draw what the push
+   * carried and no section has anything to re-read for itself.
+   */
+  const rechecking = $derived(read.busy && read.snapshot !== null)
 
   /** The rail's own words in the language the app holds (0.2.0, D4). */
   const copy = $derived(settingsCopy(language.current))
@@ -226,11 +272,11 @@
                   <HomeSetting {shell} />
                 {/if}
               {:else if selected === 'updates'}
-                <UpdatesPane {updates} {openChats} />
+                <UpdatesPane updates={updatesView} {openChats} refreshing={rechecking} onRefresh={again} />
               {:else if selected === 'account'}
-                <AccountPane {auth} />
+                <AccountPane auth={authView} onRefresh={again} />
               {:else if selected === 'usage'}
-                <UsagePane {usage} />
+                <UsagePane usage={usageView} refreshing={rechecking} onRefresh={again} />
               {:else if selected === 'language'}
                 <!-- The app's own words (0.2.0, S2): the two languages, each named
                      in its own language, and the current one marked. -->

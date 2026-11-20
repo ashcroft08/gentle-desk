@@ -6,7 +6,7 @@
 // that is gone, a name Windows would not take) or `ViewState.config_notice`
 // (what became of the config file) in the next push, which the sidebar draws.
 
-import { commands, type AttachmentView, type TerminalActionView, type UiIntent } from './contract/bindings'
+import { commands, type AttachmentView, type SettingsSnapshot_Serialize as SettingsSnapshot, type TerminalActionView, type UiIntent } from './contract/bindings'
 
 /** Sends one user intent; the answer is drawn through the next pushed state. */
 export async function dispatchIntent(intent: UiIntent): Promise<void> {
@@ -163,6 +163,28 @@ export async function storeLastRunVersion(): Promise<void> {
     await commands.storeLastRunVersion()
   } catch {
     // The next push still carries the notes; the modal comes back.
+  }
+}
+
+/**
+ * The Settings dialog's one read (settings-snapshot): every page's data in one
+ * plain object - the theme, the language, the home, the running version, and the
+ * three reads that cost something (the sign-ins, the published versions and the
+ * subscription usage). The dialog asks for it ONCE per open and every section
+ * draws from the answer, so walking the rail reads nothing.
+ *
+ * `null` is a load that did not answer at all: the dialog keeps drawing what the
+ * last push carried, and a section whose own read failed says so INSIDE the
+ * object (each section carries its own status), never here.
+ */
+export async function settingsSnapshot(): Promise<SettingsSnapshot | null> {
+  try {
+    const answer = await commands.settingsSnapshot()
+    // The command answers its refusals in the envelope, so a load that did not
+    // run is the same here as one that said nothing: `null`.
+    return answer.status === 'ok' ? answer.data : null
+  } catch {
+    return null
   }
 }
 

@@ -34,6 +34,7 @@ pub mod reaper;
 pub mod release;
 pub mod sessions;
 pub mod settings;
+pub mod settings_snapshot;
 pub mod shell_install;
 pub mod state_view;
 pub mod terminal;
@@ -74,6 +75,7 @@ pub fn contract_builder() -> Builder<tauri::Wry> {
             commands::pick_files,
             commands::describe_attachments,
             commands::store_last_run_version,
+            commands::settings_snapshot,
             terminal_commands::open_terminal,
         ])
         .events(tauri_specta::collect_events![

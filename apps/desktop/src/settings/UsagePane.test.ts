@@ -4,10 +4,10 @@
 // and the countdown to its reset. A provider with no credentials says "no
 // data"; the pane never turns that into a zero.
 //
-// The one read is the pane's own: it asks when it appears, because a run of the
-// sources takes seconds (the cheap correct answer: one run when the user asks),
-// and "Check again" asks for another. Nothing here reads a chat, so no open chat
-// can hold the pane back.
+// The pane reads NOTHING (settings-snapshot): the dialog's one load already
+// ran the sources, so appearing costs no run. "Check again" asks the dialog for
+// another load through `onRefresh`, and `refreshing` is the quiet line that
+// makes the ask visible while it is on its way.
 import '../test-support/dom-env'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, within } from '@testing-library/svelte'
@@ -69,18 +69,18 @@ function installed(): UsageView {
   }
 }
 
-function draw(view: UsageView | null = installed()): HTMLElement {
-  const { container } = render(UsagePane, { props: { usage: view } })
+/** A load the user asked for, as the dialog would be asked for one. */
+function ask(): () => void {
+  return vi.fn()
+}
+
+function draw(
+  view: UsageView | null = installed(),
+  refreshing = false,
+  onRefresh: () => void = ask(),
+): HTMLElement {
+  const { container } = render(UsagePane, { props: { usage: view, refreshing, onRefresh } })
   return container as HTMLElement
-}
-
-function intents(): unknown[] {
-  return handlerArgs('dispatch_intent').map((args) => args.intent)
-}
-
-/** How many usage reads the pane asked for. */
-function reads(): number {
-  return intents().filter((intent) => (intent as { type: string }).type === 'RefreshUsage').length
 }
 
 describe('the Usage pane', () => {
@@ -146,13 +146,24 @@ describe('the Usage pane', () => {
     expect(within(pane).getByRole('button', { name: copy.checkAgain })).toBeTruthy()
   })
 
-  it('draws a quiet line while the read runs, with no spinner and no second read', async () => {
-    const pane = draw({ status: { type: 'Reading' }, providers: [] })
+  it('draws a quiet line while the read runs, with no spinner and no read of its own', () => {
+    const again = ask()
+    const pane = draw({ status: { type: 'Reading' }, providers: [] }, false, again)
 
     expect(within(pane).getByText(copy.reading)).toBeTruthy()
     expect(within(pane).queryByRole('progressbar')).toBeNull()
     expect(within(pane).queryByRole('button', { name: copy.checkAgain })).toBeNull()
-    await vi.waitFor(() => expect(reads()).toBe(1))
+    // Nothing was asked for: the dialog's one load is what read this.
+    expect(again).not.toHaveBeenCalled()
+  })
+
+  it("says the load is running while the user's own re-check is on its way", () => {
+    // A card the last load answered, and a re-check in flight: the same quiet
+    // line, so a click that takes seconds is never silent.
+    const pane = draw(installed(), true)
+
+    expect(within(pane).getByText(copy.reading)).toBeTruthy()
+    expect(pane.querySelector('.usage-provider')).toBeNull()
   })
 
   it('says so when the sources answered with no provider at all', () => {
@@ -160,11 +171,15 @@ describe('the Usage pane', () => {
     expect(within(pane).getByText(copy.noProviders)).toBeTruthy()
   })
 
-  it('reads once when it appears, and again only when the user asks', async () => {
-    const pane = draw()
+  it('reads nothing when it appears, and asks for one load when the user asks', async () => {
+    const again = ask()
+    const pane = draw(installed(), false, again)
+    expect(again).not.toHaveBeenCalled()
 
-    await vi.waitFor(() => expect(reads()).toBe(1))
     await fireEvent.click(within(pane).getByRole('button', { name: copy.checkAgain }))
-    expect(reads()).toBe(2)
+
+    expect(again).toHaveBeenCalledTimes(1)
+    // Still no intent: the pane's one read path is the dialog's load.
+    expect(handlerArgs('dispatch_intent')).toEqual([])
   })
 })
