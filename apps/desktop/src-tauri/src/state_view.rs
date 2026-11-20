@@ -23,7 +23,7 @@ use crate::contract::{
     AuthView, BranchView, ChatActivityMark, ChatActivityView, ChatProfileView, ContextUsageView,
     FolderView, ImageView, LanguageView, ModelChipView, ModelChoiceView, ModelListStatusView,
     NoticeActionView, NoticeLevel, NoticeView, SessionModeView, ShellView, ThemeView, UpdatesView,
-    UsageView, ViewState, WhatsNewView,
+    UsageView, ViewState, WelcomeView, WhatsNewView,
 };
 use crate::images::Images;
 use crate::{dialogs, helper_thread, helpers, sessions, view};
@@ -90,6 +90,13 @@ pub struct ShellParts<'a> {
     /// session row does not exist yet. The chat is carried for the same gate the
     /// other per-chat slices keep here.
     pub folder_hint: Option<(String, crate::contract::FolderView)>,
+    /// View A's data (welcome-screen T1, S1, S3, R3, R4), built by the shell from
+    /// the config and the tree of this revision: the last workspace, its recent
+    /// chats and the other configured workspaces. It is read whatever the
+    /// foreground chat is, because a push that CLOSES the last chat is the one
+    /// that has to bring the screen back; whether it is carried at all is this
+    /// module's foreground gate ([`view_state`]).
+    pub welcome: WelcomeView,
 }
 
 /// The slice of `state` as it stands now, carrying the revision the holder
@@ -115,6 +122,7 @@ pub fn view_state(state: &AppState, sessions_revision: u32, shell: ShellParts<'_
         usage,
         images,
         folder_hint,
+        welcome,
     } = shell;
     let helpers_view = helpers::helpers(state);
     let foreground = state
@@ -164,6 +172,10 @@ pub fn view_state(state: &AppState, sessions_revision: u32, shell: ShellParts<'_
             false,
         ),
     };
+    // View A is the screen of NO foreground chat and of no other state
+    // (welcome-screen R1): with a chat on screen the web side draws none of it,
+    // so the slice does not carry it either.
+    let welcome = foreground.is_none().then_some(welcome);
     ViewState {
         theme: view_theme(theme),
         language: view_language(language),
@@ -213,6 +225,7 @@ pub fn view_state(state: &AppState, sessions_revision: u32, shell: ShellParts<'_
         whats_new,
         app_version,
         fatal,
+        welcome,
     }
 }
 

@@ -1,12 +1,14 @@
 <script lang="ts">
-  // The Updates pane (0.1.12, S2, S3, S4, S7): ONE card, from the check the app
-  // already ran when it opened. Nothing here checks on its own, so a pane that
-  // is visited before the check answers says so quietly and never blocks.
+  // The Updates pane (0.1.12, S2, S3, S4, S7): ONE card, from the check the
+  // dialog's one load ran when it opened (settings-snapshot). Nothing here
+  // checks on its own, so a pane that is visited while the load is still on its
+  // way says so quietly and never blocks.
   //
   // The card has three shapes, and the rules that pick one live in `./updates`:
   // available (a warning tag, one headline per row that is behind, the quiet
   // versions), up to date (the success tag and the same quiet row), or the
-  // checking line with the versions it already had.
+  // checking line with the versions it already had. `refreshing` is what puts the
+  // last shape on screen while a load the USER asked for is on its way.
   //
   // The Update button is the terminal's - the shell's own update runs there -
   // and it is DEAD while any chat is open (S4), with the reason written under
@@ -21,13 +23,27 @@
   // touches the packages the shell has installed, and nothing can tell which of
   // them are behind, so there is no check to wait for and it is drawn in every
   // state, safe to press any time. It obeys the same chats-closed gate.
-  import { dispatchIntent, openTerminal } from '../bridge'
+  import { openTerminal } from '../bridge'
   import type { UpdatesView_Serialize as UpdatesView } from '../contract/bindings'
   import { language } from '../i18n/language.svelte'
   import { cardOf } from './updates'
   import { updatesCopy } from './updates-copy'
 
-  let { updates, openChats = 0 }: { updates: UpdatesView | null; openChats?: number } = $props()
+  let {
+    updates,
+    openChats = 0,
+    refreshing = false,
+    onRefresh = () => {},
+  }: {
+    /** The check as the dialog's one load answered, or null before any read. */
+    updates: UpdatesView | null
+    /** How many chats are open: the Update gate (S4). */
+    openChats?: number
+    /** Whether a load the user asked for is in flight: the checking line. */
+    refreshing?: boolean
+    /** Asks the dialog for one more load: the pane's only read path. */
+    onRefresh?: () => void
+  } = $props()
 
   /** The pane's own words in the language the app holds (0.2.0, D4). */
   const copy = $derived(updatesCopy(language.current))
@@ -36,6 +52,8 @@
   let terminalError = $state<string | null>(null)
 
   const card = $derived(cardOf(updates, copy))
+  /** Whether a check is on its way: the pushed one, or the one the user asked for. */
+  const checking = $derived(card.checking || refreshing)
   const blocked = $derived(openChats > 0)
   const hint = $derived(copy.gateHint(openChats))
   const hintId = 'updates-gate'
@@ -45,10 +63,6 @@
     ),
   )
   const showVersions = $derived(card.versions.some((line) => line.version !== null))
-
-  function check(): void {
-    void dispatchIntent({ type: 'CheckUpdates' })
-  }
 
   async function update(): Promise<void> {
     if (blocked) return
@@ -74,7 +88,7 @@
   >
 {/snippet}
 
-{#if card.checked}
+{#if card.checked && !refreshing}
   <div class="card updates">
     <div class="head">
       <span class="tag {card.available ? 'warn' : 'ok'}">
@@ -88,7 +102,7 @@
       <p class="versions">{versions}</p>
     {/if}
     <div class="acts">
-      <button class="btn" type="button" onclick={check}>{copy.checkAgain}</button>
+      <button class="btn" type="button" onclick={onRefresh}>{copy.checkAgain}</button>
       {#if card.available && card.terminal}
         <button
           class="btn accent"
@@ -118,7 +132,7 @@
 {:else}
   <!-- Before the first answer, and while a check runs: a quiet line, the
        versions already known, and the check button. The pane never waits. -->
-  {#if card.checking}
+  {#if checking}
     <p class="quiet" role="status">{copy.checking}</p>
   {:else}
     <p class="quiet">{copy.notChecked}</p>
@@ -127,7 +141,7 @@
     <p class="versions">{versions}</p>
   {/if}
   <div class="acts">
-    <button class="btn" type="button" onclick={check}>{copy.checkAgain}</button>
+    <button class="btn" type="button" onclick={onRefresh}>{copy.checkAgain}</button>
     {@render extensionsButton()}
   </div>
   {#if blocked}

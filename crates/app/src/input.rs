@@ -52,6 +52,13 @@ pub enum Intent {
     OpenChat(ChatId),
     /// A chat that did not exist before, with an id of its own.
     OpenNewChat,
+    /// Start that chat's child, if this chat never had one started (welcome-screen
+    /// T4, R2): a new chat is ALLOCATED when it opens and its process starts on
+    /// this ask, which the composer sends the first time its box is focused for
+    /// that chat or the first key lands in it. Every later ask for a chat that was
+    /// started already - Opening, working, queued, idle or ended - changes
+    /// nothing: the start of one chat is one start.
+    EnsureStarted(ChatId),
     /// Start that chat's child again and reopen the chat, after its child died
     /// (S3). This is the action of the death notice; it works on any chat, not
     /// only the foreground one.

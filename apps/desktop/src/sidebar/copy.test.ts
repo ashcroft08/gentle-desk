@@ -1,9 +1,14 @@
 // The sidebar's own words (0.2.0, S3 and D4): the empty state, the reading line,
 // the New workspace menu and its create dialog, the footer's chip and gear, the
-// theme control's own two names, the new-chat icon of a workspace header and the
-// words around a chat row live in ONE language-keyed dictionary. This file pins
-// the two columns and the lines that carry a number, a label or a title; the
-// words a drawn sidebar shows are pinned in `copy.flip.test.ts`.
+// new-chat icon of a workspace header and the words around a chat row live in ONE
+// language-keyed dictionary. This file pins the two columns and the lines that
+// carry a number, a label or a title; the words a drawn sidebar shows are pinned
+// in `copy.flip.test.ts`.
+//
+// The theme control's three names (its tooltip, its list's name and the prefix of
+// its accessible name) left this dictionary with the control itself: the
+// Appearance section draws theme CARDS now, and their words are the theme module's
+// labels and the settings dictionary's. Nothing here names a theme any more.
 //
 // The English column is quoted literally: it is what the sidebar has drawn since
 // 01a and the states board, so a change of copy is a change here. The titles, the
@@ -32,8 +37,6 @@ const ENGLISH = {
   noWorkspaceReason: 'Select a workspace to start a session.',
   preview: 'Preview',
   previewTitle: 'Preview: under active development - fixes ship fast',
-  themeTip: 'Theme',
-  themeListName: 'Theme',
   chatActionsTip: 'Chat actions',
   chatName: 'Chat name',
   rename: 'Rename',
@@ -69,8 +72,6 @@ const SPANISH = {
   noWorkspaceReason: 'Elige un espacio de trabajo para iniciar una sesión.',
   preview: 'Vista previa',
   previewTitle: 'Vista previa: en desarrollo activo; las correcciones llegan rápido',
-  themeTip: 'Tema',
-  themeListName: 'Tema',
   chatActionsTip: 'Acciones del chat',
   chatName: 'Nombre del chat',
   rename: 'Renombrar',
@@ -134,11 +135,6 @@ describe('the sidebar lines that carry a number, a name or a title', () => {
     expect(english.reading(4, 9)).toBe('Reading chats... 4 / 9')
     expect(spanish.reading(0, 0)).toBe('Leyendo chats...')
     expect(spanish.reading(4, 9)).toBe('Leyendo chats... 4 / 9')
-  })
-
-  it('names the theme control with its label, and never renames the label', () => {
-    expect(english.themeName('Dark')).toBe('Theme: Dark')
-    expect(spanish.themeName('Oscuro')).toBe('Tema: Oscuro')
   })
 
   it('names a row menu with the title Rust sent, word for word', () => {

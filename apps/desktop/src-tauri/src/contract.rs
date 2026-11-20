@@ -148,6 +148,23 @@ pub enum UiIntent {
     },
     /// The same for a chat that did not exist before.
     OpenNewChat,
+    /// Start the child of that chat, if this run never started one for it
+    /// (welcome-screen T4, R2).
+    ///
+    /// A new chat is ALLOCATED when it opens and its process starts on this ask:
+    /// the composer sends it the first time its box is focused for that chat, or
+    /// when the first key lands in it, so opening a new session (or the app
+    /// itself) starts no child and costs no process. Until the child answers, the
+    /// chat is Opening and its composer is disabled with the reason it has today;
+    /// the draft is kept and an Enter sends nothing.
+    ///
+    /// The ask is IDEMPOTENT by the state: a chat whose child was asked for
+    /// already - Opening, working, queued, idle or ended - sends no command and
+    /// changes nothing, so a focus and a keystroke can never start two children.
+    /// A stored chat starts its child when it is opened, so it never needs this.
+    EnsureStarted {
+        chat_id: String,
+    },
     /// Start a NEW chat in the workspace at `path`: what the header's New
     /// session button (D2) and a workspace's own new-chat icon (D3) send. The
     /// web side decides which workspace is the current one and names it; the
@@ -1617,6 +1634,107 @@ pub struct WhatsNewView {
     pub notes: String,
 }
 
+/// View A's data (welcome-screen T1, S1, S3, R3, R4): the workspace the user
+/// worked in last, that workspace's recent chats and the other configured
+/// workspaces as quiet links. It is the screen the app shows when NO chat is in
+/// the foreground.
+///
+/// Every field is read from what the sidebar already groups and draws - the
+/// config's workspaces and the session list - so the welcome names no folder the
+/// sidebar does not name, no chat the sidebar does not list, and counts nothing
+/// of its own.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+pub struct WelcomeView {
+    /// The workspace of the most recent session, `None` only when the config
+    /// holds no workspace at all: there is nothing to be last in.
+    pub last: Option<WelcomeWorkspace>,
+    /// Up to three chats of [`last`](Self::last), newest first. Empty for a
+    /// workspace with no chat, which says so instead of drawing an empty list.
+    pub recents: Vec<WelcomeChat>,
+    /// The other CONFIGURED workspaces, in the order the config lists them,
+    /// without [`last`](Self::last): the quiet links at the foot of the screen.
+    pub others: Vec<WelcomeLink>,
+}
+
+/// The workspace the user worked in last (welcome-screen R3): the configured
+/// workspace that owns the most recent session of the list, with what the
+/// sidebar already draws for it and nothing more.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+pub struct WelcomeWorkspace {
+    /// The canonical spelling of the folder, which
+    /// [`UiIntent::NewChatInWorkspace`] takes back: the same `path` a sidebar
+    /// workspace row carries.
+    pub path: String,
+    /// The label the sidebar row draws: the folder's name, extended with the
+    /// parent segments it takes to tell two workspaces of the same name apart.
+    pub label: String,
+    /// Whether new chats can start in this folder right now: the very
+    /// `available` a sidebar workspace row carries
+    /// ([`WorkspaceRowView::available`]), from the same probe. `false` is a
+    /// folder that is gone and a path that holds something else instead, so the
+    /// primary action is disabled exactly when the sidebar disables it.
+    pub available: bool,
+    /// Why it cannot, in the shell's own words, exactly as
+    /// [`WorkspaceRowView::reason`] carries them for that same folder: the
+    /// sidebar's "this folder no longer exists" line for a folder that is gone,
+    /// and its other refusal for a path that is not a folder. `None` while the
+    /// folder is available, which is when there is nothing to warn about.
+    pub reason: Option<String>,
+    /// How many sessions the sidebar's tree holds for this workspace, folded
+    /// away or not.
+    pub chat_count: u32,
+    /// The most recent session's timestamp, in epoch milliseconds: what the
+    /// screen turns into `hace 21 min`, `None` for a workspace with no chat.
+    ///
+    /// An `f64` rather than the session's `u64` because the generated bindings
+    /// refuse a 64-bit integer on the wire - a `number` could lose precision -
+    /// and every real millisecond count is exact in a double (the same rule
+    /// [`ThinkingItemView::duration_ms`] follows).
+    pub last_activity_ms: Option<f64>,
+}
+
+/// One recent chat of the last workspace (welcome-screen R4): a row of the
+/// sidebar, with the id that opens it and the age the screen words itself.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+pub struct WelcomeChat {
+    /// Exactly the string [`UiIntent::OpenChat`] takes back: the RAW session
+    /// file path, never the id `gentle_app::ChatId` builds from it (the intent
+    /// prefixes it once).
+    pub chat_id: String,
+    /// The session's stored title, whole: the name the sidebar row beside it
+    /// draws for the same session, uncut here because this column is wider - the
+    /// page ellipsizes it for the width it really has, so a long name keeps the
+    /// room it is given instead of the truncation a narrow sidebar row makes.
+    pub title: String,
+    /// When the session was last written, in epoch milliseconds: the same value
+    /// a chat row's `modified_ago` is worded from, carried as the number so the
+    /// screen can measure it against the clock it holds.
+    ///
+    /// An `f64` for the same reason [`WelcomeWorkspace::last_activity_ms`] is:
+    /// the generated bindings refuse a 64-bit integer on the wire, and a real
+    /// millisecond count is exact in a double.
+    pub modified_ms: f64,
+}
+
+/// One other configured workspace, as the quiet link under the recents
+/// (welcome-screen T1): the folder, the label the sidebar draws for it, and
+/// whether a new chat can start there right now.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub struct WelcomeLink {
+    /// The canonical spelling of the folder, as [`UiIntent::NewChatInWorkspace`]
+    /// takes it back.
+    pub path: String,
+    /// The label the sidebar row draws.
+    pub label: String,
+    /// Whether new chats can start in this folder right now: the very
+    /// `available` a sidebar workspace row carries
+    /// ([`WorkspaceRowView::available`]), from the same probe. `false` is a
+    /// folder that is gone and a path that holds something else instead, and a
+    /// link that is not available must not offer a new chat: the intent alone
+    /// would not refuse it.
+    pub available: bool,
+}
+
 /// The state the current views render: the foreground chat (as the app names
 /// it, the id the sidebar passes back) with its thread, the notices, the
 /// per-chat activity the list rows show, and the session list as a status plus
@@ -1828,6 +1946,15 @@ pub struct ViewState {
     /// never the manifest's. `None` for a run that never named one, so the section
     /// says it does not know instead of guessing.
     pub app_version: Option<String>,
+    /// View A's data (welcome-screen T1, S1, S3, R3, R4): the workspace the user
+    /// worked in last, its recent chats and the other configured workspaces.
+    ///
+    /// `Some` ONLY while no chat is in the foreground, which is the one state
+    /// that draws the welcome at all: with a chat on screen the field costs
+    /// nothing and the web side draws none of it. It is never `None` for a
+    /// missing workspace or an empty list - those are cases of the view itself
+    /// ([`WelcomeView::last`]), not an absent screen.
+    pub welcome: Option<WelcomeView>,
 }
 
 /// The state slice after each dispatch, emitted to the web side (typed

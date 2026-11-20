@@ -180,7 +180,10 @@ impl ChatExecutor for RuntimeExecutor {
             return refuse(self.holder.language(), command);
         }
         let folder = match &command {
-            ChatCommand::OpenProcess { chat } => self.folders.take(chat),
+            // The folder waits until this open runs, which for a new chat is its
+            // composer's own ask and never the click that allocated it
+            // (welcome-screen T4, R2).
+            ChatCommand::OpenProcess { chat } => self.folders.take(chat.as_str()),
             ChatCommand::Send { .. }
             | ChatCommand::CloseProcess { .. }
             | ChatCommand::StopHelper { .. }

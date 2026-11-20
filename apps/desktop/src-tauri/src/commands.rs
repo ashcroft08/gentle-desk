@@ -46,6 +46,7 @@ use crate::settings::{
     self, Changed, Dirs, FileRead, ProviderProbe, SettingsSeams, SettingsWatch, VersionProbe,
     WebGet,
 };
+use crate::settings_snapshot::{self, Reads, SettingsConfig, SettingsSnapshot};
 use crate::shell_install::{CommandInstaller, Installer};
 use crate::theme::SystemWindowTheme;
 use crate::window::{self, SystemWindowRecorder};
@@ -621,19 +622,20 @@ impl Bridge {
             return Ok(self.holder.view());
         }
         // The folder of a chat that starts in a workspace travels BESIDE the
-        // command: the reducer names the chat and `crates/app` carries no folder
-        // at all (S2). A blank path names none, so nothing is opened for it.
+        // state: the reducer names the chat and `crates/app` carries no folder
+        // at all (S2). A blank path names none, so nothing is opened for it, and
+        // the chat it belongs to is the one the answered slice names - a new chat
+        // asks for no child until its composer does (welcome-screen T4, R2), so
+        // the folder waits for that ask.
         let folder = match &intent {
             UiIntent::NewChatInWorkspace { path } => Some(path.clone()),
             _ => None,
         };
         let (view, commands) = self.holder.dispatch_commands(intent);
-        emit_view(&emit, &view)?;
         if let Some(folder) = folder {
-            // Before the first command runs on its thread: the executor takes it
-            // from here, once.
-            workspace::remember_folder(&self.folders, &commands, &folder);
+            workspace::remember_folder(&self.folders, view.foreground_chat.as_deref(), &folder);
         }
+        emit_view(&emit, &view)?;
         self.run_chat_commands(commands);
         Ok(view)
     }
@@ -840,6 +842,47 @@ impl Bridge {
     pub fn start_updates(&self, desk_endpoint: Option<&str>) {
         *lock(&self.desk_endpoint) = desk_endpoint.map(str::to_owned);
         self.run_update_check(self.emitter());
+    }
+
+    /// The Settings dialog's one read (settings-snapshot): every page's data
+    /// in one object, gathered once per open and never on the window's thread.
+    ///
+    /// The reads are the three the panes used to run on their own - the auth
+    /// store and its per-provider check, the usage sources' one run, and the
+    /// update check - plus the half of the slice this run already holds, which
+    /// costs nothing. Every seam is cloned out BEFORE the load starts, so no
+    /// lock is held while a file, a process or a socket is read, and the reads
+    /// themselves run on a blocking worker, so the window keeps drawing.
+    ///
+    /// A refusal is only the load's own: a read that fails says why in its own
+    /// section ([`SettingsSnapshot`] carries each one's status) and leaves the
+    /// rest of the object whole.
+    pub async fn settings_snapshot(&self) -> Result<SettingsSnapshot, String> {
+        self.accepting_work()?;
+        let view = self.holder.view();
+        let reads = Reads {
+            files: Arc::clone(&self.settings.files),
+            auth: self.settings.paths.auth.clone(),
+            agent: self.settings.paths.agent.clone(),
+            probe: Arc::clone(&self.settings.probe),
+            versions: Arc::clone(&self.settings.versions),
+            web: Arc::clone(&self.settings.web),
+            node: Arc::clone(&self.settings.node),
+            desk_version: view.app_version.clone(),
+            desk_manifest: lock(&self.desk_endpoint).clone(),
+            language: self.holder.language(),
+        };
+        let config = SettingsConfig {
+            theme: view.theme,
+            language: view.language,
+            shell: view.shell,
+            app_version: view.app_version,
+            open_chats: view.open_chats,
+            config_notice: view.config_notice,
+        };
+        tauri::async_runtime::spawn_blocking(move || settings_snapshot::gather(config, &reads))
+            .await
+            .map_err(|error| format!("the settings snapshot could not run: {error}"))
     }
 
     /// The Usage pane's read: where the shell's own usage sources stand, and -
@@ -1324,6 +1367,22 @@ pub fn store_last_run_version(
     _app: AppHandle<tauri::Wry>,
 ) -> Result<ViewState, String> {
     bridge.inner().store_last_run_version()
+}
+
+/// The Settings dialog's one read (settings-snapshot): every page's data in
+/// one plain object, asked once when the dialog opens.
+///
+/// It takes no argument and needs no window: the gather's seams and the half of
+/// the slice it carries all come from the bridge, and the answer is the same
+/// shape the web side draws. Nothing of a chat travels through it (a chat's
+/// profiles, session mode and images are read through that chat's own child), so
+/// opening Settings never waits on a child and never starts one.
+#[tauri::command]
+#[specta::specta]
+pub async fn settings_snapshot(
+    bridge: tauri::State<'_, Bridge>,
+) -> Result<SettingsSnapshot, String> {
+    bridge.inner().settings_snapshot().await
 }
 
 #[cfg(test)]

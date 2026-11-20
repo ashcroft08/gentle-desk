@@ -11,7 +11,6 @@ use workspace_seam::{folder, holder_at, wait_for, FakePicker};
 
 use std::path::PathBuf;
 
-use gentle_app::ChatCommand;
 use gentle_desk_lib::contract::SessionTreeRow;
 use gentle_desk_lib::pending::PendingFolders;
 use gentle_desk_lib::sessions::window::MAX_WINDOW;
@@ -56,19 +55,22 @@ fn a_picked_folder_is_added_and_a_new_chat_opens_there() {
 
     let action = workspace_add::add_existing(&holder, &FakePicker::picking(&repo), &folders);
 
-    // S7: the workspace is added AND a new chat opens in it.
-    let [ChatCommand::OpenProcess { chat }] = action.commands.as_slice() else {
-        panic!("expected exactly one open, got {:?}", action.commands);
-    };
-    assert_eq!(
-        action.view.foreground_chat.as_deref(),
-        Some(chat.as_str()),
-        "the new chat is the foreground one"
+    // S7: the workspace is added AND a new chat is opened in it - allocated, not
+    // started: its process waits for the composer (welcome-screen T4, R2).
+    assert!(
+        action.commands.is_empty(),
+        "the allocation asks for no child, got {:?}",
+        action.commands
     );
+    let chat = action
+        .view
+        .foreground_chat
+        .clone()
+        .expect("the new chat is the foreground one");
     assert_eq!(
-        folders.take(chat),
+        folders.take(&chat),
         Some(PathBuf::from(&repo)),
-        "the open starts in the folder that was added"
+        "the open its composer asks for starts in the folder that was added"
     );
     assert!(folders.is_empty());
     assert!(
@@ -123,11 +125,13 @@ fn a_known_folder_is_added_once_and_still_opens_a_chat() {
         repo,
         "the config keeps the canonical spelling"
     );
-    let [ChatCommand::OpenProcess { chat }] = action.commands.as_slice() else {
-        panic!("expected exactly one open, got {:?}", action.commands);
-    };
+    let chat = action
+        .view
+        .foreground_chat
+        .clone()
+        .expect("the new chat is the foreground one");
     assert_eq!(
-        folders.take(chat),
+        folders.take(&chat),
         Some(PathBuf::from(&repo)),
         "the open takes the canonical spelling"
     );

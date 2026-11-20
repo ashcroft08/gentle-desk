@@ -84,6 +84,9 @@ export function viewState(overrides: Partial<ViewState_Serialize> = {}): ViewSta
     whats_new: null,
     // A run whose bridge named no version: the About section says so (S5).
     app_version: null,
+    // No chat is in the foreground in a test's default slice, but view A's data
+    // is the state's own (welcome-screen T1): a test that draws it sets it.
+    welcome: null,
     ...overrides,
   }
 }

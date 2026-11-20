@@ -35,18 +35,14 @@ function auth(over: Partial<AuthView> = {}): AuthView {
   }
 }
 
-function draw(view: AuthView | null = auth()): HTMLElement {
-  const { container } = render(AccountPane, { props: { auth: view } })
+/** One ask for the dialog's load, as the pane sends it. */
+function ask(): () => void {
+  return vi.fn()
+}
+
+function draw(view: AuthView | null = auth(), onRefresh: () => void = ask()): HTMLElement {
+  const { container } = render(AccountPane, { props: { auth: view, onRefresh } })
   return container as HTMLElement
-}
-
-function intents(): unknown[] {
-  return handlerArgs('dispatch_intent').map((args) => args.intent)
-}
-
-/** How many checks the pane asked for. */
-function checks(): number {
-  return intents().filter((intent) => (intent as { type: string }).type === 'RefreshAuth').length
 }
 
 describe('the Account pane', () => {
@@ -84,26 +80,29 @@ describe('the Account pane', () => {
     ).toBeTruthy()
   })
 
-  it('checks again when the user asks', async () => {
-    const pane = draw()
+  it('asks for one load when the user checks again', async () => {
+    const again = ask()
+    const pane = draw(auth(), again)
 
-    // The pane reads once on open, so the click is one more check, not the first.
-    const before = checks()
     await fireEvent.click(within(pane).getByRole('button', { name: copy.checkAgain }))
-    expect(checks()).toBe(before + 1)
+
+    expect(again).toHaveBeenCalledTimes(1)
+    // Not an intent: the one read path of the dialog is its load
+    // (settings-snapshot).
+    expect(handlerArgs('dispatch_intent')).toEqual([])
   })
 
-  it('checks when the pane opens and again when the desk is focused', async () => {
-    draw()
+  it('reads nothing when it appears, and asks for a load when the desk is focused', async () => {
+    const again = ask()
+    draw(auth(), again)
 
-    // Opened: one check, which is why the quiet "Reading..." is not forever.
-    await vi.waitFor(() => expect(intents()).toEqual([{ type: 'RefreshAuth' }]))
+    // Appearing costs nothing: the dialog's one load already answered for this
+    // pane, so the quiet "Reading..." is not what makes it fill in.
+    expect(again).not.toHaveBeenCalled()
 
-    // The terminal window closes and the desk takes the focus back: one more.
+    // The terminal window closes and the desk takes the focus back: one ask.
     window.dispatchEvent(new Event('focus'))
-    await vi.waitFor(() =>
-      expect(intents()).toEqual([{ type: 'RefreshAuth' }, { type: 'RefreshAuth' }]),
-    )
+    await vi.waitFor(() => expect(again).toHaveBeenCalledTimes(1))
   })
 
   // `pi auth login|logout` need a provider the desk does not have, so signing in

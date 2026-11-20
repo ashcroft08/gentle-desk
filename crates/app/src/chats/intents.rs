@@ -21,7 +21,8 @@ use crate::state::{push_user_message, AppState, ModelsStatus, NoticeLevel};
 pub(crate) fn apply(state: &mut AppState, intent: &Intent) -> Option<Effects> {
     match intent {
         Intent::OpenChat(chat) => Some(for_chat(open(state, chat.clone()))),
-        Intent::OpenNewChat => Some(for_chat(open(state, ChatId::fresh()))),
+        Intent::OpenNewChat => Some(for_chat(allocate(state, ChatId::fresh()))),
+        Intent::EnsureStarted(chat) => Some(for_chat(ensure_started(state, chat))),
         Intent::RestartChat(chat) => Some(for_chat(open(state, chat.clone()))),
         Intent::CloseChat(chat) => Some(for_chat(close_chat(state, chat))),
         Intent::SendPrompt(text) => send_prompt(state, text).map(for_chat),
@@ -143,6 +144,22 @@ fn for_shell(commands: Vec<Command>) -> Effects {
     }
 }
 
+/// Everything an open does to the chat ITSELF, and nothing about its child: it
+/// becomes the foreground one (which clears the death and the stderr an old
+/// child left), the helper panel's selection goes - a selection never names a
+/// task of a chat the user left - and the chip's data is forgotten, because it
+/// belongs to the previous chat's child.
+fn present(state: &mut AppState, chat: &ChatId) {
+    drop_restart_notice(state, chat);
+    state.chats.open(chat.clone());
+    state.selected_helper = None;
+    state.models = Vec::new();
+    state.models_status = ModelsStatus::Unknown;
+    state.model = None;
+    state.thinking_level = None;
+    state.thinking_levels = Vec::new();
+}
+
 /// Makes `chat` the foreground one and asks the host for its child. A chat that
 /// already has a live child is only focused by the host, so this never sends
 /// `switch_session` or `new_session`: the session travels on the command line.
@@ -155,20 +172,41 @@ fn for_shell(commands: Vec<Command>) -> Effects {
 /// and a failed start through `Input::ChatFailed`; an already-live child is
 /// confirmed at once. So the state never sticks.
 fn open(state: &mut AppState, chat: ChatId) -> Vec<ChatCommand> {
-    drop_restart_notice(state, &chat);
-    state.chats.open(chat.clone());
-    state.chats.mark_opening(&chat);
-    // The helper the panel had open was that chat's: another chat is on screen
-    // now, and a selection never names a task of a chat the user left.
-    state.selected_helper = None;
-    // The chip's data belongs to the previous chat's child; the new one
-    // answers `get_state` / `get_available_models` when it opens.
-    state.models = Vec::new();
-    state.models_status = ModelsStatus::Unknown;
-    state.model = None;
-    state.thinking_level = None;
-    state.thinking_levels = Vec::new();
+    present(state, &chat);
+    // The ask is made here, so this chat's one start is behind it.
+    state.chats.mark_started(&chat);
     vec![ChatCommand::OpenProcess { chat }]
+}
+
+/// Allocates a NEW chat and asks for NO child (welcome-screen T4, R2): the chat
+/// is the foreground one, and it is [`ChatActivity::Opening`] from here on - so
+/// its composer keeps the state and the reason it has today, and an Enter in it
+/// sends nothing while the draft stays where it is - but the process itself
+/// starts on the composer's own ask ([`Intent::EnsureStarted`]). Opening a chat
+/// at launch therefore costs no child at all, and the seconds it takes to come
+/// up are spent when the user looks at the box, never while the app starts.
+fn allocate(state: &mut AppState, chat: ChatId) -> Vec<ChatCommand> {
+    present(state, &chat);
+    state.chats.mark_opening(&chat);
+    Vec::new()
+}
+
+/// Starts `chat`'s child if it was never asked for, and answers nothing at all
+/// when it was (welcome-screen T4, R2).
+///
+/// This is the composer's own ask - the first time its box is focused for that
+/// chat, or the first key that lands in it - and it is idempotent by the state:
+/// a chat the app started already (Opening, working, queued, idle or ended)
+/// sends no command and changes nothing, so the focus and the first keystroke of
+/// one box can never start two children. The chat is NOT made the foreground one
+/// here: it is the chat the composer belongs to, and moving the foreground is the
+/// open's own act, never a side effect of a keystroke.
+fn ensure_started(state: &mut AppState, chat: &ChatId) -> Vec<ChatCommand> {
+    if state.chats.is_started(chat) {
+        return Vec::new();
+    }
+    state.chats.mark_started(chat);
+    vec![ChatCommand::OpenProcess { chat: chat.clone() }]
 }
 
 /// Closes `chat` (0.1.14): its child is stopped and the chat leaves the open

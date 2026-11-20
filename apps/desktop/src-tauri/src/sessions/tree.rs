@@ -8,13 +8,18 @@
 //! FLATTENS that list into rows: one header row per workspace, then - only when
 //! the workspace is not collapsed - one row per chat of it.
 //!
+//! The list itself and the sessions it was built from are kept: the welcome
+//! view (welcome-screen T1) reads the same grouping at the same revision, so the
+//! screen the app shows when no chat is open names exactly the workspaces and
+//! chats the sidebar does.
+//!
 //! Whether the folder of a workspace still exists is NOT part of the tree: it
 //! touches the file system, so it is asked per served page and only for the
 //! headers that page holds (`sessions::window`).
 
 use gentle_app::SessionItem;
 use gentle_runtime::app_config::AppConfig;
-use gentle_runtime::workspaces::{self, Workspace};
+use gentle_runtime::workspaces::{self, Workspace, WorkspaceList};
 
 /// One row of the flattened tree, by index into [`Tree`]'s own lists.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -50,12 +55,21 @@ impl Header {
 }
 
 /// The flattened tree of one revision: the rows in the order the sidebar draws
-/// them, and the chats they point at.
+/// them, the chats they point at, and the two inputs those came from.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Tree {
     revision: u32,
+    /// The workspaces of this revision, exactly as the runtime grouped, named
+    /// and ordered them: what the rows below were flattened from, and what the
+    /// welcome view reads instead of grouping the list a second time.
+    workspaces: WorkspaceList,
+    /// The session list this tree was built from. A chat row points into it, and
+    /// so does every [`Workspace::sessions`] index, so one session is one item
+    /// however it is reached.
+    sessions: Vec<SessionItem>,
     headers: Vec<Header>,
-    chats: Vec<SessionItem>,
+    /// Indices into [`Tree::sessions`], in the order the rows draw them.
+    chats: Vec<usize>,
     rows: Vec<Row>,
 }
 
@@ -64,7 +78,7 @@ impl Tree {
     pub fn build(revision: u32, config: &AppConfig, sessions: &[SessionItem]) -> Self {
         let list = workspaces::build(config, sessions);
         let mut headers: Vec<Header> = Vec::new();
-        let mut chats: Vec<SessionItem> = Vec::new();
+        let mut chats: Vec<usize> = Vec::new();
         let mut rows: Vec<Row> = Vec::new();
         for workspace in &list.workspaces {
             headers.push(Header::of(workspace));
@@ -74,15 +88,17 @@ impl Tree {
                 continue;
             }
             for index in &workspace.sessions {
-                let Some(session) = sessions.get(*index) else {
+                if sessions.get(*index).is_none() {
                     continue;
-                };
-                chats.push(session.clone());
+                }
+                chats.push(*index);
                 rows.push(Row::Chat(index_of(chats.len())));
             }
         }
         Self {
             revision,
+            workspaces: list,
+            sessions: sessions.to_vec(),
             headers,
             chats,
             rows,
@@ -118,7 +134,20 @@ impl Tree {
     }
 
     pub fn chat(&self, index: u32) -> Option<&SessionItem> {
-        self.chats.get(index as usize)
+        self.sessions.get(*self.chats.get(index as usize)?)
+    }
+
+    /// The workspaces of this revision, as the sidebar groups them (the runtime's
+    /// list): the welcome view reads this grouping rather than a second one
+    /// (welcome-screen T1).
+    pub fn workspaces(&self) -> &WorkspaceList {
+        &self.workspaces
+    }
+
+    /// The session list this tree was built from: the slice every
+    /// [`Workspace::sessions`] index points into.
+    pub fn sessions(&self) -> &[SessionItem] {
+        &self.sessions
     }
 
     /// Whether a workspace of this tree is the folder `key` names

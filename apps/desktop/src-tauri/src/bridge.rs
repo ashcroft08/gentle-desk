@@ -65,6 +65,7 @@ mod settings;
 mod shell;
 mod theme;
 mod transcript;
+mod welcome;
 mod whats_new;
 
 /// What runs one shared command the reducer asked for. `Command::RefreshSessions`
@@ -264,8 +265,16 @@ impl AppStateHolder {
 
     /// Records the folder the workspace handed a NEW chat (composer-dock L12):
     /// the hint is what its folder chip names until its own session row exists,
-    /// and answers `true` when at least one open took it.
-    fn note_folder_hints(&self, folder: &str, commands: &[gentle_app::ChatCommand]) -> bool {
+    /// and answers `true` when the chat the answered slice names took it.
+    ///
+    /// The chat is the SLICE's foreground one and no longer a command: since
+    /// welcome-screen T4 (R2) a new chat asks for no child when it is allocated,
+    /// so the fold that opens it answers no `OpenProcess` to read the chat off,
+    /// and the slice it answers is where that chat is named.
+    fn note_folder_hint(&self, folder: &str, chat: Option<&str>) -> bool {
+        let Some(chat) = chat else {
+            return false;
+        };
         let name = folder
             .rsplit(['\\', '/'])
             .find(|segment| !segment.is_empty())
@@ -275,15 +284,8 @@ impl AppStateHolder {
             name,
             path: folder.to_owned(),
         };
-        let mut hints = lock(&self.folder_hints);
-        let mut any = false;
-        for command in commands {
-            if let gentle_app::ChatCommand::OpenProcess { chat } = command {
-                hints.insert(chat.as_str().to_owned(), view.clone());
-                any = true;
-            }
-        }
-        any
+        lock(&self.folder_hints).insert(chat.to_owned(), view);
+        true
     }
 
     /// The folder hint the FOREGROUND chat carries, `None` when it has none:
@@ -506,7 +508,7 @@ impl AppStateHolder {
                 // A NEW chat in a workspace lives in that folder from the start
                 // (composer-dock L12): the hint is what its folder chip names
                 // until its own session row exists, and what the branch is read
-                // from. Recorded only for the chats the fold opens, never one
+                // from. Recorded only for the chat the fold opens, never one
                 // more.
                 let hint = match (&intent, &reduced) {
                     (UiIntent::NewChatInWorkspace { path }, gentle_app::Intent::OpenNewChat)
@@ -517,7 +519,9 @@ impl AppStateHolder {
                     _ => None,
                 };
                 let answer = self.apply(gentle_app::Input::Intent(reduced));
-                let hinted = hint.map(|folder| self.note_folder_hints(&folder, &answer.1));
+                let hinted = hint.map(|folder| {
+                    self.note_folder_hint(&folder, answer.0.foreground_chat.as_deref())
+                });
                 // Opening a stored chat paints its thread from its session file
                 // while its child starts (chat-open-latency T1): the read is
                 // claimed here and run on a worker, because this path is
@@ -790,7 +794,31 @@ impl AppStateHolder {
             updates: self.updates(),
             usage: self.usage(),
             images: &self.images,
+            welcome: self.welcome_view(),
         }
+    }
+
+    /// View A's data (welcome-screen T1, S1, S3, R3, R4): the last workspace, its
+    /// recent chats and the other configured workspaces, read from the config and
+    /// the tree of the revision the holder is at.
+    ///
+    /// No pass over the session list runs here: the grouping is the one the tree
+    /// already cached for this revision (welcome-screen T1), so a push pays the
+    /// workspaces of the config and three chat rows, never 50 000 sessions. The
+    /// one thing it asks the disk is whether the last workspace's folder is still
+    /// there - the same probe a served page runs for its headers, asked for ONE
+    /// folder - and it asks it with no lock held: the config, the tree and the
+    /// language are snapshots read before it.
+    fn welcome_view(&self) -> crate::contract::WelcomeView {
+        let config = self.config_snapshot();
+        let tree = self.tree();
+        let language = config.config.language.unwrap_or(Language::En);
+        welcome::welcome(
+            &config.config,
+            tree.workspaces(),
+            tree.sessions(),
+            &|path| folder_status(path, language),
+        )
     }
 
     /// Runs the shared commands of one fold through the sink, if any.

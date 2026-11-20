@@ -15,7 +15,7 @@ use std::sync::{Arc, Barrier};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use gentle_app::{ChatCommand, Input};
+use gentle_app::Input;
 use gentle_core::i18n::Language;
 use gentle_desk_lib::bridge::AppStateHolder;
 use gentle_desk_lib::config::{ConfigSnapshot, ConfigWriter};
@@ -49,39 +49,71 @@ fn a_new_chat_in_a_workspace_opens_a_new_chat_and_holds_its_folder() {
     let (view, commands) =
         holder.dispatch_commands(UiIntent::NewChatInWorkspace { path: repo.clone() });
 
-    // The new chat of the per-chat model, never the legacy single-child `NewChat`.
-    let [ChatCommand::OpenProcess { chat }] = commands.as_slice() else {
-        panic!("expected exactly one open, got {commands:?}");
-    };
+    // The new chat of the per-chat model, never the legacy single-child `NewChat`,
+    // and NO child yet: its process starts on the composer's own ask
+    // (welcome-screen T4, R2).
     assert!(
-        chat.as_str().starts_with("new-"),
-        "a chat that did not exist before, got {}",
-        chat.as_str()
+        commands.is_empty(),
+        "the allocation asks for no child, got {commands:?}"
     );
-    assert_eq!(
-        view.foreground_chat.as_deref(),
-        Some(chat.as_str()),
-        "the new chat is the foreground one"
+    let chat = view
+        .foreground_chat
+        .clone()
+        .expect("the new chat is the foreground one");
+    assert!(
+        chat.starts_with("new-"),
+        "a chat that did not exist before, got {chat}"
     );
     assert_eq!(
         view.activity,
         vec![ChatActivityView {
-            chat_id: chat.as_str().to_owned(),
+            chat_id: chat.clone(),
             activity: ChatActivityMark::Opening,
         }]
     );
 
-    // What the intent path does before the command runs: the folder waits for
-    // exactly the chat the reducer allocated.
-    workspace::remember_folder(&folders, &commands, &repo);
+    // What the intent path does with the chat the slice named: the folder waits
+    // for the open its composer asks for.
+    workspace::remember_folder(&folders, Some(&chat), &repo);
 
     assert_eq!(
-        folders.take(chat),
+        folders.take(&chat),
         Some(PathBuf::from(&repo)),
         "the open takes the folder the workspace named"
     );
-    assert_eq!(folders.take(chat), None, "a folder is taken once");
+    assert_eq!(folders.take(&chat), None, "a folder is taken once");
     assert!(folders.is_empty(), "no entry waits after its open took it");
+}
+
+#[test]
+fn the_workspace_folder_waits_for_the_composer_that_starts_the_child() {
+    // R2: the folder is remembered when the chat is allocated and taken when its
+    // child is asked for, which are two different moments now. A push in between
+    // - anything the window draws while the user types - must not lose it.
+    let dir = tempfile::tempdir().unwrap();
+    let repo = folder(dir.path(), "repo");
+    let holder = AppStateHolder::default();
+    let folders = PendingFolders::default();
+
+    let (view, _) = holder.dispatch_commands(UiIntent::NewChatInWorkspace { path: repo.clone() });
+    let chat = view.foreground_chat.clone().expect("a foreground chat");
+    workspace::remember_folder(&folders, view.foreground_chat.as_deref(), &repo);
+
+    // The user types: the composer's first key asks for the child, and one more
+    // push carries the same chat.
+    let (opening, commands) = holder.dispatch_commands(UiIntent::EnsureStarted {
+        chat_id: chat.clone(),
+    });
+    assert_eq!(commands.len(), 1, "the ask is the open");
+    assert_eq!(commands[0].chat().as_str(), chat);
+    assert_eq!(opening.foreground_chat.as_deref(), Some(chat.as_str()));
+
+    assert_eq!(
+        folders.take(&chat),
+        Some(PathBuf::from(&repo)),
+        "the open a keystroke asked for is the one that takes the folder"
+    );
+    assert!(folders.is_empty());
 }
 
 #[test]
@@ -92,32 +124,28 @@ fn an_open_of_another_chat_finds_no_folder_left_behind() {
     let holder = AppStateHolder::default();
     let folders = PendingFolders::default();
 
-    let (_, commands) = holder.dispatch_commands(UiIntent::NewChatInWorkspace {
+    let (view, _) = holder.dispatch_commands(UiIntent::NewChatInWorkspace {
         path: first.clone(),
     });
-    let [ChatCommand::OpenProcess { chat }] = commands.as_slice() else {
-        panic!("expected exactly one open, got {commands:?}");
-    };
-    workspace::remember_folder(&folders, &commands, &first);
+    let chat = view.foreground_chat.clone().expect("a foreground chat");
+    workspace::remember_folder(&folders, Some(&chat), &first);
     // The first chat's open runs here.
-    assert_eq!(folders.take(chat), Some(PathBuf::from(&first)));
+    assert_eq!(folders.take(&chat), Some(PathBuf::from(&first)));
 
-    let (_, commands) = holder.dispatch_commands(UiIntent::NewChatInWorkspace {
+    let (view, _) = holder.dispatch_commands(UiIntent::NewChatInWorkspace {
         path: second.clone(),
     });
-    let [ChatCommand::OpenProcess { chat: next }] = commands.as_slice() else {
-        panic!("expected exactly one open, got {commands:?}");
-    };
-    workspace::remember_folder(&folders, &commands, &second);
+    let next = view.foreground_chat.clone().expect("a foreground chat");
+    workspace::remember_folder(&folders, Some(&next), &second);
 
     assert_ne!(next, chat, "a second workspace opens a chat of its own");
     assert_eq!(
-        folders.take(next),
+        folders.take(&next),
         Some(PathBuf::from(&second)),
         "the second chat takes its own folder"
     );
     assert_eq!(
-        folders.take(chat),
+        folders.take(&chat),
         None,
         "the first chat's folder was consumed by its own open"
     );
@@ -125,18 +153,19 @@ fn an_open_of_another_chat_finds_no_folder_left_behind() {
 
 #[test]
 fn the_plain_new_chat_names_no_folder() {
-    // PRESERVE: `OpenNewChat` is unchanged by this slice - it starts the same new
-    // chat and names no folder, so the child inherits this process's folder.
+    // `OpenNewChat` names no folder, so the child it starts on the composer's ask
+    // inherits this process's folder.
     let holder = AppStateHolder::default();
     let folders = PendingFolders::default();
 
     let (view, commands) = holder.dispatch_commands(UiIntent::OpenNewChat);
 
-    let [ChatCommand::OpenProcess { chat }] = commands.as_slice() else {
-        panic!("expected exactly one open, got {commands:?}");
-    };
-    assert_eq!(view.foreground_chat.as_deref(), Some(chat.as_str()));
-    assert_eq!(folders.take(chat), None, "no intent named a folder for it");
+    assert!(
+        commands.is_empty(),
+        "a new chat asks for no child until its composer does, got {commands:?}"
+    );
+    let chat = view.foreground_chat.clone().expect("a foreground chat");
+    assert_eq!(folders.take(&chat), None, "no intent named a folder for it");
 }
 
 #[test]

@@ -84,6 +84,73 @@ fn open_chat_asks_for_one_open_process_and_the_next_state_shows_it_opening() {
 }
 
 #[test]
+fn a_new_chat_starts_its_child_on_the_composers_ask_and_only_once() {
+    // welcome-screen T4 (R2): the click allocates the chat and starts nothing, so
+    // the window carries no process it does not need. The first ask - the box
+    // focused, or the first key typed in it - is what asks the host, and every
+    // later ask for the same chat is answered with nothing at all.
+    let holder = AppStateHolder::default();
+    let fake = Fake::answering(Answer::Started);
+
+    let (allocated, commands) = holder.dispatch_commands(UiIntent::OpenNewChat);
+    let chat = allocated
+        .foreground_chat
+        .clone()
+        .expect("a new chat is the foreground one");
+    assert!(
+        commands.is_empty(),
+        "the click starts no child, got {commands:?}"
+    );
+    assert_eq!(
+        allocated.activity,
+        vec![ChatActivityView {
+            chat_id: chat.clone(),
+            activity: ChatActivityMark::Opening,
+        }],
+        "and the chat the composer draws is Opening, with today's reason"
+    );
+
+    let (opening, commands) = holder.dispatch_commands(UiIntent::EnsureStarted {
+        chat_id: chat.clone(),
+    });
+    assert_eq!(commands.len(), 1, "the composer's ask is one open");
+    assert!(
+        matches!(&commands[0], ChatCommand::OpenProcess { chat: opened } if opened.as_str() == chat),
+        "for the chat the slice named, got {:?}",
+        commands[0]
+    );
+    assert_eq!(
+        opening.activity[0].activity,
+        ChatActivityMark::Opening,
+        "nothing is usable until the child answers"
+    );
+
+    // A second ask while the child comes up, and a third once it is up, both
+    // answer nothing: this chat's one start is behind it.
+    let (_, again) = holder.dispatch_commands(UiIntent::EnsureStarted {
+        chat_id: chat.clone(),
+    });
+    assert!(again.is_empty(), "no second child, got {again:?}");
+
+    let chat_id = commands[0].chat().clone();
+    let ran = effects::run_one(commands[0].clone(), &fake);
+    assert_eq!(
+        ran.confirm_after,
+        Some(chat_id.clone()),
+        "a fresh child's phase ends with its own first event, and the net covers one that never speaks"
+    );
+    let after = holder.fold_input(Input::ChatOpened { chat: chat_id });
+    assert!(after.activity.is_empty(), "the confirmed chat is idle");
+    let (_, later) = holder.dispatch_commands(UiIntent::EnsureStarted {
+        chat_id: chat.clone(),
+    });
+    assert!(
+        later.is_empty(),
+        "a chat whose child is up is not started twice, got {later:?}"
+    );
+}
+
+#[test]
 fn an_already_live_chat_is_confirmed_at_once() {
     let holder = AppStateHolder::default();
     let fake = Fake::answering(Answer::Existing);

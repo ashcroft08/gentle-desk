@@ -28,7 +28,10 @@
 //   (S4): they belong to the run too, so they are read whatever chat is open;
 // - that chat's profile view, which the Profile tab draws (profiles-editor T2c):
 //   Rust projects it only while its chat is the foreground one, and the tab reads
-//   it fresh when it opens (L13).
+//   it fresh when it opens (L13);
+// - view A's data, which the welcome screen draws (welcome-screen T2): Rust sends
+//   it ONLY while no chat is in the foreground, so it is carried as it arrives and
+//   compared by value - every push rebuilds it, a text delta included.
 //
 // No chat open draws no chat chrome at all: a push that carries a title, a
 // notice or a dialog for a chat that is already gone must not leave a header
@@ -49,6 +52,7 @@ import type {
   SessionModeView_Serialize as SessionModeView,
   ShellView_Serialize as ShellView,
   ViewState_Serialize as ViewState,
+  WelcomeView_Serialize as WelcomeView,
   WhatsNewView,
 } from '../contract/bindings'
 import { createSessionsStore, type SessionsStore } from '../sessions/store'
@@ -104,6 +108,10 @@ export type ChatViewState = {
   whatsNew: WhatsNewView | null
   /** What the app found about pi and what was chosen; not about any one chat. */
   shell: ShellView
+  /** View A's data (welcome-screen T2): the workspace worked in last, its recent
+   * chats and the other workspaces, or `null` before the first push and while a
+   * chat is in the foreground (Rust sends it only when none is). */
+  welcome: WelcomeView | null
 }
 
 export type ChatView = {
@@ -141,6 +149,8 @@ export function chatOf(view: ViewState | null): ChatViewState {
   const shell = view?.shell ?? NO_SHELL
   // And so are the notes of the version this run follows, which the modal draws.
   const whatsNew = view?.whats_new ?? null
+  // View A's slice travels as it arrives: Rust sends it only while no chat is in
+  // the foreground, which is the one state the welcome screen is drawn in.
   if (chat === null) {
     return {
       chat: null,
@@ -162,6 +172,7 @@ export function chatOf(view: ViewState | null): ChatViewState {
       fatal,
       whatsNew,
       shell,
+      welcome: view?.welcome ?? null,
     }
   }
   return {
@@ -184,6 +195,7 @@ export function chatOf(view: ViewState | null): ChatViewState {
     fatal,
     whatsNew,
     shell,
+    welcome: view?.welcome ?? null,
   }
 }
 
@@ -211,6 +223,15 @@ function sameShell(a: ShellView, b: ShellView): boolean {
 function sameSessionMode(a: SessionModeView | null, b: SessionModeView | null): boolean {
   if (a === null || b === null) return a === b
   return a.mode === b.mode && a.refusal === b.refusal && a.attempt === b.attempt
+}
+
+/**
+ * Whether two pushes say the same about view A (welcome-screen T2). By value,
+ * because Rust builds the slice afresh on every push - a text delta included -
+ * and it is three plain lists: identity would redraw the welcome for every delta.
+ */
+function sameWelcome(a: WelcomeView | null, b: WelcomeView | null): boolean {
+  return a === null || b === null ? a === b : JSON.stringify(a) === JSON.stringify(b)
 }
 
 /**
@@ -248,6 +269,7 @@ export function createChatView(deps: ChatViewDeps = {}): ChatView {
     fatal: null,
     whatsNew: null,
     shell: NO_SHELL,
+    welcome: null,
   }
   const listeners = new Set<(state: ChatViewState) => void>()
 
@@ -278,7 +300,8 @@ export function createChatView(deps: ChatViewDeps = {}): ChatView {
       sameSessionMode(next.sessionMode, state.sessionMode) &&
       next.fatal === state.fatal &&
       next.whatsNew === state.whatsNew &&
-      sameShell(next.shell, state.shell)
+      sameShell(next.shell, state.shell) &&
+      sameWelcome(next.welcome, state.welcome)
     ) {
       return
     }

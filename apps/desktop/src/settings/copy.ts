@@ -23,6 +23,18 @@ export interface SettingsCopy {
   settings: string
   /** The rail's accessible name: the dialog's title already says Settings. */
   railLabel: string
+  /**
+   * The search field's own words (settings-dialog follow-up): the name a screen
+   * reader announces, and the placeholder the empty field draws. Both are the
+   * reference's "Find a setting…", which is what the field DOES - it finds one,
+   * it never changes one.
+   */
+  searchLabel: string
+  searchPlaceholder: string
+  /** The one quiet line when the query leaves no entry in the rail. */
+  noMatches: string
+  /** The name of the theme card grid in the Appearance section. */
+  themeGroup: string
   /** Each section's word, for the rail entry and the pane's heading. */
   titles: Record<Section, string>
   /** Each section's one-line hint, drawn at the top of its pane (L4). */
@@ -51,6 +63,10 @@ const ENGLISH: SettingsCopy = {
   languageGroup: 'App language',
   settings: 'Settings',
   railLabel: 'Settings sections',
+  searchLabel: 'Find a setting',
+  searchPlaceholder: 'Find a setting…',
+  noMatches: 'No settings match.',
+  themeGroup: 'Theme',
   titles: {
     appearance: 'Appearance',
     home: 'Shell home',
@@ -82,6 +98,10 @@ const SPANISH: typeof ENGLISH = {
   languageGroup: 'Idioma de la app',
   settings: 'Ajustes',
   railLabel: 'Secciones de ajustes',
+  searchLabel: 'Buscar un ajuste',
+  searchPlaceholder: 'Buscar un ajuste…',
+  noMatches: 'Ningún ajuste coincide.',
+  themeGroup: 'Tema',
   titles: {
     appearance: 'Apariencia',
     home: 'Home del shell',

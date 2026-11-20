@@ -303,6 +303,39 @@ fn alive(pid: u64) -> bool {
     }
 }
 
+/// Opens a new chat the way the window does (welcome-screen T4, R2): the click
+/// ALLOCATES the chat and starts nothing, and the composer's own ask - its box
+/// focused for that chat, or the first key landing in it - is what starts the
+/// child. Answers the id the slice named the chat with.
+fn open_new_chat(bridge: &Bridge) -> String {
+    let allocated = bridge.dispatch(UiIntent::OpenNewChat);
+    let chat = allocated
+        .foreground_chat
+        .clone()
+        .expect("a new chat is the foreground one");
+    bridge.dispatch(UiIntent::EnsureStarted {
+        chat_id: chat.clone(),
+    });
+    chat
+}
+
+/// Opens a new chat in `folder` the way the window does (welcome-screen T4,
+/// R2): the workspace click ALLOCATES the chat, and the composer's own ask is
+/// what starts its child. Answers the id the slice named the chat with.
+fn open_new_chat_in(bridge: &Bridge, folder: &str) -> String {
+    let allocated = bridge.dispatch(UiIntent::NewChatInWorkspace {
+        path: folder.to_owned(),
+    });
+    let chat = allocated
+        .foreground_chat
+        .clone()
+        .expect("a new chat is the foreground one");
+    bridge.dispatch(UiIntent::EnsureStarted {
+        chat_id: chat.clone(),
+    });
+    chat
+}
+
 /// Whether that child logged its own exit.
 fn exited(log: &Path, pid: u64) -> bool {
     log_lines(log)
@@ -317,11 +350,7 @@ fn an_opened_chat_reaches_the_child_and_its_echo_is_pushed() {
     };
     let bridge = Bridge::runtime_executor();
 
-    let opened = bridge.dispatch(UiIntent::OpenNewChat);
-    let chat = opened
-        .foreground_chat
-        .clone()
-        .expect("a new chat is the foreground one");
+    let chat = open_new_chat(&bridge);
 
     // The opening mark ends with the fresh child's own first event: the reply
     // to the `get_state` the executor asked for right after the start. That
@@ -399,11 +428,7 @@ fn an_error_turn_ends_in_the_state_the_reducer_defines() {
     };
     let bridge = Bridge::runtime_executor();
 
-    let opened = bridge.dispatch(UiIntent::OpenNewChat);
-    let chat = opened
-        .foreground_chat
-        .clone()
-        .expect("a new chat is the foreground one");
+    let chat = open_new_chat(&bridge);
     wait_for("the chat's child to answer its first request", || {
         (bridge.holder.view().activity.is_empty()).then_some(())
     });
@@ -466,7 +491,7 @@ fn an_error_turns_notify_reaches_the_notices_with_its_level() {
     };
     let bridge = Bridge::runtime_executor();
 
-    bridge.dispatch(UiIntent::OpenNewChat);
+    open_new_chat(&bridge);
     wait_for("the chat's child to answer its first request", || {
         (bridge.holder.view().activity.is_empty()).then_some(())
     });
@@ -515,7 +540,7 @@ fn shutting_the_host_down_leaves_no_child_behind() {
     };
     let bridge = Bridge::runtime_executor();
 
-    bridge.dispatch(UiIntent::OpenNewChat);
+    open_new_chat(&bridge);
     let pid = wait_for("the child to log its start", || {
         start_pids(harness.log()).first().copied()
     });
@@ -609,7 +634,7 @@ fn closing_stops_every_child_even_the_one_in_a_turn_that_never_ends() {
 
     // Two chats, so two live children: the first is on a `slow` turn, which
     // streams until an abort and never ends by itself.
-    bridge.dispatch(UiIntent::OpenNewChat);
+    open_new_chat(&bridge);
     wait_for("the first child to log its start", || {
         start_pids(harness.log()).first().copied()
     });
@@ -626,7 +651,7 @@ fn closing_stops_every_child_even_the_one_in_a_turn_that_never_ends() {
     wait_for("the slow turn's prompt to reach its child", || {
         prompt_pid(harness.log(), "slow")
     });
-    bridge.dispatch(UiIntent::OpenNewChat);
+    open_new_chat(&bridge);
     wait_for("the second child to log its start", || {
         (start_pids(harness.log()).len() == 2).then_some(())
     });
@@ -654,7 +679,7 @@ fn the_event_pump_ends_when_it_is_told_to() {
         return;
     };
     let bridge = Bridge::runtime_executor();
-    bridge.dispatch(UiIntent::OpenNewChat);
+    open_new_chat(&bridge);
     wait_for("the child to log its start", || {
         start_pids(harness.log()).first().copied()
     });
@@ -684,13 +709,7 @@ fn a_new_chat_in_a_workspace_runs_its_child_in_that_folder() {
     std::fs::create_dir_all(&repo).expect("the workspace folder is creatable");
     let bridge = Bridge::runtime_executor();
 
-    let opened = bridge.dispatch(UiIntent::NewChatInWorkspace {
-        path: repo.to_string_lossy().into_owned(),
-    });
-    let chat = opened
-        .foreground_chat
-        .clone()
-        .expect("a new chat is the foreground one");
+    let chat = open_new_chat_in(&bridge, &repo.to_string_lossy());
     assert!(chat.starts_with("new-"), "got {chat}");
 
     // The stand-in reports the folder it was started in, and a child only logs
@@ -731,9 +750,7 @@ fn a_workspace_folder_that_is_gone_starts_no_child() {
     let gone = harness.root.join("gone");
     let bridge = Bridge::runtime_executor();
 
-    bridge.dispatch(UiIntent::NewChatInWorkspace {
-        path: gone.to_string_lossy().into_owned(),
-    });
+    open_new_chat_in(&bridge, &gone.to_string_lossy());
 
     // The host's refusal comes back through the failed-open path the reducer
     // already defines: one error notice naming the chat and its reason, and the
@@ -778,7 +795,7 @@ fn an_unresolvable_launcher_is_the_runs_global_banner() {
     std::env::set_var("GENTLE_SHELL_BIN", &missing);
     let bridge = Bridge::runtime_executor();
 
-    bridge.dispatch(UiIntent::OpenNewChat);
+    open_new_chat(&bridge);
 
     let view = wait_for("the failed open to be reported", || {
         last_where(&bridge.pushed, |view| view.fatal.is_some())

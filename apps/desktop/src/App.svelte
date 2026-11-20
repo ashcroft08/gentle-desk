@@ -9,10 +9,10 @@
   // extension dialog as a modal. The Helpers view draws the list or, once a card is
   // selected, that helper's own thread (T7b-2).
   import ChatHeader from './chat/Header.svelte'
+  import ChatPane from './chat/ChatPane.svelte'
   import FatalBanner from './chat/FatalBanner.svelte'
   import type { ViewTab } from './chat/tabs'
   import { createChatView } from './chat/view'
-  import Composer from './composer/Composer.svelte'
   import Dialogs from './dialogs/Dialogs.svelte'
   import HelpersPanel from './helpers/HelpersPanel.svelte'
   import Notices from './notices/Notices.svelte'
@@ -21,7 +21,6 @@
   import Sidebar from './sidebar/Sidebar.svelte'
   import SidebarToggle from './chat/SidebarToggle.svelte'
   import { collapsedOf, overlayOf } from './sidebar/collapse'
-  import Thread from './thread/Thread.svelte'
   import type { Update } from '@tauri-apps/plugin-updater'
   import UpdateNotice from './update/UpdateNotice.svelte'
   import { downloadAndInstall, findUpdate } from './update/plugin'
@@ -29,6 +28,8 @@
   import { updateCopy } from './update/copy'
   import { createThreadView } from './thread/view'
   import MissingShell from './install/MissingShell.svelte'
+  import Home from './home/Home.svelte'
+  import { homeCopy } from './home/copy'
   import Welcome from './welcome/Welcome.svelte'
   import WhatsNewDialog from './whats-new/WhatsNewDialog.svelte'
   import { appCopy } from './app-copy'
@@ -42,6 +43,14 @@
   const shownNotices = $derived(visibleNotices(chat.notices))
   // The shell's own words, in the language this run is set to (0.2.0, S3/D4).
   const copy = $derived(appCopy(language.current))
+  // View A's own word for the header (R1): the page's one h1 names the screen
+  // that is there whenever the welcome draws its rose and its actions - a
+  // welcome WITH a last workspace. Every other no-chat state keeps the old
+  // words, because view A's title is not on the page then.
+  const homeWords = $derived(homeCopy(language.current))
+  const noChatTitle = $derived(
+    chat.welcome !== null && chat.welcome.last !== null ? homeWords.homeTitle : copy.noChatOpen,
+  )
   // The update line's own words: the retry's reason is one of them (0.2.0, T9),
   // because the sentence it completes is the line's (`update/copy.ts`).
   const updateWords = $derived(updateCopy(language.current))
@@ -160,9 +169,9 @@
     {#if model.chat === null}
       <header class="mh">
         <SidebarToggle collapsed={sidebarCollapsed} onToggle={() => (manualCollapsed = !sidebarCollapsed)} />
-        <h1>{copy.noChatOpen}</h1>
+        <h1>{noChatTitle}</h1>
       </header>
-      <p class="placeholder">{copy.noChatHint}</p>
+      {#if chat.welcome === null}<p class="placeholder">{copy.noChatHint}</p>{:else}<Home welcome={chat.welcome} />{/if}
     {:else}
       <ChatHeader
         title={chat.title ?? ''}
@@ -189,26 +198,10 @@
           aria-labelledby="t-chat"
           hidden={tab !== 'chat'}
         >
-          <Thread
-            messages={model.messages}
-            items={model.items}
-            foregroundChat={model.chat}
-            mark={chat.mark}
-            sessionMode={chat.sessionMode}
-            provisional={model.provisional}
-            visible={tab === 'chat'}
-            bind:scrollTop={threadScroll}
-          />
-          <Composer
-            chat={model.chat}
-            mark={chat.mark}
-            images={chat.images}
-            imagesNotice={chat.imagesNotice}
-            chip={chat.modelChip}
-            contextUsage={chat.contextUsage}
-            folder={chat.folder}
-            branch={chat.branch}
-          />
+          <!-- One tree for both faces of a chat: the thread and the composer,
+               or the new-session hero above the centred composer
+               (welcome-screen T3). Never a second composer. -->
+          <ChatPane chat={chat} thread={model} visible={tab === 'chat'} bind:scrollTop={threadScroll} />
         </div>
         <div class="view" id="p-helpers" role="tabpanel" aria-labelledby="t-help" hidden={tab !== 'helpers'}>
           {#if chat.helpers !== null}

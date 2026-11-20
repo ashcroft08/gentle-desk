@@ -107,8 +107,8 @@ pub fn collapse(holder: &AppStateHolder, path: &str, collapsed: bool) -> ViewSta
 }
 
 /// Starts the new chat of `folder` through the same path
-/// `NewChatInWorkspace` takes, with the folder waiting for the open it asked
-/// for.
+/// `NewChatInWorkspace` takes, with the folder waiting for the child its
+/// composer will ask for.
 fn open_chat_in(
     holder: &AppStateHolder,
     folder: &str,
@@ -117,16 +117,19 @@ fn open_chat_in(
     let (view, commands) = holder.dispatch_commands(UiIntent::NewChatInWorkspace {
         path: folder.to_owned(),
     });
-    remember_folder(folders, &commands, folder);
+    remember_folder(folders, view.foreground_chat.as_deref(), folder);
     WorkspaceAction { view, commands }
 }
 
-/// Remembers the folder of the chat a workspace intent is opening, before that
-/// command runs: exactly the chats the command opens, never one more.
-pub fn remember_folder(folders: &PendingFolders, commands: &[ChatCommand], folder: &str) {
-    for command in commands {
-        if let ChatCommand::OpenProcess { chat } = command {
-            folders.set(chat, folder);
-        }
+/// Remembers the folder of the chat a workspace intent allocated, for that
+/// chat's open to take: exactly the one chat the fold opened, named by the id
+/// its slice carries (welcome-screen T4: the allocation asks for NO child, so
+/// there is no command to read the chat off).
+///
+/// The folder waits for as long as the chat stays unstarted: its open is the
+/// composer's own ask, which is the moment the runtime takes it.
+pub fn remember_folder(folders: &PendingFolders, chat: Option<&str>, folder: &str) {
+    if let Some(chat) = chat {
+        folders.set(chat, folder);
     }
 }

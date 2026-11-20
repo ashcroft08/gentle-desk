@@ -19,11 +19,23 @@ use std::time::Duration;
 
 use gentle_app::{ChatId, Input, Intent, SessionItem};
 use gentle_desk_lib::bridge::AppStateHolder;
-use gentle_desk_lib::contract::{BranchView, ViewState};
+use gentle_desk_lib::contract::{BranchView, UiIntent, ViewState};
 use gentle_desk_lib::git;
 
 const SESSION_PATH: &str = "/sessions/a.jsonl";
 const CWD: &str = r"C:\Users\josep\dev\gentle-desk";
+
+/// The `ChatId` the app gave the chat a slice named, read back through the
+/// composer's own ask (welcome-screen T4, R2): the open it answers carries it.
+fn started_chat(holder: &AppStateHolder, chat_id: &str) -> ChatId {
+    let (_, commands) = holder.dispatch_commands(UiIntent::EnsureStarted {
+        chat_id: chat_id.to_owned(),
+    });
+    let [gentle_app::ChatCommand::OpenProcess { chat }] = commands.as_slice() else {
+        panic!("the composer's ask opens the chat, got {commands:?}");
+    };
+    chat.clone()
+}
 
 /// One session file of the list, as the first pass reports it.
 fn session(cwd: &str) -> SessionItem {
@@ -410,7 +422,10 @@ fn a_new_chat_names_the_workspace_folder_until_its_session_exists() {
     let (view, commands) = holder.dispatch_commands(UiIntent::NewChatInWorkspace {
         path: r"C:\dev\wsp".to_owned(),
     });
-    assert_eq!(commands.len(), 1, "the workspace opens one chat");
+    assert!(
+        commands.is_empty(),
+        "the allocation asks for no child (welcome-screen T4)"
+    );
     let folder = view
         .foreground_folder
         .expect("the new chat names the workspace folder");
@@ -418,10 +433,7 @@ fn a_new_chat_names_the_workspace_folder_until_its_session_exists() {
     assert_eq!(folder.path, r"C:\dev\wsp");
 
     // A chat that closed takes the hint with it: absent, never a placeholder.
-    let chat = match &commands[0] {
-        gentle_app::ChatCommand::OpenProcess { chat } => chat.clone(),
-        other => panic!("the workspace opens a chat, got {other:?}"),
-    };
+    let chat = started_chat(&holder, &view.foreground_chat.expect("a foreground chat"));
     holder.fold_input(Input::ChatClosed {
         chat: chat.clone(),
         expected: true,
@@ -440,13 +452,10 @@ fn the_session_row_wins_over_the_workspace_hint() {
     use gentle_desk_lib::contract::UiIntent;
 
     let holder = AppStateHolder::default();
-    let (_, commands) = holder.dispatch_commands(UiIntent::NewChatInWorkspace {
+    let (view, _) = holder.dispatch_commands(UiIntent::NewChatInWorkspace {
         path: r"C:\dev\wsp".to_owned(),
     });
-    let chat = match &commands[0] {
-        gentle_app::ChatCommand::OpenProcess { chat } => chat.clone(),
-        other => panic!("the workspace opens a chat, got {other:?}"),
-    };
+    let chat = started_chat(&holder, &view.foreground_chat.expect("a foreground chat"));
 
     // The session the child created: its cwd is the chat's own truth.
     holder.fold_input(Input::ChatRekeyed {

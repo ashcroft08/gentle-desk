@@ -10,12 +10,27 @@ fn chat(name: &str) -> ChatId {
     ChatId::of_session(name)
 }
 
-/// A state with one fresh chat open, and that chat's id.
+/// A state with one fresh chat open and started, and that chat's id: the click
+/// allocates it and the composer's own ask is what starts its child
+/// (welcome-screen T4, R2).
 fn with_a_new_chat() -> (AppState, ChatId) {
     let (state, effects) = update_chats(AppState::default(), Input::Intent(Intent::OpenNewChat));
-    let ChatCommand::OpenProcess { chat } = effects.chat_commands[0].clone() else {
-        panic!("a new chat asks for its child: {:?}", effects.chat_commands);
-    };
+    assert_eq!(
+        effects,
+        Effects::default(),
+        "a new chat asks for no child by itself"
+    );
+    let chat = state
+        .chats
+        .foreground()
+        .cloned()
+        .expect("the new chat is the foreground one");
+    let (state, effects) = update_chats(state, Input::Intent(Intent::EnsureStarted(chat.clone())));
+    assert_eq!(
+        effects.chat_commands,
+        vec![ChatCommand::OpenProcess { chat: chat.clone() }],
+        "the composer's ask starts it"
+    );
     (state, chat)
 }
 

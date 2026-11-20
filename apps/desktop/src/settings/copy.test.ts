@@ -17,6 +17,10 @@ const ENGLISH = {
   languageGroup: 'App language',
   settings: 'Settings',
   railLabel: 'Settings sections',
+  searchLabel: 'Find a setting',
+  searchPlaceholder: 'Find a setting…',
+  noMatches: 'No settings match.',
+  themeGroup: 'Theme',
   homeExplain:
     'My pi uses the pi installation already on the machine: sign-ins, local models and chats appear in the terminal. Separate creates a clean space at ~/.gentle-shell/agent and touches nothing else.',
   appName: 'Gentle Shell Desktop',
@@ -29,6 +33,10 @@ const SPANISH = {
   languageGroup: 'Idioma de la app',
   settings: 'Ajustes',
   railLabel: 'Secciones de ajustes',
+  searchLabel: 'Buscar un ajuste',
+  searchPlaceholder: 'Buscar un ajuste…',
+  noMatches: 'Ningún ajuste coincide.',
+  themeGroup: 'Tema',
   homeExplain:
     'Mi pi usa la instalación de pi que ya está en la máquina: los inicios de sesión, los modelos locales y los chats aparecen en la terminal. Separado crea un espacio limpio en ~/.gentle-shell/agent y no toca nada más.',
   appName: 'Gentle Shell Desktop',

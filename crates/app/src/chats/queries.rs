@@ -58,6 +58,14 @@ impl Chats {
         self.entries.get(chat).is_some_and(|entry| entry.opening)
     }
 
+    /// Whether that chat's child was asked for already (welcome-screen T4): the
+    /// lazy start fires once, so an ask for a chat this answers `true` for sends
+    /// nothing at all. `false` for a chat allocated by an open that has started
+    /// nothing, and for a chat the app never heard of.
+    pub(crate) fn is_started(&self, chat: &ChatId) -> bool {
+        self.entries.get(chat).is_some_and(|entry| entry.started)
+    }
+
     /// Every chat whose child is gone, in id order: the chats a Restart can
     /// bring back.
     pub fn ended(&self) -> Vec<ChatId> {

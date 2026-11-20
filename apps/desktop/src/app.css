@@ -225,11 +225,100 @@ p {
   display: none;
 }
 
-/* The thread takes what the composer leaves inside its own view. */
-.view > .thread {
+/* The thread takes what the composer leaves inside the pane's body. */
+.chat-pane-body > .thread {
   flex: 1 1 0;
   min-height: 0;
 }
+
+/* The chat pane (welcome-screen T3, S1, S3): ONE tree with two faces. With rows it
+   is the thread and the composer at the bottom, exactly as before; in a chat that
+   holds no row yet, view B centres the composer with the hero in the thread's
+   place. Only the class on this element changes - the composer inside it is the
+   same element before and after, so its draft, its focus and its chips survive
+   the move. The rows below are the geometry ChatPane.test.ts pins as text. */
+.chat-pane {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+/* What holds the thread: it takes what the composer leaves, as the view did
+   before the pane existed. */
+.chat-pane-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+/* The composer's own row in the tree: it spans the pane and the dock inside it
+   decides its width (the thread's max, 560 px in view B). This is the element the
+   move is applied to, so the whole dock travels as one piece. */
+.chat-pane-dock {
+  width: 100%;
+}
+
+/* View B: the column [hero][composer] centred a little ABOVE the middle - the
+   bottom padding is the bigger one - so the box reads as the protagonist and not
+   as a box that fell to the floor. `safe` keeps that centre for the ordinary case
+   and falls back to the start when the content is taller than the pane. */
+.chat-pane.is-fresh {
+  align-items: center;
+  justify-content: safe center;
+  padding: 24px 24px clamp(24px, 8vh, 96px);
+  overflow-y: auto;
+}
+
+/* The thread's place is the hero's while the chat has no rows: the thread keeps
+   its element - its mount, its reader's place - and simply draws nothing there. */
+.chat-pane.is-fresh .chat-pane-body {
+  display: none;
+}
+
+/* The composer is the protagonist in view B, so it is narrower than the column it
+   lines up with once there are rows. */
+.chat-pane.is-fresh .composer-dock {
+  width: min(560px, 100%);
+}
+
+/* The hero itself: the rose, the title and the one line that names the folder,
+   over the same 560 px column the box under it takes (sheet B). */
+.new-session {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: min(560px, 100%);
+  text-align: center;
+}
+
+.new-session-rose {
+  margin: 0 0 18px;
+}
+
+.new-session-rose canvas {
+  max-width: 100%;
+}
+
+.new-session-title {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0 0 12px;
+}
+
+.new-session-where {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* View B's two window rules - a short window starts at the top and a narrow one
+   keeps 16 px at the sides - sit in the shared `@media` blocks further down, so
+   each of those queries stays in ONE place for both views. */
 
 /* The widest the conversation gets: the messages and the box under them share
    it, so the box lines up with the thread. The number is a readability one, not
@@ -1429,6 +1518,269 @@ p {
   padding: 28px 24px;
 }
 
+/* View A, the welcome (welcome-screen T2): a centred, quiet column under the main
+   area's header - the rose, its title, the workspace worked in last with its ONE
+   action, that workspace's recent chats and the other workspaces as quiet links.
+   Tokens only, so both themes hold it, and no motion of its own: the rose owns
+   its one bloom and reduced motion (R6).
+
+   The geometry holds at every window size (T2's follow-up, after the maintainer
+   looked at it maximized): the column FILLS the pane and its block sits a little
+   above the middle, because the bottom padding is the big one; `flex: 1 1 0` is
+   what fills the pane (the header above shares this column, so a `min-height:
+   100%` here would add the header's height back and make the document scroll),
+   and `safe center` keeps the top reachable when the content outgrows the pane. */
+.home {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  /* `safe` keeps the same centre and falls back to the start when the content is
+     taller than the pane, so the top is never unreachable. A browser too old for
+     it keeps the declaration above. */
+  justify-content: safe center;
+  text-align: center;
+  padding: 24px 24px clamp(24px, 8vh, 96px);
+}
+
+/* The rose breathes: more air under it than between the title and its line, so
+   the picture is not glued to the words. Its canvas never outgrows the pane. */
+.home-rose {
+  display: flex;
+  justify-content: center;
+  margin: 0 0 30px;
+  max-width: 100%;
+}
+
+.home-rose canvas {
+  max-width: 100%;
+}
+
+.home-title {
+  margin: 0 0 6px;
+  font-size: clamp(18px, 2.2vh + 10px, 24px);
+  font-weight: 600;
+}
+
+.home-where {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 18px;
+  color: var(--text);
+}
+
+.home-where svg {
+  color: var(--muted);
+}
+
+.home-ws {
+  font-weight: 600;
+}
+
+.home-dim {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.home-hint {
+  color: var(--faint);
+  font-size: 12px;
+}
+
+.home > .home-hint {
+  margin-top: 10px;
+}
+
+/* The app's accent button idiom, with the muted face a disabled control wears
+   (the states board's rule): a folder that cannot host a chat still shows WHY. */
+.home-go {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--bg);
+  font-weight: 600;
+  padding: 9px 16px;
+  cursor: pointer;
+}
+
+.home-go:hover {
+  filter: brightness(1.08);
+}
+
+.home-go:disabled {
+  border-color: var(--border);
+  background: var(--surface2);
+  color: var(--faint);
+  cursor: default;
+  filter: none;
+}
+
+.home-why {
+  display: grid;
+  gap: 2px;
+  margin: 10px 0 0;
+}
+
+.home-reason {
+  color: var(--warning);
+  font-size: 12px;
+}
+
+.home-recents {
+  width: min(400px, 100%);
+  margin-top: 28px;
+  text-align: left;
+}
+
+/* The heading and the rows share ONE left edge: the row's text starts 10 px inside
+   its button, so the heading carries the same inset. */
+.home-kicker {
+  margin: 0 0 6px;
+  padding: 0 10px;
+  color: var(--faint);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.home-recents ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.home-chat {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  text-align: left;
+  padding: 7px 10px;
+  cursor: pointer;
+}
+
+.home-chat:hover {
+  background: var(--surface2);
+}
+
+/* Rust sends the whole title, however long: the cell ellipsizes it and the row
+   keeps one line, so a 120-character title neither grows the row nor pushes the
+   age out of it. */
+.home-chat-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.home-chat-age {
+  flex: none;
+  white-space: nowrap;
+  color: var(--faint);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.home-others {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  margin: 26px 0 0;
+  font-size: 12px;
+  color: var(--faint);
+}
+
+.home-quiet {
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  padding: 2px 4px;
+  cursor: pointer;
+}
+
+.home-quiet:hover {
+  color: var(--text);
+  background: var(--surface2);
+}
+
+/* A link whose folder is gone starts nothing (Rust would not refuse it), so it
+   is a disabled control, visibly muted. */
+.home-quiet:disabled {
+  background: transparent;
+  color: var(--faint);
+  cursor: default;
+}
+
+/* A SHORT window does not centre the block: it starts at the top with tighter
+   paddings, and the pane scrolls what does not fit, so nothing is clipped and
+   nothing is unreachable. View B follows the same rule (welcome-screen T3): the
+   hero and the centred composer start at the top too, and the pane scrolls. */
+@media (max-height: 600px) {
+  .home {
+    justify-content: flex-start;
+    padding: 18px 20px 22px;
+    overflow-y: auto;
+  }
+
+  .home-rose {
+    margin-bottom: 20px;
+  }
+
+  .chat-pane.is-fresh {
+    justify-content: flex-start;
+    padding: 16px 16px 24px;
+    overflow-y: auto;
+  }
+
+  .new-session-rose {
+    margin-bottom: 8px;
+  }
+
+  .new-session-title {
+    margin-bottom: 8px;
+  }
+}
+
+/* A NARROW window: 16 px at the sides, the column is the whole width and the one
+   action stretches to it, so the screen keeps one left edge instead of a small
+   block floating in the middle. View B keeps the same sides. */
+@media (max-width: 640px) {
+  .home {
+    padding-inline: 16px;
+  }
+
+  .home-recents {
+    width: 100%;
+  }
+
+  .home-go {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .chat-pane.is-fresh {
+    padding-inline: 16px;
+  }
+}
+
 .side {
   background: var(--surface);
   border-right: 1px solid var(--border);
@@ -1604,10 +1956,6 @@ p {
   transform: none;
 }
 
-/* The theme control (01a's `#theme-btn` and `#theme-list`, `.tp` and `.tpl`): it
-   lives in the Settings dialog's Appearance section now (settings-dialog S3), and
-   the list is drawn in the page's own colors, so it follows the theme it offers.
-   No native popup is involved. */
 /* Bottom-anchored, so the footer stays put when the middle of the sidebar is
    short, such as the empty state before any workspace exists. */
 .foot {
@@ -1654,10 +2002,6 @@ p {
   border-radius: 999px;
   background: var(--accent);
   pointer-events: none;
-}
-
-.tp {
-  position: relative;
 }
 
 /* The home setting (shell-choice S5), drawn in the Settings dialog's Shell home
@@ -1708,62 +2052,6 @@ p {
   padding: 1px 8px;
   font-size: 12px;
   cursor: pointer;
-}
-
-.tpl {
-  position: absolute;
-  left: 0;
-  bottom: 38px;
-  z-index: 25;
-  margin: 0;
-  padding: 4px;
-  list-style: none;
-  min-width: 180px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  box-shadow: var(--shadow);
-}
-
-.tpl li {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 10px;
-  border-radius: 6px;
-  font-size: 13px;
-  color: var(--text);
-  background: transparent;
-  cursor: pointer;
-  transition:
-    background-color 120ms ease,
-    color 120ms ease;
-}
-
-/* The theme's accent as a small dot beside its name. The dot is decoration:
-   the option's name is still its word, and `system` draws the two halves it
-   follows (the component fills it in). */
-.tpl .swatch {
-  flex: none;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--swatch, var(--accent));
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
-}
-
-.tpl li:hover {
-  background: var(--surface2);
-  box-shadow: inset 0 0 0 1px var(--border);
-}
-
-.tpl li[aria-selected='true'] {
-  background: var(--tint);
-  color: var(--accent);
-}
-
-.tpl li[aria-selected='true']:hover {
-  box-shadow: inset 0 0 0 1px var(--border);
 }
 
 /* The New workspace menu: the artboard's rules for it (01a, `.menu`), except
@@ -1983,14 +2271,69 @@ p {
   max-height: calc(100vh - var(--settings-chrome));
 }
 
-.settings-rail {
+.settings-side {
   flex: none;
   width: 184px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 8px;
   padding: 2px 14px 0 0;
   border-right: 1px solid var(--border);
+}
+
+/* The search field above the rail (the reference's "Find a setting…"): the rail's
+   own width and one line high, so the seven entries start where they always
+   did. The wrapper draws the field's border and its focus ring, which is why the
+   input itself draws neither. */
+.settings-find {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface2);
+  color: var(--faint);
+}
+
+.settings-find:focus-within {
+  border-color: var(--accent);
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.settings-find input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  outline: none;
+}
+
+.settings-find input::placeholder {
+  color: var(--faint);
+}
+
+/* One quiet line where the entries would be when the query leaves none: never a
+   box, never an empty rail with nothing to say. */
+.settings-none {
+  margin: 0;
+  padding: 0 10px;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+/* The rail's entries under the field: the column's width and edge are the row's
+   above, so this only stacks what the search leaves. */
+.settings-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 /* One rail entry: its glyph and its word, quiet until it is the selected one or
@@ -2084,13 +2427,6 @@ p {
   line-height: 1.5;
 }
 
-/* The theme list opens DOWN from its button inside the dialog: the footer's own
-   rule draws it above, which in a card would leave it over the backdrop. */
-.dlg .tpl {
-  bottom: auto;
-  top: 38px;
-}
-
 /* About (settings-dialog S5): the name and the version this run runs as on one
    line. What is installed, and whether something newer is out, is the Updates
    section's own card (0.1.12). */
@@ -2117,6 +2453,147 @@ p {
   transition:
     border-color 120ms ease,
     background-color 120ms ease;
+}
+
+/* The theme cards, the Appearance section's choice (the reference's theme_cards):
+   a grid of six miniatures, four to a row on a wide window. */
+.tc-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  width: 100%;
+}
+
+/* One card: the miniature, then the drawn name with its check. Quiet until it is
+   the chosen one, or the pointer is over it. */
+.tc {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 7px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease;
+}
+
+.tc:hover {
+  background: var(--surface2);
+}
+
+.tc[aria-pressed='true'] {
+  border-color: var(--accent);
+  background: var(--tint);
+  color: var(--text);
+}
+
+.tc:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+
+/* The miniature: a picture of this theme's terminal. It carries the theme's own
+   `data-theme` attribute, so every colour below is that theme's token from
+   `theme.css` - a card never holds a colour of its own. */
+.tc-shot {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: ui-monospace, 'SF Mono', Consolas, monospace;
+  font-size: 9px;
+  line-height: 1.4;
+  overflow: hidden;
+}
+
+.tc-line {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.tc-prompt {
+  color: var(--accent);
+}
+
+.tc-text {
+  color: var(--text);
+}
+
+.tc-ok {
+  color: var(--success);
+}
+
+.tc-path {
+  color: var(--muted);
+}
+
+.tc-dots {
+  display: flex;
+  gap: 4px;
+}
+
+/* One palette dot: the token the card names inline, so the palette is the
+   theme's own and never a list of colours written here. */
+.tc-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--dot);
+}
+
+.tc-meta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 2px;
+}
+
+.tc-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11.5px;
+}
+
+.tc-check {
+  flex: none;
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* The grid on a medium window: two miniatures to a row, where four would be too
+   narrow to read. */
+@media (max-width: 900px) {
+  .tc-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ...and on a narrow one: the whole width for each card. */
+@media (max-width: 640px) {
+  .tc-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 /* --- the 0.1.12 panes (S1-S4) ------------------------------------------- */

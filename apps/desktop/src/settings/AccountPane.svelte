@@ -7,15 +7,30 @@
   //
   // The terminal does the work: login and logout are the shell's commands, so
   // each button opens a window on it, and this pane only shows where the user
-  // stands. "Check again" runs the same per-provider check again; it never
-  // refreshes a token (the check passes `--no-refresh` on the shell's side).
-  import { dispatchIntent, openTerminal } from '../bridge'
+  // stands. "Check again" asks the dialog for another load; it never refreshes a
+  // token (the check passes `--no-refresh` on the shell's side).
+  //
+  // The pane reads NOTHING when it appears (settings-snapshot): the dialog's
+  // one load already answered for it, so a visit costs no subprocess. It asks for
+  // another load only when something OUTSIDE it changed the store - the terminal
+  // window closing and the desk taking the focus back, or the native watcher's
+  // notice that `auth.json` was written - and when the user presses "Check
+  // again". Every ask goes through the dialog's single coalesced load.
+  import { openTerminal } from '../bridge'
   import type { AuthView_Serialize as AuthView, ProviderStatusView } from '../contract/bindings'
   import { language } from '../i18n/language.svelte'
   import { accountCopy } from './account-copy'
-  import { coalesced, followSettingsFiles } from './files-changed'
+  import { followSettingsFiles } from './files-changed'
 
-  let { auth }: { auth: AuthView | null } = $props()
+  let {
+    auth,
+    onRefresh = () => {},
+  }: {
+    /** The sign-ins as the dialog's one load answered, or null before any read. */
+    auth: AuthView | null
+    /** Asks the dialog for one more load: the pane's only read path. */
+    onRefresh?: () => void
+  } = $props()
 
   /** The pane's own words in the language the app holds (0.2.0, D4). */
   const copy = $derived(accountCopy(language.current))
@@ -30,40 +45,24 @@
   const ready = $derived(auth !== null && auth.status.type === 'Ready')
 
   /**
-   * The pane reads when it appears, never waiting for a button: the check runs
-   * on the intent thread (~1s per provider) and the quiet "Reading..." above is
-   * the waiting state. It is the pattern the Profiles pane had (0.1.12, L17,
-   * gone in profiles-editor T2d).
-   */
-  const check = coalesced(() => dispatchIntent({ type: 'RefreshAuth' }))
-
-  $effect(() => {
-    void check()
-  })
-
-  /**
    * The terminal window closes and the desk is focused again, while this pane is
-   * the one on screen: one more check, the same push, never a timer.
+   * the one on screen: one more load, the same path, never a timer.
    */
   $effect(() => {
-    const again = () => void check()
-    window.addEventListener('focus', again)
-    return () => window.removeEventListener('focus', again)
+    window.addEventListener('focus', onRefresh)
+    return () => window.removeEventListener('focus', onRefresh)
   })
 
   /**
-   * While this pane is on screen, the native watcher's notice runs the same
-   * check - only for the shell's auth store, and never after the pane is gone:
-   * unmounting drops a notice's queued check along with the listener, so no
+   * While this pane is on screen, the native watcher's notice asks for the same
+   * load - only for the shell's auth store, and never after the pane is gone:
+   * unmounting drops a notice's queued ask along with the listener, so no
    * subprocess runs in the background with Settings closed (rpc-settings-sync
    * T3b-2).
    */
   $effect(() => {
-    const stop = followSettingsFiles('account', check)
-    return () => {
-      stop()
-      check.cancel()
-    }
+    const stop = followSettingsFiles('account', async () => onRefresh())
+    return () => stop()
   })
 
   /** One provider's check as the row draws it: its word and its tone. */
@@ -104,7 +103,7 @@
 
 <div class="acts">
   <button class="btn accent" type="button" onclick={() => void open('Login')}>{copy.openShell}</button>
-  <button class="btn" type="button" onclick={() => void check()}>{copy.checkAgain}</button>
+  <button class="btn" type="button" onclick={onRefresh}>{copy.checkAgain}</button>
 </div>
 <p class="note">{copy.note}</p>
 {#if terminalError !== null}

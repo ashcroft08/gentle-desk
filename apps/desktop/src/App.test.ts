@@ -16,6 +16,7 @@ import {
   viewState,
 } from './test-support/tauri-mock'
 import { serveSidebar } from './test-support/sidebar'
+import { welcomeView, welcomeWorkspace } from './test-support/welcome'
 import { setLanguage } from './i18n/language.svelte'
 import { appCopy } from './app-copy'
 import App from './App.svelte'
@@ -281,6 +282,114 @@ describe('App', () => {
 
 
 
+
+  it('draws view B for a new chat, and its own composer keeps the draft when it lands', async () => {
+    // welcome-screen T3 (S1, S3, R1): a NEW chat - the fresh id Rust builds for a
+    // chat with no session file - is the centred view, and the box it draws is the
+    // one composer the app owns, still there once the first row arrives.
+    const path = 'C:\\Users\\josep\\dev\\gentle-desk'
+    const fixture = serveSidebar({
+      view: viewState({
+        foreground_chat: 'new-1',
+        foreground_folder: { name: 'gentle-desk', path },
+      }),
+    })
+    render(App)
+
+    expect(await screen.findByRole('heading', { level: 2, name: 'New session' })).toBeTruthy()
+    // The folder line is the composer row's; the hero does not repeat it.
+    expect(screen.queryByText('in gentle-desk')).toBeNull()
+    const box = screen.getByRole('textbox', { name: 'Message' }) as HTMLTextAreaElement
+    await fireEvent.input(box, { target: { value: 'hola' } })
+
+    fixture.view = viewState({
+      foreground_chat: 'new-1',
+      foreground_folder: { name: 'gentle-desk', path },
+      messages: [MESSAGE],
+      items: [{ kind: 'Message', data: MESSAGE }],
+    })
+    fixture.push()
+
+    expect(await screen.findByText(MESSAGE.text)).toBeTruthy()
+    expect(screen.queryByRole('heading', { level: 2, name: 'New session' })).toBeNull()
+    expect(screen.getByRole('textbox', { name: 'Message' })).toBe(box)
+    expect(box.value).toBe('hola')
+  })
+
+  it('draws view A where the placeholder was, and keeps the page\u2019s one h1', async () => {
+    serveSidebar({
+      view: viewState({
+        foreground_chat: null,
+        welcome: welcomeView({
+          last: welcomeWorkspace({ path: 'C:\\dev\\curriculum', label: 'Curriculum' }),
+        }),
+      }),
+    })
+    render(App)
+
+    // The pushed slice is the screen: its own h2 under the header's h1, one
+    // action for the last workspace, and no placeholder hint left behind.
+    expect(
+      await screen.findByRole('heading', { level: 2, name: 'Pick up where you left off' }),
+    ).toBeTruthy()
+    expect(screen.getByRole('heading', { level: 1, name: 'Home' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'New session in Curriculum' })).toBeTruthy()
+    expect(screen.queryByText('Choose a chat in the workspace tree, or start a new session.')).toBeNull()
+  })
+
+  it('names view A in the page\u2019s one h1, in either language, with no old words left', async () => {
+    // R1: what is on screen is view A, so the header says where the reader is
+    // (the home dictionary's own word) instead of that no chat is open.
+    setLanguage('en')
+    serveSidebar({
+      view: viewState({
+        foreground_chat: null,
+        welcome: welcomeView({
+          last: welcomeWorkspace({ path: 'C:\\dev\\curriculum', label: 'Curriculum' }),
+        }),
+      }),
+    })
+    render(App)
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Home' })).toBeTruthy()
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1)
+    expect(screen.queryByText('No chat open')).toBeNull()
+    expect(screen.queryByText('Choose a chat in the workspace tree, or start a new session.')).toBeNull()
+
+    setLanguage('es')
+    await tick()
+
+    expect(screen.getByRole('heading', { level: 1, name: 'Inicio' })).toBeTruthy()
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1)
+    expect(screen.queryByText('Ningún chat abierto')).toBeNull()
+
+    setLanguage('en')
+  })
+
+  it('keeps the old header over the welcome with no configured workspace', async () => {
+    // The welcome's no-workspace face draws the rose and the old hint, but no
+    // view A title of its own, so the header still says no chat is open.
+    serveSidebar({
+      view: viewState({ foreground_chat: null, welcome: welcomeView({ last: null }) }),
+    })
+    render(App)
+
+    expect(await screen.findByText('No chat open')).toBeTruthy()
+    expect(await screen.findByRole('img', { name: 'The gentle-shell rose' })).toBeTruthy()
+    expect(screen.getByText('Choose a chat in the workspace tree, or start a new session.')).toBeTruthy()
+    expect(screen.queryByRole('heading', { level: 1, name: 'Home' })).toBeNull()
+  })
+
+  it('keeps today’s placeholder while the push carries no welcome at all', async () => {
+    // The previous behaviour of the no-chat branch: a state with no view A (the
+    // slice Rust only fills while no chat is open) still says both old lines.
+    serveSidebar({ view: viewState({ foreground_chat: null }) })
+    render(App)
+
+    expect(await screen.findByText('No chat open')).toBeTruthy()
+    expect(screen.getByText('Choose a chat in the workspace tree, or start a new session.')).toBeTruthy()
+    expect(screen.queryByText('Pick up where you left off')).toBeNull()
+  })
 
   it('shows the fatal launcher bar above everything, with no chat open', async () => {
     serveSidebar({

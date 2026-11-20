@@ -446,6 +446,22 @@ fn node_on_path() -> bool {
 }
 
 /// Waits for what a bounded wait is about, failing the test instead of hanging.
+/// Opens a new chat the way the window does (welcome-screen T4, R2): the click
+/// allocates it and the composer's own ask is what starts its child. Answers the
+/// chat's id.
+fn started_new_chat(bridge: &Bridge) -> String {
+    bridge.dispatch(UiIntent::OpenNewChat);
+    let chat = bridge
+        .holder
+        .view()
+        .foreground_chat
+        .expect("the new chat is the foreground one");
+    bridge.dispatch(UiIntent::EnsureStarted {
+        chat_id: chat.clone(),
+    });
+    chat
+}
+
 fn wait_for<T>(what: &str, mut probe: impl FnMut() -> Option<T>) -> T {
     let deadline = Instant::now() + WAIT;
     loop {
@@ -509,12 +525,7 @@ fn the_executor_merges_the_chat_images_into_the_send_the_child_receives() {
     let path = scratch.file("shot.png", PNG);
     let bridge = Bridge::new();
 
-    bridge.dispatch(UiIntent::OpenNewChat);
-    let chat = bridge
-        .holder
-        .view()
-        .foreground_chat
-        .expect("the new chat is the foreground one");
+    let chat = started_new_chat(&bridge);
     wait_for("the child to start", || {
         (!harness.commands().is_empty()).then_some(())
     });
@@ -572,7 +583,7 @@ fn the_sent_message_carries_the_thumbnails_of_its_images() {
     let scratch = Scratch::new();
     let path = scratch.file("shot.png", PNG);
     let bridge = Bridge::new();
-    bridge.dispatch(UiIntent::OpenNewChat);
+    started_new_chat(&bridge);
     let chat = wait_for("the chat to be ready", || {
         let view = bridge.holder.view();
         let chat = view.foreground_chat?;

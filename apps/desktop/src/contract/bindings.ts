@@ -135,6 +135,17 @@ export const commands = {
 	 */
 	storeLastRunVersion: () => typedError<ViewState_Serialize, string>(__TAURI_INVOKE("store_last_run_version")),
 	/**
+	 *  The Settings dialog's one read (settings-snapshot): every page's data in
+	 *  one plain object, asked once when the dialog opens.
+	 * 
+	 *  It takes no argument and needs no window: the gather's seams and the half of
+	 *  the slice it carries all come from the bridge, and the answer is the same
+	 *  shape the web side draws. Nothing of a chat travels through it (a chat's
+	 *  profiles, session mode and images are read through that chat's own child), so
+	 *  opening Settings never waits on a child and never starts one.
+	 */
+	settingsSnapshot: () => typedError<SettingsSnapshot_Serialize, string>(__TAURI_INVOKE("settings_snapshot")),
+	/**
 	 *  Opens a visible terminal window on `action`: the shell's profiles screen, its
 	 *  login or logout, or its own update.
 	 * 
@@ -1922,6 +1933,133 @@ export type SettingsFilesChangedView = {
 };
 
 /**
+ *  One Settings dialog's whole content (settings-snapshot): the plain data
+ *  every page draws, gathered once per open and never on the window's thread.
+ * 
+ *  The dialog asks for it when it opens and draws what it already had until the
+ *  answer lands, so a section is never blank and no page reads anything on its
+ *  own. Every section is the contract's own view and every one of them carries
+ *  its own status: what failed says so there.
+ */
+export type SettingsSnapshot = SettingsSnapshot_Serialize | SettingsSnapshot_Deserialize;
+
+/**
+ *  One Settings dialog's whole content (settings-snapshot): the plain data
+ *  every page draws, gathered once per open and never on the window's thread.
+ * 
+ *  The dialog asks for it when it opens and draws what it already had until the
+ *  answer lands, so a section is never blank and no page reads anything on its
+ *  own. Every section is the contract's own view and every one of them carries
+ *  its own status: what failed says so there.
+ */
+export type SettingsSnapshot_Deserialize = {
+	/**
+	 *  The appearance of the whole window: the theme cards, and the
+	 *  `data-theme` the page paints. The dialog keeps drawing the live slice for
+	 *  this one, because it is what the user CHANGES from inside the card; the
+	 *  field says what the load saw.
+	 */
+	theme: ThemeView,
+	/**
+	 *  The language the app's own words are written in, `None` while no
+	 *  preference is stored. Live, like the theme, and carried for the same
+	 *  reason.
+	 */
+	language?: LanguageView | null,
+	/**
+	 *  The shell, its home and where installing it stands: what the Home section
+	 *  draws. Live, like the theme.
+	 */
+	shell: ShellView_Deserialize,
+	/**
+	 *  The version this run runs as, which the About section draws, or `None`
+	 *  for a run that never named one.
+	 */
+	app_version?: string | null,
+	/**  How many chats are open, which gates the Updates pane's Update button. */
+	open_chats: number,
+	/**
+	 *  What became of the app config file, when it was set aside or a save
+	 *  failed. `None` when it was read, or was not there, and every save worked.
+	 */
+	config_notice?: string | null,
+	/**
+	 *  Where the shell's authentication stands: one row per provider the store
+	 *  lists, with its own check's answer. Names only, never a key or a token.
+	 */
+	auth: AuthView_Deserialize,
+	/**
+	 *  What the machine runs and what is published for it: the desk, pi and
+	 *  gentle-shell, each row with its own answer and its own reason for having
+	 *  none.
+	 */
+	updates: UpdatesView_Deserialize,
+	/**
+	 *  The subscription usage the shell's own sources report, or the reason they
+	 *  could not be read. Nothing here touches a chat.
+	 */
+	usage: UsageView_Deserialize,
+};
+
+/**
+ *  One Settings dialog's whole content (settings-snapshot): the plain data
+ *  every page draws, gathered once per open and never on the window's thread.
+ * 
+ *  The dialog asks for it when it opens and draws what it already had until the
+ *  answer lands, so a section is never blank and no page reads anything on its
+ *  own. Every section is the contract's own view and every one of them carries
+ *  its own status: what failed says so there.
+ */
+export type SettingsSnapshot_Serialize = {
+	/**
+	 *  The appearance of the whole window: the theme cards, and the
+	 *  `data-theme` the page paints. The dialog keeps drawing the live slice for
+	 *  this one, because it is what the user CHANGES from inside the card; the
+	 *  field says what the load saw.
+	 */
+	theme: ThemeView,
+	/**
+	 *  The language the app's own words are written in, `None` while no
+	 *  preference is stored. Live, like the theme, and carried for the same
+	 *  reason.
+	 */
+	language: LanguageView | null,
+	/**
+	 *  The shell, its home and where installing it stands: what the Home section
+	 *  draws. Live, like the theme.
+	 */
+	shell: ShellView_Serialize,
+	/**
+	 *  The version this run runs as, which the About section draws, or `None`
+	 *  for a run that never named one.
+	 */
+	app_version: string | null,
+	/**  How many chats are open, which gates the Updates pane's Update button. */
+	open_chats: number,
+	/**
+	 *  What became of the app config file, when it was set aside or a save
+	 *  failed. `None` when it was read, or was not there, and every save worked.
+	 */
+	config_notice: string | null,
+	/**
+	 *  Where the shell's authentication stands: one row per provider the store
+	 *  lists, with its own check's answer. Names only, never a key or a token.
+	 */
+	auth: AuthView_Serialize,
+	/**
+	 *  What the machine runs and what is published for it: the desk, pi and
+	 *  gentle-shell, each row with its own answer and its own reason for having
+	 *  none.
+	 */
+	updates: UpdatesView_Serialize,
+	/**
+	 *  The subscription usage the shell's own sources report, or the reason they
+	 *  could not be read. Nothing here touches a chat.
+	 */
+	usage: UsageView_Serialize,
+};
+
+/**
  *  What the app knows about the shell and the home it runs on: what it found at
  *  start and what the user chose (shell-choice S1-S3).
  */
@@ -2281,6 +2419,25 @@ export type UiIntent_Deserialize = { type: "SendPrompt"; data: {
 /**  The same for a chat that did not exist before. */
 { type: "OpenNewChat" } | 
 /**
+ *  Start the child of that chat, if this run never started one for it
+ *  (welcome-screen T4, R2).
+ * 
+ *  A new chat is ALLOCATED when it opens and its process starts on this ask:
+ *  the composer sends it the first time its box is focused for that chat, or
+ *  when the first key lands in it, so opening a new session (or the app
+ *  itself) starts no child and costs no process. Until the child answers, the
+ *  chat is Opening and its composer is disabled with the reason it has today;
+ *  the draft is kept and an Enter sends nothing.
+ * 
+ *  The ask is IDEMPOTENT by the state: a chat whose child was asked for
+ *  already - Opening, working, queued, idle or ended - sends no command and
+ *  changes nothing, so a focus and a keystroke can never start two children.
+ *  A stored chat starts its child when it is opened, so it never needs this.
+ */
+{ type: "EnsureStarted"; data: {
+	chat_id: string,
+} } | 
+/**
  *  Start a NEW chat in the workspace at `path`: what the header's New
  *  session button (D2) and a workspace's own new-chat icon (D3) send. The
  *  web side decides which workspace is the current one and names it; the
@@ -2606,6 +2763,25 @@ export type UiIntent_Serialize = { type: "SendPrompt"; data: {
 } } | 
 /**  The same for a chat that did not exist before. */
 { type: "OpenNewChat" } | 
+/**
+ *  Start the child of that chat, if this run never started one for it
+ *  (welcome-screen T4, R2).
+ * 
+ *  A new chat is ALLOCATED when it opens and its process starts on this ask:
+ *  the composer sends it the first time its box is focused for that chat, or
+ *  when the first key lands in it, so opening a new session (or the app
+ *  itself) starts no child and costs no process. Until the child answers, the
+ *  chat is Opening and its composer is disabled with the reason it has today;
+ *  the draft is kept and an Enter sends nothing.
+ * 
+ *  The ask is IDEMPOTENT by the state: a chat whose child was asked for
+ *  already - Opening, working, queued, idle or ended - sends no command and
+ *  changes nothing, so a focus and a keystroke can never start two children.
+ *  A stored chat starts its child when it is opened, so it never needs this.
+ */
+{ type: "EnsureStarted"; data: {
+	chat_id: string,
+} } | 
 /**
  *  Start a NEW chat in the workspace at `path`: what the header's New
  *  session button (D2) and a workspace's own new-chat icon (D3) send. The
@@ -3451,6 +3627,17 @@ export type ViewState_Deserialize = {
 	 *  says it does not know instead of guessing.
 	 */
 	app_version?: string | null,
+	/**
+	 *  View A's data (welcome-screen T1, S1, S3, R3, R4): the workspace the user
+	 *  worked in last, its recent chats and the other configured workspaces.
+	 * 
+	 *  `Some` ONLY while no chat is in the foreground, which is the one state
+	 *  that draws the welcome at all: with a chat on screen the field costs
+	 *  nothing and the web side draws none of it. It is never `None` for a
+	 *  missing workspace or an empty list - those are cases of the view itself
+	 *  ([`WelcomeView::last`]), not an absent screen.
+	 */
+	welcome?: WelcomeView_Deserialize | null,
 };
 
 /**
@@ -3727,6 +3914,249 @@ export type ViewState_Serialize = {
 	 *  says it does not know instead of guessing.
 	 */
 	app_version: string | null,
+	/**
+	 *  View A's data (welcome-screen T1, S1, S3, R3, R4): the workspace the user
+	 *  worked in last, its recent chats and the other configured workspaces.
+	 * 
+	 *  `Some` ONLY while no chat is in the foreground, which is the one state
+	 *  that draws the welcome at all: with a chat on screen the field costs
+	 *  nothing and the web side draws none of it. It is never `None` for a
+	 *  missing workspace or an empty list - those are cases of the view itself
+	 *  ([`WelcomeView::last`]), not an absent screen.
+	 */
+	welcome: WelcomeView_Serialize | null,
+};
+
+/**
+ *  One recent chat of the last workspace (welcome-screen R4): a row of the
+ *  sidebar, with the id that opens it and the age the screen words itself.
+ */
+export type WelcomeChat = {
+	/**
+	 *  Exactly the string [`UiIntent::OpenChat`] takes back: the RAW session
+	 *  file path, never the id `gentle_app::ChatId` builds from it (the intent
+	 *  prefixes it once).
+	 */
+	chat_id: string,
+	/**
+	 *  The session's stored title, whole: the name the sidebar row beside it
+	 *  draws for the same session, uncut here because this column is wider - the
+	 *  page ellipsizes it for the width it really has, so a long name keeps the
+	 *  room it is given instead of the truncation a narrow sidebar row makes.
+	 */
+	title: string,
+	/**
+	 *  When the session was last written, in epoch milliseconds: the same value
+	 *  a chat row's `modified_ago` is worded from, carried as the number so the
+	 *  screen can measure it against the clock it holds.
+	 * 
+	 *  An `f64` for the same reason [`WelcomeWorkspace::last_activity_ms`] is:
+	 *  the generated bindings refuse a 64-bit integer on the wire, and a real
+	 *  millisecond count is exact in a double.
+	 */
+	modified_ms: number | null,
+};
+
+/**
+ *  One other configured workspace, as the quiet link under the recents
+ *  (welcome-screen T1): the folder, the label the sidebar draws for it, and
+ *  whether a new chat can start there right now.
+ */
+export type WelcomeLink = {
+	/**
+	 *  The canonical spelling of the folder, as [`UiIntent::NewChatInWorkspace`]
+	 *  takes it back.
+	 */
+	path: string,
+	/**  The label the sidebar row draws. */
+	label: string,
+	/**
+	 *  Whether new chats can start in this folder right now: the very
+	 *  `available` a sidebar workspace row carries
+	 *  ([`WorkspaceRowView::available`]), from the same probe. `false` is a
+	 *  folder that is gone and a path that holds something else instead, and a
+	 *  link that is not available must not offer a new chat: the intent alone
+	 *  would not refuse it.
+	 */
+	available: boolean,
+};
+
+/**
+ *  View A's data (welcome-screen T1, S1, S3, R3, R4): the workspace the user
+ *  worked in last, that workspace's recent chats and the other configured
+ *  workspaces as quiet links. It is the screen the app shows when NO chat is in
+ *  the foreground.
+ * 
+ *  Every field is read from what the sidebar already groups and draws - the
+ *  config's workspaces and the session list - so the welcome names no folder the
+ *  sidebar does not name, no chat the sidebar does not list, and counts nothing
+ *  of its own.
+ */
+export type WelcomeView = WelcomeView_Serialize | WelcomeView_Deserialize;
+
+/**
+ *  View A's data (welcome-screen T1, S1, S3, R3, R4): the workspace the user
+ *  worked in last, that workspace's recent chats and the other configured
+ *  workspaces as quiet links. It is the screen the app shows when NO chat is in
+ *  the foreground.
+ * 
+ *  Every field is read from what the sidebar already groups and draws - the
+ *  config's workspaces and the session list - so the welcome names no folder the
+ *  sidebar does not name, no chat the sidebar does not list, and counts nothing
+ *  of its own.
+ */
+export type WelcomeView_Deserialize = {
+	/**
+	 *  The workspace of the most recent session, `None` only when the config
+	 *  holds no workspace at all: there is nothing to be last in.
+	 */
+	last?: WelcomeWorkspace_Deserialize | null,
+	/**
+	 *  Up to three chats of [`last`](Self::last), newest first. Empty for a
+	 *  workspace with no chat, which says so instead of drawing an empty list.
+	 */
+	recents: WelcomeChat[],
+	/**
+	 *  The other CONFIGURED workspaces, in the order the config lists them,
+	 *  without [`last`](Self::last): the quiet links at the foot of the screen.
+	 */
+	others: WelcomeLink[],
+};
+
+/**
+ *  View A's data (welcome-screen T1, S1, S3, R3, R4): the workspace the user
+ *  worked in last, that workspace's recent chats and the other configured
+ *  workspaces as quiet links. It is the screen the app shows when NO chat is in
+ *  the foreground.
+ * 
+ *  Every field is read from what the sidebar already groups and draws - the
+ *  config's workspaces and the session list - so the welcome names no folder the
+ *  sidebar does not name, no chat the sidebar does not list, and counts nothing
+ *  of its own.
+ */
+export type WelcomeView_Serialize = {
+	/**
+	 *  The workspace of the most recent session, `None` only when the config
+	 *  holds no workspace at all: there is nothing to be last in.
+	 */
+	last: WelcomeWorkspace_Serialize | null,
+	/**
+	 *  Up to three chats of [`last`](Self::last), newest first. Empty for a
+	 *  workspace with no chat, which says so instead of drawing an empty list.
+	 */
+	recents: WelcomeChat[],
+	/**
+	 *  The other CONFIGURED workspaces, in the order the config lists them,
+	 *  without [`last`](Self::last): the quiet links at the foot of the screen.
+	 */
+	others: WelcomeLink[],
+};
+
+/**
+ *  The workspace the user worked in last (welcome-screen R3): the configured
+ *  workspace that owns the most recent session of the list, with what the
+ *  sidebar already draws for it and nothing more.
+ */
+export type WelcomeWorkspace = WelcomeWorkspace_Serialize | WelcomeWorkspace_Deserialize;
+
+/**
+ *  The workspace the user worked in last (welcome-screen R3): the configured
+ *  workspace that owns the most recent session of the list, with what the
+ *  sidebar already draws for it and nothing more.
+ */
+export type WelcomeWorkspace_Deserialize = {
+	/**
+	 *  The canonical spelling of the folder, which
+	 *  [`UiIntent::NewChatInWorkspace`] takes back: the same `path` a sidebar
+	 *  workspace row carries.
+	 */
+	path: string,
+	/**
+	 *  The label the sidebar row draws: the folder's name, extended with the
+	 *  parent segments it takes to tell two workspaces of the same name apart.
+	 */
+	label: string,
+	/**
+	 *  Whether new chats can start in this folder right now: the very
+	 *  `available` a sidebar workspace row carries
+	 *  ([`WorkspaceRowView::available`]), from the same probe. `false` is a
+	 *  folder that is gone and a path that holds something else instead, so the
+	 *  primary action is disabled exactly when the sidebar disables it.
+	 */
+	available: boolean,
+	/**
+	 *  Why it cannot, in the shell's own words, exactly as
+	 *  [`WorkspaceRowView::reason`] carries them for that same folder: the
+	 *  sidebar's "this folder no longer exists" line for a folder that is gone,
+	 *  and its other refusal for a path that is not a folder. `None` while the
+	 *  folder is available, which is when there is nothing to warn about.
+	 */
+	reason?: string | null,
+	/**
+	 *  How many sessions the sidebar's tree holds for this workspace, folded
+	 *  away or not.
+	 */
+	chat_count: number,
+	/**
+	 *  The most recent session's timestamp, in epoch milliseconds: what the
+	 *  screen turns into `hace 21 min`, `None` for a workspace with no chat.
+	 * 
+	 *  An `f64` rather than the session's `u64` because the generated bindings
+	 *  refuse a 64-bit integer on the wire - a `number` could lose precision -
+	 *  and every real millisecond count is exact in a double (the same rule
+	 *  [`ThinkingItemView::duration_ms`] follows).
+	 */
+	last_activity_ms?: number | null,
+};
+
+/**
+ *  The workspace the user worked in last (welcome-screen R3): the configured
+ *  workspace that owns the most recent session of the list, with what the
+ *  sidebar already draws for it and nothing more.
+ */
+export type WelcomeWorkspace_Serialize = {
+	/**
+	 *  The canonical spelling of the folder, which
+	 *  [`UiIntent::NewChatInWorkspace`] takes back: the same `path` a sidebar
+	 *  workspace row carries.
+	 */
+	path: string,
+	/**
+	 *  The label the sidebar row draws: the folder's name, extended with the
+	 *  parent segments it takes to tell two workspaces of the same name apart.
+	 */
+	label: string,
+	/**
+	 *  Whether new chats can start in this folder right now: the very
+	 *  `available` a sidebar workspace row carries
+	 *  ([`WorkspaceRowView::available`]), from the same probe. `false` is a
+	 *  folder that is gone and a path that holds something else instead, so the
+	 *  primary action is disabled exactly when the sidebar disables it.
+	 */
+	available: boolean,
+	/**
+	 *  Why it cannot, in the shell's own words, exactly as
+	 *  [`WorkspaceRowView::reason`] carries them for that same folder: the
+	 *  sidebar's "this folder no longer exists" line for a folder that is gone,
+	 *  and its other refusal for a path that is not a folder. `None` while the
+	 *  folder is available, which is when there is nothing to warn about.
+	 */
+	reason: string | null,
+	/**
+	 *  How many sessions the sidebar's tree holds for this workspace, folded
+	 *  away or not.
+	 */
+	chat_count: number,
+	/**
+	 *  The most recent session's timestamp, in epoch milliseconds: what the
+	 *  screen turns into `hace 21 min`, `None` for a workspace with no chat.
+	 * 
+	 *  An `f64` rather than the session's `u64` because the generated bindings
+	 *  refuse a 64-bit integer on the wire - a `number` could lose precision -
+	 *  and every real millisecond count is exact in a double (the same rule
+	 *  [`ThinkingItemView::duration_ms`] follows).
+	 */
+	last_activity_ms: number | null,
 };
 
 /**

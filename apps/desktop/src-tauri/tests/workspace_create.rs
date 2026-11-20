@@ -11,7 +11,6 @@ use workspace_seam::{entries, holder_at, wait_for, FakePicker, SETTLE};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use gentle_app::ChatCommand;
 use gentle_desk_lib::pending::PendingFolders;
 use gentle_desk_lib::workspace_create;
 use gentle_runtime::app_config;
@@ -36,14 +35,22 @@ fn a_new_folder_is_created_and_becomes_a_workspace() {
         vec!["fresh".to_owned()],
         "the name is trimmed and nothing else is written"
     );
-    // S7: the workspace is added and a new chat opens in it.
-    let [ChatCommand::OpenProcess { chat }] = action.commands.as_slice() else {
-        panic!("expected exactly one open, got {:?}", action.commands);
-    };
+    // S7: the workspace is added and a new chat is opened in it - allocated, not
+    // started: its process waits for the composer (welcome-screen T4, R2).
+    assert!(
+        action.commands.is_empty(),
+        "the allocation asks for no child, got {:?}",
+        action.commands
+    );
+    let chat = action
+        .view
+        .foreground_chat
+        .clone()
+        .expect("the new chat is the foreground one");
     assert_eq!(
-        folders.take(chat),
+        folders.take(&chat),
         Some(PathBuf::from(&target)),
-        "the open starts in the created folder"
+        "the open its composer asks for starts in the created folder"
     );
     assert_eq!(action.view.workspace_notice, None);
     let loaded = wait_for("the created workspace to reach the config file", || {
@@ -77,10 +84,12 @@ fn an_existing_empty_folder_is_accepted_and_nothing_is_written_into_it() {
         "an empty folder stays empty: nothing is overwritten and nothing is added"
     );
     assert_eq!(action.view.workspace_notice, None);
-    let [ChatCommand::OpenProcess { chat }] = action.commands.as_slice() else {
-        panic!("expected exactly one open, got {:?}", action.commands);
-    };
-    assert_eq!(folders.take(chat), Some(target.clone()));
+    let chat = action
+        .view
+        .foreground_chat
+        .clone()
+        .expect("the new chat is the foreground one");
+    assert_eq!(folders.take(&chat), Some(target.clone()));
     assert!(holder
         .config_value()
         .workspace(&target.to_string_lossy())
