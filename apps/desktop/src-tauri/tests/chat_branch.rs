@@ -210,8 +210,14 @@ struct Scratch {
 
 impl Scratch {
     fn new(tag: &str) -> Self {
-        let path =
-            std::env::temp_dir().join(format!("gentle-desk-git-{tag}-{}", std::process::id()));
+        // One counter per call: two tests run in parallel and a shared name
+        // would make the second `git init` see the first's half-built .git.
+        static SEQ: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+        let seq = SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let path = std::env::temp_dir().join(format!(
+            "gentle-desk-git-{tag}-{}-{seq}",
+            std::process::id()
+        ));
         std::fs::create_dir_all(&path).expect("failed to create the scratch directory");
         Self { path }
     }
@@ -306,4 +312,157 @@ fn outside_any_repo(dir: &Path) -> Result<(), String> {
         )),
         None => Ok(()),
     }
+}
+
+/// The open through the CONTRACT'S OWN intent, the way the web side asks: the
+/// path where the open's refresh lives (`AppStateHolder::dispatch_commands`).
+fn dispatch_open(holder: &AppStateHolder, cwd: &str) -> ViewState {
+    use gentle_desk_lib::contract::UiIntent;
+    holder.fold_input(Input::SessionsLoaded(vec![session(cwd)]));
+    // The chat id the WEB sends is the session's raw path: `chat_for` prefixes
+    // it, so handing it the id again would double the prefix and open a chat
+    // no row names.
+    holder
+        .dispatch_commands(UiIntent::OpenChat {
+            chat_id: SESSION_PATH.to_owned(),
+        })
+        .0
+}
+
+#[test]
+fn opening_the_chat_again_asks_git_again() {
+    // composer-dock L12: the branch is read once per folder per RUN, and an
+    // open drops that answer so a branch changed outside this app - the
+    // terminal - is seen without a restart.
+    let repo = repo_on("feat/one");
+    let cwd = repo.cwd();
+    let holder = Arc::new(AppStateHolder::default());
+
+    let (pushed, wait) = mpsc::channel::<ViewState>();
+    let weak: Weak<AppStateHolder> = Arc::downgrade(&holder);
+    holder.arm_branch_push(Arc::new(move || {
+        if let Some(holder) = weak.upgrade() {
+            let _ = pushed.send(holder.view());
+        }
+    }));
+
+    let first = dispatch_open(&holder, &cwd);
+    assert_eq!(
+        first.foreground_branch.as_ref().map(|b| b.name.clone()),
+        None,
+        "the first open answers before the read lands"
+    );
+    eprintln!(
+        "DBG lookup={:?} folder={:?}",
+        holder.branches().lookup(&cwd),
+        first.foreground_folder.clone()
+    );
+    let again = holder.fold_input(Input::SessionsLoaded(vec![session(&cwd)]));
+    eprintln!("DBG2 refold folder={:?}", again.foreground_folder.clone());
+    eprintln!(
+        "DBG3 fg={:?} total={}",
+        first.foreground_chat.clone(),
+        first.total_sessions
+    );
+    let read = wait
+        .recv_timeout(Duration::from_secs(60))
+        .expect("the first read never pushed");
+    assert_eq!(
+        read.foreground_branch.as_ref().map(|b| b.name.clone()),
+        Some("feat/one".to_owned()),
+        "the first open's answer is the branch the repo was on"
+    );
+
+    // The branch changes OUTSIDE the app, the way a terminal would, and the
+    // user comes BACK to the chat: opening it again is the moment they look.
+    // A branch that EXISTS: the read answers None for an unborn one by design
+    // (fbffd19), so the second branch carries its own commit.
+    git_in(repo.path(), &["branch", "feat/two"]);
+    git_in(
+        repo.path(),
+        &["symbolic-ref", "HEAD", "refs/heads/feat/two"],
+    );
+
+    let second = dispatch_open(&holder, &cwd);
+    assert_eq!(
+        second.foreground_branch.as_ref().map(|b| b.name.clone()),
+        None,
+        "the fresh read is answered on its push, not in the open's slice"
+    );
+    let re_read = wait
+        .recv_timeout(Duration::from_secs(60))
+        .expect("the second read never pushed");
+    assert_eq!(
+        re_read.foreground_branch.as_ref().map(|b| b.name.clone()),
+        Some("feat/two".to_owned()),
+        "the second open sees the branch the terminal changed"
+    );
+}
+
+#[test]
+fn a_new_chat_names_the_workspace_folder_until_its_session_exists() {
+    // composer-dock L12: a chat opened in a workspace lives there from the
+    // start, so the folder chip names the workspace's folder while the chat's
+    // own session row does not exist, and the branch is read from it.
+    use gentle_desk_lib::contract::UiIntent;
+
+    let holder = AppStateHolder::default();
+    let (view, commands) = holder.dispatch_commands(UiIntent::NewChatInWorkspace {
+        path: r"C:\dev\wsp".to_owned(),
+    });
+    assert_eq!(commands.len(), 1, "the workspace opens one chat");
+    let folder = view
+        .foreground_folder
+        .expect("the new chat names the workspace folder");
+    assert_eq!(folder.name, "wsp");
+    assert_eq!(folder.path, r"C:\dev\wsp");
+
+    // A chat that closed takes the hint with it: absent, never a placeholder.
+    let chat = match &commands[0] {
+        gentle_app::ChatCommand::OpenProcess { chat } => chat.clone(),
+        other => panic!("the workspace opens a chat, got {other:?}"),
+    };
+    holder.fold_input(Input::ChatClosed {
+        chat: chat.clone(),
+        expected: true,
+    });
+    let view = holder.view();
+    assert!(
+        view.foreground_folder.is_none(),
+        "a closed chat names no folder"
+    );
+}
+
+#[test]
+fn the_session_row_wins_over_the_workspace_hint() {
+    // The hint is only a stand-in: once the chat's session row is listed, the
+    // folder the row carries is the one the chip names.
+    use gentle_desk_lib::contract::UiIntent;
+
+    let holder = AppStateHolder::default();
+    let (_, commands) = holder.dispatch_commands(UiIntent::NewChatInWorkspace {
+        path: r"C:\dev\wsp".to_owned(),
+    });
+    let chat = match &commands[0] {
+        gentle_app::ChatCommand::OpenProcess { chat } => chat.clone(),
+        other => panic!("the workspace opens a chat, got {other:?}"),
+    };
+
+    // The session the child created: its cwd is the chat's own truth.
+    holder.fold_input(Input::ChatRekeyed {
+        from: chat.clone(),
+        to: ChatId::of_session(chat.as_str()),
+    });
+    holder.fold_input(Input::SessionsLoaded(vec![SessionItem {
+        path: chat.as_str().to_owned(),
+        title: "the new chat".to_owned(),
+        cwd: r"C:\dev\real".to_owned(),
+        modified_ms: 0,
+        message_count: 1,
+    }]));
+    let view = holder.view();
+    let folder = view
+        .foreground_folder
+        .expect("the session row names the folder");
+    assert_eq!(folder.path, r"C:\dev\real");
 }

@@ -177,6 +177,11 @@ pub struct AppStateHolder {
     /// the last attempt that wrote nothing, and how many writes it answered.
     /// Shell-owned, and dropped with the chat (`bridge::session_mode`).
     session_modes: Mutex<session_mode::SessionModes>,
+    /// The folder a chat was opened in before it has a session row (composer-dock
+    /// L12): a NEW chat in a workspace lives in the workspace's folder from the
+    /// start, so its chip names it until the session row takes over. Shell-owned,
+    /// and dropped with the chat.
+    folder_hints: Mutex<std::collections::BTreeMap<String, crate::contract::FolderView>>,
     /// How many times each chat's session mode was forgotten, so a command that
     /// started before a close and answers after a reopen is told apart from one
     /// of the new chat (`bridge::session_mode`).
@@ -257,6 +262,73 @@ impl AppStateHolder {
         &self.branches
     }
 
+    /// Records the folder the workspace handed a NEW chat (composer-dock L12):
+    /// the hint is what its folder chip names until its own session row exists,
+    /// and answers `true` when at least one open took it.
+    fn note_folder_hints(&self, folder: &str, commands: &[gentle_app::ChatCommand]) -> bool {
+        let name = folder
+            .rsplit(['\\', '/'])
+            .find(|segment| !segment.is_empty())
+            .unwrap_or(folder)
+            .to_owned();
+        let view = crate::contract::FolderView {
+            name,
+            path: folder.to_owned(),
+        };
+        let mut hints = lock(&self.folder_hints);
+        let mut any = false;
+        for command in commands {
+            if let gentle_app::ChatCommand::OpenProcess { chat } = command {
+                hints.insert(chat.as_str().to_owned(), view.clone());
+                any = true;
+            }
+        }
+        any
+    }
+
+    /// The folder hint the FOREGROUND chat carries, `None` when it has none:
+    /// a hint is only a stand-in for the chat's own session row.
+    fn folder_hint_for(&self, app: &gentle_app::AppState) -> Option<crate::contract::FolderView> {
+        let chat = app.chats.foreground()?;
+        lock(&self.folder_hints).get(chat.as_str()).cloned()
+    }
+
+    /// The folder hint as the slice's shell part carries it: the chat it belongs
+    /// to, and the view. The foreground gate is `view_state`'s.
+    fn folder_hint(&self) -> Option<(String, crate::contract::FolderView)> {
+        let chat = {
+            let app = lock(&self.app);
+            app.chats.foreground()?.as_str().to_owned()
+        };
+        let hint = lock(&self.folder_hints).get(&chat)?.clone();
+        Some((chat, hint))
+    }
+
+    /// Drops a chat's folder hint with the chat: its session row, or the next
+    /// chat, names the folder from now on.
+    fn forget_folder_hint(&self, chat: &gentle_app::ChatId) {
+        lock(&self.folder_hints).remove(chat.as_str());
+    }
+
+    /// Asks the branch question again for the foreground chat's folder, and
+    /// answers whether the cache really held an answer to drop (composer-dock
+    /// L12). The next slice starts the fresh read, which pushes on its own.
+    fn refresh_branch(&self) -> bool {
+        let folder = {
+            let app = lock(&self.app);
+            crate::state_view::foreground_folder(&app)
+                .or_else(|| self.folder_hint_for(&app))
+                .map(|folder| folder.path)
+        };
+        let Some(folder) = folder else {
+            return false;
+        };
+        self.branches.forget(&folder);
+        true
+    }
+
+    /// Folds one intent of the contract through the reducer and answers the
+    /// slice to push. Also the path the `state-changed` event payload takes.
     /// Folds one intent of the contract through the reducer and answers the
     /// slice to push. Also the path the `state-changed` event payload takes.
     pub fn dispatch(&self, intent: UiIntent) -> ViewState {
@@ -428,10 +500,24 @@ impl AppStateHolder {
             }
             return (self.view(), vec![command]);
         }
-        match crate::intent::to_intent(&state, intent) {
-            Some(intent) => {
-                let opened = opens_a_chat(&intent);
-                let answer = self.apply(gentle_app::Input::Intent(intent));
+        match crate::intent::to_intent(&state, &intent) {
+            Some(reduced) => {
+                let opened = opens_a_chat(&reduced);
+                // A NEW chat in a workspace lives in that folder from the start
+                // (composer-dock L12): the hint is what its folder chip names
+                // until its own session row exists, and what the branch is read
+                // from. Recorded only for the chats the fold opens, never one
+                // more.
+                let hint = match (&intent, &reduced) {
+                    (UiIntent::NewChatInWorkspace { path }, gentle_app::Intent::OpenNewChat)
+                        if !path.trim().is_empty() =>
+                    {
+                        Some(path.clone())
+                    }
+                    _ => None,
+                };
+                let answer = self.apply(gentle_app::Input::Intent(reduced));
+                let hinted = hint.map(|folder| self.note_folder_hints(&folder, &answer.1));
                 // Opening a stored chat paints its thread from its session file
                 // while its child starts (chat-open-latency T1): the read is
                 // claimed here and run on a worker, because this path is
@@ -439,7 +525,18 @@ impl AppStateHolder {
                 if opened {
                     self.start_transcript_read();
                 }
-                answer
+                // An open also asks the branch question again (composer-dock
+                // L12): the answer the cache holds may name a branch the user
+                // changed outside this app, and opening the chat is when the
+                // user looks.
+                let refreshed = opened && self.refresh_branch();
+                if hinted == Some(true) || refreshed {
+                    // The hint or the fresh read change what the slice draws,
+                    // so the slice this intent answers is built AFTER them.
+                    (self.view(), answer.1)
+                } else {
+                    answer
+                }
             }
             // Every intent has an answer: the reducer's, or the config's above.
             None => (self.view(), Vec::new()),
@@ -553,9 +650,13 @@ impl AppStateHolder {
     fn branch_view(&self) -> Option<BranchView> {
         let cwd = {
             // The directory comes from the same session row the folder chip
-            // reads, under one short lock: the read itself happens with none.
+            // reads - or, for a chat opened before its session existed, from
+            // the workspace folder hint (composer-dock L12) - under one short
+            // lock: the read itself happens with none.
             let app = lock(&self.app);
-            crate::state_view::foreground_folder(&app).map(|folder| folder.path)
+            crate::state_view::foreground_folder(&app)
+                .or_else(|| self.folder_hint_for(&app))
+                .map(|folder| folder.path)
         }?;
         match self.branches.lookup(&cwd) {
             crate::git::Lookup::Read(branch) => branch,
@@ -637,6 +738,9 @@ impl AppStateHolder {
             // The session mode is that chat's own reading of its own child, and
             // it may not outlive it either (composer-dock T3b, L7).
             self.forget_session_mode(chat);
+            // Nor does the folder the workspace handed it before its session
+            // existed (composer-dock L12).
+            self.forget_folder_hint(chat);
         }
         // One lock for the fold and the slice it answers: a revision read here
         // describes exactly the state it is pushed with. Everything the shell
@@ -681,6 +785,7 @@ impl AppStateHolder {
             session_mode: self.session_mode(),
             transcript: self.provisional_transcript(),
             branch: self.branch_view(),
+            folder_hint: self.folder_hint(),
             auth: self.auth(),
             updates: self.updates(),
             usage: self.usage(),

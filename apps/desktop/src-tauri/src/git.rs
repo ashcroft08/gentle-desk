@@ -218,6 +218,16 @@ impl Branches {
         inner.answers.insert(dir.to_owned(), answer);
     }
 
+    /// Drops the answer a directory holds, so the next lookup reads git again.
+    /// An OPEN asks for this (composer-dock L12): a branch changed outside this
+    /// app - the terminal - is then seen when the chat is opened again, with no
+    /// restart. A directory whose read is still running loses only its cached
+    /// answer; the read's own `record` writes the new one.
+    pub fn forget(&self, dir: &str) {
+        let mut inner = self.inner();
+        inner.answers.remove(dir);
+    }
+
     /// The cache, a poisoned mutex included: nothing here may panic because a
     /// thread died holding it.
     fn inner(&self) -> MutexGuard<'_, Inner> {

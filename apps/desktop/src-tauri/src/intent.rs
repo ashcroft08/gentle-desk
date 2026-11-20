@@ -12,12 +12,12 @@ use crate::contract::UiIntent;
 /// the reducer has no answer for: folding a workspace's chats away, choosing the
 /// theme and choosing the language are the config's business (D8), so the holder
 /// answers them before asking this (`bridge::AppStateHolder::config_intent`).
-pub fn to_intent(state: &gentle_app::AppState, intent: UiIntent) -> Option<gentle_app::Intent> {
+pub fn to_intent(state: &gentle_app::AppState, intent: &UiIntent) -> Option<gentle_app::Intent> {
     Some(match intent {
-        UiIntent::SendPrompt { text } => gentle_app::Intent::SendPrompt(text),
+        UiIntent::SendPrompt { text } => gentle_app::Intent::SendPrompt(text.clone()),
         UiIntent::Abort => gentle_app::Intent::Abort,
         UiIntent::NewChat => gentle_app::Intent::NewChat,
-        UiIntent::OpenChat { chat_id } => gentle_app::Intent::OpenChat(chat_for(state, &chat_id)),
+        UiIntent::OpenChat { chat_id } => gentle_app::Intent::OpenChat(chat_for(state, chat_id)),
         UiIntent::OpenNewChat => gentle_app::Intent::OpenNewChat,
         // The folder is not the reducer's business: `crates/app` carries no
         // folder at all (S2), so it travels beside the command in the bridge's
@@ -37,35 +37,38 @@ pub fn to_intent(state: &gentle_app::AppState, intent: UiIntent) -> Option<gentl
         // So are the install and the look for the launcher.
         UiIntent::InstallShell | UiIntent::CheckShellAgain => return None,
         UiIntent::RestartChat { chat_id } => {
-            gentle_app::Intent::RestartChat(chat_for(state, &chat_id))
+            gentle_app::Intent::RestartChat(chat_for(state, chat_id))
         }
         // Close chat names a chat the same way the open does, and the reducer
         // refuses a chat that is running a turn (the delete flow's own rule).
-        UiIntent::CloseChat { chat_id } => gentle_app::Intent::CloseChat(chat_for(state, &chat_id)),
+        UiIntent::CloseChat { chat_id } => gentle_app::Intent::CloseChat(chat_for(state, chat_id)),
         // The message id is not a chat: the reducer finds it in the foreground
         // chat's thread and answers the copy command the shell runs.
-        UiIntent::CopyMessage { message_id } => gentle_app::Intent::CopyMessage(message_id),
-        UiIntent::DismissNotice { id } => gentle_app::Intent::DismissNotice(u64::from(id)),
+        UiIntent::CopyMessage { message_id } => gentle_app::Intent::CopyMessage(message_id.clone()),
+        UiIntent::DismissNotice { id } => gentle_app::Intent::DismissNotice(u64::from(*id)),
         // The dialog id and its answer are the child's own protocol: the
         // reducer drops the dialog it just answered, so a repeated answer to
         // the same id reaches nothing.
         UiIntent::AnswerDialog { id, answer } => gentle_app::Intent::AnswerDialog {
-            id,
-            answer: ui_answer(answer),
+            id: id.clone(),
+            answer: ui_answer(answer.clone()),
         },
         // The helper id belongs to the foreground chat's helpers, which the
         // reducer checks, so an id that names no task selects nothing.
-        UiIntent::SelectHelper { helper_id } => gentle_app::Intent::SelectHelper(helper_id),
+        UiIntent::SelectHelper { helper_id } => gentle_app::Intent::SelectHelper(helper_id.clone()),
         // The stop names one helper of the foreground chat, which the reducer
         // checks (running, this chat's own) before it asks anything of a child.
-        UiIntent::StopHelper { helper_id } => gentle_app::Intent::StopHelper(helper_id),
+        UiIntent::StopHelper { helper_id } => gentle_app::Intent::StopHelper(helper_id.clone()),
         UiIntent::CloseHelper => gentle_app::Intent::CloseHelper,
         UiIntent::RequestModels => gentle_app::Intent::RequestModels,
         UiIntent::SelectModel { provider, model_id } => {
-            gentle_app::Intent::SelectModel { provider, model_id }
+            gentle_app::Intent::SelectModel {
+                provider: provider.clone(),
+                model_id: model_id.clone(),
+            }
         }
         UiIntent::SelectThinkingLevel { level } => {
-            gentle_app::Intent::SelectThinkingLevel { level }
+            gentle_app::Intent::SelectThinkingLevel { level: level.clone() }
         }
         // The Settings panes' intents (0.1.12) are the shell's: they read a
         // file or run the shell's own check, so the bridge answers them before

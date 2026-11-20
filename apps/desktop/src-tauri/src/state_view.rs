@@ -85,6 +85,11 @@ pub struct ShellParts<'a> {
     pub usage: UsageView,
     /// The images each chat holds or sent.
     pub images: &'a Images,
+    /// The folder a NEW chat was opened in (composer-dock L12), with the chat it
+    /// belongs to: the chip names the workspace's folder while the chat's own
+    /// session row does not exist yet. The chat is carried for the same gate the
+    /// other per-chat slices keep here.
+    pub folder_hint: Option<(String, crate::contract::FolderView)>,
 }
 
 /// The slice of `state` as it stands now, carrying the revision the holder
@@ -109,6 +114,7 @@ pub fn view_state(state: &AppState, sessions_revision: u32, shell: ShellParts<'_
         updates,
         usage,
         images,
+        folder_hint,
     } = shell;
     let helpers_view = helpers::helpers(state);
     let foreground = state
@@ -133,7 +139,15 @@ pub fn view_state(state: &AppState, sessions_revision: u32, shell: ShellParts<'_
     // R3, R4): the branch is kept only while it was read from the very directory
     // the folder chip names, so a read still in flight for the chat the user just
     // left never labels the one they are looking at.
-    let foreground_folder = foreground_folder(state);
+    let foreground_folder = foreground_folder(state).or_else(|| {
+        // A chat opened before its session exists names the folder the
+        // workspace handed it (composer-dock L12): the hint is the fallback,
+        // only for the chat it belongs to.
+        match (&folder_hint, foreground.as_deref()) {
+            (Some((chat, view)), Some(foreground)) if chat == foreground => Some(view.clone()),
+            _ => None,
+        }
+    });
     let foreground_branch = branch_of(foreground_folder.as_ref(), branch);
     // The rows read from the chat's session file are the thread only while that
     // chat's child has answered nothing and the reducer holds no row of its own:
