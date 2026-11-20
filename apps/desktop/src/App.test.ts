@@ -16,6 +16,7 @@ import {
   viewState,
 } from './test-support/tauri-mock'
 import { serveSidebar } from './test-support/sidebar'
+import { welcomeView, welcomeWorkspace } from './test-support/welcome'
 import { setLanguage } from './i18n/language.svelte'
 import { appCopy } from './app-copy'
 import App from './App.svelte'
@@ -281,6 +282,38 @@ describe('App', () => {
 
 
 
+
+  it('draws view A where the placeholder was, and keeps the page\u2019s one h1', async () => {
+    serveSidebar({
+      view: viewState({
+        foreground_chat: null,
+        welcome: welcomeView({
+          last: welcomeWorkspace({ path: 'C:\\dev\\curriculum', label: 'Curriculum' }),
+        }),
+      }),
+    })
+    render(App)
+
+    // The pushed slice is the screen: its own h2 under the header's h1, one
+    // action for the last workspace, and no placeholder hint left behind.
+    expect(
+      await screen.findByRole('heading', { level: 2, name: 'Pick up where you left off' }),
+    ).toBeTruthy()
+    expect(screen.getByRole('heading', { level: 1, name: 'No chat open' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'New session in Curriculum' })).toBeTruthy()
+    expect(screen.queryByText('Choose a chat in the workspace tree, or start a new session.')).toBeNull()
+  })
+
+  it('keeps today’s placeholder while the push carries no welcome at all', async () => {
+    // The previous behaviour of the no-chat branch: a state with no view A (the
+    // slice Rust only fills while no chat is open) still says both old lines.
+    serveSidebar({ view: viewState({ foreground_chat: null }) })
+    render(App)
+
+    expect(await screen.findByText('No chat open')).toBeTruthy()
+    expect(screen.getByText('Choose a chat in the workspace tree, or start a new session.')).toBeTruthy()
+    expect(screen.queryByText('Pick up where you left off')).toBeNull()
+  })
 
   it('shows the fatal launcher bar above everything, with no chat open', async () => {
     serveSidebar({

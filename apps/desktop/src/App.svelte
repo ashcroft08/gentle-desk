@@ -29,6 +29,7 @@
   import { updateCopy } from './update/copy'
   import { createThreadView } from './thread/view'
   import MissingShell from './install/MissingShell.svelte'
+  import Home from './home/Home.svelte'
   import Welcome from './welcome/Welcome.svelte'
   import WhatsNewDialog from './whats-new/WhatsNewDialog.svelte'
   import { appCopy } from './app-copy'
@@ -162,7 +163,7 @@
         <SidebarToggle collapsed={sidebarCollapsed} onToggle={() => (manualCollapsed = !sidebarCollapsed)} />
         <h1>{copy.noChatOpen}</h1>
       </header>
-      <p class="placeholder">{copy.noChatHint}</p>
+      {#if chat.welcome === null}<p class="placeholder">{copy.noChatHint}</p>{:else}<Home welcome={chat.welcome} />{/if}
     {:else}
       <ChatHeader
         title={chat.title ?? ''}

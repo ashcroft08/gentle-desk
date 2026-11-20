@@ -15,7 +15,8 @@ import {
 import { chatProfile } from '../test-support/chat-profile'
 import { helperRow, helpersPanel } from '../test-support/helpers'
 import { helperThread as openThread } from '../test-support/helper-thread'
-import { chatOf, createChatView } from './view'
+import { welcomeChat, welcomeView, welcomeWorkspace } from '../test-support/welcome'
+import { chatOf, createChatView, type ChatViewState } from './view'
 
 vi.mock('@tauri-apps/api/core', () => import('../test-support/tauri-mock').then((m) => m.coreModule()))
 vi.mock('@tauri-apps/api/event', () => import('../test-support/tauri-mock').then((m) => m.eventModule()))
@@ -65,6 +66,8 @@ describe('chatOf', () => {
       fatal: null,
       whatsNew: null,
       shell: { pi_path: null, choice: null, ask: false, launcher_found: true, install: { type: 'Idle' }, restart_needed: false },
+      // View A's data is drawn only while no chat is open: with one, none.
+      welcome: null,
     })
   })
 
@@ -180,8 +183,23 @@ describe('chatOf', () => {
       fatal: null,
       whatsNew: null,
       shell: { pi_path: null, choice: null, ask: false, launcher_found: true, install: { type: 'Idle' }, restart_needed: false },
+      // The state's own view A: null until a push carries the slice.
+      welcome: null,
     })
     expect(chatOf(null).chat).toBeNull()
+  })
+
+  it("carries view A's data while no chat is open (welcome-screen T1, T2)", () => {
+    const welcome = welcomeView({
+      last: welcomeWorkspace({ label: 'Curriculum' }),
+      recents: [welcomeChat('C:\\sessions\\alpha.jsonl')],
+    })
+    const state = viewState({ welcome })
+
+    expect(chatOf(state).welcome).toBe(welcome)
+    expect(chatOf(state).chat).toBeNull()
+    // Before the first push there is no screen to draw either.
+    expect(chatOf(null).welcome).toBeNull()
   })
 })
 
@@ -226,6 +244,27 @@ describe('createChatView', () => {
     )
     await vi.waitFor(() => expect(view.get().shell.launcher_found).toBe(true))
     expect(view.get().shell.install).toEqual({ type: 'Done' })
+    view.dispose()
+  })
+
+  it('does not redraw the welcome for a push that only rebuilds its slice', async () => {
+    setHandler('get_view_state', () =>
+      viewState({ welcome: welcomeView({ last: welcomeWorkspace() }) }),
+    )
+    const view = createChatView()
+    await view.ready
+    const seen: ChatViewState[] = []
+    view.subscribe((state) => seen.push(state))
+    expect(seen).toHaveLength(1)
+
+    // Every push brings a new object, a text delta included: the same VALUES are
+    // the same screen, so the view must not be rebuilt for them.
+    pushEvent('state-changed', viewState({ welcome: welcomeView({ last: welcomeWorkspace() }) }))
+    // Then something that really moves the view, so the pushes are all handled.
+    pushEvent('state-changed', viewState({ foreground_chat: 'chat-1', welcome: null }))
+    await vi.waitFor(() => expect(view.get().chat).toBe('chat-1'))
+
+    expect(seen).toHaveLength(2)
     view.dispose()
   })
 

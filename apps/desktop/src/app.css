@@ -1429,6 +1429,188 @@ p {
   padding: 28px 24px;
 }
 
+/* View A, the welcome (welcome-screen T2): a centred, quiet column under the main
+   area's header - the rose, its title, the workspace worked in last with its ONE
+   action, that workspace's recent chats and the other workspaces as quiet links.
+   Tokens only, so both themes hold it, and no motion of its own: the rose owns
+   its one bloom and reduced motion (R6). */
+.home {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 34px 24px 40px;
+}
+
+.home-rose {
+  display: flex;
+  justify-content: center;
+}
+
+.home-title {
+  margin: 2px 0 6px;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.home-where {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 18px;
+  color: var(--text);
+}
+
+.home-where svg {
+  color: var(--muted);
+}
+
+.home-ws {
+  font-weight: 600;
+}
+
+.home-dim {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.home-hint {
+  color: var(--faint);
+  font-size: 12px;
+}
+
+.home > .home-hint {
+  margin-top: 10px;
+}
+
+/* The app's accent button idiom, with the muted face a disabled control wears
+   (the states board's rule): a folder that cannot host a chat still shows WHY. */
+.home-go {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--bg);
+  font-weight: 600;
+  padding: 9px 16px;
+  cursor: pointer;
+}
+
+.home-go:hover {
+  filter: brightness(1.08);
+}
+
+.home-go:disabled {
+  border-color: var(--border);
+  background: var(--surface2);
+  color: var(--faint);
+  cursor: default;
+  filter: none;
+}
+
+.home-why {
+  display: grid;
+  gap: 2px;
+  margin: 10px 0 0;
+}
+
+.home-reason {
+  color: var(--warning);
+  font-size: 12px;
+}
+
+.home-recents {
+  width: min(460px, 100%);
+  margin-top: 28px;
+  text-align: left;
+}
+
+.home-kicker {
+  margin: 0 0 6px;
+  color: var(--faint);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.home-recents ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.home-chat {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  text-align: left;
+  padding: 7px 10px;
+  cursor: pointer;
+}
+
+.home-chat:hover {
+  background: var(--surface2);
+}
+
+.home-chat-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.home-chat-age {
+  color: var(--faint);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.home-others {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  margin: 26px 0 0;
+  font-size: 12px;
+  color: var(--faint);
+}
+
+.home-quiet {
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  padding: 2px 4px;
+  cursor: pointer;
+}
+
+.home-quiet:hover {
+  color: var(--text);
+  background: var(--surface2);
+}
+
+/* A link whose folder is gone starts nothing (Rust would not refuse it), so it
+   is a disabled control, visibly muted. */
+.home-quiet:disabled {
+  background: transparent;
+  color: var(--faint);
+  cursor: default;
+}
+
 .side {
   background: var(--surface);
   border-right: 1px solid var(--border);
