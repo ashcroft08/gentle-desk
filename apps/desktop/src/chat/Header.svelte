@@ -104,7 +104,7 @@
   }
 </script>
 
-<header class="mh">
+<header class="mh" class:renaming>
   <SidebarToggle {collapsed} onToggle={onToggleSidebar} />
   {#if renaming}
     <input
@@ -146,6 +146,21 @@
 </header>
 
 <style>
+  /* The pencil hides like the copy does: opacity 0 until the mouse crosses the
+     header or the keyboard reaches it, so the title line reads clean and the
+     affordance appears where the cursor is. While the rename field is open the
+     pencil stays visible, and it never hides from focus. */
+  button.ic {
+    opacity: 0;
+    transition: opacity 100ms ease;
+  }
+
+  .mh:hover button.ic,
+  button.ic:focus-visible,
+  .mh.renaming button.ic {
+    opacity: 1;
+  }
+
   .pencil {
     display: block;
     width: 16px;
