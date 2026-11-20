@@ -1,25 +1,29 @@
 <script lang="ts">
-  // The session mode control (design/composer-dock S1, T3c): a quiet text button
-  // with a caret at the right edge of the status line, opening the four modes the
-  // channel knows (`02-mode-picker.html`, sheet A).
+  // The session mode control (design/composer-dock S1, T3c; sheet D of
+  // `02-mode-picker.html`): a quiet text button with a caret at the right edge of
+  // the status row, opening the four modes the channel knows.
   //
-  // composer-dock T3c (L7 revokes R1, L8 approves the design) puts it at the right
-  // edge of the working line. Normal and Auto change at once; YOLO and Super YOLO
-  // ask first in the same popover (`./SessionModeMenu`, sheet B), and only its
-  // danger button sends.
+  // The row is PERMANENT since sheet D: it is drawn whether the chat is working
+  // or idle, and the control sits at its right edge in both states, so the mode
+  // can be changed at any time. Only the row's left side belongs to the turn - the
+  // clock `./WorkingLine` hands in as this component's content, drawn while the
+  // mark is `Working` and absent otherwise.
+  //
+  // Normal and Auto change at once; YOLO and Super YOLO ask first in the same
+  // popover (`./SessionModeMenu`, sheet B), and only its danger button sends.
   //
   // The shown mode NEVER changes optimistically: a write keeps the previous text
   // beside a spinner until the pushed `attempt` moves, which is the shell's own
   // count of answered writes, and a wait nothing answers drops silently after
   // `PENDING_MS`. A refused answer says its code, in the line under this one, and
   // leaves the mode exactly as it was (sheet C). A chat the shell answered
-  // nothing for draws NO control: no button, no gap, no dash.
+  // nothing for draws NO control: no button, no gap. It still draws the row - it
+  // may simply be empty, and that is what an unanswered read looks like.
   //
-  // This component draws the status line's two wrappers because its own parts
-  // live on both sides of the row: the button inside `.work-line`, the refusal
-  // line beside it under the row (`.work` is the column that spaces them, and
-  // app.css owns both). The clock the line reports is the caller's, handed in as
-  // its content.
+  // This component draws the status row's two wrappers because its own parts live
+  // on both sides of it: the button inside `.work-line`, the refusal line beside
+  // it under the row (`.work` is the column that spaces them, and app.css owns
+  // both). The clock the row reports is the caller's, handed in as its content.
   import type { Snippet } from 'svelte'
   import type { SessionModeView_Serialize as SessionModeView } from '../contract/bindings'
   import { dispatchIntent } from '../bridge'

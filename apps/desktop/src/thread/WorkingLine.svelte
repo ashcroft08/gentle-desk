@@ -1,18 +1,21 @@
 <script lang="ts">
-  // The status line's CLOCK (design/composer-dock S1): the last line of the
-  // thread, above the composer, that says what the chat is doing. It shares the
-  // reasoning row's anatomy instead of growing a third visual language - a thin
-  // spinner, the word, the seconds - faint, 11.5px, no card, no glyph soup.
+  // The status row's CLOCK (design/composer-dock S1; sheet D of
+  // 02-mode-picker): the last line of the thread, above the composer. It shares
+  // the reasoning row's anatomy instead of growing a third visual language - a
+  // thin spinner, the word, the seconds - faint, 11.5px, no card, no glyph soup.
+  //
+  // The ROW is permanent since sheet D: the chat always has it, and the session
+  // mode control sits at its right edge whether the chat is working or idle. Only
+  // this side of it belongs to the turn - the clock is drawn while the mark is
+  // `Working` and nothing at all is drawn while it is not. The rotating body of
+  // the clock is below; the row and the control are `./SessionModeControl`'s, and
+  // what it draws is what this file hands it.
   //
   // The clock is the WEB's: it counts from the moment the chat's mark BECOMES
   // working and stops when the mark leaves, which is why the contract carries no
   // timestamp for it and the thread gains no field. The line disappears with the
   // turn; a mark that is not `Working` (opening, queued, ended) is another line's
   // business (`./Activity`).
-  //
-  // The row itself is drawn by `./SessionModeControl`, which owns the session
-  // mode at its right edge and the refusal line under it (composer-dock T3c); the
-  // clock is what this file hands it, and the only thing here that ticks.
   import type {
     ChatActivityMark,
     SessionModeView_Serialize as SessionModeView,
@@ -56,10 +59,13 @@
   })
 </script>
 
-{#if mark === 'Working'}
-  <SessionModeControl {chatId} {sessionMode}>
+<!-- The row is always there (sheet D): the control on the right always, the
+     clock on the left only while the mark is `Working`, and nothing standing in
+     for the clock when it is not. -->
+<SessionModeControl {chatId} {sessionMode}>
+  {#if mark === 'Working'}
     <span class="spin" aria-hidden="true"></span>
     <span class="t">{copy.working}</span>
     <span class="n" aria-hidden="true">{seconds}s</span>
-  </SessionModeControl>
-{/if}
+  {/if}
+</SessionModeControl>

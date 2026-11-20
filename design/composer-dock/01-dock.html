@@ -47,7 +47,7 @@ h2{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint
    grouped in three acts the eye tells apart (clip / runs-on / runs-in), and the
    context rail keeps 10px of air above the dock so the focus ring never crosses it */
 .row{display:flex;align-items:center;gap:12px;padding:0 12px 10px;min-width:0}
-.grp{display:inline-flex;align-items:center;gap:6px;min-width:0}
+.grp{display:inline-flex;align-items:center;gap:6px;min-width:0;border:1px solid var(--border);border-radius:8px;padding:2px 8px}
 .seg{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);white-space:nowrap;min-width:0;background:none;border:0;padding:0;font-family:inherit;cursor:pointer}
 .seg:hover{color:var(--text)}
 .seg .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
@@ -55,7 +55,7 @@ h2{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint
 .seg .car{width:9px;height:9px;opacity:.65}
 .seg .dot{width:6px;height:6px;border-radius:50%;background:var(--warning);flex:none}
 /* a hairline between the two groups: what the message runs ON, and where it runs */
-.vsep{width:1px;height:14px;background:var(--border);flex:none;margin:0 2px}
+.vsep{display:none}
 .seg.name{color:var(--text);font-weight:600}
 .seg.name .pre{color:var(--faint);font-weight:400}
 .att{width:26px;height:26px;display:inline-grid;place-items:center;border:0;background:none;color:var(--faint);cursor:pointer;border-radius:6px;flex:none;padding:0}
@@ -122,7 +122,7 @@ h2{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint
 
   <div class="sheet">
     <h2>C · los dos bordes que importan</h2>
-    <p class="note">Sin repo: el segmento de rama <b>no existe</b>, no queda hueco. Contexto al 82%: la línea pasa a ámbar, sin agregar ningún chip. El archivo adjunto es la única cosa que gana una fila propia, porque es contenido, no cromo.</p>
+    <p class="note">Cada grupo de la fila es un <b>chip discreto con su propio borde</b> — clip, lo que corre el mensaje, dónde corre — porque comparten el fondo del dock y sin borde propio se leen como un solo rectángulo (el maintainer, 2026-11-19). Sin repo: el segmento de rama <b>no existe</b>, no queda hueco. Contexto al 82%: la línea pasa a ámbar, sin agregar ningún chip. El archivo adjunto es la única cosa que gana una fila propia, porque es contenido, no cromo.</p>
     <div class="stage">
       <div class="state"><span class="spin"></span><span class="t">trabajando…</span><span class="n">4s</span>
         <span class="right"><span class="tag">Normal</span></span>

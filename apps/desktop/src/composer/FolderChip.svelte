@@ -4,10 +4,10 @@
   // the whole path only on hover. No box around it and no control: it is text in
   // the composer's row, and clicking a folder has nowhere to go in this slice.
   //
-  // The 1px hairline belongs to this group, not to the row: the line separates
-  // what the message runs ON (model, effort) from where it runs (folder, and the
-  // branch in a later slice), so a chat with no folder to name leaves no
-  // dangling separator either (R3's rule, applied one group earlier).
+  // It draws the folder and nothing else. The 1px hairline it used to lead with
+  // is gone: each group of the row wears its own quiet border since the
+  // maintainer read the row as one big rectangle (L11, artboard C), so a
+  // separator here would only double the border it sits inside.
   import type { FolderView } from '../contract/bindings'
   import Icon from '../icons/Icon.svelte'
 
@@ -15,7 +15,6 @@
 </script>
 
 {#if folder !== null && folder.name !== ''}
-  <span class="vsep" aria-hidden="true"></span>
   <span class="folder" title={folder.path}>
     <Icon name="folder" size={12} />
     <span class="t">{folder.name}</span>

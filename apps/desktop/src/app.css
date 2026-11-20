@@ -902,9 +902,8 @@ p {
 }
 
 /* The composer's one row, under the input (design/composer-dock): what the
-   message runs ON (the two selects), a 1px hairline, then where it runs (the
-   folder and the branch it is on), the flexible space and Send. Everything here
-   is text - no chip carries a box. */
+   message runs ON (the two selects), then where it runs (the folder and the
+   branch it is on), the flexible space and Send. */
 .composer .row {
   display: flex;
   align-items: center;
@@ -912,20 +911,19 @@ p {
   min-width: 0;
 }
 
-/* The row's groups: each group keeps its own tight 6px rhythm, and the 12px
-   gap of the row plus the hairline are what separate clip / runs-on / runs-in. */
+/* The row's groups: each group keeps its own tight 6px rhythm, and wears its own
+   quiet border so the three acts read as three chips instead of one big
+   rectangle (the maintainer's screenshot, L11, artboard C). The 12px gap of the
+   row separates clip / runs-on / runs-in; with a border per group the old 1px
+   hairline is gone - it would only double the border it sat next to. */
 .composer .row .grp {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   min-width: 0;
-}
-
-.composer .row .vsep {
-  width: 1px;
-  height: 14px;
-  flex: none;
-  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 2px 8px;
 }
 
 .composer .row .grow {
@@ -2925,11 +2923,14 @@ p {
   animation-delay: 0.4s;
 }
 
-/* The status line at the end of the thread (design/composer-dock S1): ONE faint
-   line sharing the reasoning row's anatomy - a 9px spinner, the working word and
-   the seconds it has been working - never a card, never a second visual language.
-   Its right side holds the session mode control (T3c, L7/L8). Reduced motion
-   leaves both rings still, through the shared rule at the end of this file. */
+/* The status row at the end of the thread (design/composer-dock S1, sheet D of
+   02-mode-picker): ONE faint row sharing the reasoning row's anatomy - a 9px
+   spinner, the working word and the seconds it has been working - never a card,
+   never a second visual language. The row is PERMANENT: its left side is the
+   clock (drawn only while the turn runs) and its right side is the session mode
+   control (T3c, L7/L8), which is there whether the chat is working or idle, so
+   the row may be empty when nothing answered the read. Reduced motion leaves
+   both rings still, through the shared rule at the end of this file. */
 .work {
   display: flex;
   flex-direction: column;
@@ -2964,9 +2965,9 @@ p {
   font-variant-numeric: tabular-nums;
 }
 
-/* The session mode (design/composer-dock/02-mode-picker.html, sheet A): a quiet
-   text button with a caret at the right edge of the line. YOLO and Super YOLO
-   wear the danger tone, a sent change keeps its old text and adds a ring. */
+/* The session mode (design/composer-dock/02-mode-picker.html, sheets A and D): a
+   quiet text button with a caret at the right edge of the row. YOLO and Super
+   YOLO wear the danger tone, a sent change keeps its old text and adds a ring. */
 .work-line .mode {
   margin-left: auto;
   display: inline-flex;

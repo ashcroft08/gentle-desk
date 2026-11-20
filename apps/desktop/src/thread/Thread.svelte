@@ -208,9 +208,10 @@
       {/if}
     {/each}
     <Activity {mark} />
-    <!-- The working line (design/composer-dock S1): the reasoning row's anatomy,
-         the web's own clock, and the session mode control at its right edge
-         (T3c). It shares the last slot with the opening line, never both at once. -->
+    <!-- The status row (design/composer-dock S1; sheet D of 02-mode-picker): the
+         reasoning row's anatomy and the web's own clock on its left while the
+         chat works, the session mode control on its right (T3c) always - the row
+         is PERMANENT, so the mode is reachable while the chat is idle too. -->
     <WorkingLine {mark} chatId={foregroundChat} {sessionMode} />
   </div>
   {#if streaming}

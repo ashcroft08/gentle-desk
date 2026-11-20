@@ -1,8 +1,9 @@
-// The status line (design/composer-dock S1, R1): the one quiet line at the end of
-// the thread, above the composer, that says what the chat is doing. It shares the
-// reasoning row's anatomy - a thin spinner, a word and a time - instead of
-// growing a third visual language, and it draws nothing at all once the turn
-// ends.
+// The status row (design/composer-dock S1; sheet D of 02-mode-picker): the one
+// quiet line at the end of the thread, above the composer. It is PERMANENT - the
+// chat always has this row, and the session mode control lives at its right edge
+// whether or not a turn is running - and only its LEFT side, the clock, belongs
+// to the turn: a thin spinner, a word and a time, sharing the reasoning row's
+// anatomy instead of growing a third visual language.
 //
 // The seconds are the WEB's clock: it starts counting the moment the chat's mark
 // becomes `Working` and stops when the mark leaves, which is why the contract
@@ -49,7 +50,8 @@ describe('the working line', () => {
   it('starts counting when the mark becomes working, not when the thread drew', async () => {
     const drawn = render(WorkingLine, { props: { mark: null } })
     await wait(5)
-    expect(line(drawn.container)).toBeNull()
+    // Whitespace between the snippets is the only thing an idle row holds.
+    expect(line(drawn.container)?.textContent?.trim()).toBe('')
 
     await drawn.rerender({ mark: 'Working' })
     await wait(4)
@@ -57,22 +59,31 @@ describe('the working line', () => {
     expect(line(drawn.container)?.textContent).toContain('4s')
   })
 
-  it('disappears, and stops its clock, once the turn ends', async () => {
+  it('stops its clock once the turn ends, and keeps its row', async () => {
     const drawn = render(WorkingLine, { props: { mark: 'Working' } })
     await wait(3)
-    expect(line(drawn.container)).not.toBeNull()
+    expect(line(drawn.container)?.textContent).toContain('3s')
 
     await drawn.rerender({ mark: null })
 
-    expect(line(drawn.container)).toBeNull()
-    // Nothing keeps ticking behind a line nobody draws.
+    // The row is permanent (sheet D): the turn ends, the row does not go away.
+    expect(line(drawn.container)).not.toBeNull()
+    expect(line(drawn.container)?.textContent?.trim()).toBe('')
+    // Nothing keeps ticking behind a clock nobody draws.
     expect(vi.getTimerCount()).toBe(0)
   })
 
-  it('draws nothing for a chat that is not working', () => {
+  it('keeps its row for a chat that is not working, with no clock and no placeholder', () => {
     for (const mark of ['Opening', 'Queued', 'NewReply', 'NeedsAttention', 'Ended'] as const) {
       const { container } = render(WorkingLine, { props: { mark } })
-      expect(line(container)).toBeNull()
+      const row = line(container)!
+
+      expect(row).not.toBeNull()
+      // Idle: no spinner, no word, no seconds, and nothing standing in for them.
+      expect(row.querySelector('.spin')).toBeNull()
+      expect(row.querySelector('.t')).toBeNull()
+      expect(row.querySelector('.n')).toBeNull()
+      expect(row.textContent?.trim()).toBe('')
       cleanup()
     }
   })

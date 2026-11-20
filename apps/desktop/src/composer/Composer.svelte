@@ -221,10 +221,12 @@
     ></textarea>
     <!-- The row, regrouped in THREE groups the eye can tell apart (maintainer's
          test note, 2026-11-19): the clip is its own act, the model and its
-         effort are what the message runs ON, a hairline, then where it runs
-         (the folder, and the branch that folder is on - absent when there is no
-         repository to name), the flexible space and Send. The wider gap between
-         the groups is what keeps them from reading as one control. -->
+         effort are what the message runs ON, then where it runs (the folder,
+         and the branch that folder is on - absent when there is no repository to
+         name), the flexible space and Send. Since the maintainer's screenshot
+         (L11) each group wears its own quiet border in app.css: the 12px gap
+         between them was not enough on its own, because sharing the dock's
+         background made the three groups read as one big rectangle. -->
     <div class="row">
       <span class="grp"><AttachButton label={copy.attachFiles} disabled={chat === null} onPick={attach} /></span>
       <span class="grp"><ModelChip {chip} /></span>

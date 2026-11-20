@@ -11,7 +11,8 @@
 //   spinner until the pushed `attempt` moves, and a stuck pending drops;
 // - a refused answer says its code and that the mode did not change;
 // - the mode is READ once per chat, no matter how many pushes arrive;
-// - a chat that is not working has no line and therefore no control.
+// - the status row is PERMANENT (sheet D): the control is on it whether the chat
+//   is working or not, and only the clock belongs to the turn.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/svelte'
@@ -328,13 +329,47 @@ describe('the session mode control', () => {
     expect(screen.queryByRole('alert')).toBeNull()
   })
 
-  it('is absent while the chat is not working, whatever the shell knows', () => {
+  it('keeps the control while the chat is not working, and draws no clock beside it', () => {
     for (const mark of [null, 'Opening', 'Queued', 'Ended'] as const) {
       const { container } = draw(mode({ mode: 'yolo' }), mark)
-      expect(container.querySelector('.work-line')).toBeNull()
-      expect(container.querySelector('.mode')).toBeNull()
+      const row = container.querySelector('.work-line')!
+
+      // Sheet D: the row is permanent, and the control sits on it while idle.
+      expect(row).not.toBeNull()
+      expect(control(container)!.textContent).toContain('YOLO')
+      // Idle left side: no spinner, no word, no seconds, no placeholder.
+      expect(row.children).toHaveLength(1)
+      expect(row.querySelector('.spin')).toBeNull()
+      expect(row.querySelector('.t')).toBeNull()
+      expect(row.querySelector('.n')).toBeNull()
+      expect(row.textContent).not.toContain('\u2013')
       cleanup()
     }
+  })
+
+  it('draws an empty row for an idle chat the shell answered nothing for', () => {
+    const { container } = draw(null, null)
+    const row = container.querySelector('.work-line')!
+
+    expect(row).not.toBeNull()
+    expect(control(container)).toBeNull()
+    expect(row.textContent?.trim()).toBe('')
+    expect(row.children).toHaveLength(0)
+  })
+
+  it('keeps the refusal line under a row that is not working', async () => {
+    const drawn = draw(mode({ mode: 'normal', attempt: 0 }))
+    await drawn.rerender({
+      mark: null,
+      chatId: 'chat-1',
+      sessionMode: mode({ mode: 'normal', refusal: 'permission_denied', attempt: 1 }),
+    })
+
+    const alert = screen.getByRole('alert')
+    expect(alert.textContent).toContain('permission_denied')
+    expect(alert.textContent).toContain('Still on Normal.')
+    // The line belongs to the row: it sits under it, and the row is still there.
+    expect(drawn.container.querySelector('.work-line')!.nextElementSibling).toBe(alert)
   })
 })
 

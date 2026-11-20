@@ -70,6 +70,12 @@ h2{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint
 .row .name{color:var(--text);font-weight:600}
 .row .grow{flex:1}
 .send{width:24px;height:24px;border-radius:50%;background:var(--accent);display:inline-block}
+
+/* sheet D: the mode as a PERMANENT chip in the context rail's corner */
+.state .mode{margin-left:auto;margin-right:4px}
+.state .mode{font-size:11px}
+.pop .cap{display:flex;justify-content:space-between}
+.opt .nm{display:inline-flex;align-items:center;gap:7px}
 </style>
 </head>
 <body>
@@ -148,6 +154,29 @@ h2{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint
     </div>
     <div class="stage">
       <div class="idle" style="margin:12px 16px">Sin trabajo en curso no hay fila de estado y tampoco control. El modo se cambia mientras trabaja, no antes.</div>
+    </div>
+  </div>
+
+
+  <div class="sheet">
+    <h2>D · el modo siempre visible, en la esquina del contexto (reemplaza A en la fila de estado)</h2>
+    <p class="note">El modo ya no vive en la fila de estado: <b>la fila de arriba es permanente</b> — el reloj a la izquierda cuando hay turno, el modo <b>fijo a la derecha siempre</b>, encima del contexto. Se ve <b>siempre</b> — el estado existe aunque el agente no esté trabajando — y abre el mismo menú en cualquier momento. Las descripciones son <b>las que el canal informa</b>: YOLO y Super YOLO las tienen, Normal y Auto no (el canal no dice nada de ellas, y no se inventa). La confirmación de YOLO y Super YOLO y las reglas de nunca-cambiar-optimista siguen iguales.</p>
+    <div class="stage">
+      <div class="state">
+        <span class="spin"></span><span class="t">trabajando…</span><span class="n">12s</span>
+        <button class="mode hot" aria-haspopup="menu" aria-expanded="true">Super YOLO<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
+      </div>
+      <div class="ctx"><div class="lab"><span class="l"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2"/></svg>6%</span><span>1M</span></div><div class="rail"><i></i></div></div>
+      <div class="dock"><div class="in">¿y el plan de migración?</div><div class="row"><span class="name">Kallari_Pagina_web</span><span class="grow"></span><span class="send"></span></div></div>
+      <div class="pop" role="menu" aria-label="Modo de la sesión" style="position:absolute;right:40px;top:38px">
+        <div class="cap"><span>Modo de esta sesión · el default no cambia</span></div>
+        <button class="opt" role="menuitemradio" aria-checked="false"><span class="ck"></span><span class="nm">Normal</span><span class="ds">Canal sin descripción.</span></button>
+        <button class="opt" role="menuitemradio" aria-checked="false"><span class="ck"></span><span class="nm">Auto</span><span class="ds">Canal sin descripción.</span></button>
+        <div class="sep"></div>
+        <button class="opt hot" role="menuitemradio" aria-checked="false"><span class="nm">YOLO</span><span class="ds">destructive confirmations remain</span></button>
+        <button class="opt hot" role="menuitemradio" aria-checked="true"><span class="nm">Super YOLO</span><span class="ds">no permission prompts; private paths stay blocked</span></button>
+      </div>
+      <div style="height:210px"></div>
     </div>
   </div>
 

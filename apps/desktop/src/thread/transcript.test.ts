@@ -77,7 +77,8 @@ describe('the transcript', () => {
       },
     })
     const region = screen.getByRole('region', { name: THREAD })
-    const rows = Array.from(container.querySelectorAll('.thread-in > *')).map((row) =>
+    // The status row (`.work`) is permanent, so it is not a row of the list.
+    const rows = Array.from(container.querySelectorAll('.thread-in > *:not(.work)')).map((row) =>
       row.classList.contains('tool-card')
         ? 'tool'
         : row.classList.contains('think-row')
@@ -86,6 +87,8 @@ describe('the transcript', () => {
     )
 
     expect(rows).toEqual(['message', 'thinking', 'tool'])
+    // It is drawn after every row of the list, working or not (sheet D).
+    expect(container.querySelector('.thread-in > :last-child')?.className).toBe('work')
     // The card is the real one: its command, its body and its footer are drawn.
     expect(within(region).getByText('ls node_modules')).toBeTruthy()
     expect(region.querySelector('.tc-out')?.textContent).toContain('mocker.d.ts')

@@ -193,7 +193,7 @@ describe('App', () => {
     // R3: the folder is drawn and the branch is simply not there - the row
     // moves on to its flexible space, with nothing standing in the gap.
     expect(container.querySelector('.composer .row .branch')).toBeNull()
-    expect(folder.nextElementSibling?.className).toBe('grow')
+    expect(folder.closest('.grp')!.nextElementSibling?.className).toBe('grow')
   })
 
   it('draws no folder chip for a chat whose folder Rust did not name', async () => {

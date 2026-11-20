@@ -1,7 +1,8 @@
 // The composer's dock as the artboard draws it (design/composer-dock/01-dock.html,
 // approved): the context rail ABOVE the box and outside its border, one borderless
-// row inside it - attach clip, the two selects, a hairline, the folder, Send - and
-// the key hint BELOW the border, left-aligned.
+// row inside it - attach clip, the two selects, the folder, Send - and the key hint
+// BELOW the border, left-aligned. Each of the row's three groups wears its own quiet
+// border since the maintainer read the row as one big rectangle (L11, artboard C).
 //
 // This file pins the PLACEMENT, which is what the slice changes: what surrounds
 // the box, what shares the row, and the order of the row's groups. Each part's
@@ -13,10 +14,18 @@
 // `Composer.attachments.test.ts`.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render } from '@testing-library/svelte'
+import APP_CSS from '../app.css?raw'
 import type { ModelChipView } from '../contract/bindings'
 import { resetTauriMock, setHandler, viewState } from '../test-support/tauri-mock'
 import Composer from './Composer.svelte'
 import { composerCopy } from './copy'
+
+/** The body of the first rule whose selector is exactly `selector`. */
+function rule(selector: string): string {
+  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const match = APP_CSS.match(new RegExp(`(?:^|[}\\n])\\s*${escaped}\\s*\\{([^}]*)\\}`))
+  return match?.[1] ?? ''
+}
 
 vi.mock('@tauri-apps/api/core', () => import('../test-support/tauri-mock').then((m) => m.coreModule()))
 vi.mock('@tauri-apps/api/event', () => import('../test-support/tauri-mock').then((m) => m.eventModule()))
@@ -84,27 +93,27 @@ describe('the dock', () => {
     const { container } = draw()
     const row = container.querySelector('.composer .row') as HTMLElement
 
-    // One hairline (the model group's), one folder, nothing between them and the
-    // send but the flexible space.
-    expect(row.querySelectorAll('.vsep')).toHaveLength(1)
+    // No hairline (the groups wear their own borders now), one folder, nothing
+    // between them and the send but the flexible space.
+    expect(row.querySelectorAll('.vsep')).toHaveLength(0)
     expect(row.querySelector('.grp .branch')).toBeNull()
     expect(row.querySelector('[data-glyph="branch"]')).toBeNull()
   })
 
-  it('draws the branch after the folder, and the one hairline stays before the group', () => {
+  it('draws the branch after the folder, inside the one group that names the place', () => {
     const { container } = render(Composer, {
       props: { chat: 'c1', chip: READY, folder: FOLDER, branch: BRANCH },
     })
     const row = container.querySelector('.composer .row') as HTMLElement
     const parts = Array.from(row.children).map((child) => child.className)
 
-    // What the message runs ON, the hairline, then where it runs - the folder
-    // and the branch on it, in that order, inside ONE group - and Send.
+    // What the message runs ON, then where it runs - the folder and the branch
+    // on it, in that order, inside ONE group - and Send.
     expect(parts).toEqual(['grp', 'grp', 'grp', 'grow', 'ic fill tip-r'])
     const place = row.querySelectorAll('.grp')[2] as HTMLElement
     expect(place.querySelector('.folder')).not.toBeNull()
     expect(place.querySelector('.branch')).not.toBeNull()
-    expect(row.querySelectorAll('.vsep')).toHaveLength(1)
+    expect(row.querySelectorAll('.vsep')).toHaveLength(0)
     expect((place.querySelector('.branch') as HTMLElement).textContent?.trim()).toBe(BRANCH.name)
   })
 
@@ -119,7 +128,24 @@ describe('the dock', () => {
 
     expect(parts).toEqual(['grp', 'grp', 'grp', 'grow', 'ic fill tip-r'])
     expect(row.querySelector('.grp .branch')).toBeNull()
-    expect(row.querySelectorAll('.vsep')).toHaveLength(1)
+    expect(row.querySelectorAll('.vsep')).toHaveLength(0)
+  })
+
+  // The maintainer's screenshot (L11): the row read as one big rectangle, so each
+  // of its three acts is a quiet chip with its own border. jsdom lays nothing
+  // out, so the rule is read as TEXT, the way `chat/chrome-styles.test.ts` does.
+  it('gives each group its own quiet border, and no hairline doubles them', () => {
+    const { container } = draw()
+    const groups = container.querySelectorAll('.composer .row > .grp')
+
+    expect(groups).toHaveLength(3)
+    const grp = rule('.composer .row .grp')
+    expect(grp).toContain('border: 1px solid var(--border)')
+    expect(grp).toContain('border-radius: 8px')
+    expect(grp).toContain('padding: 2px 8px')
+    // The 12px gap between the groups stays, and the old hairline is gone.
+    expect(rule('.composer .row')).toContain('gap: 12px')
+    expect(rule('.composer .row .vsep')).toBe('')
   })
 
   it('draws no context chip in the row any more: the rail is the only reading', () => {
