@@ -36,9 +36,15 @@ what is left, to be taken after the 0.7.0 release.
   the primary action and shows the reason the sidebar already uses ("Esta carpeta ya no
   existe."), no other action is invented (artboard A2).
 - R4: no invented data. Recents and counts come from the session list only.
-- R5: the rose of gentle-shell-gpui is NOT reproduced: its asset is not on this machine
-  (not under `C:\Users\josep\dev`). The artboards use the app's own rose icon with a
-  dot veil as a stand-in. Needs the repo path to read how it is animated.
+- R5: the rose IS available and it is not an image: gentle-shell-gpui draws it from
+  braille art (`ROSE`, 17 rows, each character is 2x4 dots) plus a 0-9 shade map
+  (`ROSE_SHADE`), in `crates/app/src/shared/banner.rs` (read remotely, the repo was NOT
+  cloned). 1,779 dots. Its animation is procedural: it blooms from its heart outward
+  over 2.6 s, floats and sways while it does, a glint crosses the petals, and it comes
+  to REST (a finished rose asks for no more frames). The workspace declares MIT
+  (`license = "MIT"` in its Cargo.toml; no top-level LICENSE file was seen), the same
+  licence as this app, so it is ported with an attribution comment. The welcome
+  artboards already render it with a faithful canvas port.
 - R6: any animation stops under `prefers-reduced-motion`, and (build rule) pauses when
   the window is unfocused and after the first send, because low-end machines are a
   standing concern (open-latency and stream measurements in `tools/perf`).
@@ -62,11 +68,14 @@ what is left, to be taken after the 0.7.0 release.
   instant under reduced motion).
 - [ ] T4 (R2) runtime: start the chat's process on focus or first keystroke instead of
   on open. The riskiest task: it touches the open path of every new chat.
-- [ ] T5 (S4, R5, R6) the rose animation. BLOCKED on the gentle-shell-gpui asset.
+- [ ] T5 (S4, R5, R6) the rose: port `ROSE`/`ROSE_SHADE` and the bloom, float, sway and glint
+  to a canvas component (the artboard script is the reference), still once it has
+  bloomed, drawn open under reduced motion. Unblocked. Optional later: the same banner
+  also writes the "Gentle Shell" wordmark with a pen (`pen_times`); the sidebar draws that
+  wordmark static today.
 
 ## Open questions
 
-- Where is the gentle-shell-gpui repo (for the rose)?
 - Does B's first version show a workspace picker (a popover, like the reference) or just
   the folder as text? Default proposed: text only, picker later.
 - In B, are the context rail and the mode chip drawn before the first message? Default
@@ -80,3 +89,9 @@ what is left, to be taken after the 0.7.0 release.
 - L2 (2026-11-19, design): three directions in `design/welcome-screen/` (A resume, B
   composer in the centre, C start panel). The maintainer chose A for launch and B for
   new sessions (S3). Release order agreed earlier: 0.7.0 first, this after it.
+- L3 (2026-11-19, the rose found): the maintainer gave the repo URL and asked NOT to
+  download it. Read remotely, file by file: `features/welcome/{mod,finale,view}.rs` is
+  gentle-shell-gpui's FIRST-RUN onboarding (the banner writes itself in, the rose blows
+  kisses) - a different screen from ours - and the rose lives in `shared/banner.rs`. The
+  three artboards now use a canvas port of it (verified: the script parses, the data
+  decodes to 1,779 dots; NOT seen rendered by me - the canvas is for the maintainer to look at).

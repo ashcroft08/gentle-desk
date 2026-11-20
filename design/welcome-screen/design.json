@@ -1,6 +1,6 @@
 {
   "title": "Welcome screen - what the app shows when no chat is open",
-  "brief": "The empty state \"Ningún chat abierto\" feels bare. Three directions for a welcome screen built only from data the app really has: the last workspace (the most recent session in the list), its recent chats, the app's own rose icon. Opening the app must not cost a chat process: A and C are pure view, B starts the process only when the box is focused. The dot-matrix rose animation of gentle-shell-gpui is NOT reproduced here (its asset is not available); the artboards use the app icon with a dot veil as a stand-in. DECISION (2026-11-19): artboard A for the app launch (no chat open), artboard B for every new session; C was not chosen.",
+  "brief": "The empty state \"Ningún chat abierto\" feels bare. Three directions for a welcome screen built only from data the app really has: the last workspace (the most recent session in the list), its recent chats, the app's own rose icon. Opening the app must not cost a chat process: A and C are pure view, B starts the process only when the box is focused. The rose is gentle-shell-gpui's own braille-art rose (crates/app/src/shared/banner.rs, MIT), ported to a canvas: it blooms once from its heart, floats a moment and rests.",
   "artboards": [
     {
       "file": "01-resume.html",
