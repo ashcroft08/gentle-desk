@@ -20,11 +20,16 @@ package install are NOT in this release: they go to 0.9.0 as their own feature.
   empty space, alignment and hierarchy, judged from the real panes and reproduced as artboards before any
   code changes.
 
+- S6 The shell row checks the latest `gentle-pi` version on npm (one GET through the existing `WebGet`, like pi), so it can be "behind".
+- S7 When the shell is behind, the pane offers `gentle-shell upgrade` in a terminal (a new terminal action next to `gentle-shell update`), under the same zero-open-chats gate.
+- S8 The pane shows when it last checked and, when a read failed, which one and why, instead of blank versions. An unknown stays unknown, never "up to date".
+
 ## Tasks
 
 - T1 (S1, S2, S3) Updates: config field, intent, snapshot/view carry, pane action, startup rule. Route:
   worker.
 - T2 (S4) Remove the dead intents. Route: worker, AFTER T1 (same surfaces).
+- T4 (S6, S7, S8) Updates: the shell row, the upgrade action, last-checked and failure reasons. Route: worker, AFTER T1 (same surfaces); design first (the `03-updates` artboard gains these rows).
 - T3 (S5) Design pass: artboards in `design/settings-polish/`, approved on the canvas, then wired. Route:
   design worker first.
 
@@ -42,3 +47,5 @@ release, each commit a reviewable work unit.
 - L2 (2026-11-20, the maintainer, asked which scope): "Mi propuesta: diseño + omitir versión + limpieza"
   - the design pass, "skip this version" and the dead-intent cleanup go in 0.8.0; the General page and
   the live install go to 0.9.0.
+- L3 (2026-11-20, the maintainer): "nuestro actualizaciones no sirve la verdad, no avisa si hay una nueva version de pi o hay que actualizar extensiones. aparte no dice si hay actualizaciones de gentle-shell o pi install@gentle-shell ... y aparte estos manes manejan de mejor forma como se actualiza eso y los paquetes a eso me refiero que quiero poder implementar". Explorer check (verified, not assumed): pi's newer version IS checked (npm registry `@earendil-works/pi-coding-agent/latest`, gear dot, headline); the shell row's `latest` is always None (`apps/desktop/src-tauri/src/settings/updates.rs:66-68`); extensions/packages are not checked at all and "Update extensions" only opens a terminal on `gentle-shell update --extensions`; no last-checked time, no failure reason, no skip button (the Rust skip path exists, no pane dispatches it). The other app gets package state from the Desktop RPC `get_update_status`, which the installed Shell 4.8.0 does not advertise (needs Shell main), so a per-package "behind" state is not possible today.
+- L4 (2026-11-20, the maintainer, asked which scope): "Lo que se puede ya (recomendado)" - 0.8.0 gets: S6 the shell row checks `gentle-pi` on npm (one GET through the existing `WebGet`, like pi); S7 a "gentle-shell upgrade" action in a terminal when it is behind (a new terminal action, like `gentle-shell update`); S8 the pane shows when it last checked and WHY a read failed instead of blank versions; S1-S3 (skip) as already specified. Package management (install, remove, which package is behind, live output) moves to 0.9.0 with the General page, because it mutates the machine, needs its own design and an isolated test setup, and depends on the Shell exposing package state.
