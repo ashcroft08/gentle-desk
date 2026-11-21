@@ -1,12 +1,15 @@
-//! The Settings panes' holder state (0.1.12, S1): the auth read, the last update
-//! check and the usage read, beside the two notice lines and the what's-new notes
-//! the holder already carries, and the version the user skipped (0.8.0
+//! The Settings panes' holder state (0.1.12, S1): the auth slice, the last update
+//! check and the usage slice, beside the two notice lines and the what's-new
+//! notes the holder already carries, and the version the user skipped (0.8.0
 //! settings-polish S1).
 //!
 //! All of them are SHELL-owned: the reducer knows nothing about a config file, a
-//! provider check or a registry, and the reads run off the intent path (the
-//! update check on a thread of its own). Each `note_*` records what a read
-//! answered and returns the slice to push, which is the same step every other
+//! provider check or a registry. Neither the auth read nor the usage read has an
+//! intent of its own any more (0.8.0 settings-polish S4): both run inside the
+//! Settings dialog's one load (`Bridge::settings_snapshot`, which
+//! `settings_snapshot::gather` fills), and the only check this module records is
+//! the one a startup or a load answered. `note_updates` is that step - what a
+//! read answered, and the slice to push - which is the same step every other
 //! shell-owned line takes.
 //!
 //! The profiles read left with the Profiles pane (profiles-editor T2d): no pane
@@ -16,27 +19,12 @@
 use gentle_runtime::app_config::AppConfig;
 
 use super::{lock, AppStateHolder};
-use crate::contract::{
-    AuthView, UpdatesStatusView, UpdatesView, UsageStatusView, UsageView, ViewState,
-};
+use crate::contract::{AuthView, UpdatesView, UsageView, ViewState};
 
 impl AppStateHolder {
-    /// Records what the auth read answered and answers the slice to push.
-    pub fn note_auth(&self, auth: AuthView) -> ViewState {
-        *lock(&self.auth) = auth;
-        self.view()
-    }
-
     /// Records the update check's answer and answers the slice to push.
     pub fn note_updates(&self, updates: UpdatesView) -> ViewState {
         *lock(&self.updates) = updates;
-        self.view()
-    }
-
-    /// Marks the check as running (S3: it happens once when the app opens, and
-    /// only when the user asks again), keeping the versions it showed.
-    pub fn note_updates_checking(&self) -> ViewState {
-        lock(&self.updates).status = UpdatesStatusView::Checking;
         self.view()
     }
 
@@ -87,19 +75,6 @@ impl AppStateHolder {
     /// skips nothing changes nothing.
     pub fn unskip_update(&self) -> ViewState {
         self.update_config(AppConfig::clear_skipped_update);
-        self.view()
-    }
-
-    /// Marks the usage read as running, keeping what it showed: the pane's
-    /// quiet loading line, never a blocking spinner.
-    pub fn note_usage_reading(&self) -> ViewState {
-        lock(&self.usage).status = UsageStatusView::Reading;
-        self.view()
-    }
-
-    /// Records what the usage read answered and answers the slice to push.
-    pub fn note_usage(&self, usage: UsageView) -> ViewState {
-        *lock(&self.usage) = usage;
         self.view()
     }
 

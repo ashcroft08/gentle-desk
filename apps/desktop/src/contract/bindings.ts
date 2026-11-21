@@ -2768,22 +2768,6 @@ export type UiIntent_Deserialize = { type: "SendPrompt"; data: {
 	mode: SessionModeChoice,
 } } | 
 /**
- *  Re-read the provider names and re-run one `auth check` per provider
- *  (0.1.12, T3). The answer travels back on [`ViewState::auth`].
- */
-{ type: "RefreshAuth" } | 
-/**
- *  Check the three versions again (0.1.12, S2, S7), the same check the app
- *  runs once when it opens. It only ever CHECKS: no update is installed
- *  from here. The answer travels back on [`ViewState::updates`].
- * 
- *  Unlike the check that runs when the app opens, this one always reports
- *  the real state: a version the user skipped is offered here with
- *  [`UpdatesView::skipped`] beside it, so the pane can say so and offer to
- *  stop skipping (0.8.0 settings-polish S2).
- */
-{ type: "CheckUpdates" } | 
-/**
  *  Skip the version the Updates pane offered (0.8.0 settings-polish S1): the
  *  version the check reported, remembered in the app config so it survives a
  *  restart, and beside the rows of every later push as
@@ -2803,16 +2787,7 @@ export type UiIntent_Deserialize = { type: "SendPrompt"; data: {
  *  the re-emitted slice like every other config intent, and nothing is
  *  installed or uninstalled by it.
  */
-{ type: "UnskipUpdate" } | 
-/**
- *  Read the subscription usage the shell's own sources report, and run them
- *  if they are installed: what the Usage pane asks for when it appears and
- *  on "Check again". This is the ONE run the pane makes, on the intent's own
- *  thread, because a run takes seconds and the keyboard must not wait.
- *  Nothing of it reads a chat, so no open chat can hold it back. The answer
- *  travels back on [`ViewState::usage`].
- */
-{ type: "RefreshUsage" };
+{ type: "UnskipUpdate" };
 
 /**
  *  What the user asked for, as the web side sends it. Only the intents the
@@ -3149,22 +3124,6 @@ export type UiIntent_Serialize = { type: "SendPrompt"; data: {
 	mode: SessionModeChoice,
 } } | 
 /**
- *  Re-read the provider names and re-run one `auth check` per provider
- *  (0.1.12, T3). The answer travels back on [`ViewState::auth`].
- */
-{ type: "RefreshAuth" } | 
-/**
- *  Check the three versions again (0.1.12, S2, S7), the same check the app
- *  runs once when it opens. It only ever CHECKS: no update is installed
- *  from here. The answer travels back on [`ViewState::updates`].
- * 
- *  Unlike the check that runs when the app opens, this one always reports
- *  the real state: a version the user skipped is offered here with
- *  [`UpdatesView::skipped`] beside it, so the pane can say so and offer to
- *  stop skipping (0.8.0 settings-polish S2).
- */
-{ type: "CheckUpdates" } | 
-/**
  *  Skip the version the Updates pane offered (0.8.0 settings-polish S1): the
  *  version the check reported, remembered in the app config so it survives a
  *  restart, and beside the rows of every later push as
@@ -3184,16 +3143,7 @@ export type UiIntent_Serialize = { type: "SendPrompt"; data: {
  *  the re-emitted slice like every other config intent, and nothing is
  *  installed or uninstalled by it.
  */
-{ type: "UnskipUpdate" } | 
-/**
- *  Read the subscription usage the shell's own sources report, and run them
- *  if they are installed: what the Usage pane asks for when it appears and
- *  on "Check again". This is the ONE run the pane makes, on the intent's own
- *  thread, because a run takes seconds and the keyboard must not wait.
- *  Nothing of it reads a chat, so no open chat can hold it back. The answer
- *  travels back on [`ViewState::usage`].
- */
-{ type: "RefreshUsage" };
+{ type: "UnskipUpdate" };
 
 /**
  *  Why one row of the Updates pane has no answer (0.8.1 settings-polish S8): the

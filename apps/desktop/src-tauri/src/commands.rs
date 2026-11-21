@@ -32,8 +32,7 @@ use crate::close::{self, BridgeSteps, CloseFlow};
 use crate::config::{ConfigSnapshot, ConfigWriter};
 use crate::contract::{
     AttachmentView, SettingsFilesChanged, SettingsFilesChangedView, StateChanged,
-    TerminalActionView, UiIntent, UpdatesStatusView, UpdatesView, UsageStatusView, UsageView,
-    ViewState,
+    TerminalActionView, UiIntent, UpdatesView, ViewState,
 };
 use crate::effects::{self, Ran, RuntimeExecutor};
 use crate::events::{EventPump, Push};
@@ -602,15 +601,6 @@ impl Bridge {
             emit_view(&emit, &view)?;
             return Ok(view);
         }
-        // The Settings panes' intents (0.1.12) are the shell's, not the
-        // reducer's: they read a file or run the shell's own check. Each answers
-        // the slice it pushed.
-        match &intent {
-            UiIntent::RefreshAuth => return self.refresh_auth(),
-            UiIntent::CheckUpdates => return self.check_updates(),
-            UiIntent::RefreshUsage => return self.refresh_usage(),
-            _ => {}
-        }
         // A relaunch is the close flow with a different last step: the config
         // writer and the session cache are flushed first, as for any close.
         if matches!(intent, UiIntent::RestartApp) {
@@ -803,53 +793,16 @@ impl Bridge {
         )
     }
 
-    /// The Account pane's read (0.1.12, T3): the provider names the auth store
-    /// lists, and one `auth check --no-refresh` per provider, pushed as the next
-    /// slice.
-    ///
-    /// The checks run on the intent's own thread - one short process each, and
-    /// the pane draws the answer it asked for - and nothing here refreshes a
-    /// token: `--no-refresh` is part of the command.
-    pub fn refresh_auth(&self) -> Result<ViewState, String> {
-        self.accepting_work()?;
-        let emit = self.emitter();
-        let view = self.holder.note_auth(settings::auth_view(
-            &self.settings.files,
-            self.settings.paths.auth.as_deref(),
-            &self.settings.probe,
-            self.holder.language(),
-        ));
-        emit_view(&emit, &view)?;
-        Ok(view)
-    }
-
-    /// One update check (0.1.12, S2, S3, S7): "Check again" from the pane. The
-    /// answer to the click says the check is running, and the check's own thread
-    /// pushes the versions it found. A check only ever CHECKS: no update is
-    /// installed from here.
-    ///
-    /// This is the USER's check (0.8.0 settings-polish S2, S3): it reports the
-    /// real state - the version they skipped included - and a check that fails
-    /// still says so, exactly as it did before the startup pass went quiet.
-    pub fn check_updates(&self) -> Result<ViewState, String> {
-        self.accepting_work()?;
-        let emit = self.emitter();
-        let view = self.holder.note_updates_checking();
-        emit_view(&emit, &view)?;
-        self.run_update_check(emit, CheckReason::Manual);
-        Ok(view)
-    }
-
     /// The automatic check of this run (S3): once, when the app opens, and never
     /// on the thread that draws. The endpoint is kept so a later "Check again"
-    /// reads the same manifest.
+    /// - the Settings dialog's own load - reads the same manifest.
     ///
     /// This is the STARTUP pass (0.8.0 settings-polish S2, S3): it does not offer
     /// the version the user skipped, and a check that learned nothing says
     /// nothing at all.
     pub fn start_updates(&self, desk_endpoint: Option<&str>) {
         *lock(&self.desk_endpoint) = desk_endpoint.map(str::to_owned);
-        self.run_update_check(self.emitter(), CheckReason::Startup);
+        self.run_update_check(self.emitter());
     }
 
     /// The Settings dialog's one read (settings-snapshot): every page's data
@@ -895,57 +848,13 @@ impl Bridge {
             .map_err(|error| format!("the settings snapshot could not run: {error}"))
     }
 
-    /// The Usage pane's read: where the shell's own usage sources stand, and -
-    /// when they are installed - what the one document they print says.
-    ///
-    /// The locator and the run are both work: the answer to the click says the
-    /// read is running, and the read's own thread pushes what it found, so the
-    /// window keeps drawing while `node` works (up to the seam's 30 s budget).
-    /// Nothing here looks at a chat, so no open chat can hold this read back,
-    /// and nothing is written: the sources own their own credentials.
-    pub fn refresh_usage(&self) -> Result<ViewState, String> {
-        self.accepting_work()?;
-        let emit = self.emitter();
-        let view = self.holder.note_usage_reading();
-        emit_view(&emit, &view)?;
-        let files = Arc::clone(&self.settings.files);
-        let node = Arc::clone(&self.settings.node);
-        let home = self.settings.paths.agent.clone();
-        let holder = Arc::clone(&self.holder);
-        let thread_emit = Arc::clone(&emit);
-        let spawned = std::thread::Builder::new()
-            .name("usage-read".to_owned())
-            .spawn(move || {
-                let answered = settings::usage_view(
-                    &files,
-                    home.as_deref(),
-                    &node,
-                    gentle_runtime::clock::now_ms(),
-                    holder.language(),
-                );
-                push(&thread_emit, holder.note_usage(answered));
-            });
-        if spawned.is_err() {
-            // No thread to read on: the pane says the read could not run rather
-            // than staying on "Reading...".
-            let view = self.holder.note_usage(UsageView {
-                status: UsageStatusView::Failed(
-                    messages::usage_read_could_not_start(self.holder.language()).to_owned(),
-                ),
-                ..UsageView::default()
-            });
-            push(&emit, view);
-        }
-        Ok(view)
-    }
-
     /// The check itself, on a thread of its own: the two versions the shell
     /// prints, the desk's own manifest and pi's registry entry, gathered outside
     /// every lock and pushed when they are all in.
     ///
-    /// `reason` is what separates the two passes (0.8.0 settings-polish S2, S3):
-    /// see [`update_answer`].
-    fn run_update_check(&self, emit: Emit, reason: CheckReason) {
+    /// It is the STARTUP pass only (0.8.0 settings-polish S2, S3): the Settings
+    /// dialog's own load is the check the user asks for. See [`update_answer`].
+    fn run_update_check(&self, emit: Emit) {
         let desk = self.holder.app_version();
         let manifest = lock(&self.desk_endpoint).clone();
         let web = Arc::clone(&self.settings.web);
@@ -953,7 +862,10 @@ impl Bridge {
         let skipped = self.holder.skipped_update();
         let holder = Arc::clone(&self.holder);
         let thread_emit = Arc::clone(&emit);
-        let spawned = std::thread::Builder::new()
+        // No thread to check on: the version probe and the two GETs are not moved
+        // onto the thread that draws, and a pass that cannot start says nothing at
+        // all, exactly like one that learned nothing (S3).
+        let _ = std::thread::Builder::new()
             .name("update-check".to_owned())
             .spawn(move || {
                 let checked = settings::updates_view(
@@ -967,56 +879,26 @@ impl Bridge {
                     // line is worded from (0.8.1 settings-polish S8).
                     gentle_runtime::clock::now_ms(),
                 );
-                if let Some(view) = update_answer(&holder, checked, reason) {
+                if let Some(view) = update_answer(&holder, checked) {
                     push(&thread_emit, view);
                 }
             });
-        if spawned.is_err() {
-            // No thread to check on: the version probe and the two GETs are not
-            // moved onto the thread that draws. A check the user asked for says
-            // the check ran and learned nothing rather than staying on
-            // "checking"; the one that runs when the app opens says nothing at
-            // all (S3).
-            if reason == CheckReason::Manual {
-                let view = self.holder.note_updates(UpdatesView {
-                    status: UpdatesStatusView::Ready,
-                    ..UpdatesView::default()
-                });
-                push(&emit, view);
-            }
-        }
     }
 }
 
-/// Why an update check ran (0.8.0 settings-polish S2, S3): the one the app makes
-/// when it opens, or the one the user asked for. The two differ in exactly two
-/// rules, both in [`update_answer`]: a skipped version is offered only to the
-/// user's own check, and a check that learned nothing is silent only at startup.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum CheckReason {
-    Startup,
-    Manual,
-}
-
-/// What a finished check pushes: [`CheckReason::Startup`] is silent when it
-/// learned nothing (S3: no notice, no error state, nothing user-visible) and
-/// never offers the version the user skipped (S2), while the check the user asked
-/// for always reports the real state, exactly as it did before this slice.
+/// What a finished check pushes: `None` is a startup pass with nothing to say
+/// (S3: no notice, no error state, nothing user-visible), and a checked view is
+/// pushed WITHOUT the version the user skipped (S2), so the pane never offers it
+/// again.
 ///
-/// `None` is a startup pass with nothing to say: no push at all, so the pane keeps
-/// saying it has not checked and the gear keeps no dot.
-fn update_answer(
-    holder: &AppStateHolder,
-    checked: UpdatesView,
-    reason: CheckReason,
-) -> Option<ViewState> {
-    match reason {
-        CheckReason::Startup if settings::updates_learned_nothing(&checked) => None,
-        CheckReason::Startup => {
-            Some(holder.note_updates(settings::updates_without_skipped(checked)))
-        }
-        CheckReason::Manual => Some(holder.note_updates(checked)),
+/// The check the user asks for is the Settings dialog's own load
+/// ([`Bridge::settings_snapshot`]), which reports the real state - the skipped
+/// version included - because an explicit read never hides information (S2).
+fn update_answer(holder: &AppStateHolder, checked: UpdatesView) -> Option<ViewState> {
+    if settings::updates_learned_nothing(&checked) {
+        return None;
     }
+    Some(holder.note_updates(settings::updates_without_skipped(checked)))
 }
 
 /// Whether the `gentle-shell` launcher resolves on this machine right now.

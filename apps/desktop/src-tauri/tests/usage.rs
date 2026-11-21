@@ -1,6 +1,7 @@
-//! Windowless tests of the Usage pane's read through the REAL
-//! `Bridge::dispatch`: the shell's own package located in its settings, the
-//! one run of its script, and the four states the pane draws.
+//! Windowless tests of the Usage pane's read (0.8.0 settings-polish S4: the
+//! `RefreshUsage` intent is gone, so the read is driven directly, exactly as the
+//! Settings dialog's one load drives it): the shell's own package located in its
+//! settings, the one run of its script, and the states the pane draws.
 //!
 //! Every test sets its own `APPDATA`, `LOCALAPPDATA`, `PI_CODING_AGENT_DIR`,
 //! `GENTLE_SHELL_HOME`, `GENTLE_PI_CONFIG_HOME` and `GENTLE_SHELL_CONFIG_HOME`,
@@ -8,18 +9,12 @@
 //! starts a process. The environment is process-global, so only one test of this
 //! file runs at a time.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard};
-use std::time::{Duration, Instant};
 
-use gentle_app::{ChatId, Input, Intent, SessionItem};
 use gentle_core::i18n::Language;
-use gentle_desk_lib::commands::{Bridge, Emit};
-use gentle_desk_lib::contract::{UiIntent, UsageProviderStatusView, UsageStatusView, ViewState};
-use gentle_desk_lib::settings::NodeProbe;
-
-/// The wait of the read's own thread.
-const WAIT: Duration = Duration::from_secs(10);
+use gentle_desk_lib::contract::{UsageProviderStatusView, UsageStatusView, UsageView};
+use gentle_desk_lib::settings::{usage_view, FileRead, NodeProbe};
 
 static ENV_LOCK: Mutex<()> = Mutex::new(());
 
@@ -121,34 +116,20 @@ fn scratch_root() -> PathBuf {
     std::env::temp_dir().join(format!("gentle-desk-usage-{}-{stamp}", std::process::id()))
 }
 
-/// The emit seam: every slice the bridge pushed, in order.
-fn recorder() -> (Emit, Arc<Mutex<Vec<ViewState>>>) {
-    let views = Arc::new(Mutex::new(Vec::new()));
-    let kept = Arc::clone(&views);
-    let emit: Emit = Arc::new(move |view: &ViewState| {
-        lock(&kept).push(view.clone());
-        Ok(())
-    });
-    (emit, views)
-}
-
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(|poison| poison.into_inner())
 }
 
-/// Waits for the pushed slice a predicate holds for, failing instead of hanging.
-fn wait_for<T>(what: &str, mut probe: impl FnMut() -> Option<T>) -> T {
-    let deadline = Instant::now() + WAIT;
-    loop {
-        if let Some(value) = probe() {
-            return value;
-        }
-        assert!(
-            Instant::now() < deadline,
-            "waited {WAIT:?} for {what} and it never came"
-        );
-        std::thread::sleep(Duration::from_millis(20));
-    }
+/// The real file reader the app gives the read, over this test's own home: a
+/// file that is not there is no text, never a failure.
+fn files() -> FileRead {
+    Arc::new(
+        |path: &Path, _language: Language| match std::fs::read_to_string(path) {
+            Ok(text) => Ok(Some(text)),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+            Err(error) => Err(error.to_string()),
+        },
+    )
 }
 
 /// A run that answers `answer` and records the script it was asked to run.
@@ -160,41 +141,32 @@ fn node(answer: Result<&'static str, &'static str>, asked: &Arc<Mutex<Vec<String
     })
 }
 
-/// The installed slice of the last push that finished the read, waited for.
-fn installed(views: &Arc<Mutex<Vec<ViewState>>>) -> ViewState {
-    wait_for("the usage read to answer", || {
-        lock(views)
-            .iter()
-            .rev()
-            .find(|view| view.usage.status != UsageStatusView::Reading)
-            .cloned()
-    })
+/// The pane's slice for this harness, read once exactly as the dialog's load
+/// reads it.
+fn read(harness: &Harness, node: &NodeProbe) -> UsageView {
+    usage_view(
+        &files(),
+        Some(&harness.agent()),
+        node,
+        gentle_runtime::clock::now_ms(),
+        Language::En,
+    )
 }
 
 #[test]
-fn the_sources_reach_the_pane_through_the_intent() {
+fn the_sources_reach_the_pane() {
     let harness = Harness::new();
     harness.write_settings(SETTINGS);
     let script = harness.write_script();
     let asked = Arc::new(Mutex::new(Vec::new()));
-    let (emit, views) = recorder();
-    let bridge = Bridge::new()
-        .with_emit(emit)
-        .with_node_probe(node(Ok(DOCUMENT), &asked));
 
-    let answer = bridge
-        .dispatch(UiIntent::RefreshUsage)
-        .expect("the usage read answers");
+    let view = read(&harness, &node(Ok(DOCUMENT), &asked));
 
-    // The click's own answer says the read is running: the window keeps drawing.
-    assert_eq!(answer.usage.status, UsageStatusView::Reading);
-
-    let view = installed(&views);
-    assert_eq!(view.usage.status, UsageStatusView::Installed);
+    assert_eq!(view.status, UsageStatusView::Installed);
     assert_eq!(
         lock(&asked).len(),
         1,
-        "one run when the user asks, and only with the locator's own script"
+        "one run of the read, and only with the locator's own script"
     );
     assert_eq!(
         std::path::Path::new(&lock(&asked)[0]),
@@ -203,7 +175,6 @@ fn the_sources_reach_the_pane_through_the_intent() {
     );
 
     let names: Vec<&str> = view
-        .usage
         .providers
         .iter()
         .map(|provider| provider.provider.as_str())
@@ -213,20 +184,13 @@ fn the_sources_reach_the_pane_through_the_intent() {
         vec!["opencode-go", "antigravity", "commandcode", "claude-bridge"]
     );
     assert_eq!(
-        view.usage.providers[0].status,
+        view.providers[0].status,
         UsageProviderStatusView::NoData,
         "a provider without credentials is no data, never 0%"
     );
-    assert_eq!(
-        view.usage.providers[2].plan.as_deref(),
-        Some("individual goat")
-    );
-    assert_eq!(
-        view.usage.providers[3].limits[0].windows[1].used_percent,
-        96.0
-    );
+    assert_eq!(view.providers[2].plan.as_deref(), Some("individual goat"));
+    assert_eq!(view.providers[3].limits[0].windows[1].used_percent, 96.0);
     assert!(view
-        .usage
         .providers
         .iter()
         .flat_map(|provider| provider.limits.iter())
@@ -239,18 +203,12 @@ fn a_shell_without_the_package_says_it_is_missing_and_runs_nothing() {
     let harness = Harness::new();
     // No settings file at all: nobody installed anything for this shell.
     let asked = Arc::new(Mutex::new(Vec::new()));
-    let (emit, views) = recorder();
-    let bridge = Bridge::new()
-        .with_emit(emit)
-        .with_node_probe(node(Ok(DOCUMENT), &asked));
+    let node = node(Ok(DOCUMENT), &asked);
 
-    bridge
-        .dispatch(UiIntent::RefreshUsage)
-        .expect("a missing package is an answer");
+    let view = read(&harness, &node);
 
-    let view = installed(&views);
-    assert!(matches!(view.usage.status, UsageStatusView::Missing(_)));
-    assert!(view.usage.providers.is_empty());
+    assert!(matches!(view.status, UsageStatusView::Missing(_)));
+    assert!(view.providers.is_empty());
     assert!(
         lock(&asked).is_empty(),
         "nothing is run for a missing package"
@@ -258,11 +216,8 @@ fn a_shell_without_the_package_says_it_is_missing_and_runs_nothing() {
 
     // The checkout the entry names, but not the script: still missing.
     harness.write_settings(SETTINGS);
-    bridge
-        .dispatch(UiIntent::RefreshUsage)
-        .expect("a checkout without the script is an answer");
-    let view = installed(&views);
-    assert!(matches!(view.usage.status, UsageStatusView::Missing(_)));
+    let view = read(&harness, &node);
+    assert!(matches!(view.status, UsageStatusView::Missing(_)));
     assert!(lock(&asked).is_empty());
 }
 
@@ -272,69 +227,12 @@ fn a_run_that_failed_says_why_and_draws_no_provider() {
     harness.write_settings(SETTINGS);
     harness.write_script();
     let asked = Arc::new(Mutex::new(Vec::new()));
-    let (emit, views) = recorder();
-    let bridge = Bridge::new()
-        .with_emit(emit)
-        .with_node_probe(node(Err("node is not installed"), &asked));
 
-    bridge
-        .dispatch(UiIntent::RefreshUsage)
-        .expect("a failed run is an answer");
+    let view = read(&harness, &node(Err("node is not installed"), &asked));
 
-    let view = installed(&views);
     assert_eq!(
-        view.usage.status,
+        view.status,
         UsageStatusView::Failed("node is not installed".to_owned())
     );
-    assert!(view.usage.providers.is_empty());
-}
-
-#[test]
-fn a_chat_that_is_open_never_holds_the_read() {
-    let harness = Harness::new();
-    harness.write_settings(SETTINGS);
-    harness.write_script();
-    let session = harness.root.join("a.jsonl");
-    std::fs::write(&session, "{\"type\":\"session_info\"}\n").expect("a scratch session file");
-    let path = session.to_string_lossy().into_owned();
-
-    let asked = Arc::new(Mutex::new(Vec::new()));
-    let (emit, views) = recorder();
-    let bridge = Bridge::new()
-        .with_emit(emit)
-        .with_node_probe(node(Ok(DOCUMENT), &asked));
-
-    // A chat is open: the Updates pane's gate has something to count.
-    let chat = ChatId::of_session(&path);
-    bridge
-        .holder
-        .fold_input(Input::SessionsLoaded(vec![SessionItem {
-            path: path.clone(),
-            title: "A chat".to_owned(),
-            cwd: "/dev/repo".to_owned(),
-            modified_ms: 0,
-            message_count: 1,
-        }]));
-    bridge
-        .holder
-        .fold_input(Input::Intent(Intent::OpenChat(chat.clone())));
-    bridge.holder.fold_input(Input::ChatOpened { chat });
-    assert_eq!(bridge.holder.view().open_chats, 1);
-
-    bridge
-        .dispatch(UiIntent::RefreshUsage)
-        .expect("an open chat is no reason to refuse the read");
-
-    let view = installed(&views);
-    assert_eq!(
-        view.usage.status,
-        UsageStatusView::Installed,
-        "this section reads nothing from chats, so no chat can block it"
-    );
-    assert_eq!(view.open_chats, 1, "the slice still reports the open chat");
-    assert_eq!(
-        view.usage.providers.len(),
-        4,
-        "the whole document reaches the pane with a chat open"
-    );
+    assert!(view.providers.is_empty());
 }

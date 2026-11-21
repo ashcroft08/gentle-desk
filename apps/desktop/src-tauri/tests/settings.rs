@@ -1,6 +1,12 @@
-//! Windowless tests of the Settings panes' reads through the REAL
-//! `Bridge::dispatch` (0.1.12, S1, S2, S3, S5, S7): the auth store and the update
-//! check, with the machine behind seams the test answers.
+//! Windowless tests of the Settings panes' reads (0.1.12, S1, S2, S3, S5, S7):
+//! the auth store and the update check, with the machine behind seams the test
+//! answers.
+//!
+//! The `RefreshAuth` and `CheckUpdates` intents left with 0.8.0 settings-polish
+//! S4: the auth store is read by [`auth_view`] exactly as the Settings dialog's
+//! one load reads it, and the startup pass is the only check the bridge runs (the
+//! check the user asks for is that same dialog load, pinned by
+//! `tests/settings_snapshot.rs`).
 //!
 //! The profiles file and the session-only orchestrator switch were tested here
 //! until profiles-editor T2d removed both: no pane reads `profiles.json` any
@@ -13,7 +19,7 @@
 //! test starts a shell or reaches the network. The environment is
 //! process-global, so only one test of this file runs at a time.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
@@ -21,11 +27,9 @@ use gentle_app::{ChatId, Input};
 use gentle_core::i18n::Language;
 use gentle_core::rpc::{decode_line, Decoded};
 use gentle_desk_lib::commands::{Bridge, Emit};
-use gentle_desk_lib::contract::{
-    AuthStatusView, ProviderStatusView, UiIntent, UpdatesStatusView, ViewState,
-};
+use gentle_desk_lib::contract::{AuthStatusView, ProviderStatusView, UpdatesStatusView, ViewState};
 use gentle_desk_lib::settings::{
-    ProviderAnswer, ProviderProbe, VersionProbe, WebGet, SHELL_REGISTRY,
+    auth_view, FileRead, ProviderAnswer, ProviderProbe, VersionProbe, WebGet, SHELL_REGISTRY,
 };
 
 /// The wait of the update check's own thread.
@@ -78,8 +82,14 @@ impl Harness {
     /// Writes `body` where the shell keeps its auth store: the agent folder the
     /// home flags select.
     fn write_auth(&self, body: &str) {
-        let path = self.root.join("home").join("auth.json");
+        let path = self.auth_store();
         std::fs::write(path, body).expect("the scratch auth store is writable");
+    }
+
+    /// Where the shell keeps its auth store: the agent folder the home flags
+    /// select.
+    fn auth_store(&self) -> PathBuf {
+        self.root.join("home").join("auth.json")
     }
 }
 
@@ -124,6 +134,18 @@ fn recorder() -> (Emit, Arc<Mutex<Vec<ViewState>>>) {
 
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(|poison| poison.into_inner())
+}
+
+/// The real file reader the app gives a read, over this test's own home: a file
+/// that is not there is no text, never a failure.
+fn files() -> FileRead {
+    Arc::new(
+        |path: &Path, _language: Language| match std::fs::read_to_string(path) {
+            Ok(text) => Ok(Some(text)),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+            Err(error) => Err(error.to_string()),
+        },
+    )
 }
 
 /// The slices pushed so far, as one read of the recorder.
@@ -235,47 +257,44 @@ fn the_auth_store_is_read_for_its_names_and_never_its_values() {
         }"#,
     );
     let asked = Arc::new(Mutex::new(Vec::new()));
-    let (emit, views) = recorder();
-    let bridge = Bridge::new().with_emit(emit).with_provider_probe(probe(
-        vec![
-            (
-                "anthropic",
-                1,
-                r#"{"status":"not_ready","provider":"anthropic","reason":"OAuth token expired"}"#,
-            ),
-            (
-                "commandcode",
-                0,
-                r#"{"status":"ready","provider":"commandcode","authType":"api_key"}"#,
-            ),
-        ],
-        &asked,
-    ));
+    let view = auth_view(
+        &files(),
+        Some(&harness.auth_store()),
+        &probe(
+            vec![
+                (
+                    "anthropic",
+                    1,
+                    r#"{"status":"not_ready","provider":"anthropic","reason":"OAuth token expired"}"#,
+                ),
+                (
+                    "commandcode",
+                    0,
+                    r#"{"status":"ready","provider":"commandcode","authType":"api_key"}"#,
+                ),
+            ],
+            &asked,
+        ),
+        Language::En,
+    );
 
-    let answer = bridge
-        .dispatch(UiIntent::RefreshAuth)
-        .expect("the auth read answers");
-
-    assert_eq!(answer.auth.status, AuthStatusView::Ready);
+    assert_eq!(view.status, AuthStatusView::Ready);
     assert_eq!(
         *lock(&asked),
         vec!["anthropic".to_owned(), "commandcode".to_owned()],
         "one check per provider, in the store's order"
     );
-    assert_eq!(answer.auth.providers.len(), 2);
-    assert_eq!(answer.auth.providers[0].name, "anthropic");
+    assert_eq!(view.providers.len(), 2);
+    assert_eq!(view.providers[0].name, "anthropic");
+    assert_eq!(view.providers[0].status, ProviderStatusView::NotReady);
     assert_eq!(
-        answer.auth.providers[0].status,
-        ProviderStatusView::NotReady
-    );
-    assert_eq!(
-        answer.auth.providers[0].reason.as_deref(),
+        view.providers[0].reason.as_deref(),
         Some("OAuth token expired")
     );
-    assert_eq!(answer.auth.providers[1].status, ProviderStatusView::Ready);
+    assert_eq!(view.providers[1].status, ProviderStatusView::Ready);
 
     // What the page receives carries no material from the store.
-    let pushed = serde_json::to_string(&lock(&views).last().cloned().expect("a push")).unwrap();
+    let pushed = serde_json::to_string(&view).unwrap();
     for secret in ["SECRET", "sk-ant", "cc-", "access", "key"] {
         assert!(!pushed.contains(secret), "the slice carried {secret}");
     }
@@ -370,22 +389,6 @@ fn the_check_runs_once_when_the_app_opens() {
             SHELL_REGISTRY.to_owned()
         ]
     );
-
-    // "Check again" asks the same two addresses again, and its answer to the
-    // click says the check is running.
-    let answer = bridge
-        .dispatch(UiIntent::CheckUpdates)
-        .expect("the check starts again");
-    assert_eq!(answer.updates.status, UpdatesStatusView::Checking);
-    wait_for("the second check to answer", || {
-        lock(&views)
-            .iter()
-            .filter(|view| view.updates.status == UpdatesStatusView::Ready)
-            .count()
-            .ge(&2)
-            .then_some(())
-    });
-    assert_eq!(lock(&asked).len(), 6, "two checks, three addresses each");
 }
 
 #[test]
@@ -490,48 +493,6 @@ fn a_version_newer_than_the_skipped_one_is_offered_as_usual() {
 }
 
 #[test]
-fn the_check_the_user_asks_for_reports_a_skipped_version_as_it_is() {
-    let _harness = Harness::new();
-    let asked = Arc::new(Mutex::new(Vec::new()));
-    let (emit, views) = recorder();
-    let bridge = Bridge::new()
-        .with_emit(emit)
-        .with_version_probe(versions("1.5.2"))
-        .with_web_get(web(None, Some(r#"{"version":"2.0.5"}"#), None, &asked));
-    bridge.holder.set_app_version("0.1.12");
-    bridge.holder.replace_config(skipping("2.0.5"));
-    bridge.start_updates(None);
-    wait_for("the opening check to answer", || {
-        last_answer(&views).map(|_| ())
-    });
-
-    // "Check again": the user asked, so the answer is the real state - the
-    // skipped version included - and the pane decides what to draw with it.
-    bridge
-        .dispatch(UiIntent::CheckUpdates)
-        .expect("the check starts again");
-    // Two answers counted in ONE read of the recorder: the startup pass's and the
-    // user's own. The second must carry the skipped version as it is.
-    let ready = wait_for("the check the user asked for to answer", || {
-        let answers: Vec<ViewState> = pushed(&views)
-            .into_iter()
-            .filter(|view| view.updates.status == UpdatesStatusView::Ready)
-            .collect();
-        (answers.len() >= 2).then(|| answers.last().cloned().expect("the second answer"))
-    });
-    assert_eq!(
-        ready.updates.pi.update_available,
-        Some(true),
-        "an explicit check never hides the skipped version"
-    );
-    assert_eq!(
-        ready.updates.skipped.as_deref(),
-        Some("2.0.5"),
-        "and it names the skip, which is what offers to undo it"
-    );
-}
-
-#[test]
 fn a_check_that_learned_nothing_when_the_app_opened_says_nothing() {
     let _harness = Harness::new();
     let asked = Arc::new(Mutex::new(Vec::new()));
@@ -555,35 +516,4 @@ fn a_check_that_learned_nothing_when_the_app_opened_says_nothing() {
         UpdatesStatusView::Unknown,
         "a check that learned nothing leaves the pane saying it has not checked"
     );
-}
-
-#[test]
-fn a_check_that_learned_nothing_when_the_user_asked_is_still_shown() {
-    // PRESERVE (S3): the same failure, but the user asked for it, so it is
-    // reported exactly as it was before the startup pass went quiet.
-    let _harness = Harness::new();
-    let asked = Arc::new(Mutex::new(Vec::new()));
-    let (emit, views) = recorder();
-    let failing: VersionProbe = Arc::new(|_language: Language| Err("the shell is gone".to_owned()));
-    let bridge = Bridge::new()
-        .with_emit(emit)
-        .with_version_probe(failing)
-        .with_web_get(web(None, None, None, &asked));
-    bridge.holder.set_app_version("0.1.12");
-    bridge.start_updates(None);
-    nothing_pushed_for(Duration::from_millis(200), &views);
-
-    let answer = bridge
-        .dispatch(UiIntent::CheckUpdates)
-        .expect("the check starts again");
-    assert_eq!(answer.updates.status, UpdatesStatusView::Checking);
-    let ready = wait_for("the check the user asked for to answer", || {
-        last_answer(&views)
-    });
-    assert_eq!(ready.updates.pi.latest, None);
-    assert_eq!(
-        ready.updates.pi.update_available, None,
-        "unknown is never an update, and the pane says so"
-    );
-    assert_eq!(ready.updates.desk.latest, None);
 }

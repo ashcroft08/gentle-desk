@@ -98,10 +98,7 @@ pub fn to_intent(state: &gentle_app::AppState, intent: &UiIntent) -> Option<gent
         // is that chat's OWN child's, asked through a per-chat command of the
         // shell's own (`AppStateHolder::dispatch_commands`).
         | UiIntent::ReadSessionMode { .. }
-        | UiIntent::SetSessionMode { .. }
-        | UiIntent::RefreshAuth
-        | UiIntent::CheckUpdates
-        | UiIntent::RefreshUsage => return None,
+        | UiIntent::SetSessionMode { .. } => return None,
     })
 }
 
