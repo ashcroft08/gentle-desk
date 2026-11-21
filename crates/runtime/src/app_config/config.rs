@@ -13,7 +13,8 @@
 //! absent until the user chooses one. The notifications setting
 //! ([`AppConfig::notifications`]) is additive too: a file written before it
 //! existed loads with the default, and a value this version does not know loads
-//! the same way.
+//! the same way; it is not written while it IS the default, so such a file stays
+//! what older builds wrote.
 
 use serde::{Deserialize, Deserializer, Serialize};
 
@@ -57,7 +58,10 @@ pub struct AppConfig {
     /// not in front (the default), or nothing. An ADDITIVE field like the theme,
     /// read leniently: absent, or a value this version does not know, is the
     /// default and never a damaged file, so the workspaces below are never
-    /// discarded for it.
+    /// discarded for it. What a saved file holds is the write shape's decision
+    /// alone (`store::document`'s `DocumentRef`): it writes the key only once the
+    /// mode is NOT the default, so this field carries no `skip_serializing_if` of
+    /// its own.
     #[serde(default, deserialize_with = "notifications::or_default")]
     pub notifications: Notifications,
     /// Which home the user chose on the welcome screen, `None` until they do.

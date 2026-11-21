@@ -358,7 +358,7 @@ fn every_notifications_mode_round_trips_through_the_file() {
         let path = config_file(dir.path());
         let mut config = AppConfig::default();
         assert!(config.add_workspace(r"C:\dev\p"));
-        // The default needs no set: what matters is that it is written back.
+        // The default is not written at all; what matters is that it reads back.
         config.set_notifications(mode);
 
         save(&path, &config).unwrap();
@@ -414,6 +414,63 @@ fn the_saved_document_carries_the_notifications_mode_the_setting_names() {
     let document: serde_json::Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
     assert_eq!(document["notifications"], serde_json::json!("off"));
     assert_eq!(document["version"], serde_json::json!(CONFIG_VERSION));
+}
+
+#[test]
+fn the_default_notifications_mode_is_not_written_at_all() {
+    // A file of a user who never touched the setting stays byte-for-byte what
+    // older builds wrote: the key only appears once the alert is turned off.
+    let config = AppConfig {
+        theme: crate::app_config::Theme::Dark,
+        ..AppConfig::default()
+    };
+
+    let bytes = super::document::bytes(&config).expect("serialises");
+
+    assert_eq!(
+        String::from_utf8(bytes).unwrap(),
+        r#"{"version":1,"theme":"dark","workspaces":[]}"#,
+        "nothing of this setting reaches a file at its default"
+    );
+}
+
+#[test]
+fn choosing_the_default_again_takes_the_notifications_key_out_of_the_file() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = config_file(dir.path());
+    write_damaged(&path, WITHOUT_NOTIFICATIONS);
+    let mut config = load(&path).config;
+
+    assert!(config.set_notifications(crate::app_config::Notifications::Off));
+    save(&path, &config).unwrap();
+    let written = fs::read(&path).unwrap();
+    assert!(
+        String::from_utf8(written)
+            .unwrap()
+            .contains(r#""notifications":"off""#),
+        "the mode off is in the file"
+    );
+
+    assert!(
+        config.set_notifications(crate::app_config::Notifications::WhenUnfocused),
+        "back to the default is a change, so it is saved"
+    );
+    save(&path, &config).unwrap();
+
+    // The rewrite is the document the user's own file was before the key
+    // existed, plus nothing: the key is gone again, not stored as the default.
+    let after: serde_json::Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    assert!(
+        after.get("notifications").is_none(),
+        "the default is not written: {after}"
+    );
+    assert_eq!(after["theme"], serde_json::json!("dark"));
+    assert_eq!(after["language"], serde_json::json!("es"));
+    assert_eq!(after["workspaces"][0]["collapsed"], serde_json::json!(true));
+    assert_eq!(
+        load(&path).config.notifications,
+        crate::app_config::Notifications::WhenUnfocused
+    );
 }
 
 #[test]

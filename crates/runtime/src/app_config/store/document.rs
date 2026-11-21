@@ -26,8 +26,12 @@ struct DocumentRef<'a> {
     /// absent the web side starts from the system's own language.
     #[serde(skip_serializing_if = "Option::is_none")]
     language: Option<Language>,
-    /// Always written, like the theme: the choice has a default the user can
-    /// read back as the document's own value.
+    /// Written only once the user turns the alert off, so a file of a user who
+    /// never touched the setting stays byte-for-byte what older builds wrote:
+    /// while it is absent the mode reads as the default (a tone and a toast
+    /// while the window is not in front), exactly like an unset language or an
+    /// unchosen home.
+    #[serde(skip_serializing_if = "is_default_mode")]
     notifications: Notifications,
     /// Written only once the user chose, so a file of a user who never saw the
     /// welcome screen stays byte-for-byte what older builds wrote.
@@ -45,6 +49,13 @@ struct DocumentRef<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     last_run_version: Option<&'a str>,
     workspaces: &'a [WorkspaceEntry],
+}
+
+/// Whether the stored mode is the one an absent key reads as (the default), in
+/// which case the key is not written at all: `serde`'s answer for
+/// `skip_serializing_if` above.
+fn is_default_mode(mode: &Notifications) -> bool {
+    *mode == Notifications::default()
 }
 
 /// The bytes of `config` as this app writes them.

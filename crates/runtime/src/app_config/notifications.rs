@@ -9,6 +9,12 @@
 //! version does not know loads as the default instead of turning the whole file
 //! into a damaged one (`or_default`). Nothing is ever migrated or moved aside
 //! for it, and `CONFIG_VERSION` does not move.
+//!
+//! Writing follows the other additive fields: the key is written only once the
+//! mode is `off`, so a file of a user who never touched the setting stays
+//! byte-for-byte what older builds wrote - the rule the language preference and
+//! the chosen home follow while they are unset. An absent key reads back as the
+//! default.
 
 use serde::{Deserialize, Deserializer, Serialize};
 
