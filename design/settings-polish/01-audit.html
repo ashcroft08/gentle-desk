@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="es" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ajustes 0.8.0 — 01 · auditoría del diálogo real</title>
+<style>
+/* Todos los valores de este bloque son los TOKENS del sistema (design/system.md,
+   tema `dark`, el de por defecto): ninguna regla de más abajo escribe un color. */
+:root{--bg:#0e1116;--surface:#151a21;--surface2:#1c222b;--border:#2b333d;--text:#e4e8ee;--muted:#9aa4b2;--faint:#7d8593;--accent:#7aa2f7;--tint:rgba(122,162,247,.14);--success:#7edc9a;--warning:#e7b455;--danger:#ff8585;--shadow:0 8px 24px rgba(0,0,0,.45)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif}
+.page{max-width:900px;margin:0 auto;padding:26px 20px 48px}
+.kicker{margin:0 0 8px;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--faint)}
+h1{margin:0 0 10px;font-size:18px;font-weight:600}
+.lede{margin:0 0 8px;color:var(--muted);font-size:13px;line-height:1.6}
+.lede b{color:var(--text);font-weight:600}
+.lede code,p code,li code,dd code{font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:12px;background:var(--surface2);border-radius:4px;padding:1px 5px}
+
+ol.findings{list-style:none;margin:22px 0 0;padding:0}
+.finding{display:grid;grid-template-columns:36px minmax(0,1fr);gap:0 12px;padding:16px 0 18px;border-top:1px solid var(--border)}
+.finding:first-child{border-top:0;padding-top:4px}
+.n{font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:12px;font-weight:600;color:var(--accent);line-height:1.8}
+.finding h2{margin:0 0 6px;font-size:14px;font-weight:600;line-height:1.45}
+.finding h2 .where{color:var(--faint);font-weight:400;font-size:12px}
+.finding p{margin:0 0 8px;color:var(--muted);font-size:13px;line-height:1.6}
+.finding p b{color:var(--text);font-weight:600}
+.refs{display:flex;flex-wrap:wrap;gap:6px;margin:0}
+.refs code{font:12px/1.5 ui-monospace,'Cascadia Code',Consolas,monospace;background:var(--surface2);border-radius:4px;padding:1px 6px;color:var(--muted);white-space:nowrap}
+
+/* La única prueba dibujada de esta hoja: el campo tal y como lo dibuja hoy
+   app.css y el ancho de cada tramo, medido. No es la app: es una lupa. */
+.ev{margin:10px 0 0;padding:12px 14px;border:1px solid var(--border);border-radius:10px;background:var(--surface)}
+.ev .cap{margin:0 0 8px;font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--faint)}
+.find{display:flex;align-items:center;gap:6px;width:169px;height:28px;padding:0 8px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--faint)}
+.find svg{flex:none;width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.find input{flex:1;min-width:0;border:0;background:transparent;color:var(--text);font:inherit;font-size:12.5px;outline:none}
+.find input::placeholder{color:var(--faint)}
+/* Hoy: el `padding: 7px 10px` de `.dlg input` (app.css:2153) sigue vivo aquí,
+   porque `.settings-find input` (app.css:2306) nunca lo repone. */
+.find.today input{padding:7px 10px}
+.find.today{overflow:visible}
+.find.fixed input{padding:0}
+.rule{margin:10px 0 0;font:11.5px/1.5 ui-monospace,'Cascadia Code',Consolas,monospace;color:var(--faint)}
+.rule b{color:var(--muted);font-weight:600}
+
+.acts{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0}
+.btn{border:1px solid var(--border);background:var(--surface2);color:var(--text);border-radius:8px;padding:6px 14px;font:inherit;font-size:13px}
+.btn.accent{border-color:var(--accent);background:var(--accent);color:var(--bg);font-weight:600}
+
+.outro{margin:26px 0 0;padding:16px 0 0;border-top:1px solid var(--border);color:var(--muted);font-size:13px;line-height:1.6}
+.outro h3{margin:0 0 8px;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--faint)}
+.outro p{margin:0 0 8px}
+.outro b{color:var(--text);font-weight:600}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style></head><body>
+<main class="page">
+
+<p class="kicker">01 · auditoría del diálogo real</p>
+<h1>Lo que hoy no funciona en Ajustes, con la regla que lo causa</h1>
+<p class="lede">Doce defectos leídos en el código de verdad —<code>SettingsDialog.svelte</code>, los ocho paneles y las reglas de <code>app.css</code>—, ordenados por lo que primero se ve. Cada uno lleva el <b>archivo:línea</b> de su regla y la <b>medida</b> que lo prueba. No hay gusto: si una línea no se puede señalar, no está aquí. Las medidas salen de la geometría real del diálogo: la tarjeta mide <b>680 px</b>, el cuerpo queda en <b>642 px</b>, el riel ocupa <b>184</b>, el hueco entre riel y panel <b>18</b>, y el panel <b>440</b> con <b>430</b> de contenido.</p>
+
+<ol class="findings">
+
+<li class="finding">
+  <span class="n">01</span>
+  <div>
+    <h2>Buscador del riel: la lupa queda a 16 px del texto, y el campo de texto se sale de su caja <span class="where">· el defecto del pantallazo</span></h2>
+    <p>El campo mide <b>169 px</b> de ancho (<code>.settings-side</code> son 184 menos 14 de relleno derecho y 1 de borde) y la primera letra del marcador empieza a <b>39 px</b>: 1 de borde + 8 de relleno + 14 de la lupa + los 6 del <code>gap</code> + <b>10 de relleno izquierdo del propio input</b>. Ese relleno de 10 es la causa exacta: <code>.settings-find input</code> nunca repone <code>padding</code>, así que le llega el <code>padding: 7px 10px</code> de la regla genérica <code>.dlg input</code>, escrito para un campo a todo lo ancho y sin icono (misma especificidad, la genérica no queda anulada porque la específica no declara la propiedad). Son <b>16 px entre la lupa y la B</b>, el 23 % del campo vacío.</p>
+    <p>El mismo relleno tiene la segunda mitad del defecto, la vertical: 7 px arriba y abajo sobre una línea de 18,75 px dan un input de <b>32,75 px dentro de una caja de 28</b>, centrado con <code>align-items: center</code>. La caja donde se pinta el cursor y la selección sobresale <b>~2,4 px por arriba y por abajo</b> del borde del campo, y una pulsación 2 px por encima del borde enfoca igual.</p>
+    <div class="ev">
+      <p class="cap">Hoy, a tamaño real (169 px)</p>
+      <div class="find today">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+        <input type="search" placeholder="Buscar un ajuste…" aria-label="Buscar un ajuste" readonly>
+      </div>
+      <p class="rule"><b>hoy</b> 1 + 8 + 14 + 6 + <b>10</b> = 39 px &nbsp;·&nbsp; <b>propuesto</b> 1 + 9 + 14 + 8 + <b>0</b> = 32 px</p>
+    </div>
+    <p class="refs"><code>app.css:2306</code><code>app.css:2153</code><code>app.css:2288-2298</code></p>
+  </div>
+</li>
+
+<li class="finding">
+  <span class="n">02</span>
+  <div>
+    <h2>Apariencia: 84 px de tarjeta vacía bajo la segunda fila de temas</h2>
+    <p>El hueco lateral del pantallazo ya no existe: con <code>repeat(3, minmax(0,1fr))</code> y 10 px de separación las seis tarjetas miden <b>136,7 px</b> y llenan dos filas exactas de borde a borde. Lo que sobra es vertical. El contenido del panel termina a <b>224,5 px</b> (título 26,5 + pista 32 + rejilla 166) y el cuerpo mide <b>308</b>, así que quedan <b>83,5 px</b> de superficie de tarjeta sin nada.</p>
+    <p>La altura no la pone el panel: la pone el <b>riel</b> — 28 del campo + 8 del hueco + 8 entradas de 32 + 7 huecos de 2 = <b>306 px</b>. Y <code>.settings-body { min-height: 240px }</code> es una declaración muerta: el riel siempre es más alto, así que esos 240 nunca se aplican. El mismo aire aparece en Idioma, Acerca de y Notificaciones.</p>
+    <p class="refs"><code>app.css:2270</code><code>app.css:2288-2298</code><code>app.css:2333-2342</code><code>app.css:2389</code></p>
+  </div>
+</li>
+
+<li class="finding">
+  <span class="n">03</span>
+  <div>
+    <h2>Apariencia: cuántas tarjetas caben lo decide el ancho de la VENTANA, no el del lienzo</h2>
+    <p>La tarjeta del diálogo mide <code>min(680px, 100vw - 32px)</code> y la ventana de la app tiene <code>minWidth: 800</code>: la tarjeta mide <b>680 px siempre</b> (sólo bajaría por debajo de una ventana de 712). Aun así la rejilla se parte con dos <i>media queries</i> de ventana. Entre <b>800 y 900 px</b> —el rango más estrecho que la app permite— la tarjeta sigue en 680, el panel en 430 y las tres columnas siguen cabiendo con holgura (136,7 px cada una, y el nombre más largo, «Gentleman-Sexy» a 11,5 px, mide ~83), pero la rejilla cae a <b>dos columnas</b>: tres filas, el panel crece ~88 px y el aire del punto 02 se hace visible como un salto. La segunda consulta, por debajo de 640 px, <b>no se alcanza nunca</b>.</p>
+    <p class="refs"><code>app.css:2473-2478</code><code>app.css:2599-2603</code><code>app.css:2606-2610</code><code>app.css:2250</code></p>
+  </div>
+</li>
+
+<li class="finding">
+  <span class="n">04</span>
+  <div>
+    <h2>Las acciones: el mismo botón de acento cambia de sitio en cada panel</h2>
+    <p><code>.btn.accent</code> es el único relleno de acento del panel, y en cada sección cae en una posición distinta de la fila: en <b>Actualizaciones</b> es el segundo de tres botones y «Actualizar extensiones» queda a su derecha; en <b>Cuenta</b> y en <b>Uso</b> es el primero; en <b>Notificaciones</b> está solo. El ojo que recorre el riel no puede aprender dónde vive la acción principal.</p>
+    <p class="refs"><code>UpdatesPane.svelte:104-116</code><code>AccountPane.svelte:104-107</code><code>UsagePane.svelte:58-61</code><code>app.css:2650-2662</code></p>
+  </div>
+</li>
+
+<li class="finding">
+  <span class="n">05</span>
+  <div>
+    <h2>Actualizaciones: la fila de botones se recompone entre estados y un botón salta ~100 px</h2>
+    <p>Los tres botones viven en un solo <code>.acts</code> con <code>flex-wrap: wrap</code> y sin anchos fijos. Cuando no hay versión ofrecida la fila es <code>[Comprobar de nuevo][Actualizar extensiones]</code>; cuando la hay es <code>[Comprobar de nuevo][Actualizar][Actualizar extensiones]</code>. El borde de la tarjeta no se mueve: el botón de extensiones salta <b>~100 px</b> a la derecha —y de línea, en cuanto la ventana es estrecha— sólo porque apareció un botón antes que él.</p>
+    <div class="ev">
+      <p class="cap">Hoy: los dos estados, uno bajo el otro</p>
+      <div class="acts"><button type="button" class="btn">Comprobar de nuevo</button><button type="button" class="btn">Actualizar extensiones</button></div>
+      <p class="rule" style="margin:10px 0 8px">— versión ofrecida —</p>
+      <div class="acts"><button type="button" class="btn">Comprobar de nuevo</button><button type="button" class="btn accent">Actualizar</button><button type="button" class="btn">Actualizar extensiones</button></div>
+    </div>
+    <p class="refs"><code>app.css:2631-2638</code><code>UpdatesPane.svelte:104-116</code><code>UpdatesPane.svelte:143-147</code></p>
+  </div>
+</li>
+
+<li class="finding">
+  <span class="n">06</span>
+  <div>
+    <h2>Marco: la fila de «Cerrar» lleva el doble de aire que el título</h2>
+    <p>La tarjeta es una columna flex con <code>gap: 14px</code>, y <code>.dlg .acts</code> —la fila que sostiene el botón Cerrar— suma además su propio <code>margin-top: 16px</code>: <b>30 px</b> entre el cuerpo y Cerrar contra <b>14 px</b> entre el título y el cuerpo. El borde inferior del diálogo se despega sin motivo y el aire del punto 02 se repite una segunda vez.</p>
+    <p class="refs"><code>app.css:2257</code><code>app.css:2158-2165</code></p>
+  </div>
+</li>
+
+<li class="finding">
+  <span class="n">07</span>
+  <div>
+    <h2>Apariencia: el único control del panel no tiene etiqueta visible</h2>
+    <p>La rejilla de temas se anuncia como grupo con <code>aria-label={copy.themeGroup}</code>, y esa palabra —«Tema», «Theme»— existe ya en los dos diccionarios. En pantalla no se dibuja: el panel muestra un título, una pista y seis miniaturas sin decir qué eligen. Es el único panel cuyo control no está nombrado a la vista.</p>
+    <p class="refs"><code>ThemeCards.svelte:52</code><code>copy.ts:69</code><code>copy.ts:107</code></p>
+  </div>
+</li>
+
+<li class="finding">
+  <span class="n">08</span>
+  <div>
+    <h2>Actualizaciones: hasta cinco líneas de nota en cursiva bajo los botones</h2>
+    <p><code>.settings-pane .note</code> es 12 px en cursiva y en <code>--faint</code>, la tinta más débil de la tarjeta, y el panel dibuja hasta tres seguidas: lo que hace Actualizar, lo que hace Actualizar extensiones (la más larga, ~230 caracteres = 3 líneas a 430 px) y la nota del caso «sólo la app». Después de cada estado, el texto más largo y menos legible del diálogo ocupa el espacio que debería explicar el estado, no el botón.</p>
+    <p class="refs"><code>app.css:2640-2647</code><code>UpdatesPane.svelte:120-127</code><code>updates-copy.ts:108-111</code></p>
+  </div>
+</li>
+
+<li class="finding">
+  <span class="n">09</span>
+  <div>
+    <h2>Panel: el relleno es asimétrico y el contenido queda 4 px corrido a la izquierda</h2>
+    <p><code>.settings-pane</code> rellena 2 px a la izquierda y 8 a la derecha, mientras <code>.settings-side</code> rellena 14 a la derecha y 0 a la izquierda. Con los 18 de la tarjeta, el margen izquierdo del cuerpo es <b>18</b> y el derecho <b>26</b>: el contenido del panel es 8 px más estrecho de lo que la tarjeta permite y todo el cuerpo se lee desplazado 4 px.</p>
+    <p class="refs"><code>app.css:2389</code><code>app.css:2280</code></p>
+  </div>
+</li>
+
+<li class="finding">
+  <span class="n">10</span>
+  <div>
+    <h2>Panel: el borde derecho del contenido salta 10 px entre una sección y otra</h2>
+    <p>El panel es <code>overflow-y: auto</code> y la barra del sistema está tematizada a <b>10 px</b> con reglas <i>webkit</i>. Una sección que cabe (Apariencia) no paga ancho; una que desborda (Actualizaciones, Cuenta, Uso) pierde 10 px de contenido de golpe. La tarjeta del diálogo no se mueve, así que al cambiar de sección el borde derecho de las tarjetas interiores se corre 10 px: nada reserva el canal de la barra.</p>
+    <p class="refs"><code>app.css:2385</code><code>app.css:3715-3718</code></p>
+  </div>
+</li>
+
+<li class="finding">
+  <span class="n">11</span>
+  <div>
+    <h2>Dos dialectos del mismo control de dos respuestas, en el mismo diálogo</h2>
+    <p>«Idioma» y «Notificaciones» usan <code>.seg</code>: relleno 5/12, 12,5 px, y la opción elegida se rellena de <code>--accent</code> con texto <code>--bg</code> y peso 600. «Home del shell» usa <code>.home-choice</code>: relleno 4/10, 12 px, y la elegida toma <code>--tint</code> con <code>--text</code> y sin cambiar de peso. Misma pregunta, misma forma, dos alturas y dos rellenos.</p>
+    <p class="refs"><code>app.css:2719-2752</code><code>app.css:2018-2039</code></p>
+  </div>
+</li>
+
+<li class="finding">
+  <span class="n">12</span>
+  <div>
+    <h2>Uso: la fila de una ventana no puede partirse y su línea de reinicio se sale de la tarjeta</h2>
+    <p><code>.uwindow</code> es una fila flex sin <code>flex-wrap</code>, con la etiqueta a <code>min-width: 52px</code>, la barra a 76 y el porcentaje a 38; lo único elástico es la línea de reinicio, que es <code>white-space: nowrap</code> y va empujada con <code>margin-left: auto</code>. Con una fecha larga —«Se restablece el 12 de noviembre»— la fila no tiene dónde bajar y el texto desborda el relleno de 16 px de la tarjeta en lugar de pasar a la línea siguiente.</p>
+    <p class="refs"><code>app.css:3085-3093</code><code>app.css:3095-3100</code><code>app.css:3135-3139</code></p>
+  </div>
+</li>
+
+</ol>
+
+<div class="outro">
+  <h3>Lo que esta hoja no dice</h3>
+  <p>No hay aquí reproches de gusto: nada de «poco aire», «falta jerarquía» ni «queda frío». Cada punto tiene una regla, una medida y un arreglo posible con lo que la app ya tiene.</p>
+  <p>Los puntos <b>01, 02, 03, 06, 07, 09 y 10</b> son del marco y del panel de Apariencia, y se resuelven en <code>02-frame.html</code>. Los puntos <b>04, 05, 08</b> son del panel de Actualizaciones y se resuelven en <code>03-updates.html</code> (el 08 es cambio de copy: queda marcado como decisión, no dibujado). El <b>11</b> y el <b>12</b> se arreglan en una regla cada uno y no cambian ninguna forma; quedan como deuda declarada.</p>
+</div>
+
+</main>
+</body></html>

@@ -1,0 +1,35 @@
+{
+  "title": "Settings polish 0.8.0 — a design pass over every Settings pane",
+  "brief": "S5 of odd/tasks/settings-polish.md: the Settings dialog judged from the real panes (SettingsDialog.svelte, the eight section components, and the .dlg.settings / .settings-* / .tc* / .seg / .why / .quiet / .btn rules in app.css), reproduced as artboards before any code changes. 01 names twelve concrete defects with the file:line and the measurement of each rule; 02 proposes the frame, the rail and the search field at the dialog's real 680px on the Appearance pane, every fix one declaration that reuses the app's own tokens and components; 03 draws the Updates pane in its three states with the new 'Skip this version' action (es: 'Omitir esta versión' / 'Dejar de omitir') placed where a plain .btn already fits, so the wiring that lands the config field and the intent can adopt it as drawn. 04 extends the same pane for T4 (S6, S7, S8): the three rows become real rows with their own versions and their own action, the shell row gains 'Actualizar Gentle Shell' (gentle-shell upgrade), a failed read says which row failed and why, the card says when it last checked, and 'Actualizar extensiones' moves to its own honest block because no data drives it. Spanish is the language drawn; the English column of the new words is in each artboard's notes.",
+  "feature": "odd/tasks/settings-polish.md",
+  "artboards": [
+    {
+      "file": "01-audit.html",
+      "title": "01 · the audit: twelve defects, each with its rule and its measurement",
+      "tradeoff": "Ordered by how visible each defect is, not by pane, and every line can be pointed at (file:line plus the px it costs). No taste, no redesign: this board only establishes what is wrong, so it reads as a list rather than as a screen. Two defects are drawn at real size (the search field's 39px to the first letter, and the button that jumps ~100px between Updates states); the rest are text and numbers.",
+      "width": 900,
+      "height": 2300
+    },
+    {
+      "file": "02-frame.html",
+      "title": "02 · the frame, the rail and the search field, on Appearance at 680px",
+      "tradeoff": "Eight one-declaration fixes, no new component and no new token: the magnifier lands 8px from the placeholder (the leaked `padding: 7px 10px` of `.dlg input` is the cause), the glyph-to-word gap returns to the house's 8, the pane's padding becomes symmetric and reserves its scrollbar channel, and the Close row stops taking 30px where the card's own gap already gives 14. It also adds the visible 'Tema' label the pane's only control was missing, and deletes the two viewport media queries that flipped the theme deck to two columns in the one window range the app allows. It does NOT shrink the rail, so 62px of air under the deck remain: that is decision D1, and board 02c shows the height budget so the maintainer can decide it knowingly.",
+      "width": 900,
+      "height": 1950
+    },
+    {
+      "file": "03-updates.html",
+      "title": "03 · Updates in three states with 'Skip this version'",
+      "tradeoff": "The skip action is a plain `.btn` third in the row, and the action row is split in two so nothing moves: row one is the offered version's own actions (Comprobar de nuevo · Actualizar · Omitir esta versión), row two is the extensions button that no data drives. Availability, the skipped version and 'up to date' all keep 'Actualizar extensiones' at the same x, which is the defect the single wrapping row has today. A skip shows a quiet status line between the versions and the actions instead of hiding anything: the tag still says the update is available, because an explicit check never lies. The pane's existing copy is kept character for character so the wiring can land the button alone; merging the three italic notes is a separate copy change (decision D8).",
+      "width": 900,
+      "height": 2450
+    },
+    {
+      "file": "04-updates-full.html",
+      "title": "04 · Updates with the three rows made real, a failed read and last-checked",
+      "tradeoff": "T4 (S6, S7, S8) on the same pane: the one quiet versions line becomes three rows (name, current -> latest, its own action), so a button finally names the piece it updates and the shell row can be behind at all. The card stops lying twice: a row that could not be read always carries one short sentence saying which read failed and why, and while any row is unknown the header tag says 'Sin comprobar' instead of 'Todo está al día'. The card's metadata line keeps its class and changes its content, from the three versions to 'Última comprobación: hace 3 min', which is the one datum no seam carries yet (so the artboard also states the two contract fields the wiring needs). 'Actualizar extensiones' leaves the action row for its own card, because it is the one action no data drives and it deserves the sentence that says so. Still nothing is offered with a chat open, with today's words, and the skip stays a single version on one row. The cost is height and one row of new CSS, and the one thing it does not do is per-row skip, which the stored version cannot hold (decision D9).",
+      "width": 900,
+      "height": 6600
+    }
+  ]
+}
