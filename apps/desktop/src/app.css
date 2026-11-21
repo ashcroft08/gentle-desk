@@ -2468,10 +2468,11 @@ p {
 }
 
 /* The theme cards, the Appearance section's choice (the reference's theme_cards):
-   a grid of six miniatures, four to a row on a wide window. */
+   a grid of six miniatures, three to a row on a wide window: two even rows, and
+   wide enough for the longest name (Gentleman-Classic) to read in full. */
 .tc-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
   width: 100%;
 }

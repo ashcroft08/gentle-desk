@@ -208,9 +208,9 @@ describe('the theme cards', () => {
     }
   })
 
-  it('lays the cards four to a row, two on a medium window and one on a narrow one', () => {
+  it('lays the cards three to a row, two on a medium window and one on a narrow one', () => {
     expect(declarations(APP_CSS, '.tc-grid')).toMatch(
-      /grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\)/,
+      /grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/,
     )
     expect(scoped('max-width: 900px', '.tc-grid')).toMatch(
       /grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/,
