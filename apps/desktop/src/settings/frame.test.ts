@@ -68,12 +68,17 @@ describe('the Settings frame the maintainer approved', () => {
   })
 
   // D4/P5 · the rail column's gap, and the pane's symmetric padding plus the
-  // scrollbar channel reserved in all eight sections.
+  // scrollbar channel reserved in all eight sections. S7 raised both by the one
+  // step the sheet already uses: 12 -> 14 between field and rail, 2 -> 4 at the
+  // pane's two edges. The BOTTOM edge is the one thing this design changed here:
+  // settings-redesign R2 (approved as D5/D9) puts 24px of air under the content so
+  // no pane ends flush against the Close row, with a 24px veil over the cut
+  // (pinned in `scrollend.test.ts`). Top, right and left are unchanged.
   it('separates the field from the rail and keeps the pane symmetric and gutter-stable', () => {
-    expect(declarations('.settings-side')).toMatch(/gap:\s*12px\s*;/)
+    expect(declarations('.settings-side')).toMatch(/gap:\s*14px\s*;/)
 
     const pane = declarations('.settings-pane')
-    expect(pane).toMatch(/padding:\s*2px\s+0\s+0\s+2px\s*;/)
+    expect(pane).toMatch(/padding:\s*4px\s+0\s+24px\s+4px\s*;/)
     expect(pane).toMatch(/scrollbar-gutter:\s*stable\s*;/)
   })
 
@@ -93,9 +98,10 @@ describe('the Settings frame the maintainer approved', () => {
     expect(label).toMatch(/margin:\s*0\s+0\s+8px\s*;/)
   })
 
-  // D3/P3 · three columns whatever the window says: the card is 680px wide at
-  // every window the app allows, so a viewport media query only ever described a
-  // range the grid could not really be narrow in.
+  // D3/P3 · three columns whatever the window says: the card is at least 752px
+  // wide at every window the app allows (860 from 1280 up, S7), so a viewport
+  // media query only ever described a range the grid could not really be narrow
+  // in.
   it('keeps the cards three to a row with no viewport query to override it', () => {
     expect(declarations('.tc-grid')).toMatch(
       /grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/,

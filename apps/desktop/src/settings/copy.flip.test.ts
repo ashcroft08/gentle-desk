@@ -112,6 +112,8 @@ describe('a drawn Settings dialog', () => {
     const dialog = await openSettings({}, '0.1.9')
     await pick(dialog, 'About')
     expect(within(pane(dialog)).getByText('Version 0.1.9')).toBeTruthy()
+    // S9: the repository row's NAME is a word of this app, so it flips.
+    expect(within(pane(dialog)).getByText('Repository')).toBeTruthy()
 
     setLanguage('es')
     await tick()
@@ -119,8 +121,11 @@ describe('a drawn Settings dialog', () => {
     await pick(dialog, 'Acerca de')
     expect(pane(dialog).textContent).toContain('Gentle Shell Desktop')
     expect(within(pane(dialog)).getByText('Versión 0.1.9')).toBeTruthy()
-    // D7: the number is the bridge's, so it reads the same in both languages.
+    expect(within(pane(dialog)).getByText('Repositorio')).toBeTruthy()
+    // D7: the number is the bridge's, so it reads the same in both languages,
+    // and so is the address behind the link.
     expect(pane(dialog).textContent).toContain('0.1.9')
+    expect(pane(dialog).textContent).toContain('github.com/ashcroft08/gentle-desk')
 
     setLanguage('en')
   })

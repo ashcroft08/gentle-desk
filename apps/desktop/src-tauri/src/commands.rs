@@ -21,7 +21,7 @@
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use gentle_app::Command;
-use gentle_core::i18n::messages;
+use gentle_core::i18n::{messages, Language};
 use gentle_runtime::whats_new::{self, Decision, Latest, UpdateRun};
 use tauri::{AppHandle, Manager};
 use tauri_specta::Event;
@@ -32,7 +32,7 @@ use crate::close::{self, BridgeSteps, CloseFlow};
 use crate::config::{ConfigSnapshot, ConfigWriter};
 use crate::contract::{
     AttachmentView, SettingsFilesChanged, SettingsFilesChangedView, StateChanged,
-    TerminalActionView, UiIntent, UpdatesView, ViewState,
+    TerminalActionView, UiIntent, UpdatesView, ViewState, WhatsNewRead,
 };
 use crate::effects::{self, Ran, RuntimeExecutor};
 use crate::events::{EventPump, Push};
@@ -56,10 +56,11 @@ use crate::workspace::{self, WorkspaceAction};
 /// from a thread of its own and the pump pushes from its two.
 pub type Emit = Arc<dyn Fn(&ViewState) -> Result<(), String> + Send + Sync>;
 
-/// What reads `latest.json` for the what's-new step (S3): the endpoint the
-/// updater config names, and the manifest it answers, or the reason it could not
-/// be read. The real one is the shell's own fetch of that URL; a test gives a
-/// closure, so no test here ever reaches the network.
+/// What reads `latest.json` for the what's-new step (S3) and for the About
+/// pane's read on demand (T5, S9, D6): the endpoint the updater config names, and
+/// the manifest it answers, or the reason it could not be read. The real one is
+/// the shell's own fetch of that URL; a test gives a closure, so no test here
+/// ever reaches the network.
 pub type Fetcher = Arc<dyn Fn(&str) -> Result<Latest, String> + Send + Sync>;
 
 /// Whether the `gentle-shell` launcher resolves on this machine right now: the
@@ -764,16 +765,48 @@ impl Bridge {
     /// as the version the last run was, the notes are cleared and the slice that
     /// carries neither is pushed. A run that never named its version has nothing
     /// to store, and answers the slice it holds.
+    ///
+    /// The About pane's read on demand draws the SAME modal (T5, S9, D6) and
+    /// dismisses itself through this same command, so the state says which kind of
+    /// notes are up: an update run's are stored as S5 asks, and a read on demand
+    /// is only cleared, because a manual view is not an update run and must leave
+    /// the startup step exactly as it found it.
     pub fn store_last_run_version(&self) -> Result<ViewState, String> {
         self.accepting_work()?;
         let emit = self.emitter();
-        match self.holder.store_last_run_version() {
+        match self.holder.dismiss_notes() {
             Some(view) => {
                 emit_view(&emit, &view)?;
                 Ok(view)
             }
             None => Ok(self.holder.view()),
         }
+    }
+
+    /// The About pane's "What is new in this version" (T5, S9, D6): one read of
+    /// the running version's notes, off the window's thread, exactly as the
+    /// Settings snapshot's reads are, so a slow or absent release server never
+    /// holds the page.
+    ///
+    /// The address and the fetcher are the ones the startup step uses (the same
+    /// `latest.json`), and the version is this run's own: nothing about it comes
+    /// from the page. A result of `Shown` means the notes already reached
+    /// `ViewState.whats_new` and the modal is up; `Unavailable` is the one quiet
+    /// line the pane draws instead.
+    pub async fn show_whats_new(
+        &self,
+        endpoint: Option<&str>,
+        fetch: Fetcher,
+    ) -> Result<WhatsNewRead, String> {
+        self.accepting_work()?;
+        let holder = Arc::clone(&self.holder);
+        let emit = self.emitter();
+        let endpoint = endpoint.map(str::to_owned);
+        tauri::async_runtime::spawn_blocking(move || {
+            read_whats_new(&holder, &emit, endpoint.as_deref(), fetch.as_ref())
+        })
+        .await
+        .map_err(|error| format!("the notes could not be read: {error}"))?
     }
 
     /// Opens a visible terminal window on one of the jobs the desk hands to the
@@ -934,6 +967,61 @@ fn after_fetch(holder: &AppStateHolder, decision: Decision) -> Option<ViewState>
     match decision {
         Decision::Show { version, notes } => Some(holder.note_whats_new(version, notes)),
         Decision::Store => holder.store_last_run_version(),
+    }
+}
+
+/// The one quiet line the About pane draws when a read on demand of this
+/// version's notes brought none (T5, S9, D6), worded where it is produced: the
+/// shell holds the language and the reason, so the page draws a string.
+fn unreadable(language: Language, reason: whats_new::Missing) -> String {
+    match reason {
+        whats_new::Missing::Unreachable => messages::whats_new_unreadable(language).to_owned(),
+        whats_new::Missing::AnotherVersion => {
+            messages::whats_new_another_version(language).to_owned()
+        }
+        whats_new::Missing::NoText => messages::whats_new_no_text(language).to_owned(),
+    }
+}
+
+/// One read on demand of the RUNNING version's notes (T5, S9, D6): the About
+/// pane's button, with the fetch run inline on the caller's thread.
+///
+/// The command hands it to a blocking worker, and a windowless test calls it with
+/// a recorder where the window would be, so the version rule, the push and the
+/// slice are proved without one. The rules themselves are pure and live in
+/// `gentle_runtime::whats_new` (`on_demand`): a manifest of another version is
+/// never shown as this one's, and every failure is one short reason.
+///
+/// This is NOT the startup step: no run is detected, nothing is stored, and the
+/// notes are recorded as a read on demand, so their dismissal only clears them.
+pub fn read_whats_new(
+    holder: &AppStateHolder,
+    emit: &Emit,
+    endpoint: Option<&str>,
+    fetch: &(dyn Fn(&str) -> Result<Latest, String> + Send + Sync),
+) -> Result<WhatsNewRead, String> {
+    let language = holder.language();
+    // A run that never named its version has none to read notes for, and a build
+    // that names no release server has nowhere to read them: neither is a fetch
+    // that failed, and both are a read that could not happen.
+    let Some(version) = holder.app_version() else {
+        return Ok(WhatsNewRead::Unavailable(
+            messages::whats_new_unreadable(language).to_owned(),
+        ));
+    };
+    let Some(endpoint) = endpoint else {
+        return Ok(WhatsNewRead::Unavailable(
+            messages::whats_new_unreadable(language).to_owned(),
+        ));
+    };
+    match whats_new::on_demand(fetch(endpoint), &version) {
+        whats_new::OnDemand::Notes(notes) => {
+            emit_view(emit, &holder.note_whats_new_on_demand(version, notes))?;
+            Ok(WhatsNewRead::Shown)
+        }
+        whats_new::OnDemand::Missing(reason) => {
+            Ok(WhatsNewRead::Unavailable(unreadable(language, reason)))
+        }
     }
 }
 
@@ -1304,6 +1392,28 @@ pub fn store_last_run_version(
     _app: AppHandle<tauri::Wry>,
 ) -> Result<ViewState, String> {
     bridge.inner().store_last_run_version()
+}
+
+/// The About pane's one action (T5, S9, D6): the notes of the version this run
+/// RUNS as, read on demand, because the what's-new slice is a one-shot of the run
+/// that follows an update and is empty on every other run.
+///
+/// It takes no argument: the run is the side that knows its version, and the
+/// address is the endpoint the updater config names, the same `latest.json` the
+/// startup step reads. The answer says what the page draws - nothing at all,
+/// because the modal is up, or the one quiet line to show instead - and the fetch
+/// itself runs off the window's thread.
+#[tauri::command]
+#[specta::specta]
+pub async fn show_whats_new(
+    bridge: tauri::State<'_, Bridge>,
+    app: AppHandle<tauri::Wry>,
+) -> Result<WhatsNewRead, String> {
+    let endpoint = crate::release::endpoint(&app);
+    bridge
+        .inner()
+        .show_whats_new(endpoint.as_deref(), crate::release::fetcher())
+        .await
 }
 
 /// The Settings dialog's one read (settings-snapshot): every page's data in

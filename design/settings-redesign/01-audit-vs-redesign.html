@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="es" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=1180">
+<title>Ajustes — 01 · la auditoría contra las tres direcciones</title>
+<style>
+/* ── TOKENS. Copia literal de apps/desktop/src/theme.css (los seis bloques). ── */
+:root,[data-theme='dark']{--bg:#0e1116;--surface:#151a21;--surface2:#1c222b;--border:#2b333d;--text:#e4e8ee;--muted:#9aa4b2;--faint:#7d8593;--accent:#7aa2f7;--tint:rgba(122,162,247,.14);--success:#7edc9a;--warning:#e7b455;--danger:#ff8585;--shadow:0 8px 24px rgba(0,0,0,.45);--row-h:34px}
+[data-theme='light']{--bg:#f2f4f7;--surface:#ffffff;--surface2:#e9edf2;--border:#cfd5dd;--text:#17202a;--muted:#576272;--faint:#6b7686;--accent:#2e5bd7;--tint:rgba(46,91,215,.1);--success:#166e38;--warning:#8a5800;--danger:#c22f37;--shadow:0 8px 24px rgba(23,32,42,.18);--row-h:34px}
+[data-theme='Gentle']{--bg:#06080f;--surface:#06080f;--surface2:#0d0f14;--border:#313342;--text:#f3f6f9;--muted:#8394a3;--faint:#96a2b0;--accent:#7fb4ca;--tint:#161d2e;--success:#b7cc85;--warning:#deba87;--danger:#cb7c94;--shadow:0 8px 24px rgba(0,0,0,.6);--row-h:34px}
+[data-theme='Gentleman-Cute']{--bg:#060407;--surface:#100a0f;--surface2:#100a0f;--border:#563040;--text:#f6eff3;--muted:#a78e9b;--faint:#d7a0b8;--accent:#f095c8;--tint:#2a1523;--success:#b4e7c7;--warning:#f2b86d;--danger:#ff718f;--shadow:0 8px 24px rgba(0,0,0,.6);--row-h:34px}
+[data-theme='Gentleman-Sexy']{--bg:#060407;--surface:#100a0f;--surface2:#100a0f;--border:#563040;--text:#f6eff3;--muted:#a78e9b;--faint:#d7a0b8;--accent:#f43888;--tint:#2e0f1f;--success:#d2cbd0;--warning:#f2b86d;--danger:#ff718f;--shadow:0 8px 24px rgba(0,0,0,.6);--row-h:34px}
+@media (prefers-color-scheme:light){[data-theme='system']{--bg:#f2f4f7;--surface:#ffffff;--surface2:#e9edf2;--border:#cfd5dd;--text:#17202a;--muted:#576272;--faint:#6b7686;--accent:#2e5bd7;--tint:rgba(46,91,215,.1);--success:#166e38;--warning:#8a5800;--danger:#c22f37;--shadow:0 8px 24px rgba(23,32,42,.18);--row-h:34px}}
+[data-theme='dark'],[data-theme='Gentle'],[data-theme='Gentleman-Cute'],[data-theme='Gentleman-Sexy']{color-scheme:dark}
+[data-theme='light']{color-scheme:light}
+
+*{box-sizing:border-box}
+h1,h2,h3,p,ul,li,ol{margin:0}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.page{width:1180px;padding:30px 40px 60px}
+.kicker{margin:0 0 10px;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--faint)}
+h1{margin:0 0 12px;font-size:23px;font-weight:600;line-height:1.25}
+.lede{margin:0 0 10px;max-width:900px;color:var(--muted);font-size:13.5px;line-height:1.65}
+.lede b{color:var(--text);font-weight:600}
+code{font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:12px;background:var(--surface2);border-radius:4px;padding:1px 5px}
+h2{margin:38px 0 4px;font-size:15px;font-weight:600}
+h2 .n{color:var(--accent);font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:12px;margin-right:8px}
+.sub{margin:0 0 14px;color:var(--faint);font-size:12px;line-height:1.6}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{text-align:left;font-size:10.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);padding:0 10px 7px 0;border-bottom:1px solid var(--border);vertical-align:bottom}
+td{padding:8px 10px 8px 0;border-bottom:1px dashed var(--border);vertical-align:top;color:var(--muted);line-height:1.5}
+td.id{font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:12px;color:var(--accent);font-weight:600;width:26px}
+td.name{color:var(--text);width:236px}
+td.measure{width:330px;font-size:12px}
+td.measure b{color:var(--text);font-weight:600}
+.v{font-weight:600;white-space:nowrap}
+.v.yes{color:var(--success)}
+.v.part{color:var(--warning)}
+.v.no{color:var(--faint)}
+.done{display:inline-block;padding:1px 7px;border-radius:999px;border:1px solid currentColor;font-size:10.5px;font-weight:600;white-space:nowrap}
+.done.fixed{color:var(--success)}
+.done.open{color:var(--warning)}
+.done.frame{color:var(--accent)}
+.cols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;margin-top:6px}
+.card{border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:16px 18px}
+.card h3{margin:0 0 4px;font-size:13px;font-weight:600}
+.card .who{margin:0 0 10px;color:var(--accent);font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase}
+.card p{margin:0 0 8px;color:var(--muted);font-size:12.5px;line-height:1.6}
+.card p:last-child{margin-bottom:0}
+.card p b{color:var(--text);font-weight:600}
+.card ul{margin:6px 0 0;padding-left:16px;color:var(--muted);font-size:12.5px;line-height:1.6}
+.card ul li{margin-bottom:4px}
+.pick{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.pick .who{color:var(--success)}
+.verdict{margin-top:8px;padding-left:12px;border-left:2px solid var(--accent);color:var(--text);font-size:12.5px;line-height:1.6}
+ol.decisions{margin:8px 0 0;padding-left:20px;color:var(--muted);font-size:12.5px;line-height:1.7}
+ol.decisions b{color:var(--text);font-weight:600}
+ol.decisions li{margin-bottom:6px}
+.note{margin-top:26px;padding-top:14px;border-top:1px solid var(--border);color:var(--faint);font-size:12px;line-height:1.6}
+.note b{color:var(--muted);font-weight:600}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style></head>
+<body>
+<main class="page">
+
+<p class="kicker">01 · la auditoría contra las tres direcciones</p>
+<h1>Los doce defectos medidos, lo que ya arregló la 0.8.1, y qué dirección resuelve cada uno</h1>
+<p class="lede">La auditoría de <code>design/settings-polish/01-audit.html</code> marcó doce defectos con su regla y su medida. Antes de rediseñar hay que decir cuáles siguen vivos: <b>siete ya están cerrados</b> por la pasada de la 0.8.1 (el campo de búsqueda, la rejilla de temas, la fila de Cerrar, la etiqueta «Tema», el relleno asimétrico, el canal de la barra y el salto del botón de extensiones) y <b>cinco siguen abiertos</b>. Pero los dos que el mantenedor señaló con sus palabras —«lo veo pequeño», «todo está apretado», «mucho uso de cards»— <b>no son ninguno de los doce</b>: son la medida de la tarjeta y la densidad, y ninguna regla los cierra. Para eso está este rediseño.</p>
+
+<h2><span class="n">01</span>Los doce, uno por uno</h2>
+<p class="sub">«Hoy» es la medida sobre <code>apps/desktop/src/app.css</code> en la rama; ✓ = la dirección lo cierra; ◐ = lo mejora o lo hereda sin cerrarlo; — = no lo toca.</p>
+<table>
+  <thead><tr><th>#</th><th>hallazgo</th><th>medida de hoy</th><th>estado</th><th>A</th><th>B</th><th>C</th></tr></thead>
+  <tbody>
+    <tr><td class="id">01</td><td class="name">El buscador: la lupa a 16 px del texto y el input se sale de su caja</td><td class="measure">La primera letra del marcador empieza a <b>39 px</b> (1+8+14+6+<b>10</b> de relleno heredado); el input mide <b>32,75 dentro de una caja de 28</b> (2,4 px por arriba y por abajo).</td><td><span class="done fixed">cerrado 0.8.1</span></td><td class="v yes">✓</td><td class="v yes">✓</td><td class="v yes">✓</td></tr>
+    <tr><td class="id">02</td><td class="name">Apariencia: tarjeta vacía bajo la segunda fila de temas</td><td class="measure">El contenido del panel termina a <b>224,5</b>; el cuerpo mide <b>310</b> (lo fija el riel: 28 + 12 + 8×32 + 7×2), así que quedan <b>85,5 px</b> de superficie sin nada — el mismo aire en Idioma, Acerca de y Notificaciones.</td><td><span class="done open">sigue</span></td><td class="v part">◐ el aire queda, pero fuera de toda caja</td><td class="v yes">✓ lo que sigue asoma</td><td class="v part">◐ la ficha corta deja aire</td></tr>
+    <tr><td class="id">03</td><td class="name">Las columnas de la rejilla de temas las decidía el ancho de la VENTANA</td><td class="measure">Dos consultas de ventana partían la rejilla a 2 columnas entre <b>800 y 900 px</b> aunque la tarjeta mide <b>680 siempre</b>; la segunda (640) no se alcanzaba nunca.</td><td><span class="done fixed">cerrado 0.8.1</span></td><td class="v yes">✓</td><td class="v yes">✓</td><td class="v yes">✓</td></tr>
+    <tr><td class="id">04</td><td class="name">La acción de acento cambia de sitio en cada panel</td><td class="measure">En Actualizaciones es el segundo de tres botones; en Cuenta y Uso el primero; en Notificaciones está solo. El ojo del riel no puede aprender dónde vive la acción.</td><td><span class="done open">sigue</span></td><td class="v yes">✓ una columna de acciones fija a la derecha</td><td class="v yes">✓ la misma columna, en el documento</td><td class="v yes">✓ la misma columna, en la ficha</td></tr>
+    <tr><td class="id">05</td><td class="name">El botón de extensiones saltaba ~100 px entre estados</td><td class="measure">Con versión ofrecida la fila era de tres botones; sin ella, de dos. El borde de la tarjeta no se movía: el botón sí.</td><td><span class="done fixed">cerrado 0.8.1</span></td><td class="v yes">✓</td><td class="v yes">✓</td><td class="v yes">✓</td></tr>
+    <tr><td class="id">06</td><td class="name">La fila de «Cerrar» llevaba el doble de aire que el título</td><td class="measure"><b>30 px</b> entre el cuerpo y Cerrar (14 de hueco + 16 de margen) contra <b>14</b> entre el título y el cuerpo.</td><td><span class="done fixed">cerrado 0.8.1</span></td><td class="v yes">✓ Cerrar sube a la fila del título</td><td class="v yes">✓ Cerrar vive en la cabecera</td><td class="v yes">✓ Cerrar vive en la cabecera</td></tr>
+    <tr><td class="id">07</td><td class="name">El único control de Apariencia no tenía etiqueta visible</td><td class="measure">La palabra «Tema» existía en los dos diccionarios (<code>copy.themeGroup</code>) y no se dibujaba.</td><td><span class="done fixed">cerrado 0.8.1</span></td><td class="v yes">✓</td><td class="v yes">✓</td><td class="v yes">✓</td></tr>
+    <tr><td class="id">08</td><td class="name">Hasta cinco líneas de nota en cursiva bajo los botones</td><td class="measure"><code>.note</code> es 12 px en cursiva en <code>--faint</code>, la tinta más débil; la nota de extensiones sola ocupaba ~230 caracteres (3 líneas a 432 px).</td><td><span class="done open">mejorado 0.8.1</span></td><td class="v part">◐ una sola nota en cursiva</td><td class="v part">◐ una sola nota en cursiva</td><td class="v part">◐ una sola nota en cursiva</td></tr>
+    <tr><td class="id">09</td><td class="name">El relleno del panel era asimétrico y el contenido quedaba 4 px corrido</td><td class="measure">2 px a la izquierda y 8 a la derecha contra los 14 del riel: margen izquierdo <b>18</b>, derecho <b>26</b>.</td><td><span class="done fixed">cerrado 0.8.1</span></td><td class="v yes">✓</td><td class="v yes">✓</td><td class="v yes">✓</td></tr>
+    <tr><td class="id">10</td><td class="name">El borde derecho del contenido saltaba 10 px entre secciones</td><td class="measure">La barra tematizada mide 10; una sección que cabe no la paga y una que desborda pierde 10 de contenido.</td><td><span class="done fixed">cerrado 0.8.1</span></td><td class="v yes">✓</td><td class="v yes">✓</td><td class="v yes">✓</td></tr>
+    <tr><td class="id">11</td><td class="name">Dos dialectos del mismo control de dos respuestas</td><td class="measure"><code>.seg</code> es 5/12 a 12,5 px con relleno de acento; <code>.home-choice</code> es 4/10 a 12 px con tinte y sin peso. Misma pregunta, dos alturas.</td><td><span class="done open">sigue</span></td><td class="v part">◐ no lo toca: queda como deuda de una regla</td><td class="v part">◐ igual</td><td class="v part">◐ igual</td></tr>
+    <tr><td class="id">12</td><td class="name">La fila de una ventana de Uso no puede partirse</td><td class="measure"><code>.uwindow</code> no envuelve; la etiqueta son 52, la barra 76 y el porcentaje 38, y la línea de reinicio es <code>nowrap</code> con <code>margin-left:auto</code>: con una fecha larga se sale del relleno de 16.</td><td><span class="done open">sigue</span></td><td class="v part">◐ el panel gana 760 de ancho: cabe más fecha</td><td class="v part">◐ igual, con 692</td><td class="v part">◐ 712, el más estrecho de los tres</td></tr>
+  </tbody>
+</table>
+
+<h2><span class="n">02</span>Lo que ninguna regla podía cerrar: la medida y la densidad</h2>
+<p class="sub">Los números de la tarjeta de hoy salen de <code>.dlg.settings</code> (680, relleno 18, hueco 14), <code>.settings-side</code> (184 con 14 de relleno y 1 de borde), el hueco de 18 y <code>.settings-pane</code> (2 y 8 de relleno). Las tres direcciones se midieron sobre la ventana de 1280 × 820 y sobre la mínima de 800 × 560.</p>
+<table>
+  <thead><tr><th>medida</th><th>hoy</th><th>A · ventana amplia</th><th>B · página</th><th>C · hoja del buscador</th></tr></thead>
+  <tbody>
+    <tr><td class="name">superficie</td><td class="measure">tarjeta <b>680</b> centrada; cuerpo <b>310</b></td><td class="measure">tarjeta <b>1180 × 660</b>; cuerpo <b>544</b></td><td class="measure">página <b>1000</b> en el área del chat; alto <b>768</b></td><td class="measure">hoja <b>760 × 820</b>; ficha <b>720</b></td></tr>
+    <tr><td class="name">columna de lectura</td><td class="measure"><b>432</b> (644 − 184 − 18 − 10 de relleno)</td><td class="measure"><b>760</b> · a 800 × 560: <b>487</b></td><td class="measure"><b>692</b> (tope 720) · a 800: <b>760</b></td><td class="measure"><b>712</b> · a 800: <b>696</b></td></tr>
+    <tr><td class="name">navegación</td><td class="measure">riel de <b>184</b>, una sección por vez</td><td class="measure">riel de <b>216</b>, una sección por vez</td><td class="measure">nav de <b>220</b> con anclas y spy; tira de 44 en la mínima</td><td class="measure">un campo y <b>8 filas</b> con su valor; dos niveles</td></tr>
+    <tr><td class="name">cajas dentro del cuerpo · Apariencia</td><td class="measure"><b>6</b> tarjetas + <b>6</b> marcos de miniatura = 12 cajas</td><td class="measure"><b>6</b> (una por tema)</td><td class="measure"><b>6</b></td><td class="measure"><b>6</b></td></tr>
+    <tr><td class="name">cajas · Actualizaciones</td><td class="measure"><b>2</b> tarjetas</td><td class="measure"><b>0</b></td><td class="measure"><b>0</b></td><td class="measure"><b>0</b></td></tr>
+    <tr><td class="name">cajas · Cuenta</td><td class="measure"><b>1</b> tarjeta</td><td class="measure"><b>0</b></td><td class="measure"><b>0</b></td><td class="measure"><b>0</b></td></tr>
+    <tr><td class="name">total de las tres pantallas</td><td class="measure"><b>9 tarjetas · 15 cajas</b> contando las anidadas</td><td class="measure"><b>6 · 6</b></td><td class="measure"><b>6 · 6</b></td><td class="measure"><b>6 · 6</b></td></tr>
+    <tr><td class="name">ventana mínima</td><td class="measure">680 × ~434, cuerpo 310, columna <b>432</b></td><td class="measure">744 × 504, cuerpo 388, columna <b>487</b></td><td class="measure">800 × 560, columna <b>760</b> (nav en tira)</td><td class="measure">760 × 560, columna <b>696</b></td></tr>
+  </tbody>
+</table>
+<p class="sub" style="margin-top:12px">Las seis cajas que quedan en las tres direcciones son <b>las previsualizaciones de tema</b>, y no son un descuido: S2 nombra «la previsualización de un tema» como la unidad que sí merece una caja. Lo que desaparece es la tarjeta que envolvía ajustes que no son una unidad: la de Actualizaciones, la de extensiones, la de proveedores, la del perfil y la de cada proveedor de Uso.</p>
+
+<h2><span class="n">03</span>Qué optimiza cada dirección y qué cuesta</h2>
+<div class="cols">
+  <div class="card pick">
+    <p class="who">A · la ventana amplia</p>
+    <h3>El mismo diálogo, de 1180 × 660</h3>
+    <p><b>Optimiza</b> el cambio más grande por la obra más pequeña: el diálogo solo aprende a usar la ventana; no hay ruta nueva, ni estado nuevo, ni una pieza de comportamiento que reescribir.</p>
+    <p><b>Cuesta</b> que una sección por vez deja aire en las cortas, y que en la ventana mínima la columna baja a 487.</p>
+    <ul>
+      <li>Cierra 01 · 03 · 04 · 05 · 06 · 07 · 09 · 10 · 11(parcial)</li>
+      <li>Deja 02 y 08 a medias, y 12 igual</li>
+    </ul>
+    <div class="verdict">Se construye en dos trozos: la geometría de la tarjeta y, después, cada panel con sus filas. Nada de la app se mueve de sitio.</div>
+  </div>
+  <div class="card">
+    <p class="who">B · Ajustes como página</p>
+    <h3>Una sola página con anclas y spy</h3>
+    <p><b>Optimiza</b> el barrido y el salto: todo se ve, se compara sin cambiar de sitio y la columna mide casi lo mismo en cualquier ventana (692 → 760).</p>
+    <p><b>Cuesta</b> que Ajustes deja de ser un overlay —hay que ir y volver, y el chat no está mientras tanto— y que la ventana mínima necesita una tira de anclas.</p>
+    <ul>
+      <li>Cierra 02 (lo siguiente asoma)</li>
+      <li>Necesita estado de vista nuevo y el spy; el resto del contenido es el mismo</li>
+    </ul>
+    <div class="verdict">Es la que más cambia el modelo mental: muy buena para diez secciones, más de lo que el mantenedor pidió.</div>
+  </div>
+  <div class="card">
+    <p class="who">C · el buscador delante</p>
+    <h3>Una hoja de 760 desde la derecha</h3>
+    <p><b>Optimiza</b> el acceso directo y la lectura: teclear es el camino más corto, la columna nunca se comprime (712 → 696) y el chat sigue a la vista.</p>
+    <p><b>Cuesta</b> un nivel más para pasearse, que la lista necesita un valor por sección (texto nuevo y datos que hoy no se componen) y que a 800 la hoja ya casi es una pantalla.</p>
+    <ul>
+      <li>Cierra 04 y 06, mejora 02</li>
+      <li>Añade la dependencia más grande: el valor de cada sección</li>
+    </ul>
+    <div class="verdict">La más rápida para quien ya sabe qué busca; la más frágil para quien no.</div>
+  </div>
+</div>
+
+<h2><span class="n">04</span>La recomendación: A</h2>
+<p class="lede" style="max-width:1000px">Por tres razones medidas. <b>Una:</b> responde exactamente a lo que el mantenedor dijo —pequeño (680 → 1180 de ancho, 310 → 544 de alto), apretado (432 → 760 de columna) y muchas cards (9 → 6, y las 6 son las previsualizaciones que S2 autoriza)— sin cambiar una sola comportamiento: Escape, el fondo que no cierra, el riel como tablist, la búsqueda que estrecha el riel y no mueve el panel. <b>Dos:</b> es la única que se puede entregar en trozos que se aprueban por separado (la tarjeta, después cada panel) y la que menos superficie nueva introduce: una fila de tema y tres grupos con hairline. <b>Tres:</b> el marco que viene (S5) ya está probado dentro de ella en <code>00-future.html</code>: diez entradas de riel caben en 544 de alto y las dos páginas nuevas son filas, no tarjetas.</p>
+<p class="lede" style="max-width:1000px"><b>Lo que A no resuelve y hay que decir:</b> las secciones cortas dejan aire (02), la nota en cursiva sigue siendo la tinta más débil (08) y la fila de Uso sigue sin poder partirse (12). Y las dos ideas buenas de B y C que valdría la pena adoptar más adelante sin rehacer el marco: el <b>barrido</b> de B (si algún día el riel se queda corto con doce secciones) y el <b>valor por sección</b> de C, que en A podría vivir como la pista del riel.</p>
+
+<h2><span class="n">05</span>Decisiones que son del mantenedor</h2>
+<ol class="decisions">
+  <li><b>La dirección.</b> Las tres están dibujadas con las mismas tres pantallas; A es la recomendada, B y C quedan como alternativas completas.</li>
+  <li><b>El tamaño de la tarjeta de A:</b> 1180 × 660 (dibujado) admite una ventana de 1280 × 820. ¿Se prefiere que crezca con la ventana hasta 1180 o que se quede en 1080 para dejar más aire alrededor?</li>
+  <li><b>Los temas como filas anchas</b> (A y C) o como fichas en tres columnas (B). Las dos usan la misma miniatura y una caja por tema; la fila muestra el tema a 760 de ancho, la ficha lo hace comparable de un vistazo.</li>
+  <li><b>El texto nuevo.</b> Las etiquetas «Proveedores», «La sesión la escribe la shell» y «Extensiones» (A, B, C) no existen en los diccionarios; o se añaden en las dos lenguas, o se quitan y el grupo se distingue solo por la hairline.</li>
+  <li><b>La nota de terminal</b> (08): ¿se queda en cursiva <code>--faint</code> o pasa a <code>--muted</code> sin cursiva, como la frase de extensiones?</li>
+  <li><b>La fila de Uso</b> (12): envolver <code>.uwindow</code> es una declaración y arregla el desborde en las tres direcciones; conviene hacerlo en el mismo paso que el marco.</li>
+  <li><b>S5 · General y Paquetes:</b> si la app abre en General en vez de en Apariencia, y si «Quitar» de un paquete es una fila o un botón con confirmación. La caja de salida en vivo es lo único que necesita CSS nuevo.</li>
+</ol>
+
+<p class="note"><b>Método.</b> Todas las medidas de esta hoja salen de las declaraciones de <code>app.css</code> y <code>theme.css</code> (arriba, al lado de cada número) y de la aritmética de las cajas que se dibujan en las tres hojas: no hay ninguna medida estimada a ojo. Las tres direcciones usan <code>design/system.md</code> (sincronizado el 2026-11-21 desde las dos hojas de estilo) y ninguna escribe un color propio: la tira de los seis temas de cada hoja lo demuestra.</p>
+
+</main>
+</body></html>

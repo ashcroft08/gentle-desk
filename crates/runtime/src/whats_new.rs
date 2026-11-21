@@ -72,6 +72,49 @@ pub fn decide(fetched: Result<Latest, String>, app_version: &str) -> Decision {
     }
 }
 
+/// Why a read on demand of this version's notes has no notes to show (T5, S9,
+/// D6): the reason the About pane draws as one quiet line instead of an empty
+/// modal.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Missing {
+    /// The manifest was not read at all: no network, no answer inside the
+    /// budget, or an answer that is not a success. The seam's own words are
+    /// deliberately not carried here (they are the client's, never the
+    /// screen's), so every one of them is this same quiet reason.
+    Unreachable,
+    /// The manifest read announces ANOTHER version - the release after this one,
+    /// or an older one - so its notes are never this run's to show.
+    AnotherVersion,
+    /// The manifest is this version's and its text is empty or only whitespace.
+    NoText,
+}
+
+/// What one read on demand of the running version's notes came to (T5, S9, D6):
+/// the About pane's button, which is not an update run and stores nothing.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum OnDemand {
+    /// The notes of THIS version, exactly as the manifest read carries them.
+    Notes(String),
+    /// Nothing to show, for the reason the page words in one line.
+    Missing(Missing),
+}
+
+/// The notes of this version, read on demand: the same manifest and the same
+/// version rule [`decide`] applies at startup - a manifest of another version
+/// never reaches the modal - with the reasons the startup step does not need,
+/// because it only stores the version in silence.
+///
+/// Nothing here stores, clears or compares the version the last run was: a read
+/// on demand is not an update run (T5).
+pub fn on_demand(fetched: Result<Latest, String>, app_version: &str) -> OnDemand {
+    match fetched {
+        Err(_) => OnDemand::Missing(Missing::Unreachable),
+        Ok(latest) if latest.version != app_version => OnDemand::Missing(Missing::AnotherVersion),
+        Ok(latest) if latest.notes.trim().is_empty() => OnDemand::Missing(Missing::NoText),
+        Ok(latest) => OnDemand::Notes(latest.notes),
+    }
+}
+
 /// The notes as plain text: an absent, `null` or non-text `notes` is no text.
 fn text_or_empty<'de, D>(deserializer: D) -> Result<String, D::Error>
 where
@@ -171,6 +214,62 @@ mod tests {
         .expect("a latest.json as the release workflow writes it reads");
         assert_eq!(manifest.version, "0.1.8");
         assert_eq!(manifest.notes, "The sidebar folds.");
+    }
+
+    #[test]
+    fn a_read_on_demand_answers_the_notes_of_this_version() {
+        // The About pane's button (T5, D6): the notes of the version this run
+        // runs as, from the same manifest and by the same version rule the
+        // startup step uses.
+        let manifest = Latest {
+            version: "0.1.8".to_owned(),
+            notes: "The sidebar folds.".to_owned(),
+        };
+        assert_eq!(
+            on_demand(Ok(manifest), "0.1.8"),
+            OnDemand::Notes("The sidebar folds.".to_owned())
+        );
+    }
+
+    #[test]
+    fn a_read_on_demand_never_answers_another_versions_notes() {
+        // Older AND newer: the manifest of another release carries notes about a
+        // version this run is not, so they are never this run's to show (T5).
+        for version in ["0.1.7", "0.1.9", "0.1.8.1"] {
+            let manifest = Latest {
+                version: version.to_owned(),
+                notes: "Notes of another release.".to_owned(),
+            };
+            assert_eq!(
+                on_demand(Ok(manifest), "0.1.8"),
+                OnDemand::Missing(Missing::AnotherVersion),
+                "a manifest of {version} is not this run's"
+            );
+        }
+    }
+
+    #[test]
+    fn a_read_on_demand_that_read_no_manifest_says_it_could_not() {
+        assert_eq!(
+            on_demand(Err("no network".to_owned()), "0.1.8"),
+            OnDemand::Missing(Missing::Unreachable)
+        );
+    }
+
+    #[test]
+    fn a_read_on_demand_of_a_release_with_no_text_has_nothing_to_show() {
+        // The manifest of THIS version whose text is empty or whitespace: the
+        // read answers that there is no text, never an empty modal.
+        for notes in ["", "   ", "\n\t"] {
+            let manifest = Latest {
+                version: "0.1.8".to_owned(),
+                notes: notes.to_owned(),
+            };
+            assert_eq!(
+                on_demand(Ok(manifest), "0.1.8"),
+                OnDemand::Missing(Missing::NoText)
+            );
+        }
     }
 
     #[test]

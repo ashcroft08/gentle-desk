@@ -1054,5 +1054,36 @@ pub const fn closing(language: Language) -> &'static str {
     }
 }
 
+// --- The notes read on demand (tauri::commands::read_whats_new, T5, S9, D6) --
+
+/// "The notes could not be read: no connection." - the one quiet line the About
+/// pane draws in place of the what's-new modal. A release server that did not
+/// answer shares this line: the seam's own words are the client's, never the
+/// screen's, and the cause the user can act on is the connection.
+pub const fn whats_new_unreadable(language: Language) -> &'static str {
+    match language {
+        Language::En => "The notes could not be read: no connection.",
+        Language::Es => "No se pudieron leer las novedades: sin conexión.",
+    }
+}
+
+/// "No notes were published for this version." - the release manifest carries
+/// ANOTHER version's notes, which are never shown as this one's.
+pub const fn whats_new_another_version(language: Language) -> &'static str {
+    match language {
+        Language::En => "No notes were published for this version.",
+        Language::Es => "No se publicaron novedades para esta versión.",
+    }
+}
+
+/// "This version's notes are empty." - the manifest of this version was read and
+/// its text is nothing, so there is no modal to open.
+pub const fn whats_new_no_text(language: Language) -> &'static str {
+    match language {
+        Language::En => "This version's notes are empty.",
+        Language::Es => "Las novedades de esta versión están vacías.",
+    }
+}
+
 #[cfg(test)]
 mod tests;

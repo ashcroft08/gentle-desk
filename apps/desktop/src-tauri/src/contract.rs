@@ -1710,22 +1710,43 @@ pub struct HelperThreadView {
     pub items: Vec<HelperThreadItemView>,
 }
 
-/// The notes of the version this run follows (what's-new S3b): the version the run
-/// runs as and the plain text its release carried. It is pushed once, through the
-/// same `state-changed` step the notices travel on, and cleared when the modal's
-/// dismiss stores the version (S5), so the web side draws it for exactly the run
-/// that follows an update.
+/// The notes of the version this run follows (what's-new S3b), or the notes of
+/// the version it runs as read on demand from the About pane (T5, S9, D6): the
+/// version the run runs as and the plain text its release carried. It is pushed
+/// through the same `state-changed` step the notices travel on, and cleared when
+/// the modal's dismiss stores the version (S5), so the web side draws it for
+/// exactly the run that follows an update - or once, for the read the user asked
+/// for.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
 pub struct WhatsNewView {
     /// The version this run runs as, never the manifest's (S5).
     pub version: String,
     /// The version the last run stored, which this run followed: the modal says
     /// "since <it>". `None` when the config stored nothing, so the modal never
-    /// invents a starting point.
+    /// invents a starting point - and `None` for a read on demand (T5), which
+    /// follows nothing.
     pub previous_version: Option<String>,
     /// The release notes as plain text: no markup and no locale, so the modal
     /// decides how it lays them out (T2).
     pub notes: String,
+}
+
+/// What one read on demand of the running version's notes came to (T5, S9, D6):
+/// the answer the About pane draws when the notes are not the modal's to open.
+///
+/// It is the RESULT of one command and never part of a push: the notes
+/// themselves travel as [`ViewState.whats_new`], the one slice the what's-new
+/// modal draws, so a read on demand opens exactly the window an update opens.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(tag = "type", content = "data")]
+pub enum WhatsNewRead {
+    /// This version's notes reached the slice and the modal is up: the pane draws
+    /// nothing of its own.
+    Shown,
+    /// There was nothing to show, and this is the one quiet line the pane draws.
+    /// It arrives worded in the language the app holds (D6, `messages`): the
+    /// reason belongs to the shell, which is the side that knows it.
+    Unavailable(String),
 }
 
 /// View A's data (welcome-screen T1, S1, S3, R3, R4): the workspace the user

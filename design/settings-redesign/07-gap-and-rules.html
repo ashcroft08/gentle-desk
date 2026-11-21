@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="es" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=1400">
+<title>Las reglas que comparten Uso y Acerca de</title>
+<style>
+/* ── TOKENS. Copia literal de apps/desktop/src/theme.css (los seis bloques). ── */
+:root,[data-theme='dark']{--bg:#0e1116;--surface:#151a21;--surface2:#1c222b;--border:#2b333d;--text:#e4e8ee;--muted:#9aa4b2;--faint:#7d8593;--accent:#7aa2f7;--tint:rgba(122,162,247,.14);--success:#7edc9a;--warning:#e7b455;--danger:#ff8585;--shadow:0 8px 24px rgba(0,0,0,.45);--row-h:34px}
+[data-theme='light']{--bg:#f2f4f7;--surface:#ffffff;--surface2:#e9edf2;--border:#cfd5dd;--text:#17202a;--muted:#576272;--faint:#6b7686;--accent:#2e5bd7;--tint:rgba(46,91,215,.1);--success:#166e38;--warning:#8a5800;--danger:#c22f37;--shadow:0 8px 24px rgba(23,32,42,.18);--row-h:34px}
+[data-theme='Gentle']{--bg:#06080f;--surface:#06080f;--surface2:#0d0f14;--border:#313342;--text:#f3f6f9;--muted:#8394a3;--faint:#96a2b0;--accent:#7fb4ca;--tint:#161d2e;--success:#b7cc85;--warning:#deba87;--danger:#cb7c94;--shadow:0 8px 24px rgba(0,0,0,.6);--row-h:34px}
+[data-theme='Gentleman-Cute']{--bg:#060407;--surface:#100a0f;--surface2:#100a0f;--border:#563040;--text:#f6eff3;--muted:#a78e9b;--faint:#d7a0b8;--accent:#f095c8;--tint:#2a1523;--success:#b4e7c7;--warning:#f2b86d;--danger:#ff718f;--shadow:0 8px 24px rgba(0,0,0,.6);--row-h:34px}
+[data-theme='Gentleman-Sexy']{--bg:#060407;--surface:#100a0f;--surface2:#100a0f;--border:#563040;--text:#f6eff3;--muted:#a78e9b;--faint:#d7a0b8;--accent:#f43888;--tint:#2e0f1f;--success:#d2cbd0;--warning:#f2b86d;--danger:#ff718f;--shadow:0 8px 24px rgba(0,0,0,.6);--row-h:34px}
+@media (prefers-color-scheme:light){[data-theme='system']{--bg:#f2f4f7;--surface:#ffffff;--surface2:#e9edf2;--border:#cfd5dd;--text:#17202a;--muted:#576272;--faint:#6b7686;--accent:#2e5bd7;--tint:rgba(46,91,215,.1);--success:#166e38;--warning:#8a5800;--danger:#c22f37;--shadow:0 8px 24px rgba(23,32,42,.18);--row-h:34px}}
+[data-theme='dark'],[data-theme='Gentle'],[data-theme='Gentleman-Cute'],[data-theme='Gentleman-Sexy']{color-scheme:dark}
+[data-theme='light']{color-scheme:light}
+
+/* ── la hoja ──────────────────────────────────────────────────────────────── */
+*{box-sizing:border-box}
+h1,h2,h3,h4,p,ul,li{margin:0}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.page{width:1400px;padding:30px 0 64px}
+.head{width:1280px;margin:0 auto 26px}
+.kicker{margin:0 0 10px;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--faint)}
+h1{margin:0 0 12px;font-size:23px;font-weight:600;line-height:1.25}
+.lede{margin:0 0 12px;max-width:880px;color:var(--muted);font-size:13.5px;line-height:1.65}
+.lede b{color:var(--text);font-weight:600}
+.tradeoff{margin:0 0 22px;max-width:920px;padding-left:14px;border-left:2px solid var(--accent);color:var(--text);font-size:13px;line-height:1.6}
+.tradeoff b{color:var(--accent);font-weight:600}
+h1 code,p code,li code,dd code,td code{font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:12px;background:var(--surface2);border-radius:4px;padding:1px 5px}
+.rules{width:1280px;margin:0 auto;display:flex;flex-direction:column;gap:22px}
+.rule{display:grid;grid-template-columns:56px minmax(0,1fr) 618px;gap:0 24px}
+.rule>.n{font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:13px;font-weight:600;color:var(--accent);padding-top:2px}
+.rule h2{font-size:15px;font-weight:600}
+.rule .whyline{margin:8px 0 0;color:var(--muted);font-size:12.5px;line-height:1.6}
+.rule .whyline b{color:var(--text);font-weight:600}
+.rule .src{margin:10px 0 0;color:var(--faint);font-size:11.5px;line-height:1.55}
+.rule .src b{color:var(--muted);font-weight:600}
+pre{margin:0;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--surface2);color:var(--text);font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:11px;line-height:1.6;overflow-x:auto;white-space:pre}
+pre .c{color:var(--faint)}
+pre .k{color:var(--accent)}
+.sec{width:1280px;margin:34px auto 0}
+.sec>h2{margin:0 0 6px;font-size:15px;font-weight:600}
+.sec>.p{margin:0 0 14px;max-width:980px;color:var(--muted);font-size:13px;line-height:1.65}
+.sec>.p b{color:var(--text);font-weight:600}
+.checks{width:100%;border-collapse:collapse;font-size:12.5px}
+.checks th{text-align:left;font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);padding:0 10px 6px 0;border-bottom:1px solid var(--border)}
+.checks td{padding:8px 10px 8px 0;border-bottom:1px solid var(--border);vertical-align:top;color:var(--muted)}
+.checks td:first-child{color:var(--text);font-weight:600;white-space:nowrap}
+.checks td b{color:var(--text);font-weight:600}
+.yes{color:var(--success);font-weight:600}
+.nap{color:var(--muted);font-weight:600}
+
+/* ── los dos diagramas: la rejilla de cuatro columnas y el corte del pane ─── */
+.fig{width:618px;padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--surface)}
+.fig .cap{margin:0 0 10px;color:var(--faint);font-size:10.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase}
+/* la plantilla a 592 de ancho, a tamaño real */
+.gridfig{position:relative;height:74px;border-left:1px solid var(--border);border-right:1px solid var(--border)}
+.gridfig .band{position:absolute;top:0;bottom:26px;border-top:1px solid var(--accent);border-bottom:1px solid var(--accent);background:var(--tint)}
+.gridfig .band.b1{left:0;width:96px}
+.gridfig .band.b2{left:108px;width:302px}
+.gridfig .band.b3{left:422px;width:46px}
+.gridfig .band.b4{left:480px;width:112px}
+.gridfig .band.out{background:transparent;border-color:var(--border)}
+.gridfig .t{position:absolute;bottom:4px;font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:10px;color:var(--muted);white-space:nowrap}
+.gridfig .t.t1{left:0}
+.gridfig .t.t2{left:108px}
+.gridfig .t.t3{left:422px}
+.gridfig .t.t4{left:480px}
+.gridfig .gapmark{position:absolute;top:8px;font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:9.5px;color:var(--faint)}
+.gridfig .m1{left:96px}
+.gridfig .m2{left:410px}
+.gridfig .m3{left:468px}
+/* el corte del pane, con su velo y su aire */
+.cutfig{display:flex;flex-direction:column}
+.cutfig .pane{position:relative;height:96px;overflow:hidden;background:var(--surface);border-left:1px solid var(--border);border-right:1px solid var(--border);padding:0 0 24px}
+.cutfig .pane::after{content:'';position:absolute;left:1px;right:1px;bottom:24px;height:24px;background:linear-gradient(to bottom,transparent,var(--surface))}
+.cutfig .rowfake{display:grid;grid-template-columns:96px minmax(0,1fr) 46px 112px;align-items:center;gap:0 12px;padding:5px 0;font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:10px;color:var(--muted)}
+.cutfig .rowfake i{display:block;height:5px;border-radius:3px;background:var(--border)}
+.cutfig .rowfake i b{display:block;height:100%;border-radius:3px;background:var(--accent)}
+.cutfig .gap{height:16px;background:var(--bg);border-left:1px dashed var(--border);border-right:1px dashed var(--border);display:flex;align-items:center;justify-content:center;font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:9.5px;color:var(--faint)}
+.cutfig .actsrow{display:flex;justify-content:flex-end;padding:0 0 2px}
+.cutfig .btnfake{border:1px solid var(--border);background:var(--surface2);border-radius:8px;padding:4px 12px;font-size:11px}
+.cutfig .legend{margin:8px 0 0;font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:9.5px;color:var(--faint)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style></head>
+<body>
+<main class="page">
+
+<header class="head">
+  <p class="kicker">Reglas compartidas · el juego que Uso y Acerca de estrenan, y que los demás paneles pueden adoptar</p>
+  <h1>Cuatro reglas, cero tokens nuevos: <span style="color:var(--accent)">secciones separadas por una hairline</span>, <span style="color:var(--accent)">aire y velo al final de todo pane que scrollee</span>, columnas fijas para lo tabular y sub-etiquetas calladas</h1>
+  <p class="lede">Esto no es un rediseño de nada: es el juego de reglas que las hojas <code>05-usage.html</code> y <code>06-about.html</code> usan, escrito para que <b>el cableado sea mecánico</b> y para que el próximo panel —la sonda de entorno y los paquetes de la 0.9.0, que se van a construir dentro de este marco (S5)— no tenga que inventar su propia separación. Cada regla nace de una pieza que la app <b>ya tiene</b>: <code>.provider + .provider</code> y <code>.urow + .urow</code> ya son runs con hairline (T3 se las dejó a Cuenta y a Actualizaciones), y el aire y el velo son las dos declaraciones que faltan.</p>
+  <p class="tradeoff"><b>Lo que cuesta.</b> Una regla general obliga a revisar los paneles que ya existen: hoy <b>ningún</b> pane de Ajustes tiene aire ni velo abajo, incluidos los dos que sí scrollean (Cuenta y Actualizaciones), así que este par de declaraciones cambia también su borde inferior aunque el pedido fuera Uso. Es a propósito —lo de «el botón está pegado» le pasa a todo pane largo— y se dice aquí para que no sorprenda en la revisión.</p>
+</header>
+
+<div class="rules">
+
+  <section class="rule">
+    <p class="n">R1</p>
+    <div>
+      <h2>Una sección es un run separado por una hairline, no una caja</h2>
+      <p class="whyline">Un grupo de ajustes que no es <b>una sola cosa</b> no lleva tarjeta: lleva su nombre, su aire y una <code>1px var(--border)</code> que lo separa del anterior. La tarjeta se reserva para la unidad real (una previsualización de tema, una fila que se elige).</p>
+      <p class="whyline"><b>La medida del aire:</b> 18 arriba y 18 abajo de cada sección, y 14 de aire más el subtítulo dentro. Es el ritmo del diálogo, no uno nuevo: 18 es el gap entre el riel y el pane y el aire entre mensajes.</p>
+      <p class="src"><b>Precedente en el código:</b> <code>.settings-pane .provider + .provider</code> y <code>.settings-pane .urow + .urow</code> (<code>apps/desktop/src/app.css</code>). <b>Estreno:</b> <code>.uprov + .uprov</code> (Uso) y <code>.agroup</code> (Acerca de).</p>
+    </div>
+    <div>
+<pre><span class="c">/* el run: sin caja, sin radio, sin gap */</span>
+<span class="k">.uprov</span> { width: 100%; padding: 18px 0; }
+<span class="k">.uprov:first-child</span> { padding-top: 2px; }
+<span class="k">.uprov + .uprov</span> {
+  border-top: 1px solid var(--border);
+}
+<span class="c">/* Acerca de usa el mismo gesto por grupo */</span>
+<span class="k">.agroup</span> {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}</pre>
+    </div>
+  </section>
+
+  <section class="rule">
+    <p class="n">R2</p>
+    <div>
+      <h2>Todo pane que scrollee termina en 24 de aire y un velo de 24</h2>
+      <p class="whyline">Dos declaraciones en <code>.settings-pane</code>, y el número es el mismo en las dos <b>a propósito</b>: cuando el scroll llega al final, el velo cae sobre relleno y no desvanece contenido. Nunca el último bloque contra la fila de «Cerrar».</p>
+      <p class="whyline"><b>Por qué el velo es una máscara:</b> una <code>mask-image</code> lee solo el <b>alfa</b> del gradiente, así que sirve cualquier token opaco —<code>--text</code> lo es en los seis temas— y <b>ningún hex entra en la hoja</b>.</p>
+      <p class="src"><b>Coste medido:</b> en WebView2 la barra de scroll se pinta dentro del elemento, así que el pulgar también se desvanece en los últimos 24px. Alternativa si molesta: un <code>::after</code> con <code>position:sticky;bottom:0</code> y <code>background:linear-gradient(to bottom,transparent,var(--surface))</code>, a cambio de un elemento más. <b>Y el prefijo:</b> escribir también <code>-webkit-mask-image</code> con el mismo gradiente, porque las WebView2 anteriores a Chromium 120 solo entienden la forma con prefijo.</p>
+    </div>
+    <div>
+<pre><span class="k">.settings-pane</span> {
+  <span class="c">/* el aire: era 4px 0 0 4px */</span>
+  padding: 4px 0 24px 4px;
+  <span class="c">/* el velo, con el mismo 24 */</span>
+  mask-image: linear-gradient(
+    to bottom,
+    var(--text) calc(100% - 24px),
+    transparent 100%);
+  <span class="c">/* y la forma con prefijo, por WebView2 viejo */</span>
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    var(--text) calc(100% - 24px),
+    transparent 100%);
+}</pre>
+      <div class="fig" style="margin-top:10px">
+        <p class="cap">el corte, a tamaño real (columna 592) — diagrama, no una lectura</p>
+        <div class="cutfig">
+          <div class="pane">
+            <div class="rowfake"><span>5h</span><i><b style="width:21%"></b></i><span>21%</span><span>reinicia en 4h</span></div>
+            <div class="rowfake"><span>week</span><i><b style="width:96%;background:var(--danger)"></b></i><span>96%</span><span>reinicia en 7d</span></div>
+            <div class="rowfake"><span>billing</span><i><b style="width:44%"></b></i><span>44%</span><span>reinicia en 24d</span></div>
+            <div class="rowfake"><span>week</span><i><b style="width:88%;background:var(--warning)"></b></i><span>88%</span><span>reinicia en 6d</span></div>
+          </div>
+          <div class="gap">16 · el gap de la tarjeta</div>
+          <div class="actsrow"><span class="btnfake">Cerrar</span></div>
+          <p class="legend">24 el velo · 24 el relleno · 16 el gap · ningún texto desvanecido al final</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="rule">
+    <p class="n">R3</p>
+    <div>
+      <h2>Lo tabular va en columnas fijas, declaradas una vez y compartidas</h2>
+      <p class="whyline">Si dos hermanos dibujan las mismas columnas, la plantilla se declara <b>una sola vez</b>, en la propiedad <code>--ucols</code> del contenedor, y cada fila la usa. Así el «reinicia en 17d» y el «reinicia en 4h» empiezan en la misma x, y no hay forma de desalinearlos sin tocar la plantilla.</p>
+      <p class="whyline"><b>La trampa que evita:</b> alinear a la derecha con <code>margin-left:auto</code> dentro de un flex hace que el texto más ancho empiece más a la izquierda —es exactamente lo que el mantenedor vio en «billing»—. Una columna con <code>text-align:left</code> no tiene ese problema.</p>
+      <p class="src"><b>Dónde más sirve:</b> la sonda de entorno de la 0.9.0 (pieza · versión · estado · acción) y los paquetes son la misma forma. Acerca de ya usa la versión corta de la regla: <code>grid-template-columns: 132px minmax(0,1fr)</code>.</p>
+    </div>
+    <div>
+<pre><span class="k">.usecs</span> {
+  --ucols: 96px minmax(0, 1fr) 46px 112px;
+}
+<span class="k">.uwindow</span> {
+  display: grid;
+  grid-template-columns: var(--ucols);
+  align-items: center;
+  gap: 0 12px;
+}
+<span class="k">.upercent</span> { text-align: right; }
+<span class="k">.ureset</span>   { text-align: left; }</pre>
+      <div class="fig" style="margin-top:10px">
+        <p class="cap">la plantilla, a tamaño real</p>
+        <div class="gridfig">
+          <span class="band b1"></span><span class="band b2"></span><span class="band b3"></span><span class="band b4"></span>
+          <span class="gapmark m1">12</span><span class="gapmark m2">12</span><span class="gapmark m3">12</span>
+          <span class="t t1">etiqueta 96</span>
+          <span class="t t2">barra minmax(0,1fr) → 302</span>
+          <span class="t t3">tanto 46</span>
+          <span class="t t4">reinicio 112</span>
+        </div>
+        <p class="legend" style="margin:8px 0 0;font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:9.5px;color:var(--faint)">x: 0 · 108 · 422 · 480 — el reinicio empieza siempre en 480</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="rule">
+    <p class="n">R4</p>
+    <div>
+      <h2>Una sub-etiqueta es 11px, 600, mayúsculas y <code>--faint</code></h2>
+      <p class="whyline">La etiqueta de sección de la casa, aplicada un nivel más abajo: agrupa las ventanas de un límite («claude», «command code», «credits», «Gemini Models») sin dibujar una caja ni competir con el nombre del proveedor.</p>
+      <p class="whyline"><b>El dato no se toca:</b> <code>text-transform</code> es pintura, no contenido — un lector de pantalla sigue leyendo «Gemini Models», y el valor sigue siendo el del paquete (D7).</p>
+      <p class="src"><b>Ya está en <code>design/system.md</code>:</b> «Section labels are 11–12px uppercase with <code>letter-spacing: .05em</code>–<code>.08em</code> in <code>--faint</code>». La regla solo dice cuál de las dos tallas y que esta es la de un sub-nivel.</p>
+    </div>
+    <div>
+<pre><span class="k">.ulimit-head</span> {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 4px;
+  color: var(--faint);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+<span class="c">/* un límite alcanzado: la palabra Y el color */</span>
+<span class="k">.ulimit.reached .ulimit-head</span> {
+  color: var(--warning);
+}</pre>
+    </div>
+  </section>
+
+</div>
+
+<!-- el control de los otros paneles cortos -->
+<section class="sec">
+  <h2>Los otros paneles cortos, contra las cuatro reglas</h2>
+  <p class="p">La pregunta era si <b>Idioma</b>, <b>Notificaciones</b> y <b>Home del shell</b> ya cumplen, sin rediseñarlos. La respuesta corta: <b>los tres cumplen R1 y R4</b> (no tienen tarjeta que sobrar ni sub-etiquetas que dibujar), <b>R2 les es indiferente porque no scrollean</b>, y <b>R3 no les aplica</b> porque no dibujan filas tabulares. Ninguno necesita una línea de CSS; el que sí la necesita es Cuenta, que scrollea y hoy termina a hueso. El detalle, panel por panel, en la tabla.</p>
+  <table class="checks">
+    <thead><tr><th>panel</th><th>R1 · secciones con hairline</th><th>R2 · aire + velo</th><th>R3 · columnas fijas</th><th>R4 · sub-etiquetas</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Idioma</td>
+        <td><span class="yes">cumple</span> — un solo <code>.seg</code> y nada que separar</td>
+        <td><span class="yes">cumple</span> — no scrollea (≈ 90 de 480); el aire del <code>padding</code> de R2 no cambia nada visible</td>
+        <td><span class="nap">no aplica</span> — dos botones en un <code>.seg</code></td>
+        <td><span class="yes">cumple</span> — sin grupos internos</td>
+      </tr>
+      <tr>
+        <td>Notificaciones</td>
+        <td><span class="yes">cumple</span> — <code>.seg</code>, <code>.why</code>, <code>.acts</code>, <code>.quiet</code> / <code>.note</code>: ni una caja</td>
+        <td><span class="yes">cumple</span> — no scrollea (≈ 210 de 480)</td>
+        <td><span class="nap">no aplica</span></td>
+        <td><span class="yes">cumple</span> — sin grupos internos</td>
+      </tr>
+      <tr>
+        <td>Home del shell</td>
+        <td><span class="yes">cumple</span> — <code>.why</code> + <code>.home-choices</code>: ni una caja</td>
+        <td><span class="yes">cumple</span> — no scrollea (≈ 180 de 480); con el aviso de reinicio, ≈ 220</td>
+        <td><span class="nap">no aplica</span></td>
+        <td><span class="yes">cumple</span> — sin grupos internos</td>
+      </tr>
+      <tr>
+        <td>Cuenta <span style="color:var(--faint);font-weight:400">(hoy)</span></td>
+        <td><span class="yes">cumple</span> — <code>.provider + .provider</code>, el precedente de R1</td>
+        <td><span class="nap">le falta</span> — scrollea y termina a hueso: <b>es el que hereda R2</b></td>
+        <td><span class="nap">no aplica</span> — sus filas son <code>flex-wrap</code> de nombre · estado · motivo</td>
+        <td><span class="yes">cumple</span> — sin grupos internos</td>
+      </tr>
+      <tr>
+        <td>Actualizaciones <span style="color:var(--faint);font-weight:400">(hoy)</span></td>
+        <td><span class="yes">cumple</span> — <code>.urow + .urow</code> y la hairline del bloque de extensiones</td>
+        <td><span class="nap">le falta</span> — scrollea y termina a hueso: <b>hereda R2</b></td>
+        <td><span class="nap">no aplica</span> — filas <code>flex-wrap</code> con acción propia</td>
+        <td><span class="yes">cumple</span> — sus cabeceras ya son 13px/600, la talla de un nombre, no de un grupo</td>
+      </tr>
+      <tr>
+        <td>Apariencia</td>
+        <td><span class="yes">cumple</span> — y R1 dice por qué las seis previsualizaciones sí pueden ser cajas: <b>cada una es una unidad</b></td>
+        <td><span class="nap">le falta</span> — scrollea (seis filas de 64 + aire en 480) y termina a hueso: <b>hereda R2</b></td>
+        <td><span class="nap">no aplica</span></td>
+        <td><span class="yes">cumple</span> — la etiqueta «Tema» ya es de esa familia</td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="p" style="margin-top:14px">Dos observaciones que <b>no</b> son de estas reglas y no se tocan aquí: Home del shell usa el control viejo <code>.home-choice</code> (12px, pressed en <code>--tint</code>) donde Idioma y Notificaciones usan <code>.seg</code>; y Apariencia es el único panel que scrollea con contenido que no es una lista, así que R2 le cambia el borde inferior con más razón que a nadie.</p>
+
+  <h2 style="margin-top:26px">Lo que esta hoja no estrena</h2>
+  <p class="p"><b>Ni una cadena</b> —por eso no hay columna en inglés—: las cuatro reglas son CSS y ninguna escribe palabras. <b>Ni un token</b>: los cinco valores que se usan (<code>--border</code>, <code>--faint</code>, <code>--warning</code>, <code>--text</code>, <code>--surface</code>) ya están en <code>design/system.md</code>. <b>Ni un movimiento</b>: el velo es estático y <code>prefers-reduced-motion</code> sigue apagando los <code>120ms</code> del riel, los botones y los enlaces. <b>Ni una hex</b>: el gradiente del velo usa un token y el diagrama del corte usa <code>var(--surface)</code>.</p>
+  <p class="p">Lo único que hay que anotar en <code>design/system.md</code> cuando se cablee: <code>--ucols</code> es una <b>propiedad de componente</b> (como <code>--swatch</code> y <code>--dot</code>) que el código pone por elemento y no un token de tema; y el pane de Ajustes estrena el par <code>padding-bottom</code> + <code>mask-image</code>, que conviene que quede escrito en la sección del panel de Ajustes de ese archivo.</p>
+</section>
+
+</main>
+</body></html>

@@ -65,10 +65,16 @@
   )
 
   // A push with notes opens the modal; the push that clears the slice closes
-  // it, so it is never left standing over a version it already sent.
+  // it, so it is never left standing over a version it already sent. The clear
+  // is also what forgets the dismiss (settings-redesign T4, D6): About's "What
+  // is new in this version" pushes the notes of the version the run already
+  // runs as, so a second read of the SAME version has to open again. Until that
+  // clear lands `sent` still holds, so a close stays sent while the shell's
+  // push is on its way and a second Escape sends nothing.
   $effect(() => {
     if (whatsNew === null) {
       open = false
+      sent = null
       return
     }
     if (whatsNew.version === sent) return

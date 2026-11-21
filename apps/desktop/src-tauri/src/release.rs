@@ -9,6 +9,10 @@
 //! Nothing here runs on the thread that draws: `commands::Bridge::start_whats_new`
 //! hands the fetch to a thread of its own and pushes what it answers, so a slow
 //! or absent release server never delays the first frame (S6).
+//!
+//! The About pane's read on demand (T5, S9, D6) asks the SAME address through the
+//! same fetcher, from `commands::show_whats_new`'s blocking worker: one manifest,
+//! one address, two moments at which the app reads it.
 
 use std::sync::Arc;
 use std::time::Duration;

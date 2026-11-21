@@ -70,6 +70,16 @@ export function paneOf(usage: UsageView | null): UsagePaneState {
   return { kind: 'reading' }
 }
 
+/**
+ * How many window rows a provider really draws: a limit whose shares the contract
+ * could not carry (every `used_percent` null) contributes none. The pane needs it
+ * to tell a provider with NO window - which says so in its own sentence (D3) -
+ * from one that has limits with rows under them.
+ */
+export function windowCount(provider: UsageProviderRow): number {
+  return provider.limits.reduce((count, limit) => count + limit.windows.length, 0)
+}
+
 /** The highest percentage a provider reported, which is how the cards sort. */
 function peakOf(provider: UsageProviderRow): number {
   return provider.limits.reduce(

@@ -44,6 +44,11 @@ export interface UsageCopy {
   providerFailed: string
   /** The sources answered, and named no provider at all. */
   noProviders: string
+  /**
+   * One provider answered, and it reported no window at all (L7, D3): its own
+   * sentence, never the line above, which is about the whole read.
+   */
+  noWindows: string
   /** The quiet line under the cards: what the numbers are and are not. */
   note: string
 }
@@ -67,6 +72,7 @@ const ENGLISH: UsageCopy = {
   limitReached: 'Limit reached',
   providerFailed: 'Could not read this provider',
   noProviders: 'The usage sources are not reporting any provider right now.',
+  noWindows: 'No windows',
   note: "These numbers come from the shell's own sources, the same ones its subscription panel reads: one row per window, with the share used and when it resets.",
 }
 
@@ -91,6 +97,7 @@ const SPANISH: typeof ENGLISH = {
   limitReached: 'Límite alcanzado',
   providerFailed: 'No se pudo leer este proveedor',
   noProviders: 'Las fuentes de uso no informan de ningún proveedor ahora mismo.',
+  noWindows: 'Sin ventanas',
   note: 'Estos números vienen de las propias fuentes de la shell, las mismas que lee su panel de suscripción: una fila por ventana, con la parte usada y cuándo se reinicia.',
 }
 

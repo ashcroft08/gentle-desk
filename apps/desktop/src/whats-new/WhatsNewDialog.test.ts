@@ -165,6 +165,34 @@ describe('the what’s-new modal', () => {
     expect(handlerArgs(DISMISS_COMMAND)).toHaveLength(1)
   })
 
+  // settings-redesign T4 (S9, D6): the About pane's "What is new in this
+  // version" pushes the notes of the version the run already runs as, so the
+  // close must not outlive the push that clears the slice - otherwise a manual
+  // read of the SAME version could never open the window a second time.
+  it('opens again when the same version is pushed after the slice was cleared', async () => {
+    const { rerender } = render(WhatsNewDialog, { props: { whatsNew: notes() } })
+    const dialog = await modal()
+    await fireEvent.click(within(dialog).getByRole('button', { name: DISMISS }))
+    await vi.waitFor(() => expect(dialog.isConnected).toBe(false))
+
+    // While the shell's push is still on its way the close is remembered: the
+    // notes arriving again in that window do not reopen the modal.
+    await rerender({ whatsNew: notes() })
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(handlerArgs(DISMISS_COMMAND)).toHaveLength(1)
+
+    // The push that clears the slice arrives, and with it the memory of the
+    // close: the run no longer follows this version.
+    await rerender({ whatsNew: null })
+    expect(screen.queryByRole('dialog')).toBeNull()
+
+    // Now the reader asks for this version's notes from About: the window opens
+    // again, and closing it sends the dismiss once more.
+    await rerender({ whatsNew: notes() })
+    const again = await modal()
+    expect(within(again).getByRole('heading', { name: /What's new.*0\.1\.8/ })).toBeTruthy()
+  })
+
   it('draws nothing at all while the run follows no update', () => {
     draw(null)
 

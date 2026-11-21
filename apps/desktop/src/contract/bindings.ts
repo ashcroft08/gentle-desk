@@ -135,6 +135,18 @@ export const commands = {
 	 */
 	storeLastRunVersion: () => typedError<ViewState_Serialize, string>(__TAURI_INVOKE("store_last_run_version")),
 	/**
+	 *  The About pane's one action (T5, S9, D6): the notes of the version this run
+	 *  RUNS as, read on demand, because the what's-new slice is a one-shot of the run
+	 *  that follows an update and is empty on every other run.
+	 * 
+	 *  It takes no argument: the run is the side that knows its version, and the
+	 *  address is the endpoint the updater config names, the same `latest.json` the
+	 *  startup step reads. The answer says what the page draws - nothing at all,
+	 *  because the modal is up, or the one quiet line to show instead - and the fetch
+	 *  itself runs off the window's thread.
+	 */
+	showWhatsNew: () => typedError<WhatsNewRead, string>(__TAURI_INVOKE("show_whats_new")),
+	/**
 	 *  The Settings dialog's one read (settings-snapshot): every page's data in
 	 *  one plain object, asked once when the dialog opens.
 	 * 
@@ -4346,20 +4358,45 @@ export type WelcomeWorkspace_Serialize = {
 };
 
 /**
- *  The notes of the version this run follows (what's-new S3b): the version the run
- *  runs as and the plain text its release carried. It is pushed once, through the
- *  same `state-changed` step the notices travel on, and cleared when the modal's
- *  dismiss stores the version (S5), so the web side draws it for exactly the run
- *  that follows an update.
+ *  What one read on demand of the running version's notes came to (T5, S9, D6):
+ *  the answer the About pane draws when the notes are not the modal's to open.
+ * 
+ *  It is the RESULT of one command and never part of a push: the notes
+ *  themselves travel as [`ViewState.whats_new`], the one slice the what's-new
+ *  modal draws, so a read on demand opens exactly the window an update opens.
+ */
+export type WhatsNewRead = 
+/**
+ *  This version's notes reached the slice and the modal is up: the pane draws
+ *  nothing of its own.
+ */
+{ type: "Shown" } | 
+/**
+ *  There was nothing to show, and this is the one quiet line the pane draws.
+ *  It arrives worded in the language the app holds (D6, `messages`): the
+ *  reason belongs to the shell, which is the side that knows it.
+ */
+{ type: "Unavailable"; data: string };
+
+/**
+ *  The notes of the version this run follows (what's-new S3b), or the notes of
+ *  the version it runs as read on demand from the About pane (T5, S9, D6): the
+ *  version the run runs as and the plain text its release carried. It is pushed
+ *  through the same `state-changed` step the notices travel on, and cleared when
+ *  the modal's dismiss stores the version (S5), so the web side draws it for
+ *  exactly the run that follows an update - or once, for the read the user asked
+ *  for.
  */
 export type WhatsNewView = WhatsNewView_Serialize | WhatsNewView_Deserialize;
 
 /**
- *  The notes of the version this run follows (what's-new S3b): the version the run
- *  runs as and the plain text its release carried. It is pushed once, through the
- *  same `state-changed` step the notices travel on, and cleared when the modal's
- *  dismiss stores the version (S5), so the web side draws it for exactly the run
- *  that follows an update.
+ *  The notes of the version this run follows (what's-new S3b), or the notes of
+ *  the version it runs as read on demand from the About pane (T5, S9, D6): the
+ *  version the run runs as and the plain text its release carried. It is pushed
+ *  through the same `state-changed` step the notices travel on, and cleared when
+ *  the modal's dismiss stores the version (S5), so the web side draws it for
+ *  exactly the run that follows an update - or once, for the read the user asked
+ *  for.
  */
 export type WhatsNewView_Deserialize = {
 	/**  The version this run runs as, never the manifest's (S5). */
@@ -4367,7 +4404,8 @@ export type WhatsNewView_Deserialize = {
 	/**
 	 *  The version the last run stored, which this run followed: the modal says
 	 *  "since <it>". `None` when the config stored nothing, so the modal never
-	 *  invents a starting point.
+	 *  invents a starting point - and `None` for a read on demand (T5), which
+	 *  follows nothing.
 	 */
 	previous_version?: string | null,
 	/**
@@ -4378,11 +4416,13 @@ export type WhatsNewView_Deserialize = {
 };
 
 /**
- *  The notes of the version this run follows (what's-new S3b): the version the run
- *  runs as and the plain text its release carried. It is pushed once, through the
- *  same `state-changed` step the notices travel on, and cleared when the modal's
- *  dismiss stores the version (S5), so the web side draws it for exactly the run
- *  that follows an update.
+ *  The notes of the version this run follows (what's-new S3b), or the notes of
+ *  the version it runs as read on demand from the About pane (T5, S9, D6): the
+ *  version the run runs as and the plain text its release carried. It is pushed
+ *  through the same `state-changed` step the notices travel on, and cleared when
+ *  the modal's dismiss stores the version (S5), so the web side draws it for
+ *  exactly the run that follows an update - or once, for the read the user asked
+ *  for.
  */
 export type WhatsNewView_Serialize = {
 	/**  The version this run runs as, never the manifest's (S5). */
@@ -4390,7 +4430,8 @@ export type WhatsNewView_Serialize = {
 	/**
 	 *  The version the last run stored, which this run followed: the modal says
 	 *  "since <it>". `None` when the config stored nothing, so the modal never
-	 *  invents a starting point.
+	 *  invents a starting point - and `None` for a read on demand (T5), which
+	 *  follows nothing.
 	 */
 	previous_version: string | null,
 	/**

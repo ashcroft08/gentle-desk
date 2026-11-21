@@ -2250,30 +2250,42 @@ p {
   color: var(--bg);
 }
 
-/* The Settings dialog (settings-dialog S2, L4): a rail of the three sections on
-   the left and the selected section's content in the pane on the right. The card
-   is wider than the other dialogs' 440px to hold both, about 680px. */
+/* The Settings dialog (settings-dialog S2, L4; settings-redesign S7, T3): a rail
+   of the sections on the left and the selected section's content in the pane on
+   the right. The card is wider than the other dialogs' 440px to hold both, and it
+   takes the room the window really has - up to 860px, and never more than the
+   window less a 24px margin at each side, so the shortest window the app allows
+   (800x560) still holds it whole at 752 (S1: "lo veo pequeño"). */
 .dlg.settings {
-  width: min(680px, calc(100vw - 32px));
+  width: min(860px, calc(100vw - 48px));
   /* What the card's OWN chrome takes out of the window: the title above and the
      Close button below, with slack. Named here so the body's bound below never
-     holds a number nobody can trace (native review R2-2). */
-  --settings-chrome: 200px;
+     holds a number nobody can trace (native review R2-2). Measured at about
+     135px - 40 of padding, 28 of title, 32 of the two 16px gaps and 34 of the
+     button row - and the 45px over that are what a wrapped title can take. */
+  --settings-chrome: 180px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  /* A step more air inside the card than the 18 the other dialogs take (S7):
+     padding 18 -> 20, and the two gaps the card already had 14 -> 16. */
+  padding: 20px 24px;
+  gap: 16px;
 }
 
 /* The rail and the pane, side by side: the rail is fixed and the pane takes the
    rest, with the one section drawn there.
 
-   The body is BOUNDED against the window (ui-density T1): a section can be long
-   - Usage draws every provider, limit and window - and with nothing holding it
-   the card grew past the bottom of the window, pushing its own Close button out
-   of reach. The room left over is what the card's own chrome does not use. */
+   The body has a height of its OWN (S7): 60% of the window, never under 380 and
+   never over 560, so a short section no longer reads as a small card and the rail
+   stops setting the height for every section. It is BOUNDED against the window
+   too (ui-density T1): a section can be long - Usage draws every provider, limit
+   and window - and with nothing holding it the card grew past the bottom of the
+   window, pushing its own Close button out of reach. The room left over is what
+   the card's own chrome does not use, and the pane is what scrolls inside it. */
 .settings-body {
   display: flex;
-  gap: 18px;
+  gap: 20px;
+  height: clamp(380px, 60vh, 560px);
   max-height: calc(100vh - var(--settings-chrome));
 }
 
@@ -2282,7 +2294,7 @@ p {
   width: 184px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
   padding: 2px 14px 0 0;
   border-right: 1px solid var(--border);
 }
@@ -2349,13 +2361,16 @@ p {
 
 /* One rail entry: its glyph and its word, quiet until it is the selected one or
    the pointer is over it. The selected entry wears the accent on its tint, the
-   house's own selected look (the picker list and the chat rows). */
+   house's own selected look (the picker list and the chat rows). The row is a
+   touch taller than the 32 it was (S7, "todo esta apretado") - the same gap and
+   the same word, one step more padding on each side - so the rail reads as a
+   column of entries and not as a list of links. */
 .settings-rail [role='tab'] {
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 32px;
-  padding: 0 10px;
+  height: 36px;
+  padding: 0 12px;
   border: 0;
   background: transparent;
   color: var(--muted);
@@ -2397,11 +2412,26 @@ p {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  /* Symmetric with the card's own padding, and the scrollbar's channel reserved,
-     so the content's right edge does not move 10px between a section that fits
-     and one that overflows (findings 09 and 10, D4). */
-  padding: 2px 0 0 2px;
+  /* A little air on the two edges the rail does not already give (S7), the 24px
+     of air under the content that answers "el botón está pegado a la card"
+     (settings-redesign R2, D5), and the scrollbar's channel reserved, so the
+     content's right edge does not move 10px between a section that fits and one
+     that overflows (findings 09 and 10, D4). */
+  padding: 4px 0 24px 4px;
   scrollbar-gutter: stable;
+  /* The veil where the scroll is cut (R2, D5): the last 24px fade, exactly the
+     air the padding above leaves, so at the end of the scroll the veil falls on
+     padding and never greys the last block. A mask reads only the gradient's
+     ALPHA, so any opaque token does - `--text` is the one token that is opaque
+     in all six themes - and no colour of its own enters this sheet. The prefixed
+     property stays because WebView2 older than Chromium 120 only knows that
+     form, as with the scrollbar rules below. */
+  mask-image: linear-gradient(to bottom, var(--text) calc(100% - 24px), transparent 100%);
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    var(--text) calc(100% - 24px),
+    transparent 100%
+  );
 }
 
 .settings-pane .pane-body {
@@ -2425,13 +2455,13 @@ p {
 /* The section's title at the dialog's own title size, so the two read as one
    scale; the hint sits under it in the muted small text the house uses. */
 .settings-pane h3 {
-  margin: 0 0 4px;
+  margin: 0 0 6px;
   font-size: 15px;
   font-weight: 600;
 }
 
 .settings-pane .hint {
-  margin: 0 0 14px;
+  margin: 0 0 18px;
   color: var(--muted);
   font-size: 12px;
   line-height: 1.5;
@@ -2447,28 +2477,98 @@ p {
 }
 
 .settings-pane .why {
-  margin: 0 0 12px;
+  margin: 0 0 14px;
   line-height: 1.5;
 }
 
-/* About (settings-dialog S5): the name and the version this run runs as on one
-   line. What is installed, and whether something newer is out, is the Updates
-   section's own card (0.1.12). */
-.dlg .about {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  margin: 0 0 10px;
+/* About (settings-redesign S9, L5, L6, L7): the name and the version as one
+   little title block, then the real facts as key/value rows on two columns (132
+   and the rest), each group set off by one hairline and its own air - the same
+   gesture R1 gives the Usage providers. No box, and no datum the app has not
+   already read: the installed versions and the moment of the read come from the
+   Updates slice this dialog already holds, and the repository is the README's. */
+.settings-pane .atitle,
+.settings-pane .afacts,
+.settings-pane .agroup {
+  width: 100%;
 }
 
-.dlg .about-name {
+.settings-pane .atitle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.settings-pane .aname {
   font-size: 13px;
   font-weight: 600;
 }
 
-.dlg .about-version {
+.settings-pane .aver {
+  color: var(--faint);
+  font-size: 12px;
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+}
+
+.settings-pane .agroup {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.settings-pane .afacts {
+  margin: 0;
+  padding: 0;
+}
+
+.settings-pane .afact {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr);
+  align-items: baseline;
+  gap: 0 16px;
+  padding: 7px 0;
+}
+
+.settings-pane .afact dt {
   color: var(--muted);
   font-size: 12px;
+  font-weight: 600;
+}
+
+.settings-pane .afact dd {
+  margin: 0;
+  color: var(--text);
+  font-size: 12.5px;
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  /* A value longer than its column wraps instead of pushing the pane. */
+  overflow-wrap: anywhere;
+}
+
+/* A version nobody could read is drawn as an absence, not as a datum (D8). */
+.settings-pane .afact dd.aunknown {
+  color: var(--muted);
+}
+
+/* The last-checked sentence carries its own label, so it is one quiet row of the
+   facts group rather than a term and a value (D8). */
+.settings-pane .acheck {
+  margin: 0;
+  padding: 7px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.settings-pane .alink {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color 120ms ease;
+}
+
+.settings-pane .alink:hover {
+  border-bottom-color: var(--accent);
 }
 
 /* The dialog's buttons keep the house button look with the same quiet
@@ -2493,12 +2593,13 @@ p {
 
 /* The theme cards, the Appearance section's choice (the reference's theme_cards):
    a grid of six miniatures, three to a row in two even rows - always, since the
-   card is 680px wide at every window the app allows, and wide enough for the
-   longest name (Gentleman-Classic) to read in full. */
+   card is at least 752px wide at every window the app allows (860 from 1280 up)
+   and wide enough for the longest name (Gentleman-Classic) to read in full. The
+   tiles keep the card's new width and their miniature grows with it (S7). */
 .tc-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  gap: 12px;
   width: 100%;
 }
 
@@ -2507,9 +2608,9 @@ p {
 .tc {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
-  padding: 7px;
+  padding: 8px;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: transparent;
@@ -2543,14 +2644,14 @@ p {
 .tc-shot {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 6px;
+  gap: 8px;
+  padding: 8px;
   border: 1px solid var(--border);
   border-radius: 7px;
   background: var(--bg);
   color: var(--text);
   font-family: ui-monospace, 'SF Mono', Consolas, monospace;
-  font-size: 9px;
+  font-size: 10px;
   line-height: 1.4;
   overflow: hidden;
 }
@@ -2605,7 +2706,7 @@ p {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 11.5px;
+  font-size: 12px;
 }
 
 .tc-check {
@@ -2644,7 +2745,7 @@ p {
   justify-content: flex-start;
   gap: 8px;
   align-items: center;
-  margin: 12px 0 0;
+  margin: 16px 0 0;
 }
 
 .settings-pane .note {
@@ -2943,17 +3044,16 @@ p {
   background: var(--surface2);
 }
 
-/* The Account pane's providers: one row each, the name and the state of its
-   own check, then the reason the shell gave when it gave one. */
+/* The Account pane's providers (S7): one row each, the name and the state of its
+   own check, then the reason the shell gave when it gave one. The rows are a run
+   of the pane, not a box in a box - a card said nothing the list did not already
+   say - so the wrapper keeps the rhythm and the hairline does the separating. */
 .settings-pane .providers {
   list-style: none;
   width: 100%;
   box-sizing: border-box;
   margin: 0;
-  padding: 4px 14px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--surface2);
+  padding: 0;
 }
 
 .settings-pane .provider {
@@ -2961,11 +3061,11 @@ p {
   flex-wrap: wrap;
   align-items: baseline;
   gap: 4px 10px;
-  padding: 7px 0;
+  padding: 8px 0;
 }
 
 .settings-pane .provider + .provider {
-  border-top: 1px dashed var(--border);
+  border-top: 1px solid var(--border);
 }
 
 .settings-pane .provider-name {
@@ -2987,23 +3087,23 @@ p {
   line-height: 1.5;
 }
 
-/* The Updates pane's two cards: the three rows with their tag and - while a chat
-   is open - the gate's reason, and the extensions block, which is a card of its
-   own because no data drives it (0.8.1 settings-polish D14). */
+/* The Updates pane's two groups (S6, S8; S7 touch-ups): the three rows with their
+   tag, and the extensions block, drawn as two runs of the pane instead of two
+   cards. A card around settings that are not one unit was the "mucho uso de
+   cards" the maintainer named, so the box is gone and the air and one hairline
+   say where one group ends and the next begins. */
 .settings-pane .card.updates,
 .settings-pane .card.ext {
   width: 100%;
   box-sizing: border-box;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--surface2);
-  padding: 12px 16px;
 }
 
-/* The two cards of the pane are separated the way the Usage pane separates its
-   own: one declaration, no new token. */
+/* The block after the rows is separated the way the rows are separated from each
+   other: one hairline and its own air, never a second box. */
 .settings-pane .card.updates + .card.ext {
-  margin-top: 10px;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
 }
 
 .settings-pane .card.updates .head {
@@ -3019,13 +3119,13 @@ p {
   font-weight: 600;
 }
 
-/* The three rows of the Updates card (0.8.1 settings-polish S8): one piece each,
-   its version and its own action. The declarations are the Account pane's
-   `.provider` rows without the container's border and background, which the card
-   already draws, so both panes read at the same rhythm. */
+/* The three rows of the Updates group (0.8.1 settings-polish S8, S7): one piece
+   each, its version and its own action. The declarations are the Account pane's
+   `.provider` rows - the same rhythm, the same hairline between them - since both
+   panes lost the box that used to wrap them. */
 .settings-pane .urows {
   list-style: none;
-  margin: 8px 0 0;
+  margin: 4px 0 0;
   padding: 0;
 }
 
@@ -3034,15 +3134,15 @@ p {
   flex-wrap: wrap;
   align-items: baseline;
   gap: 4px 10px;
-  padding: 7px 0;
+  padding: 8px 0;
 }
 
 .settings-pane .urow + .urow {
-  border-top: 1px dashed var(--border);
+  border-top: 1px solid var(--border);
 }
 
 .settings-pane .versions {
-  margin: 8px 0 0;
+  margin: 12px 0 0;
   color: var(--faint);
   font-size: 12px;
   font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
@@ -3060,91 +3160,119 @@ p {
   line-height: 1.5;
 }
 
-/* The Usage pane: one card per provider, its name and plan on the head line,
-   then one row per limit and one line per window. The gauge is the context
-   chip's language (a small bar and the rounded share) worn at card size, so the
-   two places that report a percentage read the same: quiet until 75%, the
-   warning token from there, the danger token from 95%. */
-.settings-pane .ucards {
-  /* One column of cards; the PANE scrolls, not this list. An inner scroll cut
-     the last card in half, and fading it only moved the problem to the top
-     edge. The pane's own scroll never slices a card. */
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+/* The Usage pane (settings-redesign S8, L5, L7): NOT a card per provider. One
+   provider is a run of the pane's whole column - its name and its plan on one
+   line, its limits as quiet sub-headings, its windows as rows of ONE grid - and
+   a hairline plus 18px of air separate it from the next (R1). The four columns
+   are declared once here (`--ucols`, D4) so the countdown of every row of every
+   provider starts at the same x whatever its text says: a trailing
+   `margin-left: auto` was what made the widest one start further left. The gauge
+   is the context chip's language (a small bar and the rounded share), quiet until
+   75%, the warning token from there, the danger token from 95%. */
+.settings-pane .usecs {
+  /* The four columns, written once for every row of every provider (R3): the
+     window's label, the bar that stretches, the share, and the reset, whose
+     column fits "resets in 24d" with little to spare (D4). */
+  --ucols: 96px minmax(0, 1fr) 46px 112px;
+  width: 100%;
 }
 
-.settings-pane .card.usage-provider {
+.settings-pane .uprov {
   width: 100%;
   box-sizing: border-box;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--surface2);
-  padding: 12px 16px;
+  padding: 18px 0;
 }
 
-.settings-pane .card.usage-provider + .card.usage-provider {
-  margin-top: 10px;
+.settings-pane .uprov:first-child {
+  padding-top: 2px;
 }
 
-.settings-pane .card.usage-provider .head {
-  display: flex;
-  flex-wrap: wrap;
+.settings-pane .uprov + .uprov {
+  border-top: 1px solid var(--border);
+}
+
+/* The provider's own line: the name takes what is left and the plan sits at the
+   right edge of it (D1), both on one baseline. */
+.settings-pane .uprov-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: baseline;
-  gap: 4px 10px;
+  gap: 0 12px;
 }
 
 .settings-pane .uname {
+  margin: 0;
   font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
   font-size: 13px;
   font-weight: 600;
   color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .settings-pane .uplan {
   color: var(--faint);
   font-size: 12px;
+  text-align: right;
+  white-space: nowrap;
 }
 
 .settings-pane .ulimit {
+  margin-top: 14px;
+}
+
+.settings-pane .uprov-head + .ulimit {
   margin-top: 10px;
 }
 
+/* A limit's name is a sub-heading, not a line of a card: the house's quiet
+   section label one level down - 11px, 600, capitals and --faint (R4, D2).
+   `text-transform` is paint, not content, so a screen reader still reads
+   "Gemini Models" exactly as the shell wrote it. */
 .settings-pane .ulimit-head {
   display: flex;
   align-items: baseline;
   gap: 8px;
-  color: var(--muted);
-  font-size: 12px;
+  margin: 0 0 4px;
+  color: var(--faint);
+  font-size: 11px;
   font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 
 /* A limit the provider marked reached: its name takes the warning colour as
    well as the tag, so neither the word nor the colour stands alone. */
-.settings-pane .ulimit.reached .ulimit-name {
+.settings-pane .ulimit.reached .ulimit-head {
   color: var(--warning);
 }
 
+/* One window on the four columns: the reset cell is left-aligned inside a fixed
+   column, so it starts at the same x in every row of every provider (R3). */
 .settings-pane .uwindow {
-  display: flex;
+  display: grid;
+  grid-template-columns: var(--ucols);
   align-items: center;
-  gap: 10px;
-  padding: 3px 0 3px 10px;
+  gap: 0 12px;
+  padding: 4px 0;
   color: var(--text);
   font-size: 12.5px;
   line-height: 1.4;
 }
 
 .settings-pane .ulabel {
-  min-width: 52px;
   color: var(--muted);
   font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
   font-size: 11.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .settings-pane .ubar {
-  display: inline-block;
-  width: 76px;
+  display: block;
+  width: 100%;
   height: 5px;
   border-radius: 3px;
   background: var(--border);
@@ -3169,14 +3297,14 @@ p {
 }
 
 .settings-pane .upercent {
-  min-width: 38px;
   font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
   font-size: 12px;
   font-weight: 600;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .settings-pane .ureset {
-  margin-left: auto;
   color: var(--faint);
   font-size: 11.5px;
   white-space: nowrap;

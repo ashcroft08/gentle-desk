@@ -1,0 +1,540 @@
+<!doctype html>
+<html lang="es" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=1400">
+<title>Uso — una sección por proveedor, filas en cuatro columnas</title>
+<style>
+/* ── TOKENS. Copia literal de apps/desktop/src/theme.css (los seis bloques), que
+   es la única fuente de color de esta hoja: ninguna regla de más abajo escribe
+   un hex. ─────────────────────────────────────────────────────────────────── */
+:root,[data-theme='dark']{--bg:#0e1116;--surface:#151a21;--surface2:#1c222b;--border:#2b333d;--text:#e4e8ee;--muted:#9aa4b2;--faint:#7d8593;--accent:#7aa2f7;--tint:rgba(122,162,247,.14);--success:#7edc9a;--warning:#e7b455;--danger:#ff8585;--shadow:0 8px 24px rgba(0,0,0,.45);--row-h:34px}
+[data-theme='light']{--bg:#f2f4f7;--surface:#ffffff;--surface2:#e9edf2;--border:#cfd5dd;--text:#17202a;--muted:#576272;--faint:#6b7686;--accent:#2e5bd7;--tint:rgba(46,91,215,.1);--success:#166e38;--warning:#8a5800;--danger:#c22f37;--shadow:0 8px 24px rgba(23,32,42,.18);--row-h:34px}
+[data-theme='Gentle']{--bg:#06080f;--surface:#06080f;--surface2:#0d0f14;--border:#313342;--text:#f3f6f9;--muted:#8394a3;--faint:#96a2b0;--accent:#7fb4ca;--tint:#161d2e;--success:#b7cc85;--warning:#deba87;--danger:#cb7c94;--shadow:0 8px 24px rgba(0,0,0,.6);--row-h:34px}
+[data-theme='Gentleman-Cute']{--bg:#060407;--surface:#100a0f;--surface2:#100a0f;--border:#563040;--text:#f6eff3;--muted:#a78e9b;--faint:#d7a0b8;--accent:#f095c8;--tint:#2a1523;--success:#b4e7c7;--warning:#f2b86d;--danger:#ff718f;--shadow:0 8px 24px rgba(0,0,0,.6);--row-h:34px}
+[data-theme='Gentleman-Sexy']{--bg:#060407;--surface:#100a0f;--surface2:#100a0f;--border:#563040;--text:#f6eff3;--muted:#a78e9b;--faint:#d7a0b8;--accent:#f43888;--tint:#2e0f1f;--success:#d2cbd0;--warning:#f2b86d;--danger:#ff718f;--shadow:0 8px 24px rgba(0,0,0,.6);--row-h:34px}
+@media (prefers-color-scheme:light){[data-theme='system']{--bg:#f2f4f7;--surface:#ffffff;--surface2:#e9edf2;--border:#cfd5dd;--text:#17202a;--muted:#576272;--faint:#6b7686;--accent:#2e5bd7;--tint:rgba(46,91,215,.1);--success:#166e38;--warning:#8a5800;--danger:#c22f37;--shadow:0 8px 24px rgba(23,32,42,.18);--row-h:34px}}
+[data-theme='dark'],[data-theme='Gentle'],[data-theme='Gentleman-Cute'],[data-theme='Gentleman-Sexy']{color-scheme:dark}
+[data-theme='light']{color-scheme:light}
+
+/* ── la hoja ──────────────────────────────────────────────────────────────── */
+*{box-sizing:border-box}
+h1,h2,h3,h4,h5,p,ul,li,dl,dd,dt{margin:0}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.page{width:1400px;padding:30px 0 64px}
+.head{width:1280px;margin:0 auto 26px}
+.kicker{margin:0 0 10px;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--faint)}
+h1{margin:0 0 12px;font-size:23px;font-weight:600;line-height:1.25}
+.lede{margin:0 0 12px;max-width:860px;color:var(--muted);font-size:13.5px;line-height:1.65}
+.lede b{color:var(--text);font-weight:600}
+.tradeoff{margin:0 0 22px;max-width:920px;padding-left:14px;border-left:2px solid var(--accent);color:var(--text);font-size:13px;line-height:1.6}
+.tradeoff b{color:var(--accent);font-weight:600}
+h1 code,p code,li code,dd code,td code{font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:12px;background:var(--surface2);border-radius:4px;padding:1px 5px}
+.metrics{width:100%;border-collapse:collapse;font-size:12.5px}
+.metrics th{text-align:left;font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);padding:0 10px 6px 0;border-bottom:1px solid var(--border)}
+.metrics td{padding:6px 10px 6px 0;border-bottom:1px dashed var(--border);vertical-align:top;color:var(--muted)}
+.metrics td:first-child{color:var(--text);font-weight:600;white-space:nowrap}
+.metrics td b{color:var(--text);font-weight:600}
+.metrics .now{color:var(--faint)}
+.wrap{display:flex;justify-content:center}
+.sheet{margin:0 0 30px}
+.sheet>.cap{width:1280px;margin:0 auto 10px;color:var(--faint);font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase}
+.sheet>.cap b{color:var(--muted)}
+.figcap{width:1280px;margin:12px auto 0;color:var(--muted);font-size:12.5px;line-height:1.6}
+.figcap b{color:var(--text);font-weight:600}
+
+/* ── la ventana de la app, a tamaño real ──────────────────────────────────── */
+.frame{position:relative;width:1280px;height:800px;background:var(--bg);border:1px solid var(--border);border-radius:12px;overflow:hidden;box-shadow:var(--shadow)}
+.app{display:grid;grid-template-columns:280px minmax(0,1fr);height:100%}
+.side{display:flex;flex-direction:column;gap:10px;padding:12px 10px 8px;background:var(--surface);border-right:1px solid var(--border)}
+.wm{padding:2px 6px 12px;font-size:12px;font-weight:600;letter-spacing:.22em;color:var(--accent)}
+.neww{display:flex;align-items:center;justify-content:center;height:38px;border:1px solid var(--border);border-radius:10px;background:var(--surface2);font-size:13px;font-weight:600}
+.gh{padding:10px 10px 2px;color:var(--muted);font-size:12px;font-weight:600;letter-spacing:.02em}
+.row{display:flex;align-items:center;gap:8px;height:var(--row-h);padding:0 10px;border-radius:8px;font-size:13px}
+.row.chat{padding-left:42px;color:var(--muted)}
+.row[aria-selected='true']{background:var(--tint);color:var(--text)}
+.row span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.foot{display:flex;align-items:center;gap:8px;margin-top:auto;padding-top:8px;border-top:1px solid var(--border);color:var(--faint);font-size:12px}
+.main{display:flex;flex-direction:column;min-height:0;background:var(--bg)}
+.mh{display:flex;align-items:center;gap:8px;height:52px;padding:0 20px;border-bottom:1px solid var(--border)}
+.mh h2{margin:0;font-size:15px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mh .grow{flex:1}
+.tabsfake{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;font-size:12.5px;color:var(--muted)}
+.tabsfake span{padding:4px 11px}
+.tabsfake span:first-child{background:var(--tint);color:var(--accent);font-weight:600}
+.thread{padding:28px 24px 12px}
+.tin{max-width:880px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+.msg-u{align-self:flex-end;max-width:78%;padding:8px 14px;border-radius:14px 14px 4px 14px;background:var(--tint)}
+.msg-a{padding:0 4px;color:var(--muted);font-size:13.5px}
+.dock{padding:0 24px 20px}
+.composer{max-width:880px;margin:0 auto;border:1px solid var(--border);border-radius:18px;background:var(--surface);padding:12px 14px 12px 16px;color:var(--faint)}
+.ovl{position:absolute;inset:0;background:rgba(0,0,0,.5)}
+
+/* ── el diálogo COMO ESTÁ HOY (S7, T3), sin cambiarle ni un número: la tarjeta
+   de 860, el riel de 184, el cuerpo de clamp(380px,60vh,560px) y las entradas
+   de 36. Todo lo que sigue mide lo que mide app.css hoy. ───────────────────── */
+.dlg{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;gap:16px;width:860px;padding:20px 24px;background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow)}
+.dlg.card-only{position:relative;left:auto;top:auto;transform:none}
+.dt{margin:0 0 6px;font-size:15px;font-weight:600}
+.body{display:flex;gap:20px;height:480px}
+.side2{flex:none;width:184px;display:flex;flex-direction:column;gap:14px;padding:2px 14px 0 0;border-right:1px solid var(--border)}
+.find{display:flex;align-items:center;gap:8px;height:28px;padding:0 9px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--faint)}
+.find svg{flex:none;width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.find input{flex:1;min-width:0;padding:0;border:0;background:transparent;color:var(--text);font:inherit;font-size:12.5px;outline:none}
+.find input::placeholder{color:var(--faint)}
+.rail{display:flex;flex-direction:column;gap:2px}
+.rail [role='tab']{display:flex;align-items:center;gap:8px;height:36px;padding:0 12px;border:0;border-radius:8px;background:transparent;color:var(--muted);font:inherit;font-size:13px;text-align:left;cursor:pointer;transition:background-color 120ms ease,color 120ms ease}
+.rail [role='tab'] svg{flex:none;width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.rail [role='tab']:hover{background:var(--surface2);color:var(--text)}
+.rail [role='tab'][aria-selected='true']{background:var(--tint);color:var(--accent)}
+
+/* EL PANE: el que scrollea, con las dos reglas nuevas (el aire y el velo). La
+   `mask-image` lee solo el alfa del gradiente, así que un token opaco sirve y
+   ningún hex entra en la hoja; el velo mide lo mismo que el relleno de abajo
+   (24), y por eso al llegar al final el velo cae sobre relleno y no sobre
+   contenido. ─────────────────────────────────────────────────────────────── */
+.pane{flex:1;min-width:0;min-height:0;overflow-y:auto;display:flex;flex-direction:column;align-items:flex-start;padding:4px 0 24px 4px;scrollbar-gutter:stable;mask-image:linear-gradient(to bottom,var(--text) calc(100% - 24px),transparent 100%)}
+.pane.end{overflow:hidden;padding-right:10px}
+.pane.end .pbody{transform:translateY(calc(480px - 100%))}
+.pbody{display:flex;flex-direction:column;align-items:flex-start;width:100%}
+.pane h3{margin:0 0 6px;font-size:15px;font-weight:600}
+.hint{margin:0 0 18px;color:var(--muted);font-size:12px;line-height:1.5}
+.quiet{margin:0 0 8px;color:var(--muted);font-size:12.5px;line-height:1.5}
+.acts{display:flex;flex-wrap:wrap;justify-content:flex-start;gap:8px;align-items:center;margin:16px 0 0}
+.note{margin:8px 0 0;color:var(--faint);font-size:12px;font-style:italic;line-height:1.5}
+.btn{border:1px solid var(--border);background:var(--surface2);color:var(--text);border-radius:8px;padding:6px 14px;font-size:13px;white-space:nowrap;cursor:pointer;transition:border-color 120ms ease,background-color 120ms ease}
+.btn:hover{border-color:var(--accent)}
+.foot-row{display:flex;justify-content:flex-end;gap:8px}
+.tag{display:inline-block;font-size:11px;font-weight:600;padding:3px 8px;border-radius:999px;border:1px solid currentColor;white-space:nowrap}
+.tag.warn{color:var(--warning)}
+/* la barra de scroll de la app, copiada: 10px, pista transparente, pulgar --border */
+*::-webkit-scrollbar{width:10px;height:10px}
+*::-webkit-scrollbar-track{background:transparent}
+*::-webkit-scrollbar-thumb{background:var(--border);border-radius:999px;border:2px solid transparent;background-clip:content-box}
+*::-webkit-scrollbar-thumb:hover{background:var(--faint);background-clip:content-box}
+*::-webkit-scrollbar-button{display:none;width:0;height:0}
+*::-webkit-scrollbar-corner{background:transparent}
+
+/* ── LA PROPUESTA · Uso: una sección por proveedor, cero tarjetas, y las cuatro
+   columnas declaradas UNA vez (--ucols) para que TODAS las filas de TODOS los
+   proveedores caigan en la misma rejilla ──────────────────────────────────── */
+.usecs{width:100%;--ucols:96px minmax(0,1fr) 46px 112px}
+.uprov{width:100%;padding:18px 0}
+.uprov:first-child{padding-top:2px}
+.uprov+.uprov{border-top:1px solid var(--border)}
+.uprov-head{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:baseline;gap:0 12px}
+.uname{font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:13px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.uplan{color:var(--faint);font-size:12px;text-align:right;white-space:nowrap}
+.ulimit{margin-top:14px}
+.uprov-head+.ulimit{margin-top:10px}
+.ulimit-head{display:flex;align-items:baseline;gap:8px;margin:0 0 4px;color:var(--faint);font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase}
+.ulimit.reached .ulimit-head{color:var(--warning)}
+.uwindow{display:grid;grid-template-columns:var(--ucols);align-items:center;gap:0 12px;padding:4px 0;color:var(--text);font-size:12.5px;line-height:1.4}
+.ulabel{color:var(--muted);font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ubar{display:block;width:100%;height:5px;border-radius:3px;background:var(--border);overflow:hidden}
+.ubar i{display:block;height:100%;min-width:4px;border-radius:3px;background:var(--accent)}
+.ubar.warning i{background:var(--warning)}
+.ubar.danger i{background:var(--danger)}
+.upercent{font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:12px;font-weight:600;text-align:right;font-variant-numeric:tabular-nums}
+.ureset{color:var(--faint);font-size:11.5px;white-space:nowrap}
+
+/* la ventana mínima: 800 × 560 (la tarjeta queda en 752 y el cuerpo en 380) */
+.frame.small{width:800px;height:560px}
+.frame.small .mh{padding:0 12px;height:48px}
+.frame.small .thread{padding:18px 16px 8px}
+.frame.small .tin{max-width:none}
+.frame.small .dock{padding:0 16px 14px}
+.frame.small .composer{max-width:none}
+.dlg.sm{width:752px}
+.dlg.sm .body{height:380px}
+
+/* ── notas ───────────────────────────────────────────────────────────────── */
+.notes{width:1280px;margin:0 auto;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px}
+.notes section{border-top:1px solid var(--border);padding-top:14px}
+.notes h4{margin:0 0 8px;color:var(--faint);font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase}
+.notes p{margin:0 0 9px;color:var(--muted);font-size:12.5px;line-height:1.6}
+.notes p:last-child{margin-bottom:0}
+.notes b{color:var(--text);font-weight:600}
+.notes .new{display:inline-block;margin-right:6px;padding:1px 6px;border:1px solid var(--warning);border-radius:999px;color:var(--warning);font-size:10.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase}
+.notes ol{margin:0 0 9px;padding-left:18px;color:var(--muted);font-size:12.5px;line-height:1.6}
+.notes pre{margin:0 0 9px;padding:9px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--text);font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:11px;line-height:1.55;overflow-x:auto;white-space:pre}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style></head>
+<body>
+<main class="page">
+
+<header class="head">
+  <p class="kicker">Uso · una sola propuesta (S8) · sobre el diálogo de hoy</p>
+  <h1>Uso sin tarjeta por proveedor: cada proveedor es una <span style="color:var(--accent)">sección de la columna entera</span>, sus ventanas filas de <span style="color:var(--accent)">cuatro columnas fijas</span>, y el scroll termina en aire y un velo</h1>
+  <p class="lede">No hay tres direcciones que elegir: es el diálogo que el mantenedor ya aprobó (860 de tarjeta, riel de 184, cuerpo de <code>clamp(380px,60vh,560px)</code>) con el panel de Uso vuelto a dibujar. Sus palabras: «eso de separar en cards no me gusta, que estén separadas pero de una mejor forma, al final el botón está pegado a la card». Las tres causas medidas: la lista <b>se encoge al contenido</b> —<code>.ucards</code> es un hijo flex de <code>.pane-body</code>, que tiene <code>align-items:flex-start</code>, así que mide su <i>max-content</i> y no la columna—, el «reinicia en» va con <code>margin-left:auto</code> y por eso <b>empieza más a la izquierda cuanto más ancho es su texto</b>, y el pane no tiene <b>ni un píxel de aire abajo</b>.</p>
+  <p class="tradeoff"><b>La propuesta.</b> Una sección por proveedor, sin caja: nombre en mono y plan al borde derecho de esa misma línea, una hairline entre proveedores, sub-etiquetas calladas para los límites («claude», «command code», «credits», «Gemini Models») y <b>una sola rejilla de cuatro columnas declarada una vez</b> para que el «reinicia en 17d» y el «reinicia en 4h» empiecen exactamente en la misma x. Debajo, las dos reglas que responden a lo de «el botón está pegado»: <b>24px de relleno inferior</b> y un <b>velo de 24px</b>, que es el mismo número para que al llegar al final el velo caiga sobre relleno y nunca sobre contenido. <b>Cuesta</b> la caja que separaba un proveedor de otro: ahora lo hacen la hairline y el aire, así que dos proveedores con un solo límite cada uno se leen más juntos que hoy.</p>
+  <table class="metrics">
+    <thead><tr><th>medida</th><th>hoy · ventana 1280 × 800</th><th>propuesta · 1280 × 800</th><th>propuesta · ventana mínima 800 × 560</th></tr></thead>
+    <tbody>
+      <tr><td>bloque de un proveedor</td><td class="now">≈ 318 de ancho dentro de una columna de 592 (54 %); la captura del mantenedor midió ≈ 390</td><td><b>592</b>, la columna entera</td><td><b>484</b>, la columna entera</td></tr>
+      <tr><td>columnas de la fila</td><td class="now">flex: etiqueta 52 · barra 76 fija · tanto 38 · resto</td><td><b>96 · 302 · 46 · 112</b></td><td><b>96 · 194 · 46 · 112</b></td></tr>
+      <tr><td>barra</td><td class="now">76 fija, en todas las filas</td><td><b>302</b> (se estira)</td><td><b>194</b> (se estira)</td></tr>
+      <tr><td>dónde empieza «reinicia en»</td><td class="now">x variable: el texto más ancho empieza más a la izquierda</td><td><b>x = 480</b> en toda fila, todo proveedor</td><td><b>x = 372</b> en toda fila</td></tr>
+      <tr><td>aire bajo el contenido</td><td class="now">0: la última card toca el borde del cuerpo</td><td><b>24</b>, con velo de 24</td><td><b>24</b>, con velo de 24</td></tr>
+      <tr><td>alto del cuerpo</td><td class="now">480</td><td>480 (sin cambios)</td><td>380 (sin cambios)</td></tr>
+    </tbody>
+  </table>
+</header>
+
+<!-- U1 · ARRIBA DEL SCROLL -->
+<section class="sheet">
+  <p class="cap">U1 · <b>1280 × 800, arriba del scroll</b> — los tres proveedores de la lectura real (claude-bridge «pro», commandcode «individual goat», antigravity) y el tercero cortado con el velo, a 16 del botón</p>
+  <div class="wrap"><div class="frame">
+    <div class="app">
+      <aside class="side" aria-hidden="true">
+        <div class="wm">GENTLE SHELL</div>
+        <div class="neww">Nueva sesión</div>
+        <p class="gh">Espacios</p>
+        <div class="row"><span>gentle-desk</span></div>
+        <div class="row chat" aria-selected="true"><span>Uso: cuatro columnas fijas</span></div>
+        <div class="row chat"><span>Ajustes: toques finales</span></div>
+        <div class="row chat"><span>Notas de la 0.8.1</span></div>
+        <div class="foot"><span>⚙</span><span>Vista previa</span></div>
+      </aside>
+      <div class="main">
+        <header class="mh"><h2>Uso: cuatro columnas fijas</h2><span class="grow"></span><span class="tabsfake"><span>Chat</span><span>Helpers</span></span></header>
+        <div class="thread"><div class="tin">
+          <p class="msg-u">El panel de Uso usa solo la mitad izquierda y el «reinicia en» no se alinea. Y abajo el botón está pegado.</p>
+          <p class="msg-a">Cada proveedor pasa a ser una sección de la columna entera, con las filas en cuatro columnas declaradas una vez, y el scroll termina en 24px de aire con un velo de 24.</p>
+        </div></div>
+        <div class="dock"><div class="composer">Pide algo…</div></div>
+      </div>
+    </div>
+    <div class="ovl"></div>
+
+    <div class="dlg" role="dialog" aria-modal="true" aria-labelledby="u1t">
+      <h2 class="dt" id="u1t">Ajustes</h2>
+      <div class="body">
+        <div class="side2">
+          <div class="find"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+            <input type="search" placeholder="Buscar un ajuste…" aria-label="Buscar un ajuste"></div>
+          <div class="rail" role="tablist" aria-orientation="vertical" aria-label="Secciones de ajustes">
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10"/><path d="M12 18a6 6 0 0 0 0-12v12z"/></svg><span>Apariencia</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span>Home del shell</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg><span>Actualizaciones</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg><span>Cuenta</span></button>
+            <button type="button" role="tab" id="u-t5" aria-selected="true" aria-controls="u-p5"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg><span>Uso</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/></svg><span>Idioma</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/><path d="M10.268 21a2 2 0 0 0 3.464 0"/></svg><span>Notificaciones</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg><span>Acerca de</span></button>
+          </div>
+        </div>
+
+        <div class="pane" role="tabpanel" id="u-p5" aria-labelledby="u-t5">
+          <div class="pbody">
+            <h3>Uso</h3>
+            <p class="hint">Lo que consumió cada suscripción, según las propias fuentes del shell.</p>
+
+            <div class="usecs">
+              <section class="uprov" aria-labelledby="p-claude">
+                <div class="uprov-head"><h4 class="uname" id="p-claude">claude-bridge</h4><span class="uplan">Plan: pro</span></div>
+                <div class="ulimit">
+                  <p class="ulimit-head">claude</p>
+                  <div class="uwindow"><span class="ulabel">5h</span><span class="ubar" aria-hidden="true"><i style="width:21%"></i></span><span class="upercent">21%</span><span class="ureset">reinicia en 4h</span></div>
+                  <div class="uwindow"><span class="ulabel">week</span><span class="ubar danger" aria-hidden="true"><i style="width:96%"></i></span><span class="upercent">96%</span><span class="ureset">reinicia en 7d</span></div>
+                </div>
+              </section>
+
+              <section class="uprov" aria-labelledby="p-commandcode">
+                <div class="uprov-head"><h4 class="uname" id="p-commandcode">commandcode</h4><span class="uplan">Plan: individual goat</span></div>
+                <div class="ulimit">
+                  <p class="ulimit-head">command code</p>
+                  <div class="uwindow"><span class="ulabel">5h</span><span class="ubar" aria-hidden="true"><i style="width:5%"></i></span><span class="upercent">5%</span><span class="ureset">reinicia en 2h</span></div>
+                  <div class="uwindow"><span class="ulabel">week</span><span class="ubar warning" aria-hidden="true"><i style="width:88%"></i></span><span class="upercent">88%</span><span class="ureset">reinicia en 6d</span></div>
+                </div>
+                <div class="ulimit">
+                  <p class="ulimit-head">credits</p>
+                  <div class="uwindow"><span class="ulabel">billing</span><span class="ubar" aria-hidden="true"><i style="width:44%"></i></span><span class="upercent">44%</span><span class="ureset">reinicia en 24d</span></div>
+                </div>
+              </section>
+
+              <section class="uprov" aria-labelledby="p-antigravity">
+                <div class="uprov-head"><h4 class="uname" id="p-antigravity">antigravity</h4></div>
+                <div class="ulimit">
+                  <p class="ulimit-head">Gemini Models</p>
+                  <div class="uwindow"><span class="ulabel">week</span><span class="ubar" aria-hidden="true"><i style="width:0%;min-width:4px"></i></span><span class="upercent">0%</span><span class="ureset">reinicia en 7d</span></div>
+                </div>
+                <div class="ulimit">
+                  <p class="ulimit-head">Claude and GPT models</p>
+                  <div class="uwindow"><span class="ulabel">week</span><span class="ubar" aria-hidden="true"><i style="width:0%;min-width:4px"></i></span><span class="upercent">0%</span><span class="ureset">reinicia en 7d</span></div>
+                </div>
+              </section>
+            </div>
+
+            <div class="acts"><button class="btn" type="button">Comprobar de nuevo</button></div>
+            <p class="note">Estos números vienen de las propias fuentes de la shell, las mismas que lee su panel de suscripción: una fila por ventana, con la parte usada y cuándo se reinicia.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="foot-row"><button class="btn" type="button">Cerrar</button></div>
+    </div>
+  </div></div>
+  <p class="figcap"><b>Los tres proveedores y sus números son una lectura real</b> (el documento de <code>crates/runtime/src/usage/tests.rs</code>: claude-bridge «pro» con la ventana de la semana al 96 % —tono <code>danger</code> desde el 95—, commandcode «individual goat» con la semana al 88 % —<code>warning</code> desde el 75—, y antigravity sin plan y a 0 %). Ya no hay caja: <b>una hairline</b> separa proveedor de proveedor y <b>el plan cae al borde derecho</b> de la línea del nombre. El «reinicia en» empieza en la misma x en las cinco filas —<b>x = 480</b> desde el borde izquierdo del contenido—, aunque uno diga «4h» y el otro «24d». Abajo se ve lo que el mantenedor vio: <b>antigravity cortado por el velo de 24px</b>, y 16px de aire hasta el botón «Cerrar», que ya no lleva NADA pegado.</p>
+</section>
+
+<!-- U2 · VENTANA MÍNIMA -->
+<section class="sheet">
+  <p class="cap">U2 · <b>800 × 560, la ventana mínima</b> — la tarjeta en 752 y el cuerpo en 380: la barra baja de 302 a 194 y las cuatro columnas siguen en su sitio</p>
+  <div class="wrap"><div class="frame small">
+    <div class="app">
+      <aside class="side" aria-hidden="true">
+        <div class="wm">GENTLE SHELL</div>
+        <div class="neww">Nueva sesión</div>
+        <p class="gh">Espacios</p>
+        <div class="row"><span>gentle-desk</span></div>
+        <div class="row chat" aria-selected="true"><span>Uso: cuatro columnas</span></div>
+        <div class="foot"><span>⚙</span><span>Vista previa</span></div>
+      </aside>
+      <div class="main">
+        <header class="mh"><h2>Uso: cuatro columnas</h2><span class="grow"></span><span class="tabsfake"><span>Chat</span><span>Helpers</span></span></header>
+        <div class="thread"><div class="tin">
+          <p class="msg-u">¿Y en la ventana mínima?</p>
+          <p class="msg-a">Las columnas no se mueven: solo la barra se estira menos.</p>
+        </div></div>
+        <div class="dock"><div class="composer">Pide algo…</div></div>
+      </div>
+    </div>
+    <div class="ovl"></div>
+
+    <div class="dlg sm" role="dialog" aria-modal="true" aria-label="Ajustes">
+      <h2 class="dt">Ajustes</h2>
+      <div class="body">
+        <div class="side2">
+          <div class="find"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+            <input type="search" placeholder="Buscar un ajuste…" aria-label="Buscar un ajuste"></div>
+          <div class="rail" role="tablist" aria-orientation="vertical" aria-label="Secciones de ajustes">
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10"/><path d="M12 18a6 6 0 0 0 0-12v12z"/></svg><span>Apariencia</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span>Home del shell</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg><span>Actualizaciones</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg><span>Cuenta</span></button>
+            <button type="button" role="tab" aria-selected="true"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg><span>Uso</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/></svg><span>Idioma</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/><path d="M10.268 21a2 2 0 0 0 3.464 0"/></svg><span>Notificaciones</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg><span>Acerca de</span></button>
+          </div>
+        </div>
+
+        <div class="pane" role="tabpanel" aria-label="Uso">
+          <div class="pbody">
+            <h3>Uso</h3>
+            <p class="hint">Lo que consumió cada suscripción, según las propias fuentes del shell.</p>
+
+            <div class="usecs">
+              <section class="uprov" aria-labelledby="s-claude">
+                <div class="uprov-head"><h4 class="uname" id="s-claude">claude-bridge</h4><span class="uplan">Plan: pro</span></div>
+                <div class="ulimit">
+                  <p class="ulimit-head">claude</p>
+                  <div class="uwindow"><span class="ulabel">5h</span><span class="ubar" aria-hidden="true"><i style="width:21%"></i></span><span class="upercent">21%</span><span class="ureset">reinicia en 4h</span></div>
+                  <div class="uwindow"><span class="ulabel">week</span><span class="ubar danger" aria-hidden="true"><i style="width:96%"></i></span><span class="upercent">96%</span><span class="ureset">reinicia en 7d</span></div>
+                </div>
+              </section>
+
+              <section class="uprov" aria-labelledby="s-commandcode">
+                <div class="uprov-head"><h4 class="uname" id="s-commandcode">commandcode</h4><span class="uplan">Plan: individual goat</span></div>
+                <div class="ulimit">
+                  <p class="ulimit-head">command code</p>
+                  <div class="uwindow"><span class="ulabel">5h</span><span class="ubar" aria-hidden="true"><i style="width:5%"></i></span><span class="upercent">5%</span><span class="ureset">reinicia en 2h</span></div>
+                  <div class="uwindow"><span class="ulabel">week</span><span class="ubar warning" aria-hidden="true"><i style="width:88%"></i></span><span class="upercent">88%</span><span class="ureset">reinicia en 6d</span></div>
+                </div>
+                <div class="ulimit">
+                  <p class="ulimit-head">credits</p>
+                  <div class="uwindow"><span class="ulabel">billing</span><span class="ubar" aria-hidden="true"><i style="width:44%"></i></span><span class="upercent">44%</span><span class="ureset">reinicia en 24d</span></div>
+                </div>
+              </section>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="foot-row"><button class="btn" type="button">Cerrar</button></div>
+    </div>
+  </div></div>
+  <p class="figcap"><b>En la ventana mínima no se mueve ni una columna de la rejilla:</b> la etiqueta sigue en 96, el tanto en 46 y el «reinicia en» en 112, y lo único que cambia es lo que se estira la barra (302 → <b>194</b>). La fila de «billing» sigue empezando su «reinicia en 24d» en <b>x = 372</b>, la misma que las de «4h». Es la prueba de que el desalineado no vuelve con la ventana chica.</p>
+</section>
+
+<!-- U3 · ESTADOS Y FINAL DEL SCROLL -->
+<section class="sheet">
+  <p class="cap">U3 · <b>1280 × 800, desplazado al final</b> — los tres estados que el panel ya sabe decir: un proveedor sin ventanas, uno que no se pudo leer, y el final del scroll con su aire y su botón</p>
+  <div class="wrap"><div class="frame">
+    <div class="app">
+      <aside class="side" aria-hidden="true">
+        <div class="wm">GENTLE SHELL</div>
+        <div class="neww">Nueva sesión</div>
+        <p class="gh">Espacios</p>
+        <div class="row"><span>gentle-desk</span></div>
+        <div class="row chat" aria-selected="true"><span>Uso: estados</span></div>
+        <div class="row chat"><span>Ajustes: toques finales</span></div>
+        <div class="foot"><span>⚙</span><span>Vista previa</span></div>
+      </aside>
+      <div class="main">
+        <header class="mh"><h2>Uso: estados</h2><span class="grow"></span><span class="tabsfake"><span>Chat</span><span>Helpers</span></span></header>
+        <div class="thread"><div class="tin">
+          <p class="msg-u">¿Y si un proveedor no tiene ventanas, o falla?</p>
+          <p class="msg-a">Se dice con las palabras que el panel ya tiene: nada de «0 %» donde no hay lectura, y el motivo del paquete tal cual, sin traducir.</p>
+        </div></div>
+        <div class="dock"><div class="composer">Pide algo…</div></div>
+      </div>
+    </div>
+    <div class="ovl"></div>
+
+    <div class="dlg" role="dialog" aria-modal="true" aria-label="Ajustes">
+      <h2 class="dt">Ajustes</h2>
+      <div class="body">
+        <div class="side2">
+          <div class="find"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+            <input type="search" placeholder="Buscar un ajuste…" aria-label="Buscar un ajuste"></div>
+          <div class="rail" role="tablist" aria-orientation="vertical" aria-label="Secciones de ajustes">
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10"/><path d="M12 18a6 6 0 0 0 0-12v12z"/></svg><span>Apariencia</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span>Home del shell</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg><span>Actualizaciones</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg><span>Cuenta</span></button>
+            <button type="button" role="tab" aria-selected="true"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg><span>Uso</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/></svg><span>Idioma</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/><path d="M10.268 21a2 2 0 0 0 3.464 0"/></svg><span>Notificaciones</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg><span>Acerca de</span></button>
+          </div>
+        </div>
+
+        <div class="pane end" role="tabpanel" aria-label="Uso">
+          <div class="pbody">
+            <h3>Uso</h3>
+            <p class="hint">Lo que consumió cada suscripción, según las propias fuentes del shell.</p>
+
+            <div class="usecs">
+              <section class="uprov" aria-labelledby="e-claude">
+                <div class="uprov-head"><h4 class="uname" id="e-claude">claude-bridge</h4><span class="uplan">Plan: pro</span></div>
+                <div class="ulimit">
+                  <p class="ulimit-head">claude</p>
+                  <div class="uwindow"><span class="ulabel">5h</span><span class="ubar" aria-hidden="true"><i style="width:21%"></i></span><span class="upercent">21%</span><span class="ureset">reinicia en 4h</span></div>
+                  <div class="uwindow"><span class="ulabel">week</span><span class="ubar danger" aria-hidden="true"><i style="width:96%"></i></span><span class="upercent">96%</span><span class="ureset">reinicia en 7d</span></div>
+                </div>
+              </section>
+
+              <section class="uprov" aria-labelledby="e-commandcode">
+                <div class="uprov-head"><h4 class="uname" id="e-commandcode">commandcode</h4><span class="uplan">Plan: individual goat</span></div>
+                <p class="quiet">Las fuentes de uso no informan de ningún proveedor ahora mismo.</p>
+              </section>
+
+              <section class="uprov" aria-labelledby="e-antigravity">
+                <div class="uprov-head"><h4 class="uname" id="e-antigravity">antigravity</h4></div>
+                <p class="quiet" role="status">No se pudo leer este proveedor: timed out after 10000ms</p>
+              </section>
+            </div>
+
+            <div class="acts"><button class="btn" type="button">Comprobar de nuevo</button></div>
+            <p class="note">Estos números vienen de las propias fuentes de la shell, las mismas que lee su panel de suscripción: una fila por ventana, con la parte usada y cuándo se reinicia.</p>
+          </div>
+        </div>
+      </div>
+      <div class="foot-row"><button class="btn" type="button">Cerrar</button></div>
+    </div>
+  </div></div>
+  <p class="figcap"><b>El final del scroll, dibujado de verdad</b> (el contenido está subido hasta su tope, no recortado a mano): el último proveedor, la nota en cursiva y los <b>24px de aire</b> del relleno inferior. Ahí el velo cae sobre relleno, así que <b>ningún texto se ve desvanecido</b>: ese es el motivo de que el velo y el aire midan lo mismo. Un proveedor sin ventanas dice la línea que el panel ya tiene («Las fuentes de uso no informan de ningún proveedor ahora mismo.») y un proveedor que falló lleva el motivo del paquete tal cual, sin traducir —<code>timed out after 10000ms</code> es el que usa la prueba de <code>crates/runtime/src/usage/tests.rs</code>—: nunca un 0 % donde no hay lectura.</p>
+</section>
+
+<!-- U4 · LEYENDO -->
+<section class="sheet">
+  <p class="cap">U4 · <b>el estado «leyendo», la tarjeta a tamaño real</b> (860 × 616, sin la ventana detrás) — la línea callada y nada más</p>
+  <div class="wrap">
+    <div class="dlg card-only" role="dialog" aria-modal="true" aria-label="Ajustes">
+      <h2 class="dt">Ajustes</h2>
+      <div class="body">
+        <div class="side2">
+          <div class="find"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+            <input type="search" placeholder="Buscar un ajuste…" aria-label="Buscar un ajuste"></div>
+          <div class="rail" role="tablist" aria-orientation="vertical" aria-label="Secciones de ajustes">
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10"/><path d="M12 18a6 6 0 0 0 0-12v12z"/></svg><span>Apariencia</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span>Home del shell</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg><span>Actualizaciones</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg><span>Cuenta</span></button>
+            <button type="button" role="tab" aria-selected="true"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg><span>Uso</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/></svg><span>Idioma</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/><path d="M10.268 21a2 2 0 0 0 3.464 0"/></svg><span>Notificaciones</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg><span>Acerca de</span></button>
+          </div>
+        </div>
+        <div class="pane" role="tabpanel" aria-label="Uso">
+          <div class="pbody">
+            <h3>Uso</h3>
+            <p class="hint">Lo que consumió cada suscripción, según las propias fuentes del shell.</p>
+            <p class="quiet" role="status">Leyendo el uso...</p>
+          </div>
+        </div>
+      </div>
+      <div class="foot-row"><button class="btn" type="button">Cerrar</button></div>
+    </div>
+  </div>
+  <p class="figcap"><b>Una línea, jamás un esqueleto ni una tarjeta congelada:</b> es la misma línea que hoy dibuja <code>copy.reading</code> —«Leyendo el uso...», tres puntos, como la tiene el diccionario— y la que se vuelve a ver al pulsar «Comprobar de nuevo» mientras la lectura va en camino. El cuerpo mide sus 480 aunque haya una sola línea: es el diálogo el que tiene alto propio (S7), no el contenido.</p>
+</section>
+
+<div class="notes">
+  <section>
+    <h4>Lo que hay que escribir (el cableado, pieza por pieza)</h4>
+    <p><b>Ningún texto nuevo.</b> El panel no estrena ni una palabra: los nombres de proveedor y de límite son los del paquete (D7) y todo lo demás ya está en <code>usage-copy.ts</code>. Por eso aquí no hay columna en inglés: no hay nada que traducir.</p>
+    <p><span class="new">nuevo</span><b>El contenedor y las cuatro columnas.</b> El bloque de abajo es literal, para que el cableado sea mecánico.</p>
+<pre>.usecs {
+  width: 100%;
+  --ucols: 96px minmax(0, 1fr) 46px 112px;
+}
+.uprov { width: 100%; padding: 18px 0; }
+.uprov:first-child { padding-top: 2px; }
+.uprov + .uprov {
+  border-top: 1px solid var(--border);
+}
+.uprov-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 0 12px;
+}
+.uplan { text-align: right; }
+.uprov-head + .ulimit { margin-top: 10px; }
+.uwindow {
+  display: grid;
+  grid-template-columns: var(--ucols);
+  align-items: center;
+  gap: 0 12px;
+  padding: 4px 0;
+}</pre>
+    <p>Y las tres que corrigen lo medido: <code>.ubar{width:100%}</code> (hoy 76), <code>.upercent{text-align:right}</code> (hoy <code>min-width:38px</code>) y <code>.ureset{text-align:left}</code> <b>sin</b> <code>margin-left:auto</code>. <code>.ucards</code> pasa a <code>.usecs</code> y <code>.card.usage-provider</code> a <code>.uprov</code>: se van la caja, el <code>border-radius</code> y el <code>gap</code> de 12.</p>
+    <p><span class="new">nuevo</span><b>La sub-etiqueta.</b> <code>.ulimit-head</code> pasa de 12px/600 <code>--muted</code> a <b>11px/600, mayúsculas, <code>letter-spacing:.05em</code>, <code>--faint</code></b> — la etiqueta de sección de la casa. <code>text-transform</code> no toca el dato: «Gemini Models» se sigue leyendo así para un lector de pantalla.</p>
+  </section>
+
+  <section>
+    <h4>Las dos reglas del final del scroll</h4>
+    <p>Son dos, y el número <b>24</b> es el mismo en las dos a propósito:</p>
+<pre>.settings-pane {
+  padding: 4px 0 24px 4px;   /* era 4px 0 0 4px */
+  mask-image: linear-gradient(
+    to bottom,
+    var(--text) calc(100% - 24px),
+    transparent 100%);
+}</pre>
+    <p><b>Por qué el mismo 24:</b> el velo solo puede caer sobre relleno cuando el scroll está al final, y entonces no desvanece contenido. Si el relleno fuera menor que el velo, el último bloque se vería gris justo al llegar abajo.</p>
+    <p><b>Por qué <code>var(--text)</code> y no un negro:</b> una máscara lee solo el <b>alfa</b> del gradiente, así que cualquier token opaco sirve y no entra ni un hex en la hoja. <code>--text</code> es el único token opaco en los seis temas.</p>
+    <p><b>Un coste a decidir:</b> en WebView2 la barra de scroll se pinta dentro del elemento, así que el pulgar también se desvanece en los últimos 24px. Si molesta, la alternativa es un <code>::after</code> con <code>position:sticky;bottom:0</code> y <code>background:linear-gradient(to bottom,transparent,var(--surface))</code>, a cambio de un elemento más. El velo de la máscara es el que se dibuja aquí.</p>
+    <p><b>Al cablear:</b> conviene escribir también <code>-webkit-mask-image</code> con el mismo gradiente —la app ya usa reglas con prefijo para la barra de scroll—, porque las WebView2 anteriores a Chromium 120 solo entienden la propiedad con prefijo.</p>
+    <p>El mismo par de reglas va a la hoja <code>07-gap-and-rules.html</code>, porque <b>vale para todo pane que scrollee</b> (Cuenta y Actualizaciones hoy).</p>
+  </section>
+
+  <section>
+    <h4>Semántica, teclado y las decisiones</h4>
+    <p><b>Lo único que no es CSS:</b> cada proveedor pasa a ser un <code>&lt;section aria-labelledby&gt;</code> con su nombre en <code>&lt;h4&gt;</code>, y cada límite una <code>&lt;p class="ulimit-head"&gt;</code>. Nada de eso estrena palabras: los textos salen de los mismos datos.</p>
+    <p><b>Teclado:</b> el panel no añade ni una parada de tabulación. «Comprobar de nuevo» sigue siendo el único control y vive al final del contenido, así que <b>se alcanza con Tab y el pane scrollea solo hasta él</b> — el aire de 24px queda debajo, así que la fila enfocada nunca toca el borde. Movimiento: el velo es estático y no anima; <code>prefers-reduced-motion</code> sigue apagando los <code>120ms</code> del riel y de los botones.</p>
+    <p><b>Decisiones para el mantenedor:</b></p>
+    <ol>
+      <li><b>El plan, a la derecha de la línea</b> (dibujado) o pegado al nombre. A la derecha alinea todos los planes en una columna; pegado deja el nombre y su plan como una frase.</li>
+      <li><b>Sub-etiquetas en mayúsculas y <code>--faint</code></b> (dibujado) o como hoy (12px/600 <code>--muted</code>). La primera separa mejor sin caja; la segunda es menos «etiqueta».</li>
+      <li><b>Un proveedor sin ventanas usa hoy la frase de «ningún proveedor»</b>. ¿Se le da la suya —«Sin ventanas» / «No windows»— o se deja como está? Dibujado como está, porque la orden es no inventar palabras.</li>
+      <li><b>El ancho de la columna del reinicio</b> (112): cabe «reinicia en 24d» y sobra poco. Si el paquete empieza a escribir reinicios más largos, sube a 128 y la barra baja 16.</li>
+      <li><b>El velo también arriba</b> (hoy el corte de arriba es seco): sería la misma regla con un segundo gradiente. No está dibujado.</li>
+    </ol>
+  </section>
+</div>
+
+</main>
+</body></html>
