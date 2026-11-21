@@ -1,0 +1,572 @@
+<!doctype html>
+<html lang="es" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=1400">
+<title>Ajustes — C · el buscador delante (hoja de 760 con dos niveles)</title>
+<style>
+/* ── TOKENS. Copia literal de apps/desktop/src/theme.css (los seis bloques). ── */
+:root,[data-theme='dark']{--bg:#0e1116;--surface:#151a21;--surface2:#1c222b;--border:#2b333d;--text:#e4e8ee;--muted:#9aa4b2;--faint:#7d8593;--accent:#7aa2f7;--tint:rgba(122,162,247,.14);--success:#7edc9a;--warning:#e7b455;--danger:#ff8585;--shadow:0 8px 24px rgba(0,0,0,.45);--row-h:34px}
+[data-theme='light']{--bg:#f2f4f7;--surface:#ffffff;--surface2:#e9edf2;--border:#cfd5dd;--text:#17202a;--muted:#576272;--faint:#6b7686;--accent:#2e5bd7;--tint:rgba(46,91,215,.1);--success:#166e38;--warning:#8a5800;--danger:#c22f37;--shadow:0 8px 24px rgba(23,32,42,.18);--row-h:34px}
+[data-theme='Gentle']{--bg:#06080f;--surface:#06080f;--surface2:#0d0f14;--border:#313342;--text:#f3f6f9;--muted:#8394a3;--faint:#96a2b0;--accent:#7fb4ca;--tint:#161d2e;--success:#b7cc85;--warning:#deba87;--danger:#cb7c94;--shadow:0 8px 24px rgba(0,0,0,.6);--row-h:34px}
+[data-theme='Gentleman-Cute']{--bg:#060407;--surface:#100a0f;--surface2:#100a0f;--border:#563040;--text:#f6eff3;--muted:#a78e9b;--faint:#d7a0b8;--accent:#f095c8;--tint:#2a1523;--success:#b4e7c7;--warning:#f2b86d;--danger:#ff718f;--shadow:0 8px 24px rgba(0,0,0,.6);--row-h:34px}
+[data-theme='Gentleman-Sexy']{--bg:#060407;--surface:#100a0f;--surface2:#100a0f;--border:#563040;--text:#f6eff3;--muted:#a78e9b;--faint:#d7a0b8;--accent:#f43888;--tint:#2e0f1f;--success:#d2cbd0;--warning:#f2b86d;--danger:#ff718f;--shadow:0 8px 24px rgba(0,0,0,.6);--row-h:34px}
+@media (prefers-color-scheme:light){[data-theme='system']{--bg:#f2f4f7;--surface:#ffffff;--surface2:#e9edf2;--border:#cfd5dd;--text:#17202a;--muted:#576272;--faint:#6b7686;--accent:#2e5bd7;--tint:rgba(46,91,215,.1);--success:#166e38;--warning:#8a5800;--danger:#c22f37;--shadow:0 8px 24px rgba(23,32,42,.18);--row-h:34px}}
+[data-theme='dark'],[data-theme='Gentle'],[data-theme='Gentleman-Cute'],[data-theme='Gentleman-Sexy']{color-scheme:dark}
+[data-theme='light']{color-scheme:light}
+
+/* ── la hoja ──────────────────────────────────────────────────────────────── */
+*{box-sizing:border-box}
+h1,h2,h3,p,ul,li{margin:0}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.page{width:1400px;padding:30px 0 64px}
+.head{width:1280px;margin:0 auto 26px}
+.kicker{margin:0 0 10px;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--faint)}
+h1{margin:0 0 12px;font-size:23px;font-weight:600;line-height:1.25}
+.lede{margin:0 0 12px;max-width:860px;color:var(--muted);font-size:13.5px;line-height:1.65}
+.lede b{color:var(--text);font-weight:600}
+.tradeoff{margin:0 0 22px;max-width:900px;padding-left:14px;border-left:2px solid var(--accent);color:var(--text);font-size:13px;line-height:1.6}
+.tradeoff b{color:var(--accent);font-weight:600}
+h1 code,p code,li code,td code{font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:12px;background:var(--surface2);border-radius:4px;padding:1px 5px}
+.metrics{width:100%;border-collapse:collapse;font-size:12.5px}
+.metrics th{text-align:left;font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);padding:0 10px 6px 0;border-bottom:1px solid var(--border)}
+.metrics td{padding:6px 10px 6px 0;border-bottom:1px dashed var(--border);vertical-align:top;color:var(--muted)}
+.metrics td:first-child{color:var(--text);font-weight:600;white-space:nowrap}
+.metrics td b{color:var(--text);font-weight:600}
+.metrics .now{color:var(--faint)}
+.wrap{display:flex;justify-content:center}
+.sheet{margin:0 0 30px}
+.sheet>.cap{width:1280px;margin:0 auto 10px;color:var(--faint);font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase}
+.sheet>.cap b{color:var(--muted)}
+.figcap{width:1280px;margin:12px auto 0;color:var(--muted);font-size:12.5px;line-height:1.6}
+.figcap b{color:var(--text);font-weight:600}
+
+/* ── la ventana de la app, a tamaño real ──────────────────────────────────── */
+.frame{position:relative;width:1280px;height:820px;background:var(--bg);border:1px solid var(--border);border-radius:12px;overflow:hidden;box-shadow:var(--shadow)}
+.app{display:grid;grid-template-columns:280px minmax(0,1fr);height:100%}
+.side{display:flex;flex-direction:column;gap:10px;padding:12px 10px 8px;background:var(--surface);border-right:1px solid var(--border)}
+.wm{padding:2px 6px 12px;font-size:12px;font-weight:600;letter-spacing:.22em;color:var(--accent)}
+.neww{display:flex;align-items:center;justify-content:center;height:38px;border:1px solid var(--border);border-radius:10px;background:var(--surface2);font-size:13px;font-weight:600}
+.gh{padding:10px 10px 2px;color:var(--muted);font-size:12px;font-weight:600;letter-spacing:.02em}
+.row{display:flex;align-items:center;gap:8px;height:var(--row-h);padding:0 10px;border-radius:8px;font-size:13px}
+.row.chat{padding-left:42px;color:var(--muted)}
+.row[aria-selected='true']{background:var(--tint);color:var(--text)}
+.row span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.foot{display:flex;align-items:center;gap:8px;margin-top:auto;padding-top:8px;border-top:1px solid var(--border);color:var(--faint);font-size:12px}
+.main{display:flex;flex-direction:column;min-height:0;min-width:0;background:var(--bg)}
+.mh{display:flex;align-items:center;gap:8px;height:52px;padding:0 20px;border-bottom:1px solid var(--border)}
+.mh h2{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mh .grow{flex:1}
+.tabsfake{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;font-size:12.5px;color:var(--muted)}
+.tabsfake span{padding:4px 11px}
+.tabsfake span:first-child{background:var(--tint);color:var(--accent);font-weight:600}
+.thread{padding:28px 24px 12px}
+.tin{max-width:880px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+.msg-u{align-self:flex-end;max-width:78%;padding:8px 14px;border-radius:14px 14px 4px 14px;background:var(--tint)}
+.msg-a{padding:0 4px;color:var(--muted);font-size:13.5px}
+.dock{padding:0 24px 20px}
+.composer{max-width:880px;margin:0 auto;border:1px solid var(--border);border-radius:18px;background:var(--surface);padding:12px 14px 12px 16px;color:var(--faint)}
+
+/* ── C · la hoja: 760 de ancho, alto entero, columna de 712 ──────────────── */
+.sheetc{position:absolute;top:0;right:0;bottom:0;width:760px;display:flex;flex-direction:column;background:var(--surface);border-left:1px solid var(--border);box-shadow:var(--shadow)}
+.chead{display:flex;align-items:center;gap:12px;padding:18px 24px 16px;border-bottom:1px solid var(--border)}
+.find{display:flex;align-items:center;gap:10px;flex:1;min-width:0;height:40px;padding:0 12px;border:1px solid var(--border);border-radius:10px;background:var(--surface2);color:var(--faint)}
+.find:focus-within{border-color:var(--accent);outline:1px solid var(--accent);outline-offset:-1px}
+.find svg{flex:none;width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.find input{flex:1;min-width:0;padding:0;border:0;background:transparent;color:var(--text);font:inherit;font-size:13px;outline:none}
+.find input::placeholder{color:var(--faint)}
+.ic{width:32px;height:32px;display:inline-grid;place-items:center;flex:none;border:0;padding:0;border-radius:8px;background:transparent;color:var(--muted);cursor:pointer;transition:background-color 120ms ease,color 120ms ease}
+.ic:hover{background:var(--surface2);color:var(--text)}
+.ic svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.cbody{flex:1;min-height:0;overflow:hidden;padding:18px 24px 24px}
+.cnote{margin:0 0 10px;color:var(--faint);font-size:12px;line-height:1.5}
+
+/* nivel 1: la puerta, ocho secciones con su valor de hoy */
+.ilist{list-style:none;padding:0}
+.irow{display:grid;grid-template-columns:20px minmax(0,1fr) auto;align-items:center;gap:0 14px;width:100%;padding:14px 10px;border:0;border-top:1px solid var(--border);background:transparent;color:var(--text);font:inherit;text-align:left;cursor:pointer;transition:background-color 120ms ease}
+.irow:last-child{border-bottom:1px solid var(--border)}
+.irow:hover{background:var(--surface2)}
+.irow:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.irow svg{width:16px;height:16px;fill:none;stroke:var(--muted);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.irow .iname{display:block;font-size:13px;font-weight:600}
+.irow .ihint{display:block;margin-top:2px;color:var(--muted);font-size:12px;line-height:1.5}
+.irow .ival{color:var(--faint);font-size:12px;white-space:nowrap}
+.irow .ival.dash{font-family:ui-monospace,'Cascadia Code',Consolas,monospace}
+
+/* nivel 2: la ficha de una sección, con su vuelta */
+.back{display:inline-flex;align-items:center;gap:7px;height:28px;padding:0 10px 0 6px;border:1px solid var(--border);border-radius:999px;background:transparent;color:var(--muted);font-size:12px;cursor:pointer}
+.back:hover,.back:focus-visible{color:var(--text);border-color:var(--accent)}
+.back svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.ftitle{margin:16px 0 4px;font-size:15px;font-weight:600}
+.hint{margin:0 0 18px;color:var(--muted);font-size:12px;line-height:1.5}
+.glabel{margin:0 0 10px;color:var(--faint);font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase}
+
+/* las seis previsualizaciones: una caja por tema, 72 de alto */
+.trows{display:flex;flex-direction:column;gap:10px}
+.trow{display:grid;grid-template-columns:168px minmax(0,1fr) 16px;align-items:center;gap:16px;height:72px;padding:0 16px;border:1px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);font:inherit;text-align:left;cursor:pointer;transition:border-color 120ms ease}
+.trow:hover{border-color:var(--accent)}
+.trow[aria-pressed='true']{box-shadow:0 0 0 1px var(--accent)}
+.trow:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.tname{font-size:13px;font-weight:600}
+.tshot{display:flex;flex-direction:column;gap:5px;min-width:0;font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:11px;line-height:1.35;white-space:nowrap;overflow:hidden}
+.tline{display:flex;align-items:baseline;gap:6px;overflow:hidden}
+.tprompt{color:var(--accent)}
+.tok{color:var(--success)}
+.tpath{color:var(--muted);overflow:hidden;text-overflow:ellipsis}
+.tdots{display:flex;gap:5px}
+.tdot{width:7px;height:7px;border-radius:50%;background:var(--dot)}
+.tcheck{width:16px;height:16px;fill:none;stroke:var(--accent);stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+
+/* filas de Actualizaciones y Cuenta */
+.tag{display:inline-block;font-size:11px;font-weight:600;padding:3px 8px;border-radius:999px;border:1px solid currentColor;white-space:nowrap}
+.tag.ok{color:var(--success)}
+.tag.warn{color:var(--warning)}
+.tag.quiet{color:var(--muted)}
+.btn{border:1px solid var(--border);background:var(--surface2);color:var(--text);border-radius:8px;padding:6px 14px;font-size:13px;white-space:nowrap;cursor:pointer;transition:border-color 120ms ease,background-color 120ms ease}
+.btn:hover{border-color:var(--accent)}
+.btn.accent{border-color:var(--accent);background:var(--accent);color:var(--bg);font-weight:600}
+.btn.accent:hover{filter:brightness(1.08)}
+.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.uhead{display:flex;align-items:center;gap:12px;padding-bottom:14px}
+.ucheck{color:var(--faint);font-size:12px;font-family:ui-monospace,'Cascadia Code',Consolas,monospace}
+.uhead .grow{flex:1}
+.ulist{list-style:none;padding:0;border-bottom:1px solid var(--border)}
+.uitem{display:grid;grid-template-columns:132px minmax(0,1fr) auto;align-items:center;gap:4px 16px;padding:14px 0;border-top:1px solid var(--border)}
+.uitem .uname{font-size:13px;font-weight:600}
+.uitem .uver{font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:12px;color:var(--muted)}
+.uitem .uactions{display:flex;gap:8px;justify-content:flex-end}
+.uitem .ureason{grid-column:2 / -1;color:var(--faint);font-size:12px;line-height:1.5}
+.note{margin:14px 0 0;color:var(--faint);font-size:12px;font-style:italic;line-height:1.5}
+.ext{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;margin-top:20px;padding-top:18px;border-top:1px solid var(--border)}
+.ext .etext{margin:0;color:var(--muted);font-size:12.5px;line-height:1.6}
+.ext .btn{justify-self:start}
+.crows{list-style:none;padding:0}
+.crow{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;padding:14px 0;border-top:1px solid var(--border)}
+.crow .cname{font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:12.5px;min-width:120px}
+.crow .creason{flex-basis:100%;color:var(--faint);font-size:12px}
+.hand{margin-top:20px;padding-top:18px;border-top:1px solid var(--border)}
+.hand .ctext{margin:0;color:var(--muted);font-size:12.5px;line-height:1.6}
+.hand .acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+
+/* ── C a la ventana mínima: 800 × 560 (hoja de 760, cuerpo de 484) ───────── */
+.frame.small{width:800px;height:560px}
+.frame.small .app{grid-template-columns:minmax(0,1fr)}
+.frame.small .mh{padding:0 12px;height:48px}
+.frame.small .thread{padding:18px 16px 8px}
+.frame.small .tin{max-width:none}
+.frame.small .dock{padding:0 16px 14px}
+.frame.small .composer{max-width:none}
+.sheetc.sm{width:760px}
+.sheetc.sm .chead{padding:12px 16px}
+.sheetc.sm .find{height:36px}
+.sheetc.sm .cbody{padding:14px 16px 20px}
+.sheetc.sm .uitem{grid-template-columns:112px minmax(0,1fr);gap:4px 12px}
+.sheetc.sm .uitem .uactions{grid-column:1 / -1;justify-content:flex-start;margin-top:6px}
+.sheetc.sm .uhead{flex-wrap:wrap;gap:8px 12px}
+.sheetc.sm .trow{grid-template-columns:140px minmax(0,1fr) 16px;gap:12px;height:68px}
+
+/* ── la prueba de los seis temas ─────────────────────────────────────────── */
+.strip{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:16px;width:1280px;margin:0 auto}
+.tcell{padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--surface)}
+.tcell .sk{margin:0 0 10px;color:var(--faint);font-size:10.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase}
+.tcell .srow{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface2)}
+.tcell .sn{font-size:12.5px;font-weight:600}
+.tcell .sv{font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:11px;color:var(--muted);flex:1}
+.tcell .btn{padding:3px 9px;font-size:11.5px;border-radius:7px}
+.tcell .tval{margin:10px 0 0;color:var(--faint);font-size:11px}
+
+/* ── notas ───────────────────────────────────────────────────────────────── */
+.notes{width:1280px;margin:0 auto;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px}
+.notes section{border-top:1px solid var(--border);padding-top:14px}
+.notes h4{margin:0 0 8px;color:var(--faint);font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase}
+.notes p{margin:0 0 9px;color:var(--muted);font-size:12.5px;line-height:1.6}
+.notes p:last-child{margin-bottom:0}
+.notes b{color:var(--text);font-weight:600}
+.notes .new{display:inline-block;margin-right:6px;padding:1px 6px;border:1px solid var(--warning);border-radius:999px;color:var(--warning);font-size:10.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase}
+.notes ol{margin:0;padding-left:18px;color:var(--muted);font-size:12.5px;line-height:1.6}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style></head>
+<body>
+<main class="page">
+
+<header class="head">
+  <p class="kicker">C · el buscador delante</p>
+  <h1>Ajustes es una hoja de <span style="color:var(--accent)">760</span> que se abre desde el buscador: la lista de secciones ya dice el valor de cada una</h1>
+  <p class="lede">Una hoja que entra desde la derecha, con el alto entero de la ventana y <b>la misma columna de lectura en cualquier tamaño: 712 px</b>. Su puerta es el campo de búsqueda —el que la app ya tiene, con las palabras clave en las dos lenguas y los acentos plegados— y su nivel uno es la lista de las ocho secciones con el valor que cada una tiene ahora (<i>Oscuro</i>, <i>Separado</i>, <i>Actualización disponible</i>…), así que se ve el estado sin abrir nada. Elegir una abre su ficha en el mismo sitio, con una vuelta arriba.</p>
+  <p class="tradeoff"><b>Optimiza</b> el acceso directo y la lectura: teclear tres letras es el camino más corto a un ajuste, la columna nunca se comprime (712 en 1280 y 672 en 800) y el chat sigue a la vista, que es lo que no dan A ni B. <b>Cuesta</b> un nivel más para pasearse —no hay riel que saltar de sección a sección mientras lees— y que la lista necesita un valor por sección, que es texto nuevo.</p>
+  <table class="metrics">
+    <thead><tr><th>medida</th><th>hoy</th><th>C · ventana 1280 × 820</th><th>C · ventana mínima 800 × 560</th></tr></thead>
+    <tbody>
+      <tr><td>superficie</td><td class="now">tarjeta de 680 centrada</td><td><b>hoja de 760 × 820</b> (alto entero)</td><td><b>hoja de 760 × 560</b></td></tr>
+      <tr><td>nivel 1</td><td class="now">—</td><td><b>8 filas de 62</b> con su valor de hoy</td><td><b>8 filas de 62</b> (con scroll)</td></tr>
+      <tr><td>columna de lectura</td><td class="now">432</td><td><b>712</b> (760 − 48 de relleno)</td><td><b>696</b> (728 − 32)</td></tr>
+      <tr><td>alto de la ficha</td><td class="now">312</td><td><b>720</b></td><td><b>484</b></td></tr>
+      <tr><td>cajas dentro del contenido</td><td class="now">9 tarjetas · 15 cajas contando las anidadas</td><td><b>6</b> (solo las previsualizaciones de tema)</td><td><b>6</b></td></tr>
+    </tbody>
+  </table>
+</header>
+
+<!-- 1 · LA PUERTA -->
+<section class="sheet">
+  <p class="cap">C1 · la puerta — el campo manda y debajo están las ocho secciones con lo que hoy valen; el chat sigue a la izquierda, sin velo</p>
+  <div class="wrap"><div class="frame">
+    <div class="app">
+      <aside class="side" aria-hidden="true">
+        <div class="wm">GENTLE SHELL</div>
+        <div class="neww">Nueva sesión</div>
+        <p class="gh">Espacios</p>
+        <div class="row"><span>gentle-desk</span></div>
+        <div class="row chat"><span>Ajustes: tres direcciones</span></div>
+        <div class="row chat"><span>Notas de la 0.8.1</span></div>
+        <div class="foot"><span>⚙</span><span>Vista previa</span></div>
+      </aside>
+      <div class="main">
+        <header class="mh"><h2>Ajustes: tres direcciones</h2><span class="grow"></span><span class="tabsfake"><span>Chat</span><span>Helpers</span></span></header>
+        <div class="thread"><div class="tin">
+          <p class="msg-u">¿Y si el buscador fuera la puerta de Ajustes?</p>
+          <p class="msg-a">Entonces la lista de secciones tiene que decir el valor de cada una, o buscar es el único camino.</p>
+        </div></div>
+        <div class="dock"><div class="composer">Pide algo…</div></div>
+      </div>
+    </div>
+
+    <div class="sheetc" role="dialog" aria-modal="true" aria-label="Ajustes">
+      <div class="chead">
+        <div class="find"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+          <input type="search" placeholder="Buscar un ajuste…" aria-label="Buscar un ajuste" autofocus></div>
+        <button class="ic" type="button" aria-label="Cerrar ajustes"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+      </div>
+      <div class="cbody">
+        <p class="cnote">Escribe para filtrar las ocho secciones, en español o en inglés. Con el campo vacío están todas.</p>
+        <ul class="ilist">
+          <li><button class="irow" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10"/><path d="M12 18a6 6 0 0 0 0-12v12z"/></svg>
+            <span><span class="iname">Apariencia</span><span class="ihint">El aspecto de esta ventana.</span></span>
+            <span class="ival">Oscuro</span></button></li>
+          <li><button class="irow" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+            <span><span class="iname">Home del shell</span><span class="ihint">En qué pi corre este shell.</span></span>
+            <span class="ival">Separado</span></button></li>
+          <li><button class="irow" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+            <span><span class="iname">Actualizaciones</span><span class="ihint">Lo que corre en esta máquina y si hay algo más nuevo.</span></span>
+            <span class="tag warn">Actualización disponible</span></button></li>
+          <li><button class="irow" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg>
+            <span><span class="iname">Cuenta</span><span class="ihint">Qué proveedores tienen sesión abierta y dónde iniciar o cerrar sesión.</span></span>
+            <span class="ival">3 proveedores</span></button></li>
+          <li><button class="irow" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg>
+            <span><span class="iname">Uso</span><span class="ihint">Lo que consumió cada suscripción, según las propias fuentes del shell.</span></span>
+            <span class="ival dash">—</span></button></li>
+          <li><button class="irow" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/></svg>
+            <span><span class="iname">Idioma</span><span class="ihint">Las palabras de esta app, en inglés o en español.</span></span>
+            <span class="ival">Español</span></button></li>
+          <li><button class="irow" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/><path d="M10.268 21a2 2 0 0 0 3.464 0"/></svg>
+            <span><span class="iname">Notificaciones</span><span class="ihint">Un tono y un aviso del sistema cuando la ventana no está al frente.</span></span>
+            <span class="ival">Cuando no está al frente</span></button></li>
+          <li><button class="irow" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+            <span><span class="iname">Acerca de</span><span class="ihint">Qué versión es esta.</span></span>
+            <span class="ival">0.8.1</span></button></li>
+        </ul>
+      </div>
+    </div>
+  </div></div>
+  <p class="figcap"><b>Ocho filas, ocho destinos, y el valor actual a la derecha.</b> El título y la pista de cada fila son los de <code>copy.ts</code> —no hay texto nuevo en las filas—; el valor es un dato que la app ya tiene (tema, home, idioma, la etiqueta de Actualizaciones, el número de proveedores, la versión). La única frase nueva es la línea de encima del campo, que describe lo que el buscador ya hace: <code>search.ts</code> pliega acentos y lee las <code>keywords</code> de las dos lenguas.</p>
+</section>
+
+<!-- 2 · APARIENCIA -->
+<section class="sheet">
+  <p class="cap">C2 · la ficha de Apariencia — la vuelta a la lista, y las seis previsualizaciones a 712 de ancho</p>
+  <div class="wrap"><div class="frame">
+    <div class="app">
+      <aside class="side" aria-hidden="true">
+        <div class="wm">GENTLE SHELL</div>
+        <div class="neww">Nueva sesión</div>
+        <p class="gh">Espacios</p>
+        <div class="row"><span>gentle-desk</span></div>
+        <div class="row chat"><span>Ajustes: tres direcciones</span></div>
+        <div class="row chat"><span>Notas de la 0.8.1</span></div>
+        <div class="foot"><span>⚙</span><span>Vista previa</span></div>
+      </aside>
+      <div class="main">
+        <header class="mh"><h2>Ajustes: tres direcciones</h2><span class="grow"></span><span class="tabsfake"><span>Chat</span><span>Helpers</span></span></header>
+        <div class="thread"><div class="tin">
+          <p class="msg-u">¿Y si el buscador fuera la puerta de Ajustes?</p>
+          <p class="msg-a">Entonces la lista de secciones tiene que decir el valor de cada una, o buscar es el único camino.</p>
+        </div></div>
+        <div class="dock"><div class="composer">Pide algo…</div></div>
+      </div>
+    </div>
+
+    <div class="sheetc" role="dialog" aria-modal="true" aria-label="Ajustes">
+      <div class="chead">
+        <div class="find"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+          <input type="search" placeholder="Buscar un ajuste…" aria-label="Buscar un ajuste"></div>
+        <button class="ic" type="button" aria-label="Cerrar ajustes"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+      </div>
+      <div class="cbody">
+        <button class="back" type="button"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m15 18-6-6 6-6"/></svg>Todas las secciones</button>
+        <h3 class="ftitle">Apariencia</h3>
+        <p class="hint">El aspecto de esta ventana.</p>
+        <p class="glabel">Tema</p>
+        <div class="trows" role="group" aria-label="Tema">
+          <button class="trow" type="button" aria-pressed="false" data-theme="system">
+            <span class="tname">Sistema</span>
+            <span class="tshot" aria-hidden="true"><span class="tline"><span class="tprompt">❯</span><span>Aa</span><span class="tok">ok</span><span class="tpath">~/src/gentle-desk</span></span><span class="tdots"><i class="tdot" style="--dot:var(--danger)"></i><i class="tdot" style="--dot:var(--warning)"></i><i class="tdot" style="--dot:var(--success)"></i><i class="tdot" style="--dot:var(--accent)"></i><i class="tdot" style="--dot:var(--muted)"></i><i class="tdot" style="--dot:var(--faint)"></i><i class="tdot" style="--dot:var(--text)"></i></span></span>
+            <span></span>
+          </button>
+          <button class="trow" type="button" aria-pressed="true" data-theme="dark">
+            <span class="tname">Oscuro</span>
+            <span class="tshot" aria-hidden="true"><span class="tline"><span class="tprompt">❯</span><span>Aa</span><span class="tok">ok</span><span class="tpath">~/src/gentle-desk</span></span><span class="tdots"><i class="tdot" style="--dot:var(--danger)"></i><i class="tdot" style="--dot:var(--warning)"></i><i class="tdot" style="--dot:var(--success)"></i><i class="tdot" style="--dot:var(--accent)"></i><i class="tdot" style="--dot:var(--muted)"></i><i class="tdot" style="--dot:var(--faint)"></i><i class="tdot" style="--dot:var(--text)"></i></span></span>
+            <svg class="tcheck" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 6 9 17l-5-5"/></svg>
+          </button>
+          <button class="trow" type="button" aria-pressed="false" data-theme="Gentle">
+            <span class="tname">Gentle</span>
+            <span class="tshot" aria-hidden="true"><span class="tline"><span class="tprompt">❯</span><span>Aa</span><span class="tok">ok</span><span class="tpath">~/src/gentle-desk</span></span><span class="tdots"><i class="tdot" style="--dot:var(--danger)"></i><i class="tdot" style="--dot:var(--warning)"></i><i class="tdot" style="--dot:var(--success)"></i><i class="tdot" style="--dot:var(--accent)"></i><i class="tdot" style="--dot:var(--muted)"></i><i class="tdot" style="--dot:var(--faint)"></i><i class="tdot" style="--dot:var(--text)"></i></span></span>
+            <span></span>
+          </button>
+          <button class="trow" type="button" aria-pressed="false" data-theme="Gentleman-Cute">
+            <span class="tname">Gentleman-Cute</span>
+            <span class="tshot" aria-hidden="true"><span class="tline"><span class="tprompt">❯</span><span>Aa</span><span class="tok">ok</span><span class="tpath">~/src/gentle-desk</span></span><span class="tdots"><i class="tdot" style="--dot:var(--danger)"></i><i class="tdot" style="--dot:var(--warning)"></i><i class="tdot" style="--dot:var(--success)"></i><i class="tdot" style="--dot:var(--accent)"></i><i class="tdot" style="--dot:var(--muted)"></i><i class="tdot" style="--dot:var(--faint)"></i><i class="tdot" style="--dot:var(--text)"></i></span></span>
+            <span></span>
+          </button>
+          <button class="trow" type="button" aria-pressed="false" data-theme="Gentleman-Sexy">
+            <span class="tname">Gentleman-Sexy</span>
+            <span class="tshot" aria-hidden="true"><span class="tline"><span class="tprompt">❯</span><span>Aa</span><span class="tok">ok</span><span class="tpath">~/src/gentle-desk</span></span><span class="tdots"><i class="tdot" style="--dot:var(--danger)"></i><i class="tdot" style="--dot:var(--warning)"></i><i class="tdot" style="--dot:var(--success)"></i><i class="tdot" style="--dot:var(--accent)"></i><i class="tdot" style="--dot:var(--muted)"></i><i class="tdot" style="--dot:var(--faint)"></i><i class="tdot" style="--dot:var(--text)"></i></span></span>
+            <span></span>
+          </button>
+          <button class="trow" type="button" aria-pressed="false" data-theme="light">
+            <span class="tname">Claro</span>
+            <span class="tshot" aria-hidden="true"><span class="tline"><span class="tprompt">❯</span><span>Aa</span><span class="tok">ok</span><span class="tpath">~/src/gentle-desk</span></span><span class="tdots"><i class="tdot" style="--dot:var(--danger)"></i><i class="tdot" style="--dot:var(--warning)"></i><i class="tdot" style="--dot:var(--success)"></i><i class="tdot" style="--dot:var(--accent)"></i><i class="tdot" style="--dot:var(--muted)"></i><i class="tdot" style="--dot:var(--faint)"></i><i class="tdot" style="--dot:var(--text)"></i></span></span>
+            <span></span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div></div>
+  <p class="figcap"><b>La vuelta es una píldora, no una barra de pestañas:</b> «Todas las secciones» devuelve el foco al campo de búsqueda, que es la puerta, así que el camino Ajustes → tema → otro ajuste son dos pasos y ninguno es un riel. La ficha de tema es la misma de A y B (una caja por tema, su <code>data-theme</code>, sus siete puntos) sólo que a 712 tiene más aire entre el nombre y la miniatura.</p>
+</section>
+
+<!-- 3 · ACTUALIZACIONES -->
+<section class="sheet">
+  <p class="cap">C3 · la ficha de Actualizaciones — tres filas, la omitida, la hora y las extensiones, en la columna de 712</p>
+  <div class="wrap"><div class="frame">
+    <div class="app">
+      <aside class="side" aria-hidden="true">
+        <div class="wm">GENTLE SHELL</div>
+        <div class="neww">Nueva sesión</div>
+        <p class="gh">Espacios</p>
+        <div class="row"><span>gentle-desk</span></div>
+        <div class="row chat"><span>Ajustes: tres direcciones</span></div>
+        <div class="row chat"><span>Notas de la 0.8.1</span></div>
+        <div class="foot"><span>⚙</span><span>Vista previa</span></div>
+      </aside>
+      <div class="main">
+        <header class="mh"><h2>Ajustes: tres direcciones</h2><span class="grow"></span><span class="tabsfake"><span>Chat</span><span>Helpers</span></span></header>
+        <div class="thread"><div class="tin">
+          <p class="msg-u">¿Y si el buscador fuera la puerta de Ajustes?</p>
+          <p class="msg-a">Entonces la lista de secciones tiene que decir el valor de cada una, o buscar es el único camino.</p>
+        </div></div>
+        <div class="dock"><div class="composer">Pide algo…</div></div>
+      </div>
+    </div>
+
+    <div class="sheetc" role="dialog" aria-modal="true" aria-label="Ajustes">
+      <div class="chead">
+        <div class="find"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+          <input type="search" placeholder="Buscar un ajuste…" aria-label="Buscar un ajuste"></div>
+        <button class="ic" type="button" aria-label="Cerrar ajustes"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+      </div>
+      <div class="cbody">
+        <button class="back" type="button"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m15 18-6-6 6-6"/></svg>Todas las secciones</button>
+        <h3 class="ftitle">Actualizaciones</h3>
+        <p class="hint">Lo que corre en esta máquina y si hay algo más nuevo.</p>
+        <div class="uhead">
+          <span class="tag warn">Actualización disponible</span>
+          <span class="ucheck">Última comprobación: hace 3 min</span>
+          <span class="grow"></span>
+          <button class="btn" type="button">Comprobar de nuevo</button>
+        </div>
+        <ul class="ulist">
+          <li class="uitem">
+            <span class="uname">Esta app</span><span class="uver">0.8.1 → 0.9.0</span><span class="uactions"></span>
+            <p class="ureason">Esta app se actualiza sola: usa el aviso de actualización de la parte superior.</p>
+          </li>
+          <li class="uitem">
+            <span class="uname">pi</span><span class="uver">1.5.2 → 2.0.5</span>
+            <span class="uactions"><button class="btn accent" type="button">Actualizar</button></span>
+          </li>
+          <li class="uitem">
+            <span class="uname">Gentle Shell</span><span class="uver">4.8.0 → 4.9.2</span>
+            <span class="uactions"><button class="btn accent" type="button">Actualizar Gentle Shell</button><button class="btn" type="button">Omitir esta versión</button></span>
+          </li>
+        </ul>
+        <p class="note">Actualizar y Actualizar Gentle Shell abren una ventana de terminal; lee lo que dice allí.</p>
+        <div class="ext">
+          <div>
+            <p class="glabel">Extensiones</p>
+            <p class="etext">No se puede saber cuáles están desactualizadas con este Gentle Shell. Actualizar extensiones las actualiza todas, así que este botón se ofrece siempre y es seguro usarlo en cualquier momento.</p>
+          </div>
+          <button class="btn" type="button">Actualizar extensiones</button>
+        </div>
+      </div>
+    </div>
+  </div></div>
+  <p class="figcap"><b>Mismo contenido que A2 y B2, otra caja.</b> A 712 la fila de shell cabe en una línea con sus dos botones; el bloque de extensiones baja su botón debajo de la frase en vez de ponerlo a la derecha (la columna no es tan ancha). El estado (etiqueta + hora + comprobar) sigue en una línea, igual que en A.</p>
+</section>
+
+<!-- 4 · CUENTA -->
+<section class="sheet">
+  <p class="cap">C4 · la ficha de Cuenta — los tres proveedores, el motivo de la shell y el traspaso a la terminal</p>
+  <div class="wrap"><div class="frame">
+    <div class="app">
+      <aside class="side" aria-hidden="true">
+        <div class="wm">GENTLE SHELL</div>
+        <div class="neww">Nueva sesión</div>
+        <p class="gh">Espacios</p>
+        <div class="row"><span>gentle-desk</span></div>
+        <div class="row chat"><span>Ajustes: tres direcciones</span></div>
+        <div class="row chat"><span>Notas de la 0.8.1</span></div>
+        <div class="foot"><span>⚙</span><span>Vista previa</span></div>
+      </aside>
+      <div class="main">
+        <header class="mh"><h2>Ajustes: tres direcciones</h2><span class="grow"></span><span class="tabsfake"><span>Chat</span><span>Helpers</span></span></header>
+        <div class="thread"><div class="tin">
+          <p class="msg-u">¿Y si el buscador fuera la puerta de Ajustes?</p>
+          <p class="msg-a">Entonces la lista de secciones tiene que decir el valor de cada una, o buscar es el único camino.</p>
+        </div></div>
+        <div class="dock"><div class="composer">Pide algo…</div></div>
+      </div>
+    </div>
+
+    <div class="sheetc" role="dialog" aria-modal="true" aria-label="Ajustes">
+      <div class="chead">
+        <div class="find"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+          <input type="search" placeholder="Buscar un ajuste…" aria-label="Buscar un ajuste"></div>
+        <button class="ic" type="button" aria-label="Cerrar ajustes"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+      </div>
+      <div class="cbody">
+        <button class="back" type="button"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m15 18-6-6 6-6"/></svg>Todas las secciones</button>
+        <h3 class="ftitle">Cuenta</h3>
+        <p class="hint">Qué proveedores tienen sesión abierta y dónde iniciar o cerrar sesión.</p>
+        <p class="glabel">Proveedores</p>
+        <ul class="crows">
+          <li class="crow"><span class="cname">anthropic</span><span class="tag ok">Conectado</span></li>
+          <li class="crow"><span class="cname">openai-codex</span><span class="tag quiet">Sesión iniciada (no verificable)</span></li>
+          <li class="crow"><span class="cname">commandcode</span><span class="tag warn">No está listo</span><p class="creason">OAuth token expired</p></li>
+        </ul>
+        <div class="hand">
+          <p class="glabel">La sesión la escribe la shell</p>
+          <p class="ctext">La shell se abre en una ventana de terminal: escribe /login para iniciar sesión o /logout para cerrarla, y luego pulsa Comprobar de nuevo aquí.</p>
+          <div class="acts">
+            <button class="btn accent" type="button">Abrir la shell para iniciar o cerrar sesión</button>
+            <button class="btn" type="button">Comprobar de nuevo</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div></div>
+  <p class="figcap"><b>Cuenta es la ficha más corta de la app</b> —tres filas y un traspaso— y en una columna de 712 queda aire debajo; es el precio de una medida de lectura fija. A cambio, el traspaso se lee entero y sus dos botones entran en una línea, cosa que hoy no ocurre en 432.</p>
+</section>
+
+<!-- 5 · LA VENTANA MÍNIMA -->
+<section class="sheet">
+  <p class="cap">C5 · la ventana mínima, 800 × 560 — la hoja mide 760, el cuerpo 484 y las filas de Actualizaciones rehacen sus botones debajo</p>
+  <div class="wrap"><div class="frame small">
+    <div class="app"><div class="main">
+      <header class="mh"><h2>Ajustes: tres direcciones</h2></header>
+      <div class="thread"><div class="tin">
+        <p class="msg-u">Tres direcciones, mismo contenido.</p>
+        <p class="msg-a">La C es la única que nunca comprime la columna.</p>
+      </div></div>
+      <div class="dock"><div class="composer">Pide algo…</div></div>
+    </div></div>
+
+    <div class="sheetc sm" role="dialog" aria-modal="true" aria-label="Ajustes">
+      <div class="chead">
+        <div class="find"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+          <input type="search" placeholder="Buscar un ajuste…" aria-label="Buscar un ajuste"></div>
+        <button class="ic" type="button" aria-label="Cerrar ajustes"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+      </div>
+      <div class="cbody">
+        <button class="back" type="button"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m15 18-6-6 6-6"/></svg>Todas las secciones</button>
+        <h3 class="ftitle">Actualizaciones</h3>
+        <p class="hint">Lo que corre en esta máquina y si hay algo más nuevo.</p>
+        <div class="uhead">
+          <span class="tag warn">Actualización disponible</span>
+          <span class="ucheck">Última comprobación: hace 3 min</span>
+          <button class="btn" type="button">Comprobar de nuevo</button>
+        </div>
+        <ul class="ulist">
+          <li class="uitem">
+            <span class="uname">Esta app</span><span class="uver">0.8.1 → 0.9.0</span>
+            <p class="ureason">Esta app se actualiza sola: usa el aviso de actualización de la parte superior.</p>
+          </li>
+          <li class="uitem">
+            <span class="uname">pi</span><span class="uver">1.5.2 → 2.0.5</span>
+            <span class="uactions"><button class="btn accent" type="button">Actualizar</button></span>
+          </li>
+          <li class="uitem">
+            <span class="uname">Gentle Shell</span><span class="uver">4.8.0 → 4.9.2</span>
+            <span class="uactions"><button class="btn accent" type="button">Actualizar Gentle Shell</button><button class="btn" type="button">Omitir esta versión</button></span>
+          </li>
+        </ul>
+        <div class="ext">
+          <div>
+            <p class="glabel">Extensiones</p>
+            <p class="etext">No se puede saber cuáles están desactualizadas con este Gentle Shell. Actualizar extensiones las actualiza todas, así que este botón se ofrece siempre y es seguro usarlo en cualquier momento.</p>
+          </div>
+          <button class="btn" type="button">Actualizar extensiones</button>
+        </div>
+      </div>
+    </div>
+  </div></div>
+  <p class="figcap"><b>A 800 × 560 la hoja mide 760 de ancho: cubre el chat y deja 40 px de contexto.</b> El cuerpo baja a 484 y Actualizaciones pide scroll —el bloque de extensiones se corta abajo, como se ve—, pero la columna sigue midiendo 696: es la única dirección que <b>no pierde ancho de lectura</b> al llegar al mínimo. La pregunta de diseño es otra: si a 760 sobre 800 la hoja ya casi es una pantalla, quizá convenga que a esa ventana Ajustes sea la página entera (dirección B) y la hoja quede para ventanas grandes.</p>
+</section>
+
+<!-- 6 · LOS SEIS TEMAS -->
+<section class="sheet">
+  <p class="cap">C6 · la fila de la lista bajo los seis temas — ninguna regla de esta hoja escribe un color</p>
+  <div class="strip">
+    <div class="tcell" data-theme="dark"><p class="sk">dark</p><div class="srow"><span class="sn">pi</span><span class="sv">1.5.2</span><button class="btn accent" type="button">Actualizar</button></div><p class="tval">Apariencia — Oscuro</p></div>
+    <div class="tcell" data-theme="light"><p class="sk">light</p><div class="srow"><span class="sn">pi</span><span class="sv">1.5.2</span><button class="btn accent" type="button">Actualizar</button></div><p class="tval">Apariencia — Oscuro</p></div>
+    <div class="tcell" data-theme="Gentle"><p class="sk">Gentle</p><div class="srow"><span class="sn">pi</span><span class="sv">1.5.2</span><button class="btn accent" type="button">Actualizar</button></div><p class="tval">Apariencia — Oscuro</p></div>
+    <div class="tcell" data-theme="Gentleman-Cute"><p class="sk">Gentleman-Cute</p><div class="srow"><span class="sn">pi</span><span class="sv">1.5.2</span><button class="btn accent" type="button">Actualizar</button></div><p class="tval">Apariencia — Oscuro</p></div>
+    <div class="tcell" data-theme="Gentleman-Sexy"><p class="sk">Gentleman-Sexy</p><div class="srow"><span class="sn">pi</span><span class="sv">1.5.2</span><button class="btn accent" type="button">Actualizar</button></div><p class="tval">Apariencia — Oscuro</p></div>
+    <div class="tcell" data-theme="system"><p class="sk">system</p><div class="srow"><span class="sn">pi</span><span class="sv">1.5.2</span><button class="btn accent" type="button">Actualizar</button></div><p class="tval">Apariencia — Oscuro</p></div>
+  </div>
+</section>
+
+<section class="head" style="margin-top:0">
+  <div class="notes">
+    <section>
+      <h4>Lo que hay que construir</h4>
+      <p><span class="new">nuevo</span><b>La hoja</b> (760, alto entero, borde izquierdo y <code>--shadow</code>): un panel que no tapa la ventana y que no lleva velo.</p>
+      <p><span class="new">nuevo</span><b>La fila de la lista</b>: glifo, título y pista ya existen; el <b>valor</b> de cada sección es lo nuevo, y necesita que <code>settings_snapshot</code> (que ya trae tema, home, idioma, notificaciones, updates, usage, auth, versión) alimente una línea por sección.</p>
+      <p><span class="new">nuevo</span><b>La vuelta</b> («Todas las secciones», píldora de 28) y el nivel 1/nivel 2 como estado de la hoja.</p>
+      <p><span class="new">nuevo</span><b>La fila de tema</b> (una caja por tema), igual que en A y B.</p>
+      <p>El campo es el <code>.settings-find</code> de hoy, subido a 40 de alto y 13 px; el resto son <code>.btn</code>, <code>.tag</code>, la hairline y el espaciado de siempre.</p>
+    </section>
+    <section>
+      <h4>Teclado, foco y movimiento</h4>
+      <ol>
+        <li>Al abrir, el foco entra en el campo de búsqueda: escribir es el primer gesto posible.</li>
+        <li><kbd>↓</kbd> baja a la lista sin salir del campo; Enter abre la fila resaltada; <kbd>Esc</kbd> en el campo vacío cierra la hoja, y con texto lo vacía antes.</li>
+        <li>Dentro de una ficha, la primera parada es «Todas las secciones», que devuelve el foco al campo; después, los controles de la sección en su orden.</li>
+        <li>Sin velo: el chat de la izquierda se ve pero no se toca mientras la hoja tiene el foco; Tab no sale de la hoja (es un diálogo).</li>
+        <li>El movimiento es la entrada de la hoja (120ms, desplazamiento corto) y se sustituye por un corte seco con <code>prefers-reduced-motion</code>.</li>
+      </ol>
+    </section>
+    <section>
+      <h4>Las dos lenguas y los temas</h4>
+      <p>Todo el texto dibujado es el de la app en español. Palabras nuevas de esta hoja: <b>Escribe para filtrar las ocho secciones, en español o en inglés. Con el campo vacío están todas.</b> · <b>Todas las secciones</b> · <b>Proveedores</b> · <b>La sesión la escribe la shell</b> · <b>Extensiones</b> · los valores <b>3 proveedores</b> y <b>Cuando no está al frente</b> (abreviatura de la etiqueta real, que es más larga). En inglés: <i>Type to filter the eight sections, in Spanish or English. With the field empty they are all here.</i> · <i>All sections</i> · <i>Providers</i> · <i>The shell writes the session</i> · <i>Extensions</i> · <i>3 providers</i> · <i>When it is not in front</i>.</p>
+      <p><b>Los seis temas:</b> la tira C6 repite la fila bajo los seis bloques de <code>theme.css</code>; el valor de la sección es <code>--faint</code> y el acento del foco es el del tema.</p>
+    </section>
+  </div>
+</section>
+
+</main>
+</body></html>

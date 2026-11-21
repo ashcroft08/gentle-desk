@@ -33,3 +33,4 @@ will be built INSIDE this new frame, so the frame is designed first.
   que lo veo pequeño y que todo esta apretado tambien mucho uso de cards. Te parece bien".
 - L2 (2026-11-21, the maintainer, asked what bothers them most and for references): "dale, puedes hacerlo
   desde cero osea tienes libertar creativa".
+- L3 (2026-11-21, design delivered): `design/settings-redesign/` - `02-direction-a-large-modal.html`, `03-direction-b-page.html`, `04-direction-c-search-first-sheet.html` (three directions over the same three screens: Appearance, Updates, Account), `00-future.html` (General with an environment probe and Packages with a live output box, in A) and `01-audit-vs-redesign.html` (the 12 audit findings: 7 closed by 0.8.1, 5 open; the measured case 680x310 -> 1180x544, column 432 -> 760, cards 9 -> 6). `design/system.md` was re-synced from `theme.css` + `app.css`. The design worker recommends A. Awaiting the maintainer's choice on the canvas.

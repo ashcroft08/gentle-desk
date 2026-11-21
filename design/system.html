@@ -174,6 +174,34 @@
   .seg [role='radio']:focus-visible { outline: 1px solid var(--text); outline-offset: -2px; }
   .split { display: flex; gap: 18px; align-items: flex-start; }
 
+  /* settings: the search field, the rail, the theme cards and the flat rows
+     (apps/desktop/src/app.css, .settings-find / .settings-rail / .tc-* / .urows) */
+  .settings-side { display: flex; flex-direction: column; gap: 12px; width: 184px; padding: 2px 14px 0 0; border-right: 1px solid var(--border); }
+  .find { display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 9px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface2); color: var(--faint); }
+  .find:focus-within { border-color: var(--accent); outline: 1px solid var(--accent); outline-offset: -1px; }
+  .find svg { flex: none; width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .find input { flex: 1; min-width: 0; padding: 0; border: 0; background: transparent; color: var(--text); font-size: 12.5px; outline: none; }
+  .find input::placeholder { color: var(--faint); }
+  .rail.flat { width: auto; padding-right: 0; border-right: 0; }
+  .tc-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .tc { display: flex; flex-direction: column; gap: 6px; padding: 7px; border: 1px solid var(--border); border-radius: 10px; background: transparent; color: var(--muted); text-align: left; cursor: pointer; transition: border-color 120ms ease, background-color 120ms ease; }
+  .tc:hover { background: var(--surface2); }
+  .tc[aria-pressed='true'] { border-color: var(--accent); background: var(--tint); color: var(--text); }
+  .tc-shot { display: flex; flex-direction: column; gap: 6px; padding: 6px; border: 1px solid var(--border); border-radius: 7px; background: var(--bg); color: var(--text); font-family: ui-monospace, 'SF Mono', Consolas, monospace; font-size: 9px; line-height: 1.4; overflow: hidden; }
+  .tc-line { display: flex; align-items: baseline; gap: 4px; white-space: nowrap; }
+  .tc-prompt { color: var(--accent); } .tc-ok { color: var(--success); } .tc-path { color: var(--muted); }
+  .tc-dots { display: flex; gap: 4px; }
+  .tc-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--dot); }
+  .tc-meta { display: flex; align-items: center; gap: 5px; padding: 0 2px; }
+  .tc-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; }
+  .urows { list-style: none; margin: 0; padding: 4px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface2); }
+  .urow { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; padding: 7px 0; }
+  .urow + .urow { border-top: 1px dashed var(--border); }
+  .urows .headline { font-size: 13px; font-weight: 600; }
+  .urows .mono { font-size: 12px; color: var(--muted); }
+  .urows .reason { flex-basis: 100%; color: var(--faint); font-size: 12px; line-height: 1.5; }
+  .versions { margin: 8px 0 0; color: var(--faint); font-size: 12px; font-family: ui-monospace, 'Cascadia Code', Consolas, monospace; }
+
   /* composer */
   .composer { display: flex; align-items: flex-end; gap: 8px; border: 1px solid var(--border); border-radius: 18px; background: var(--surface); padding: 10px 10px 10px 16px; width: min(var(--chat-max), 100%); }
   .composer:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -220,7 +248,7 @@
     <button type="button" aria-pressed="false" onclick="setTheme('Gentleman-Cute', this)">Gentleman-Cute</button>
     <button type="button" aria-pressed="false" onclick="setTheme('Gentleman-Sexy', this)">Gentleman-Sexy</button>
     <button type="button" aria-pressed="false" onclick="setTheme('system', this)">system</button>
-    <p class="live" id="live">apps/desktop/src/theme.css · apps/desktop/src/app.css</p>
+    <p class="live" id="live">synced 2026-11-21 · apps/desktop/src/theme.css · apps/desktop/src/app.css</p>
   </header>
 
   <main>
@@ -373,6 +401,63 @@
       <p class="gate">A chat is open, so the update waits until it closes.</p>
     </section>
 
+    <section class="wide" aria-labelledby="c-settings">
+      <h2 id="c-settings">Settings — search field · rail · theme cards</h2>
+      <p class="src">Source: apps/desktop/src/app.css, apps/desktop/src/settings/ThemeCards.svelte</p>
+      <div class="split">
+        <div class="settings-side">
+          <div class="find">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m21 21-4.34-4.34"></path><circle cx="11" cy="11" r="8"></circle></svg>
+            <input type="search" placeholder="Find a setting…" aria-label="Find a setting">
+          </div>
+          <div class="rail flat" role="tablist" aria-label="Settings sections" aria-orientation="vertical">
+            <button role="tab" type="button" aria-selected="true">Appearance</button>
+            <button role="tab" type="button" aria-selected="false">Shell home</button>
+            <button role="tab" type="button" aria-selected="false">Updates</button>
+          </div>
+        </div>
+        <div style="flex:1">
+          <p class="label" style="margin-top:0">Theme</p>
+          <div class="tc-grid">
+            <button class="tc" type="button" aria-pressed="true">
+              <span class="tc-shot" data-theme="dark" aria-hidden="true">
+                <span class="tc-line"><span class="tc-prompt">❯</span><span>Aa</span><span class="tc-ok">ok</span><span class="tc-path">~/src</span></span>
+                <span class="tc-dots"><span class="tc-dot" style="--dot:var(--danger)"></span><span class="tc-dot" style="--dot:var(--warning)"></span><span class="tc-dot" style="--dot:var(--success)"></span><span class="tc-dot" style="--dot:var(--accent)"></span><span class="tc-dot" style="--dot:var(--muted)"></span><span class="tc-dot" style="--dot:var(--faint)"></span><span class="tc-dot" style="--dot:var(--text)"></span></span>
+              </span>
+              <span class="tc-meta"><span class="tc-name">Dark</span></span>
+            </button>
+            <button class="tc" type="button" aria-pressed="false">
+              <span class="tc-shot" data-theme="light" aria-hidden="true">
+                <span class="tc-line"><span class="tc-prompt">❯</span><span>Aa</span><span class="tc-ok">ok</span><span class="tc-path">~/src</span></span>
+                <span class="tc-dots"><span class="tc-dot" style="--dot:var(--danger)"></span><span class="tc-dot" style="--dot:var(--warning)"></span><span class="tc-dot" style="--dot:var(--success)"></span><span class="tc-dot" style="--dot:var(--accent)"></span><span class="tc-dot" style="--dot:var(--muted)"></span><span class="tc-dot" style="--dot:var(--faint)"></span><span class="tc-dot" style="--dot:var(--text)"></span></span>
+              </span>
+              <span class="tc-meta"><span class="tc-name">Light</span></span>
+            </button>
+            <button class="tc" type="button" aria-pressed="false">
+              <span class="tc-shot" data-theme="Gentle" aria-hidden="true">
+                <span class="tc-line"><span class="tc-prompt">❯</span><span>Aa</span><span class="tc-ok">ok</span><span class="tc-path">~/src</span></span>
+                <span class="tc-dots"><span class="tc-dot" style="--dot:var(--danger)"></span><span class="tc-dot" style="--dot:var(--warning)"></span><span class="tc-dot" style="--dot:var(--success)"></span><span class="tc-dot" style="--dot:var(--accent)"></span><span class="tc-dot" style="--dot:var(--muted)"></span><span class="tc-dot" style="--dot:var(--faint)"></span><span class="tc-dot" style="--dot:var(--text)"></span></span>
+              </span>
+              <span class="tc-meta"><span class="tc-name">Gentle</span></span>
+            </button>
+          </div>
+          <p class="hint" style="margin-top:10px">A card's miniature carries its own <code class="mono">data-theme</code>: every colour inside it is that theme's token, so no second palette can drift.</p>
+        </div>
+      </div>
+    </section>
+
+    <section aria-labelledby="c-settings-rows">
+      <h2 id="c-settings-rows">Settings rows · gate</h2>
+      <p class="src">Source: apps/desktop/src/app.css</p>
+      <ul class="urows">
+        <li class="urow"><span class="headline">This app</span><span class="mono">0.8.1 → 0.9.0</span><p class="reason">This app updates itself: use the update banner at the top.</p></li>
+        <li class="urow"><span class="headline">pi</span><span class="mono">1.5.2 → 2.0.5</span><button class="btn accent" type="button">Update</button></li>
+        <li class="urow"><span class="headline">Gentle Shell</span><span class="mono">4.8.0 → 4.9.2</span><button class="btn" type="button">Skip this version</button></li>
+      </ul>
+      <p class="versions">Last checked: 3m ago</p>
+      <p class="gate" style="margin-top:10px">Updates need every chat closed. 1 chat is open - Close chat in its row menu, and the update buttons come alive.</p>
+    </section>
+
     <section class="wide" aria-labelledby="c-tabs">
       <h2 id="c-tabs">Tabs · segmented control</h2>
       <p class="src">Source: apps/desktop/src/app.css</p>
@@ -440,7 +525,9 @@
       host.append(row);
     }
     document.getElementById('live').textContent =
-      document.documentElement.getAttribute('data-theme') + ' · --shadow ' + cs.getPropertyValue('--shadow').trim();
+      'synced 2026-11-21 · ' +
+      document.documentElement.getAttribute('data-theme') +
+      ' · --shadow ' + cs.getPropertyValue('--shadow').trim();
   }
   function setTheme(name, btn) {
     document.documentElement.setAttribute('data-theme', name);

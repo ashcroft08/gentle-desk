@@ -1,0 +1,42 @@
+{
+  "title": "Ajustes, tres direcciones (0.9.0)",
+  "brief": "S1-S6 of odd/tasks/settings-redesign.md. The maintainer: 'lo veo pequeño y que todo está apretado también mucho uso de cards' and 'puedes hacerlo desde cero osea tienes libertad creativa'. Three genuinely different directions, each drawn at the app's real sizes with the same three screens (Appearance with its visible Tema label, Updates with the three rows, the skip, the last-checked line and the extensions block, Account with its providers and the sign-in hand-off), each with its behaviour at the 800x560 window minimum and a strip proving the same row under the six themes. Every artboard uses the tokens of design/system.md (synced 2026-11-21 from apps/desktop/src/theme.css and app.css) and the app's own components (.btn, .tag, .seg, .settings-find, the rail's tablist, the theme miniatures); every new component is flagged in its own notes.",
+  "feature": "odd/tasks/settings-redesign.md",
+  "artboards": [
+    {
+      "file": "00-future.html",
+      "title": "00 · el marco que absorbe lo que viene: General y Paquetes, en la dirección A",
+      "tradeoff": "La prueba de S5 dibujada en la dirección recomendada: la sonda de entorno son cuatro filas (gentle-shell, pi, node, git) con su versión o su falta y la pista del arreglo, y Paquetes son tres filas con Quitar, un campo de instalación, tres recomendados y la salida en vivo con sus últimas ocho líneas. Demuestra que el riel de diez entradas cabe en 544 de alto y que lo único nuevo es la caja de salida; el coste es que la página más larga (Paquetes) pide scroll en la ventana mínima.",
+      "width": 1400,
+      "height": 3600
+    },
+    {
+      "file": "01-audit-vs-redesign.html",
+      "title": "01 · la auditoría contra las tres direcciones",
+      "tradeoff": "Los doce defectos medidos de design/settings-polish/01-audit.html con su estado real en la rama —siete cerrados por la 0.8.1, cinco abiertos—, la columna de cada dirección para cada uno, y la tabla que sí explica las palabras del mantenedor: 680→1180 de ancho, 310→544 de alto, 432→760 de lectura y 9→6 tarjetas. Es una hoja de números, no una pantalla: no enseña nada que no pueda señalar con una declaración de app.css.",
+      "width": 1180,
+      "height": 2860
+    },
+    {
+      "file": "02-direction-a-large-modal.html",
+      "title": "A · la ventana amplia: un modal plano de 1180×660",
+      "tradeoff": "Optimiza el cambio más grande por la obra más pequeña: el mismo diálogo aprende a usar la ventana (riel de 216, columna de 760, cuerpo de 544) y agrupa con títulos y hairlines en vez de tarjetas; las únicas seis cajas son las previsualizaciones de tema. Cuesta que una sección por vez deja aire en las cortas y que en la ventana mínima la columna baja a 487.",
+      "width": 1400,
+      "height": 4820
+    },
+    {
+      "file": "03-direction-b-page.html",
+      "title": "B · Ajustes como página: una sola columna de 692 con anclas y spy",
+      "tradeoff": "Optimiza el barrido y el salto: todo Ajustes vive en un scroll, se compara sin cambiar de sitio y la columna mide casi igual en cualquier ventana (692 → 760). Cuesta que Ajustes deja de ser un overlay —hay que ir y volver, y el chat no está mientras tanto— y que a 800 el nav se convierte en una tira de anclas.",
+      "width": 1400,
+      "height": 4820
+    },
+    {
+      "file": "04-direction-c-search-first-sheet.html",
+      "title": "C · el buscador delante: una hoja de 760 con dos niveles",
+      "tradeoff": "Optimiza el acceso directo y la lectura: el campo es la puerta, la lista de secciones ya dice el valor de cada una y la columna nunca se comprime (712 → 696), con el chat a la vista. Cuesta un nivel más para pasearse, que cada fila necesite un valor (texto y datos que hoy no se componen) y que a 800 la hoja casi cubra la ventana.",
+      "width": 1400,
+      "height": 5750
+    }
+  ]
+}

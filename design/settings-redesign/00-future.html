@@ -1,0 +1,483 @@
+<!doctype html>
+<html lang="es" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=1400">
+<title>Ajustes — 00 · el marco que absorbe lo que viene (General y Paquetes)</title>
+<style>
+/* ── TOKENS. Copia literal de apps/desktop/src/theme.css (los seis bloques). ── */
+:root,[data-theme='dark']{--bg:#0e1116;--surface:#151a21;--surface2:#1c222b;--border:#2b333d;--text:#e4e8ee;--muted:#9aa4b2;--faint:#7d8593;--accent:#7aa2f7;--tint:rgba(122,162,247,.14);--success:#7edc9a;--warning:#e7b455;--danger:#ff8585;--shadow:0 8px 24px rgba(0,0,0,.45);--row-h:34px}
+[data-theme='light']{--bg:#f2f4f7;--surface:#ffffff;--surface2:#e9edf2;--border:#cfd5dd;--text:#17202a;--muted:#576272;--faint:#6b7686;--accent:#2e5bd7;--tint:rgba(46,91,215,.1);--success:#166e38;--warning:#8a5800;--danger:#c22f37;--shadow:0 8px 24px rgba(23,32,42,.18);--row-h:34px}
+[data-theme='Gentle']{--bg:#06080f;--surface:#06080f;--surface2:#0d0f14;--border:#313342;--text:#f3f6f9;--muted:#8394a3;--faint:#96a2b0;--accent:#7fb4ca;--tint:#161d2e;--success:#b7cc85;--warning:#deba87;--danger:#cb7c94;--shadow:0 8px 24px rgba(0,0,0,.6);--row-h:34px}
+[data-theme='Gentleman-Cute']{--bg:#060407;--surface:#100a0f;--surface2:#100a0f;--border:#563040;--text:#f6eff3;--muted:#a78e9b;--faint:#d7a0b8;--accent:#f095c8;--tint:#2a1523;--success:#b4e7c7;--warning:#f2b86d;--danger:#ff718f;--shadow:0 8px 24px rgba(0,0,0,.6);--row-h:34px}
+[data-theme='Gentleman-Sexy']{--bg:#060407;--surface:#100a0f;--surface2:#100a0f;--border:#563040;--text:#f6eff3;--muted:#a78e9b;--faint:#d7a0b8;--accent:#f43888;--tint:#2e0f1f;--success:#d2cbd0;--warning:#f2b86d;--danger:#ff718f;--shadow:0 8px 24px rgba(0,0,0,.6);--row-h:34px}
+@media (prefers-color-scheme:light){[data-theme='system']{--bg:#f2f4f7;--surface:#ffffff;--surface2:#e9edf2;--border:#cfd5dd;--text:#17202a;--muted:#576272;--faint:#6b7686;--accent:#2e5bd7;--tint:rgba(46,91,215,.1);--success:#166e38;--warning:#8a5800;--danger:#c22f37;--shadow:0 8px 24px rgba(23,32,42,.18);--row-h:34px}}
+[data-theme='dark'],[data-theme='Gentle'],[data-theme='Gentleman-Cute'],[data-theme='Gentleman-Sexy']{color-scheme:dark}
+[data-theme='light']{color-scheme:light}
+
+*{box-sizing:border-box}
+h1,h2,h3,p,ul,li{margin:0}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.page{width:1400px;padding:30px 0 64px}
+.head{width:1280px;margin:0 auto 26px}
+.kicker{margin:0 0 10px;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--faint)}
+h1{margin:0 0 12px;font-size:23px;font-weight:600;line-height:1.25}
+.lede{margin:0 0 12px;max-width:880px;color:var(--muted);font-size:13.5px;line-height:1.65}
+.lede b{color:var(--text);font-weight:600}
+.tradeoff{margin:0 0 22px;max-width:920px;padding-left:14px;border-left:2px solid var(--accent);color:var(--text);font-size:13px;line-height:1.6}
+.tradeoff b{color:var(--accent);font-weight:600}
+h1 code,p code,li code,td code{font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:12px;background:var(--surface2);border-radius:4px;padding:1px 5px}
+.metrics{width:100%;border-collapse:collapse;font-size:12.5px}
+.metrics th{text-align:left;font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);padding:0 10px 6px 0;border-bottom:1px solid var(--border)}
+.metrics td{padding:6px 10px 6px 0;border-bottom:1px dashed var(--border);vertical-align:top;color:var(--muted)}
+.metrics td:first-child{color:var(--text);font-weight:600;white-space:nowrap}
+.metrics td b{color:var(--text);font-weight:600}
+.wrap{display:flex;justify-content:center}
+.sheet{margin:0 0 30px}
+.sheet>.cap{width:1280px;margin:0 auto 10px;color:var(--faint);font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase}
+.sheet>.cap b{color:var(--muted)}
+.figcap{width:1280px;margin:12px auto 0;color:var(--muted);font-size:12.5px;line-height:1.6}
+.figcap b{color:var(--text);font-weight:600}
+
+/* ── la ventana y la tarjeta de la dirección A (la recomendada) ──────────── */
+.frame{position:relative;width:1280px;height:820px;background:var(--bg);border:1px solid var(--border);border-radius:12px;overflow:hidden;box-shadow:var(--shadow)}
+.app{display:grid;grid-template-columns:280px minmax(0,1fr);height:100%}
+.side{display:flex;flex-direction:column;gap:10px;padding:12px 10px 8px;background:var(--surface);border-right:1px solid var(--border)}
+.wm{padding:2px 6px 12px;font-size:12px;font-weight:600;letter-spacing:.22em;color:var(--accent)}
+.neww{display:flex;align-items:center;justify-content:center;height:38px;border:1px solid var(--border);border-radius:10px;background:var(--surface2);font-size:13px;font-weight:600}
+.gh{padding:10px 10px 2px;color:var(--muted);font-size:12px;font-weight:600;letter-spacing:.02em}
+.row{display:flex;align-items:center;gap:8px;height:var(--row-h);padding:0 10px;border-radius:8px;font-size:13px}
+.row.chat{padding-left:42px;color:var(--muted)}
+.row span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.foot{display:flex;align-items:center;gap:8px;margin-top:auto;padding-top:8px;border-top:1px solid var(--border);color:var(--faint);font-size:12px}
+.main{display:flex;flex-direction:column;min-height:0;background:var(--bg)}
+.mh{display:flex;align-items:center;gap:8px;height:52px;padding:0 20px;border-bottom:1px solid var(--border)}
+.mh h2{font-size:15px;font-weight:600}
+.mh .grow{flex:1}
+.tabsfake{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;font-size:12.5px;color:var(--muted)}
+.tabsfake span{padding:4px 11px}
+.tabsfake span:first-child{background:var(--tint);color:var(--accent);font-weight:600}
+.thread{padding:28px 24px 12px}
+.tin{max-width:880px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+.msg-u{align-self:flex-end;max-width:78%;padding:8px 14px;border-radius:14px 14px 4px 14px;background:var(--tint)}
+.msg-a{padding:0 4px;color:var(--muted);font-size:13.5px}
+.dock{padding:0 24px 20px}
+.composer{max-width:880px;margin:0 auto;border:1px solid var(--border);border-radius:18px;background:var(--surface);padding:12px 14px 12px 16px;color:var(--faint)}
+.ovl{position:absolute;inset:0;background:rgba(0,0,0,.5)}
+.dlg{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;gap:20px;width:1180px;height:660px;padding:28px;background:var(--surface);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow)}
+.dtrow{display:flex;align-items:center;gap:12px;height:40px}
+.dt{font-size:16px;font-weight:600}
+.dtrow .grow{flex:1}
+.ic{width:32px;height:32px;display:inline-grid;place-items:center;flex:none;border:0;padding:0;border-radius:8px;background:transparent;color:var(--muted);cursor:pointer;transition:background-color 120ms ease,color 120ms ease}
+.ic:hover{background:var(--surface2);color:var(--text);box-shadow:inset 0 0 0 1px var(--border)}
+.ic svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.body{display:flex;gap:40px;min-height:0;flex:1}
+.side2{flex:none;width:216px;display:flex;flex-direction:column;gap:14px;padding-right:24px;border-right:1px solid var(--border)}
+.find{display:flex;align-items:center;gap:8px;height:32px;padding:0 9px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--faint)}
+.find:focus-within{border-color:var(--accent);outline:1px solid var(--accent);outline-offset:-1px}
+.find svg{flex:none;width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.find input{flex:1;min-width:0;padding:0;border:0;background:transparent;color:var(--text);font:inherit;font-size:12.5px;outline:none}
+.find input::placeholder{color:var(--faint)}
+.rail{display:flex;flex-direction:column;gap:2px}
+.rail [role='tab']{display:flex;align-items:center;gap:9px;height:34px;padding:0 10px;border:0;border-radius:8px;background:transparent;color:var(--muted);font:inherit;font-size:13px;text-align:left;cursor:pointer;transition:background-color 120ms ease,color 120ms ease}
+.rail [role='tab'] svg{flex:none;width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.rail [role='tab']:hover{background:var(--surface2);color:var(--text)}
+.rail [role='tab'][aria-selected='true']{background:var(--tint);color:var(--accent)}
+.rail [role='tab']:focus-visible{outline:1px solid var(--accent);outline-offset:-1px}
+.pane{flex:1;min-width:0;max-width:760px;overflow:hidden;display:flex;flex-direction:column;align-items:stretch}
+.pane h3{margin:0 0 2px;font-size:15px;font-weight:600}
+.hint{margin:0 0 10px;color:var(--muted);font-size:12px;line-height:1.5}
+.glabel{margin:0;color:var(--faint);font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase}
+.ghead{display:flex;align-items:baseline;gap:14px;margin-top:12px;padding-bottom:8px}
+.ghead .grow{flex:1}
+.checked{color:var(--faint);font-size:12px;font-family:ui-monospace,'Cascadia Code',Consolas,monospace}
+.tag{display:inline-block;font-size:11px;font-weight:600;padding:3px 8px;border-radius:999px;border:1px solid currentColor;white-space:nowrap}
+.tag.ok{color:var(--success)}
+.tag.warn{color:var(--warning)}
+.tag.quiet{color:var(--muted)}
+.btn{border:1px solid var(--border);background:var(--surface2);color:var(--text);border-radius:8px;padding:6px 14px;font-size:13px;white-space:nowrap;cursor:pointer;transition:border-color 120ms ease,background-color 120ms ease}
+.btn:hover{border-color:var(--accent)}
+.btn.accent{border-color:var(--accent);background:var(--accent);color:var(--bg);font-weight:600}
+.btn.accent:hover{filter:brightness(1.08)}
+.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* General: una fila por pieza del entorno */
+.envlist{list-style:none;padding:0;border-top:1px solid var(--border)}
+.envrow{display:grid;grid-template-columns:180px minmax(0,1fr) auto;align-items:center;gap:4px 18px;padding:15px 0;border-bottom:1px solid var(--border)}
+.envrow .ename{font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:12.5px;font-weight:600}
+.envrow .ever{font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:12px;color:var(--muted)}
+.envrow .efix{grid-column:2 / -1;color:var(--faint);font-size:12px;line-height:1.5}
+
+/* Paquetes: instalar, la lista, los recomendados y la salida en vivo */
+.install{display:flex;gap:10px;margin-top:12px}
+.install input{flex:1;min-width:0;height:34px;padding:0 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px}
+.install input::placeholder{color:var(--faint)}
+.install input:focus-visible{outline:1px solid var(--accent);outline-offset:-1px;border-color:var(--accent)}
+.prows{list-style:none;padding:0;border-top:1px solid var(--border)}
+.prow{display:grid;grid-template-columns:minmax(0,1fr) 92px auto;align-items:center;gap:16px;padding:10px 0;border-bottom:1px solid var(--border)}
+.prow .btn{padding:4px 12px;font-size:12.5px}
+.prow .pname{font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:12.5px}
+.prow .pver{font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:12px;color:var(--muted)}
+.recs{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:16px}
+.rec{display:inline-flex;align-items:center;gap:10px;padding:4px 6px 4px 12px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--muted);font-size:12.5px}
+.rec .rname{font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:12px;color:var(--text)}
+.rec .btn{padding:3px 10px;font-size:12px;border-radius:6px}
+
+/* NUEVO: la salida en vivo (el único bloque nuevo del marco) */
+.outbox{margin-top:14px;border:1px solid var(--border);border-radius:10px;background:var(--surface2);overflow:hidden}
+.outhead{display:flex;align-items:center;gap:10px;padding:6px 12px;border-bottom:1px solid var(--border);color:var(--muted);font-size:12px}
+.outhead .oname{font-family:ui-monospace,'Cascadia Code',Consolas,monospace;color:var(--text)}
+.outhead .grow{flex:1}
+.outhead .live{display:inline-flex;align-items:center;gap:6px;color:var(--faint);font-size:11.5px}
+.outhead .live i{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.35}}
+.outbody{list-style:none;padding:6px 12px;font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:11.5px;line-height:1.45;color:var(--muted)}
+.outbody li{white-space:pre-wrap;overflow-wrap:anywhere}
+.outbody .ok{color:var(--success)}
+.outbody .warn{color:var(--warning)}
+
+/* la ventana mínima */
+.frame.small{width:800px;height:560px}
+.frame.small .app{grid-template-columns:minmax(0,1fr)}
+.frame.small .mh{height:48px;padding:0 12px}
+.frame.small .thread{padding:18px 16px 8px}
+.frame.small .tin{max-width:none}
+.frame.small .dock{padding:0 16px 14px}
+.frame.small .composer{max-width:none}
+.dlg.sm{width:744px;height:504px}
+.dlg.sm .side2{width:176px;gap:10px;padding-right:14px}
+.dlg.sm .find{height:28px}
+.dlg.sm .rail [role='tab']{height:29px;font-size:12.5px}
+.dlg.sm .pane{max-width:none}
+.dlg.sm .install{flex-wrap:wrap}
+.dlg.sm .prow{grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:8px 0}
+.dlg.sm .outbody{font-size:11px;line-height:1.5}
+
+/* notas */
+.notes{width:1280px;margin:0 auto;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px}
+.notes section{border-top:1px solid var(--border);padding-top:14px}
+.notes h4{margin:0 0 8px;color:var(--faint);font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase}
+.notes p{margin:0 0 9px;color:var(--muted);font-size:12.5px;line-height:1.6}
+.notes p:last-child{margin-bottom:0}
+.notes b{color:var(--text);font-weight:600}
+.notes .new{display:inline-block;margin-right:6px;padding:1px 6px;border:1px solid var(--warning);border-radius:999px;color:var(--warning);font-size:10.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase}
+.notes table{width:100%;border-collapse:collapse;font-size:12px;margin:0 0 10px}
+.notes th{text-align:left;font-size:10.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);padding:0 6px 6px 0;border-bottom:1px solid var(--border)}
+.notes td{padding:5px 6px 5px 0;border-bottom:1px dashed var(--border);vertical-align:top;color:var(--muted)}
+.notes td:first-child{color:var(--text)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style></head>
+<body>
+<main class="page">
+
+<header class="head">
+  <p class="kicker">00 · lo que viene, en el marco de la dirección A</p>
+  <h1>El marco absorbe la sonda de entorno y los paquetes <span style="color:var(--accent)">sin un segundo rediseño</span></h1>
+  <p class="lede">La prueba de S5, dibujada en la dirección recomendada: el riel gana dos entradas —<b>General</b> y <b>Paquetes</b>— y las dos páginas nuevas usan la anatomía que ya existe: título, pista, una etiqueta de grupo y <b>filas separadas por hairlines</b>. La sonda de entorno es una fila por pieza (<code>gentle-shell</code>, <code>pi</code>, <code>node</code>, <code>git</code>) con su versión o su ausencia y la frase que dice cómo arreglarla; los paquetes son una fila por paquete con <b>Quitar</b>, un campo de instalación y una lista de recomendados. Lo único que no existía es la <b>caja de salida en vivo</b>, y se dibuja con el lenguaje del bloque de código de la app.</p>
+  <p class="tradeoff"><b>La prueba:</b> ninguna de las dos páginas necesita una tarjeta, ni un control nuevo, ni un color nuevo; el riel de 10 entradas sigue cabiendo en 544 de alto (10 × 34 + 9 × 2 + 46 = 404) y la columna de lectura sigue midiendo 760. <b>Lo que hay que decidir</b> es de producto, no de forma: qué se dibuja para «instalado» y qué para «falta», dónde se sientan las dos entradas nuevas y si la app abre en General en vez de en Apariencia.</p>
+  <table class="metrics">
+    <thead><tr><th>medida</th><th>hoy</th><th>con General y Paquetes</th><th>ventana mínima 800 × 560</th></tr></thead>
+    <tbody>
+      <tr><td>riel</td><td>8 entradas · 332 de alto</td><td><b>10 entradas · 404</b> (cabe en 544)</td><td><b>10 entradas · 350</b> (cabe en 388)</td></tr>
+      <tr><td>columna de lectura</td><td>432</td><td><b>760</b></td><td><b>487</b></td></tr>
+      <tr><td>cajas nuevas dentro del cuerpo</td><td>—</td><td><b>1</b>: la salida en vivo (un bloque de log, no una tarjeta)</td><td><b>1</b>, más alta y con 8 líneas</td></tr>
+      <tr><td>filas de la sonda</td><td>—</td><td><b>4</b> (<code>gentle-shell</code>, <code>pi</code>, <code>node</code>, <code>git</code>)</td><td><b>4</b>, con la pista debajo</td></tr>
+    </tbody>
+  </table>
+</header>
+
+<!-- 1 · GENERAL -->
+<section class="sheet">
+  <p class="cap">00a · General — la sonda de entorno: cuatro filas, su versión o su falta, y la pista del arreglo</p>
+  <div class="wrap"><div class="frame">
+    <div class="app">
+      <aside class="side" aria-hidden="true">
+        <div class="wm">GENTLE SHELL</div>
+        <div class="neww">Nueva sesión</div>
+        <p class="gh">Espacios</p>
+        <div class="row"><span>gentle-desk</span></div>
+        <div class="row chat"><span>Ajustes: tres direcciones</span></div>
+        <div class="row chat"><span>Notas de la 0.8.1</span></div>
+        <div class="foot"><span>⚙</span><span>Vista previa</span></div>
+      </aside>
+      <div class="main">
+        <header class="mh"><h2>Ajustes: tres direcciones</h2><span class="grow"></span><span class="tabsfake"><span>Chat</span><span>Helpers</span></span></header>
+        <div class="thread"><div class="tin">
+          <p class="msg-u">¿Y el General con la sonda de entorno?</p>
+          <p class="msg-a">Cabe sin tocar el marco: cuatro filas y una hairline.</p>
+        </div></div>
+        <div class="dock"><div class="composer">Pide algo…</div></div>
+      </div>
+    </div>
+    <div class="ovl"></div>
+
+    <div class="dlg" role="dialog" aria-modal="true" aria-label="Ajustes">
+      <div class="dtrow"><h2 class="dt">Ajustes</h2><span class="grow"></span>
+        <button class="ic" type="button" aria-label="Cerrar"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+      </div>
+      <div class="body">
+        <div class="side2">
+          <div class="find"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+            <input type="search" placeholder="Buscar un ajuste…" aria-label="Buscar un ajuste"></div>
+          <div class="rail" role="tablist" aria-orientation="vertical" aria-label="Secciones de ajustes">
+            <button type="button" role="tab" aria-selected="true"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m4 17 6-5-6-5"/><path d="M12 19h8"/></svg><span>General</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M21 8v8a2 2 0 0 1-1 1.73l-7 4a2 2 0 0 1-2 0l-7-4A2 2 0 0 1 3 16V8a2 2 0 0 1 1-1.73l7-4a2 2 0 0 1 2 0l7 4A2 2 0 0 1 21 8z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg><span>Paquetes</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10"/><path d="M12 18a6 6 0 0 0 0-12v12z"/></svg><span>Apariencia</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span>Home del shell</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg><span>Actualizaciones</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg><span>Cuenta</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg><span>Uso</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/></svg><span>Idioma</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/><path d="M10.268 21a2 2 0 0 0 3.464 0"/></svg><span>Notificaciones</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg><span>Acerca de</span></button>
+          </div>
+        </div>
+
+        <div class="pane">
+          <h3>General</h3>
+          <p class="hint">Lo que hay en esta máquina y qué falta para que la app funcione.</p>
+          <div class="ghead">
+            <p class="glabel">Entorno</p>
+            <span class="grow"></span>
+            <span class="checked">Última comprobación: hace 2 min</span>
+            <button class="btn" type="button">Comprobar de nuevo</button>
+          </div>
+          <ul class="envlist">
+            <li class="envrow">
+              <span class="ename">gentle-shell</span>
+              <span class="ever">4.8.0</span>
+              <span class="tag ok">Instalado</span>
+            </li>
+            <li class="envrow">
+              <span class="ename">pi</span>
+              <span class="ever">1.5.2</span>
+              <span class="tag ok">Instalado</span>
+            </li>
+            <li class="envrow">
+              <span class="ename">node</span>
+              <span class="ever">22.11.0</span>
+              <span class="tag ok">Instalado</span>
+            </li>
+            <li class="envrow">
+              <span class="ename">git</span>
+              <span class="ever" style="color:var(--faint)">desconocida</span>
+              <span class="tag quiet">No encontrado</span>
+              <p class="efix">Instala git, ábrelo una vez en una terminal y vuelve a pulsar Comprobar de nuevo; hasta entonces la app no puede leer el historial de un espacio de trabajo.</p>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div></div>
+  <p class="figcap"><b>La sonda no es una tarjeta: es una lista de cuatro filas.</b> Cada fila lleva el nombre en monoespaciado, la versión (o la palabra <code>desconocida</code>, nunca un cero inventado) y una etiqueta que dice el estado en palabras —<code>ok</code> para instalado, <code>quiet</code> para lo que no se encontró, que no es un error de la app—, y la pista ocupa el ancho de la fila debajo, como el <code>.reason</code> de Actualizaciones. La hora y <b>Comprobar de nuevo</b> comparten la línea de la etiqueta de grupo: la misma gramática que la tarjeta de Actualizaciones, sin su tarjeta.</p>
+</section>
+
+<!-- 2 · PAQUETES -->
+<section class="sheet">
+  <p class="cap">00b · Paquetes — instalar, la lista con Quitar, los recomendados y la salida en vivo con las últimas 8 líneas</p>
+  <div class="wrap"><div class="frame">
+    <div class="app">
+      <aside class="side" aria-hidden="true">
+        <div class="wm">GENTLE SHELL</div>
+        <div class="neww">Nueva sesión</div>
+        <p class="gh">Espacios</p>
+        <div class="row"><span>gentle-desk</span></div>
+        <div class="row chat"><span>Ajustes: tres direcciones</span></div>
+        <div class="row chat"><span>Notas de la 0.8.1</span></div>
+        <div class="foot"><span>⚙</span><span>Vista previa</span></div>
+      </aside>
+      <div class="main">
+        <header class="mh"><h2>Ajustes: tres direcciones</h2><span class="grow"></span><span class="tabsfake"><span>Chat</span><span>Helpers</span></span></header>
+        <div class="thread"><div class="tin">
+          <p class="msg-u">¿Y los paquetes, con la salida del comando?</p>
+          <p class="msg-a">La caja de salida es lo único nuevo; el resto son filas.</p>
+        </div></div>
+        <div class="dock"><div class="composer">Pide algo…</div></div>
+      </div>
+    </div>
+    <div class="ovl"></div>
+
+    <div class="dlg" role="dialog" aria-modal="true" aria-label="Ajustes">
+      <div class="dtrow"><h2 class="dt">Ajustes</h2><span class="grow"></span>
+        <button class="ic" type="button" aria-label="Cerrar"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+      </div>
+      <div class="body">
+        <div class="side2">
+          <div class="find"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+            <input type="search" placeholder="Buscar un ajuste…" aria-label="Buscar un ajuste"></div>
+          <div class="rail" role="tablist" aria-orientation="vertical" aria-label="Secciones de ajustes">
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m4 17 6-5-6-5"/><path d="M12 19h8"/></svg><span>General</span></button>
+            <button type="button" role="tab" aria-selected="true"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M21 8v8a2 2 0 0 1-1 1.73l-7 4a2 2 0 0 1-2 0l-7-4A2 2 0 0 1 3 16V8a2 2 0 0 1 1-1.73l7-4a2 2 0 0 1 2 0l7 4A2 2 0 0 1 21 8z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg><span>Paquetes</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10"/><path d="M12 18a6 6 0 0 0 0-12v12z"/></svg><span>Apariencia</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span>Home del shell</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg><span>Actualizaciones</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg><span>Cuenta</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg><span>Uso</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/></svg><span>Idioma</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/><path d="M10.268 21a2 2 0 0 0 3.464 0"/></svg><span>Notificaciones</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg><span>Acerca de</span></button>
+          </div>
+        </div>
+
+        <div class="pane">
+          <h3>Paquetes</h3>
+          <p class="hint">Lo que esta app tiene instalado, y lo que recomienda.</p>
+
+          <p class="glabel">Instalar</p>
+          <div class="install">
+            <input type="text" placeholder="npm:paquete" aria-label="Paquete a instalar">
+            <button class="btn accent" type="button">Instalar</button>
+          </div>
+
+          <div class="ghead">
+            <p class="glabel">Instalados</p>
+            <span class="grow"></span>
+            <span class="checked">3 paquetes</span>
+          </div>
+          <ul class="prows">
+            <li class="prow"><span class="pname">npm:gentle-engram</span><span class="pver">0.9.4</span><button class="btn" type="button">Quitar</button></li>
+            <li class="prow"><span class="pname">npm:pi-claude-bridge</span><span class="pver">1.2.0</span><button class="btn" type="button">Quitar</button></li>
+            <li class="prow"><span class="pname">npm:pi-web-access</span><span class="pver">2.3.1</span><button class="btn" type="button">Quitar</button></li>
+          </ul>
+
+          <div class="recs">
+            <p class="glabel">Recomendados</p>
+            <span class="rec"><span class="rname">npm:gentle-engram</span><button class="btn" type="button">Instalar</button></span>
+            <span class="rec"><span class="rname">npm:pi-claude-bridge</span><button class="btn" type="button">Instalar</button></span>
+            <span class="rec"><span class="rname">npm:pi-web-access</span><button class="btn" type="button">Instalar</button></span>
+          </div>
+
+          <div class="outbox">
+            <div class="outhead">
+              <span class="oname">npm:pi-web-access</span>
+              <span class="grow"></span>
+              <span class="live"><i aria-hidden="true"></i>en vivo</span>
+              <span class="tag quiet">8 líneas</span>
+            </div>
+            <ul class="outbody">
+              <li>npm  fetch   pi-web-access@2.3.1</li>
+              <li class="warn">npm  warn  deprecated node-domexception@1.0.0</li>
+              <li>npm  added  24 packages in 6s</li>
+              <li>pi   registering npm:pi-web-access</li>
+              <li>pi   extension pi-web-access loaded</li>
+              <li>pi   tools: web_fetch, web_search</li>
+              <li class="ok">done npm:pi-web-access 2.3.1</li>
+              <li>listo para usar en la próxima sesión</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div></div>
+  <p class="figcap"><b>El campo de instalación es una fila más, no un formulario:</b> un input de 34 y un botón de acento, con el <code>.dlg input</code> de siempre. La lista de instalados es una fila por paquete —nombre en monoespaciado, versión y <b>Quitar</b> a la derecha—, y los recomendados son tres píldoras para no repetir la lista entera. La caja de salida es lo único nuevo: cabecera con el paquete y un punto que late, y <b>ocho líneas</b> monoespaciadas con la cola del comando. No es una tarjeta de ajustes: es la familia de <code>.md pre</code> (superficie <code>--surface2</code>, borde de 1, radio 10) y por eso no cuenta como tarjeta en S2.</p>
+</section>
+
+<!-- 3 · LA VENTANA MÍNIMA -->
+<section class="sheet">
+  <p class="cap">00c · la ventana mínima, 800 × 560 — Paquetes es la página más larga: el riel de 10 cabe y la salida sigue mostrando sus 8 líneas</p>
+  <div class="wrap"><div class="frame small">
+    <div class="app"><div class="main">
+      <header class="mh"><h2>Ajustes: tres direcciones</h2></header>
+      <div class="thread"><div class="tin">
+        <p class="msg-u">¿Y en la ventana pequeña?</p>
+        <p class="msg-a">El riel de diez entra; la salida se queda con sus ocho líneas.</p>
+      </div></div>
+      <div class="dock"><div class="composer">Pide algo…</div></div>
+    </div></div>
+    <div class="ovl"></div>
+    <div class="dlg sm" role="dialog" aria-modal="true" aria-label="Ajustes">
+      <div class="dtrow"><h2 class="dt">Ajustes</h2><span class="grow"></span>
+        <button class="ic" type="button" aria-label="Cerrar"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+      </div>
+      <div class="body">
+        <div class="side2">
+          <div class="find"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+            <input type="search" placeholder="Buscar un ajuste…" aria-label="Buscar un ajuste"></div>
+          <div class="rail" role="tablist" aria-orientation="vertical" aria-label="Secciones de ajustes">
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><span>General</span></button>
+            <button type="button" role="tab" aria-selected="true"><span>Paquetes</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><span>Apariencia</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><span>Home del shell</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><span>Actualizaciones</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><span>Cuenta</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><span>Uso</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><span>Idioma</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><span>Notificaciones</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><span>Acerca de</span></button>
+          </div>
+        </div>
+        <div class="pane">
+          <h3>Paquetes</h3>
+          <p class="hint">Lo que esta app tiene instalado, y lo que recomienda.</p>
+          <div class="install">
+            <input type="text" placeholder="npm:paquete" aria-label="Paquete a instalar">
+            <button class="btn accent" type="button">Instalar</button>
+          </div>
+          <div class="ghead">
+            <p class="glabel">Instalados</p>
+            <span class="grow"></span>
+            <span class="checked">3 paquetes</span>
+          </div>
+          <ul class="prows">
+            <li class="prow"><span class="pname">npm:gentle-engram</span><span class="pver">0.9.4</span><button class="btn" type="button">Quitar</button></li>
+            <li class="prow"><span class="pname">npm:pi-claude-bridge</span><span class="pver">1.2.0</span><button class="btn" type="button">Quitar</button></li>
+            <li class="prow"><span class="pname">npm:pi-web-access</span><span class="pver">2.3.1</span><button class="btn" type="button">Quitar</button></li>
+          </ul>
+          <div class="outbox">
+            <div class="outhead">
+              <span class="oname">npm:pi-web-access</span>
+              <span class="grow"></span>
+              <span class="live"><i aria-hidden="true"></i>en vivo</span>
+            </div>
+            <ul class="outbody">
+              <li>npm  fetch   pi-web-access@2.3.1</li>
+              <li class="warn">npm  warn  deprecated node-domexception@1.0.0</li>
+              <li>npm  added  24 packages in 6s</li>
+              <li>pi   registering npm:pi-web-access</li>
+              <li>pi   extension pi-web-access loaded</li>
+              <li>pi   tools: web_fetch, web_search</li>
+              <li class="ok">done npm:pi-web-access 2.3.1</li>
+              <li>listo para usar en la próxima sesión</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div></div>
+  <p class="figcap"><b>A 800 × 560 el riel de diez entra sin scroll (350 de 388) y la página de Paquetes pide scroll:</b> se ve el campo de instalación, la lista de instalados y la cabecera de la salida con sus primeras líneas; los recomendados y la cola del comando quedan por debajo del corte. La caja de salida conserva sus ocho líneas en el DOM y su punto late igual; el ancho de la columna baja a 487 y las filas de paquetes rehacen su <b>Quitar</b> a la derecha con 10 de hueco. Nada de esto es una decisión nueva: es la misma tarjeta de 744 × 504 de la dirección A.</p>
+</section>
+
+<section class="head" style="margin-top:0">
+  <div class="notes">
+    <section>
+      <h4>Lo que el marco absorbió sin cambiar</h4>
+      <p><b>El riel</b>: dos entradas más, el mismo patrón de tablist (una parada de tabulación, flechas, Inicio/Fin). Diez entradas de 34 + 9 huecos de 2 = 358, más el buscador de 32 y su hueco de 14: <b>404 de 544</b>.</p>
+      <p><b>La anatomía de sección</b>: título, pista, etiqueta de grupo en versalitas y filas con hairline. Ni una tarjeta nueva.</p>
+      <p><b>El vocabulario de estado</b>: <code>.tag</code> con sus cuatro tonos, la línea de hora en monoespaciado <code>--faint</code>, y los botones <code>.btn</code> / <code>.btn.accent</code>.</p>
+      <p><b>El buscador</b>: las dos páginas nuevas necesitan sus palabras clave en <code>sections.ts</code> (entorno, sonda, node, git, npm, paquete, instalar, quitar…).</p>
+    </section>
+    <section>
+      <h4>Lo único nuevo</h4>
+      <p><span class="new">nuevo</span><b>La salida en vivo</b> (<code>.outbox</code>): cabecera de 12 px con el paquete y un punto de acento que late, cuerpo monoespaciado de 12 a 1.7 de interlínea con las últimas 8 líneas, y el aviso de npm en <code>--warning</code> y el final en <code>--success</code>. Es la familia de <code>.md pre</code>, no una tarjeta.</p>
+      <p><span class="new">nuevo</span><b>La fila de entorno</b> (<code>.envrow</code>): nombre, versión, etiqueta y una pista a todo el ancho. Cuatro declaraciones, el ritmo de <code>.urow</code>.</p>
+      <p><span class="new">nuevo</span><b>La píldora de recomendado</b>: nombre y botón, con el radio 8 y el borde de la casa.</p>
+      <p>La ventana mínima: <code>prefers-reduced-motion</code> detiene el punto de la salida igual que detiene el spinner de la tarjeta de herramientas.</p>
+    </section>
+    <section>
+      <h4>Decisiones para el mantenedor</h4>
+      <table>
+        <thead><tr><th>decisión</th><th>español / inglés</th></tr></thead>
+        <tbody>
+          <tr><td>¿La app abre en General?</td><td>Hoy abre en Apariencia; con una sonda de entorno delante, General es la primera entrada.</td></tr>
+          <tr><td>Estado «instalado»</td><td>Instalado / Installed · No encontrado / Not found</td></tr>
+          <tr><td>Falta la pieza</td><td>Instala git, ábrelo una vez… / Install git, run it once…</td></tr>
+          <tr><td>Instalar y Quitar</td><td>Instalar / Install · Quitar / Remove</td></tr>
+          <tr><td>La cola</td><td>en vivo / live · «8 líneas» no se escribe: se cuenta.</td></tr>
+        </tbody>
+      </table>
+      <p>Las versiones de esta hoja (4.8.0, 1.5.2, 22.11.0, 0.9.4, 1.2.0, 2.3.1) son <b>de ejemplo</b>, como en el resto de las hojas: el dibujo es una prueba de forma, no un dato.</p>
+    </section>
+  </div>
+</section>
+
+</main>
+</body></html>

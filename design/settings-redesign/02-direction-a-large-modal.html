@@ -1,0 +1,577 @@
+<!doctype html>
+<html lang="es" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=1400">
+<title>Ajustes — A · la ventana amplia (modal plano de 1180×660)</title>
+<style>
+/* ── TOKENS. Copia literal de apps/desktop/src/theme.css (los seis bloques), que
+   es la única fuente de color de esta hoja: ninguna regla de más abajo escribe
+   un hex. ─────────────────────────────────────────────────────────────────── */
+:root,[data-theme='dark']{--bg:#0e1116;--surface:#151a21;--surface2:#1c222b;--border:#2b333d;--text:#e4e8ee;--muted:#9aa4b2;--faint:#7d8593;--accent:#7aa2f7;--tint:rgba(122,162,247,.14);--success:#7edc9a;--warning:#e7b455;--danger:#ff8585;--shadow:0 8px 24px rgba(0,0,0,.45);--row-h:34px}
+[data-theme='light']{--bg:#f2f4f7;--surface:#ffffff;--surface2:#e9edf2;--border:#cfd5dd;--text:#17202a;--muted:#576272;--faint:#6b7686;--accent:#2e5bd7;--tint:rgba(46,91,215,.1);--success:#166e38;--warning:#8a5800;--danger:#c22f37;--shadow:0 8px 24px rgba(23,32,42,.18);--row-h:34px}
+[data-theme='Gentle']{--bg:#06080f;--surface:#06080f;--surface2:#0d0f14;--border:#313342;--text:#f3f6f9;--muted:#8394a3;--faint:#96a2b0;--accent:#7fb4ca;--tint:#161d2e;--success:#b7cc85;--warning:#deba87;--danger:#cb7c94;--shadow:0 8px 24px rgba(0,0,0,.6);--row-h:34px}
+[data-theme='Gentleman-Cute']{--bg:#060407;--surface:#100a0f;--surface2:#100a0f;--border:#563040;--text:#f6eff3;--muted:#a78e9b;--faint:#d7a0b8;--accent:#f095c8;--tint:#2a1523;--success:#b4e7c7;--warning:#f2b86d;--danger:#ff718f;--shadow:0 8px 24px rgba(0,0,0,.6);--row-h:34px}
+[data-theme='Gentleman-Sexy']{--bg:#060407;--surface:#100a0f;--surface2:#100a0f;--border:#563040;--text:#f6eff3;--muted:#a78e9b;--faint:#d7a0b8;--accent:#f43888;--tint:#2e0f1f;--success:#d2cbd0;--warning:#f2b86d;--danger:#ff718f;--shadow:0 8px 24px rgba(0,0,0,.6);--row-h:34px}
+@media (prefers-color-scheme:light){[data-theme='system']{--bg:#f2f4f7;--surface:#ffffff;--surface2:#e9edf2;--border:#cfd5dd;--text:#17202a;--muted:#576272;--faint:#6b7686;--accent:#2e5bd7;--tint:rgba(46,91,215,.1);--success:#166e38;--warning:#8a5800;--danger:#c22f37;--shadow:0 8px 24px rgba(23,32,42,.18);--row-h:34px}}
+[data-theme='dark'],[data-theme='Gentle'],[data-theme='Gentleman-Cute'],[data-theme='Gentleman-Sexy']{color-scheme:dark}
+[data-theme='light']{color-scheme:light}
+
+/* ── la hoja ──────────────────────────────────────────────────────────────── */
+*{box-sizing:border-box}
+h1,h2,h3,p,ul,li{margin:0}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.page{width:1400px;padding:30px 0 64px}
+.head{width:1280px;margin:0 auto 26px}
+.kicker{margin:0 0 10px;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--faint)}
+h1{margin:0 0 12px;font-size:23px;font-weight:600;line-height:1.25}
+.lede{margin:0 0 12px;max-width:820px;color:var(--muted);font-size:13.5px;line-height:1.65}
+.lede b{color:var(--text);font-weight:600}
+.tradeoff{margin:0 0 22px;max-width:900px;padding-left:14px;border-left:2px solid var(--accent);color:var(--text);font-size:13px;line-height:1.6}
+.tradeoff b{color:var(--accent);font-weight:600}
+h1 code,p code,li code,dd code,td code{font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:12px;background:var(--surface2);border-radius:4px;padding:1px 5px}
+.metrics{width:100%;border-collapse:collapse;font-size:12.5px}
+.metrics th{text-align:left;font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);padding:0 10px 6px 0;border-bottom:1px solid var(--border)}
+.metrics td{padding:6px 10px 6px 0;border-bottom:1px dashed var(--border);vertical-align:top;color:var(--muted)}
+.metrics td:first-child{color:var(--text);font-weight:600;white-space:nowrap}
+.metrics td b{color:var(--text);font-weight:600}
+.metrics .now{color:var(--faint)}
+.wrap{display:flex;justify-content:center}
+.sheet{margin:0 0 30px}
+.sheet>.cap{width:1280px;margin:0 auto 10px;color:var(--faint);font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase}
+.sheet>.cap b{color:var(--muted)}
+.figcap{width:1280px;margin:12px auto 0;color:var(--muted);font-size:12.5px;line-height:1.6}
+.figcap b{color:var(--text);font-weight:600}
+
+/* ── la ventana de la app, a tamaño real ──────────────────────────────────── */
+.frame{position:relative;width:1280px;height:820px;background:var(--bg);border:1px solid var(--border);border-radius:12px;overflow:hidden;box-shadow:var(--shadow)}
+.app{display:grid;grid-template-columns:280px minmax(0,1fr);height:100%}
+.side{display:flex;flex-direction:column;gap:10px;padding:12px 10px 8px;background:var(--surface);border-right:1px solid var(--border)}
+.wm{padding:2px 6px 12px;font-size:12px;font-weight:600;letter-spacing:.22em;color:var(--accent)}
+.neww{display:flex;align-items:center;justify-content:center;height:38px;border:1px solid var(--border);border-radius:10px;background:var(--surface2);font-size:13px;font-weight:600}
+.gh{padding:10px 10px 2px;color:var(--muted);font-size:12px;font-weight:600;letter-spacing:.02em}
+.row{display:flex;align-items:center;gap:8px;height:var(--row-h);padding:0 10px;border-radius:8px;font-size:13px}
+.row.chat{padding-left:42px;color:var(--muted)}
+.row[aria-selected='true']{background:var(--tint);color:var(--text)}
+.row span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.foot{display:flex;align-items:center;gap:8px;margin-top:auto;padding-top:8px;border-top:1px solid var(--border);color:var(--faint);font-size:12px}
+.main{display:flex;flex-direction:column;min-height:0;background:var(--bg)}
+.mh{display:flex;align-items:center;gap:8px;height:52px;padding:0 20px;border-bottom:1px solid var(--border)}
+.mh h2{font-size:15px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mh .grow{flex:1}
+.tabsfake{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;font-size:12.5px;color:var(--muted)}
+.tabsfake span{padding:4px 11px}
+.tabsfake span:first-child{background:var(--tint);color:var(--accent);font-weight:600}
+.thread{padding:28px 24px 12px}
+.tin{max-width:880px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+.msg-u{align-self:flex-end;max-width:78%;padding:8px 14px;border-radius:14px 14px 4px 14px;background:var(--tint)}
+.msg-a{padding:0 4px;color:var(--muted);font-size:13.5px}
+.dock{padding:0 24px 20px}
+.composer{max-width:880px;margin:0 auto;border:1px solid var(--border);border-radius:18px;background:var(--surface);padding:12px 14px 12px 16px;color:var(--faint)}
+.ovl{position:absolute;inset:0;background:rgba(0,0,0,.5)}
+
+/* ── A · la tarjeta: 1180 × 660, riel de 216 y columna de lectura de 760 ──── */
+.dlg{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;gap:20px;width:1180px;height:660px;padding:28px;background:var(--surface);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow)}
+.dtrow{display:flex;align-items:center;gap:12px;height:40px}
+.dt{font-size:16px;font-weight:600}
+.dtrow .grow{flex:1}
+.ic{position:relative;width:32px;height:32px;display:inline-grid;place-items:center;flex:none;border:0;padding:0;border-radius:8px;background:transparent;color:var(--muted);cursor:pointer;transition:background-color 120ms ease,color 120ms ease}
+.ic:hover{background:var(--surface2);color:var(--text);box-shadow:inset 0 0 0 1px var(--border)}
+.ic svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.body{display:flex;gap:40px;min-height:0;flex:1}
+.side2{flex:none;width:216px;display:flex;flex-direction:column;gap:14px;padding-right:24px;border-right:1px solid var(--border)}
+.find{display:flex;align-items:center;gap:8px;height:32px;padding:0 9px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--faint)}
+.find:focus-within{border-color:var(--accent);outline:1px solid var(--accent);outline-offset:-1px}
+.find svg{flex:none;width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.find input{flex:1;min-width:0;padding:0;border:0;background:transparent;color:var(--text);font:inherit;font-size:12.5px;outline:none}
+.find input::placeholder{color:var(--faint)}
+.rail{display:flex;flex-direction:column;gap:2px}
+.rail [role='tab']{display:flex;align-items:center;gap:9px;height:34px;padding:0 10px;border:0;border-radius:8px;background:transparent;color:var(--muted);font:inherit;font-size:13px;text-align:left;cursor:pointer;transition:background-color 120ms ease,color 120ms ease}
+.rail [role='tab'] svg{flex:none;width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.rail [role='tab']:hover{background:var(--surface2);color:var(--text)}
+.rail [role='tab'][aria-selected='true']{background:var(--tint);color:var(--accent)}
+.rail [role='tab']:focus-visible{outline:1px solid var(--accent);outline-offset:-1px}
+.pane{flex:1;min-width:0;max-width:760px;overflow:hidden;display:flex;flex-direction:column;align-items:flex-start}
+.pane h3{margin:0 0 4px;font-size:15px;font-weight:600;line-height:1.5}
+.hint{margin:0 0 18px;color:var(--muted);font-size:12px;line-height:1.5}
+.glabel{margin:0;color:var(--faint);font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase}
+
+/* ── A · Apariencia: seis previsualizaciones, UNA caja por tema ───────────── */
+.tgroup{display:flex;flex-direction:column;gap:10px;width:100%;margin-top:20px}
+.tglabel{margin:0;color:var(--faint);font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase}
+.trows{display:flex;flex-direction:column;gap:10px}
+.trow{display:grid;grid-template-columns:176px minmax(0,1fr) 16px;align-items:center;gap:18px;height:64px;padding:0 16px;border:1px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);font:inherit;text-align:left;cursor:pointer;transition:border-color 120ms ease}
+.trow:hover{border-color:var(--accent)}
+.trow[aria-pressed='true']{box-shadow:0 0 0 1px var(--accent)}
+.trow:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.tname{font-size:13px;font-weight:600}
+.trow[aria-pressed='true'] .tname{font-weight:600}
+.tshot{display:flex;flex-direction:column;gap:5px;min-width:0;font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:11px;line-height:1.35;white-space:nowrap;overflow:hidden}
+.tline{display:flex;align-items:baseline;gap:6px;overflow:hidden}
+.tprompt{color:var(--accent)}
+.tt{color:var(--text)}
+.tok{color:var(--success)}
+.tpath{color:var(--muted);overflow:hidden;text-overflow:ellipsis}
+.tdots{display:flex;gap:5px}
+.tdot{width:7px;height:7px;border-radius:50%;background:var(--dot)}
+.tcheck{width:16px;height:16px;fill:none;stroke:var(--accent);stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+
+/* ── A · Actualizaciones: tres filas, ni una tarjeta ─────────────────────── */
+.tag{display:inline-block;font-size:11px;font-weight:600;padding:3px 8px;border-radius:999px;border:1px solid currentColor;white-space:nowrap}
+.tag.ok{color:var(--success)}
+.tag.warn{color:var(--warning)}
+.tag.quiet{color:var(--muted)}
+.tag.bad{color:var(--danger)}
+.btn{border:1px solid var(--border);background:var(--surface2);color:var(--text);border-radius:8px;padding:6px 14px;font-size:13px;white-space:nowrap;cursor:pointer;transition:border-color 120ms ease,background-color 120ms ease}
+.btn:hover{border-color:var(--accent)}
+.btn.accent{border-color:var(--accent);background:var(--accent);color:var(--bg);font-weight:600}
+.btn.accent:hover{filter:brightness(1.08)}
+.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.uhead{display:flex;align-items:center;gap:14px;width:100%;padding-bottom:14px}
+.ucheck{color:var(--faint);font-size:12px;font-family:ui-monospace,'Cascadia Code',Consolas,monospace}
+.uhead .grow{flex:1}
+.ulist{list-style:none;width:100%;padding:0;border-bottom:1px solid var(--border)}
+.uitem{display:grid;grid-template-columns:150px minmax(0,1fr) auto;align-items:center;gap:4px 18px;padding:14px 0;border-top:1px solid var(--border)}
+.uitem .uname{font-size:13px;font-weight:600}
+.uitem .uver{font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:12px;color:var(--muted)}
+.uitem .uactions{display:flex;gap:8px;justify-content:flex-end}
+.uitem .ureason{grid-column:2 / -1;color:var(--faint);font-size:12px;line-height:1.5}
+.note{margin:14px 0 0;color:var(--faint);font-size:12px;font-style:italic;line-height:1.5}
+.ext{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:24px;width:100%;margin-top:22px;padding-top:20px;border-top:1px solid var(--border)}
+.ext .etext{margin:8px 0 0;max-width:560px;color:var(--muted);font-size:12.5px;line-height:1.6}
+
+/* ── A · Cuenta: la lista a la izquierda, el traspaso a la terminal a la
+   derecha, separados por una hairline vertical ───────────────────────────── */
+.cuenta{display:grid;grid-template-columns:minmax(0,1fr) 288px;gap:0;width:100%;margin-top:20px}
+.clist{padding-right:32px}
+.chand{padding-left:28px;border-left:1px solid var(--border);display:flex;flex-direction:column;align-items:flex-start;gap:12px}
+.crows{list-style:none;width:100%;padding:0;margin:10px 0 0}
+.crow{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;padding:14px 0;border-top:1px solid var(--border)}
+.crow .cname{font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:12.5px;color:var(--text);min-width:120px}
+.crow .creason{flex-basis:100%;color:var(--faint);font-size:12px}
+.ctext{margin:0;color:var(--muted);font-size:12.5px;line-height:1.6}
+.chand .btn{width:100%}
+
+/* ── A a la ventana mínima: 800 × 560 (la tarjeta queda en 744 × 504) ─────── */
+.frame.small{width:800px;height:560px}
+.frame.small .app{grid-template-columns:minmax(0,1fr)}
+.frame.small .main{grid-column:1}
+.frame.small .mh{padding:0 12px;height:48px}
+.frame.small .thread{padding:18px 16px 8px}
+.frame.small .tin{max-width:none}
+.frame.small .dock{padding:0 16px 14px}
+.frame.small .composer{max-width:none}
+.dlg.sm{width:744px;height:504px}
+.dlg.sm .side2{width:176px;gap:10px;padding-right:14px}
+.dlg.sm .find{height:28px}
+.dlg.sm .rail [role='tab']{height:30px;font-size:12.5px}
+.dlg.sm .pane{max-width:none}
+.dlg.sm .uitem{grid-template-columns:128px minmax(0,1fr);gap:4px 12px}
+.dlg.sm .uitem .uactions{grid-column:1 / -1;justify-content:flex-start;margin-top:6px}
+.dlg.sm .uhead{flex-wrap:wrap;gap:8px 12px}
+.dlg.sm .ext{grid-template-columns:minmax(0,1fr);gap:12px}
+.dlg.sm .trow{grid-template-columns:150px minmax(0,1fr) 16px;gap:12px}
+
+/* ── la prueba de los seis temas: la misma fila, seis veces ──────────────── */
+.strip{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:16px;width:1280px;margin:0 auto}
+.tcell{padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--surface)}
+.tcell .sk{margin:0 0 10px;color:var(--faint);font-size:10.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase}
+.tcell .srow{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface2)}
+.tcell .sn{font-size:12.5px;font-weight:600}
+.tcell .sv{font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:11px;color:var(--muted);flex:1}
+.tcell .btn{padding:3px 9px;font-size:11.5px;border-radius:7px}
+.tcell .tag{margin-top:10px}
+
+/* ── notas ───────────────────────────────────────────────────────────────── */
+.notes{width:1280px;margin:0 auto;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px}
+.notes section{border-top:1px solid var(--border);padding-top:14px}
+.notes h4{margin:0 0 8px;color:var(--faint);font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase}
+.notes p{margin:0 0 9px;color:var(--muted);font-size:12.5px;line-height:1.6}
+.notes p:last-child{margin-bottom:0}
+.notes b{color:var(--text);font-weight:600}
+.notes .new{display:inline-block;margin-right:6px;padding:1px 6px;border:1px solid var(--warning);border-radius:999px;color:var(--warning);font-size:10.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase}
+.notes ol{margin:0;padding-left:18px;color:var(--muted);font-size:12.5px;line-height:1.6}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style></head>
+<body>
+<main class="page">
+
+<header class="head">
+  <p class="kicker">A · la ventana amplia</p>
+  <h1>Ajustes como un modal grande y plano: <span style="color:var(--accent)">1180 × 660</span> en la ventana de 1280 × 820</h1>
+  <p class="lede">Sigue siendo el diálogo de siempre —se abre sobre el chat, Escape y el fondo no cierran, el foco entra en el riel— pero deja de ser pequeño: usa <b>el 92 % del ancho de la ventana</b> y <b>el 80 % de su alto</b>, cambia el riel de 184 por uno de 216 con entradas de 34, y la columna de lectura pasa de 432 a <b>760</b>. La agrupación deja de ser tarjeta dentro de tarjeta: títulos, etiquetas y <b>hairlines</b>. Las únicas cajas que quedan son las seis previsualizaciones de tema, que son la unidad que S2 autoriza.</p>
+  <p class="tradeoff"><b>Optimiza</b> el cambio más grande por la obra más pequeña: nada de la app se mueve, el diálogo solo aprende a ocupar la ventana. <b>Cuesta</b> que una sección a la vez deja aire en las cortas —Actualizaciones y Cuenta lo enseñan— y que en la ventana mínima la columna baja a 487.</p>
+  <table class="metrics">
+    <thead><tr><th>medida</th><th>hoy</th><th>A · ventana 1280 × 820</th><th>A · ventana mínima 800 × 560</th></tr></thead>
+    <tbody>
+      <tr><td>tarjeta</td><td class="now">680 × ~400</td><td><b>1180 × 660</b> (92 % × 80 %)</td><td><b>744 × 504</b> (93 % × 90 %)</td></tr>
+      <tr><td>riel</td><td class="now">184</td><td><b>216</b>, entradas de 34</td><td><b>176</b>, entradas de 30</td></tr>
+      <tr><td>columna de lectura</td><td class="now">432</td><td><b>760</b></td><td><b>487</b></td></tr>
+      <tr><td>alto del cuerpo</td><td class="now">312 (lo fija el riel)</td><td><b>544</b></td><td><b>388</b></td></tr>
+      <tr><td>cajas dentro del cuerpo</td><td class="now">9 tarjetas · 15 cajas contando las anidadas</td><td><b>6</b> (solo las previsualizaciones de tema)</td><td><b>6</b></td></tr>
+    </tbody>
+  </table>
+</header>
+
+<!-- 1 · APARIENCIA -->
+<section class="sheet">
+  <p class="cap">A1 · Apariencia — las seis previsualizaciones, cada una con su propio color, y la etiqueta «Tema» que hoy no se dibuja</p>
+  <div class="wrap"><div class="frame">
+    <div class="app">
+      <aside class="side" aria-hidden="true">
+        <div class="wm">GENTLE SHELL</div>
+        <div class="neww">Nueva sesión</div>
+        <p class="gh">Espacios</p>
+        <div class="row"><span>gentle-desk</span></div>
+        <div class="row chat"><span>Ajustes: tres direcciones</span></div>
+        <div class="row chat"><span>Notas de la 0.8.1</span></div>
+        <div class="row chat"><span>Ficha del compositor</span></div>
+        <div class="foot"><span>⚙</span><span>Vista previa</span></div>
+      </aside>
+      <div class="main">
+        <header class="mh"><h2>Ajustes: tres direcciones</h2><span class="grow"></span><span class="tabsfake"><span>Chat</span><span>Helpers</span></span></header>
+        <div class="thread"><div class="tin">
+          <p class="msg-u">¿Puedes enseñarme tres direcciones para Ajustes, con las mismas tres pantallas?</p>
+          <p class="msg-a">Sí: una ventana amplia, una página entera y una hoja que se abre desde el buscador. Las tres llevan las mismas palabras y el mismo orden de teclado.</p>
+        </div></div>
+        <div class="dock"><div class="composer">Pide algo…</div></div>
+      </div>
+    </div>
+    <div class="ovl"></div>
+
+    <div class="dlg" role="dialog" aria-modal="true" aria-labelledby="a1t">
+      <div class="dtrow"><h2 class="dt" id="a1t">Ajustes</h2><span class="grow"></span>
+        <button class="ic" type="button" aria-label="Cerrar"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+      </div>
+      <div class="body">
+        <div class="side2">
+          <div class="find"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+            <input type="search" placeholder="Buscar un ajuste…" aria-label="Buscar un ajuste"></div>
+          <div class="rail" role="tablist" aria-orientation="vertical" aria-label="Secciones de ajustes">
+            <button type="button" role="tab" id="a-t1" aria-controls="a-p1" aria-selected="true"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10"/><path d="M12 18a6 6 0 0 0 0-12v12z"/></svg><span>Apariencia</span></button>
+            <button type="button" role="tab" aria-controls="a-p1" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span>Home del shell</span></button>
+            <button type="button" role="tab" aria-controls="a-p1" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg><span>Actualizaciones</span></button>
+            <button type="button" role="tab" aria-controls="a-p1" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg><span>Cuenta</span></button>
+            <button type="button" role="tab" aria-controls="a-p1" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg><span>Uso</span></button>
+            <button type="button" role="tab" aria-controls="a-p1" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/></svg><span>Idioma</span></button>
+            <button type="button" role="tab" aria-controls="a-p1" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/><path d="M10.268 21a2 2 0 0 0 3.464 0"/></svg><span>Notificaciones</span></button>
+            <button type="button" role="tab" aria-controls="a-p1" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg><span>Acerca de</span></button>
+          </div>
+        </div>
+        <div class="pane" role="tabpanel" id="a-p1" aria-labelledby="a-t1">
+          <h3>Apariencia</h3>
+          <p class="hint">El aspecto de esta ventana.</p>
+          <div class="tgroup" role="group" aria-label="Tema">
+            <p class="tglabel">Tema</p>
+            <div class="trows">
+              <button class="trow" type="button" aria-pressed="false" data-theme="system">
+                <span class="tname">Sistema</span>
+                <span class="tshot" aria-hidden="true"><span class="tline"><span class="tprompt">❯</span><span class="tt">Aa</span><span class="tok">ok</span><span class="tpath">~/src/gentle-desk</span></span><span class="tdots"><i class="tdot" style="--dot:var(--danger)"></i><i class="tdot" style="--dot:var(--warning)"></i><i class="tdot" style="--dot:var(--success)"></i><i class="tdot" style="--dot:var(--accent)"></i><i class="tdot" style="--dot:var(--muted)"></i><i class="tdot" style="--dot:var(--faint)"></i><i class="tdot" style="--dot:var(--text)"></i></span></span>
+                <span></span>
+              </button>
+              <button class="trow" type="button" aria-pressed="true" data-theme="dark">
+                <span class="tname">Oscuro</span>
+                <span class="tshot" aria-hidden="true"><span class="tline"><span class="tprompt">❯</span><span class="tt">Aa</span><span class="tok">ok</span><span class="tpath">~/src/gentle-desk</span></span><span class="tdots"><i class="tdot" style="--dot:var(--danger)"></i><i class="tdot" style="--dot:var(--warning)"></i><i class="tdot" style="--dot:var(--success)"></i><i class="tdot" style="--dot:var(--accent)"></i><i class="tdot" style="--dot:var(--muted)"></i><i class="tdot" style="--dot:var(--faint)"></i><i class="tdot" style="--dot:var(--text)"></i></span></span>
+                <svg class="tcheck" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 6 9 17l-5-5"/></svg>
+              </button>
+              <button class="trow" type="button" aria-pressed="false" data-theme="Gentle">
+                <span class="tname">Gentle</span>
+                <span class="tshot" aria-hidden="true"><span class="tline"><span class="tprompt">❯</span><span class="tt">Aa</span><span class="tok">ok</span><span class="tpath">~/src/gentle-desk</span></span><span class="tdots"><i class="tdot" style="--dot:var(--danger)"></i><i class="tdot" style="--dot:var(--warning)"></i><i class="tdot" style="--dot:var(--success)"></i><i class="tdot" style="--dot:var(--accent)"></i><i class="tdot" style="--dot:var(--muted)"></i><i class="tdot" style="--dot:var(--faint)"></i><i class="tdot" style="--dot:var(--text)"></i></span></span>
+                <span></span>
+              </button>
+              <button class="trow" type="button" aria-pressed="false" data-theme="Gentleman-Cute">
+                <span class="tname">Gentleman-Cute</span>
+                <span class="tshot" aria-hidden="true"><span class="tline"><span class="tprompt">❯</span><span class="tt">Aa</span><span class="tok">ok</span><span class="tpath">~/src/gentle-desk</span></span><span class="tdots"><i class="tdot" style="--dot:var(--danger)"></i><i class="tdot" style="--dot:var(--warning)"></i><i class="tdot" style="--dot:var(--success)"></i><i class="tdot" style="--dot:var(--accent)"></i><i class="tdot" style="--dot:var(--muted)"></i><i class="tdot" style="--dot:var(--faint)"></i><i class="tdot" style="--dot:var(--text)"></i></span></span>
+                <span></span>
+              </button>
+              <button class="trow" type="button" aria-pressed="false" data-theme="Gentleman-Sexy">
+                <span class="tname">Gentleman-Sexy</span>
+                <span class="tshot" aria-hidden="true"><span class="tline"><span class="tprompt">❯</span><span class="tt">Aa</span><span class="tok">ok</span><span class="tpath">~/src/gentle-desk</span></span><span class="tdots"><i class="tdot" style="--dot:var(--danger)"></i><i class="tdot" style="--dot:var(--warning)"></i><i class="tdot" style="--dot:var(--success)"></i><i class="tdot" style="--dot:var(--accent)"></i><i class="tdot" style="--dot:var(--muted)"></i><i class="tdot" style="--dot:var(--faint)"></i><i class="tdot" style="--dot:var(--text)"></i></span></span>
+                <span></span>
+              </button>
+              <button class="trow" type="button" aria-pressed="false" data-theme="light">
+                <span class="tname">Claro</span>
+                <span class="tshot" aria-hidden="true"><span class="tline"><span class="tprompt">❯</span><span class="tt">Aa</span><span class="tok">ok</span><span class="tpath">~/src/gentle-desk</span></span><span class="tdots"><i class="tdot" style="--dot:var(--danger)"></i><i class="tdot" style="--dot:var(--warning)"></i><i class="tdot" style="--dot:var(--success)"></i><i class="tdot" style="--dot:var(--accent)"></i><i class="tdot" style="--dot:var(--muted)"></i><i class="tdot" style="--dot:var(--faint)"></i><i class="tdot" style="--dot:var(--text)"></i></span></span>
+                <span></span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div></div>
+  <p class="figcap"><b>Cada fila es su tema, y es una sola caja.</b> La fila lleva el <code>data-theme</code>, así que su fondo, su borde, su texto, el acento del <code>❯</code>, el «ok» y los siete puntos son los tokens de ese tema —la misma idea que ya usa <code>ThemeCards.svelte</code>, sin el marco interior que hoy mete dos cajas por tema—. La elegida lleva el anillo en el acento de la <b>ventana</b> (la selección es de la app, no del tema) y el check en el acento del tema. La etiqueta <b>Tema</b> existe ya en los dos diccionarios (<code>copy.themeGroup</code>) y hoy no se dibuja: es el hallazgo 07 de la auditoría.</p>
+</section>
+
+<!-- 2 · ACTUALIZACIONES -->
+<section class="sheet">
+  <p class="cap">A2 · Actualizaciones — las tres filas con su acción, la omitida, cuándo se comprobó y el bloque de extensiones, sin una sola tarjeta</p>
+  <div class="wrap"><div class="frame">
+    <div class="app">
+      <aside class="side" aria-hidden="true">
+        <div class="wm">GENTLE SHELL</div>
+        <div class="neww">Nueva sesión</div>
+        <p class="gh">Espacios</p>
+        <div class="row"><span>gentle-desk</span></div>
+        <div class="row chat"><span>Ajustes: tres direcciones</span></div>
+        <div class="row chat"><span>Notas de la 0.8.1</span></div>
+        <div class="foot"><span>⚙</span><span>Vista previa</span></div>
+      </aside>
+      <div class="main">
+        <header class="mh"><h2>Ajustes: tres direcciones</h2><span class="grow"></span><span class="tabsfake"><span>Chat</span><span>Helpers</span></span></header>
+        <div class="thread"><div class="tin">
+          <p class="msg-u">¿Puedes enseñarme tres direcciones para Ajustes, con las mismas tres pantallas?</p>
+          <p class="msg-a">Sí: una ventana amplia, una página entera y una hoja que se abre desde el buscador.</p>
+        </div></div>
+        <div class="dock"><div class="composer">Pide algo…</div></div>
+      </div>
+    </div>
+    <div class="ovl"></div>
+
+    <div class="dlg" role="dialog" aria-modal="true" aria-label="Ajustes">
+      <div class="dtrow"><h2 class="dt">Ajustes</h2><span class="grow"></span>
+        <button class="ic" type="button" aria-label="Cerrar"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+      </div>
+      <div class="body">
+        <div class="side2">
+          <div class="find"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+            <input type="search" placeholder="Buscar un ajuste…" aria-label="Buscar un ajuste"></div>
+          <div class="rail" role="tablist" aria-orientation="vertical" aria-label="Secciones de ajustes">
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10"/><path d="M12 18a6 6 0 0 0 0-12v12z"/></svg><span>Apariencia</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span>Home del shell</span></button>
+            <button type="button" role="tab" id="a-t2" aria-controls="a-p2" aria-selected="true"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg><span>Actualizaciones</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg><span>Cuenta</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg><span>Uso</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/></svg><span>Idioma</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/><path d="M10.268 21a2 2 0 0 0 3.464 0"/></svg><span>Notificaciones</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg><span>Acerca de</span></button>
+          </div>
+        </div>
+
+        <div class="pane" role="tabpanel" id="a-p2" aria-labelledby="a-t2">
+          <h3>Actualizaciones</h3>
+          <p class="hint">Lo que corre en esta máquina y si hay algo más nuevo.</p>
+          <div class="uhead">
+            <span class="tag warn">Actualización disponible</span>
+            <span class="ucheck">Última comprobación: hace 3 min</span>
+            <span class="grow"></span>
+            <button class="btn" type="button">Comprobar de nuevo</button>
+          </div>
+          <ul class="ulist">
+            <li class="uitem">
+              <span class="uname">Esta app</span>
+              <span class="uver">0.8.1 → 0.9.0</span>
+              <span class="uactions"></span>
+              <p class="ureason">Esta app se actualiza sola: usa el aviso de actualización de la parte superior.</p>
+            </li>
+            <li class="uitem">
+              <span class="uname">pi</span>
+              <span class="uver">1.5.2 → 2.0.5</span>
+              <span class="uactions"><button class="btn accent" type="button">Actualizar</button></span>
+            </li>
+            <li class="uitem">
+              <span class="uname">Gentle Shell</span>
+              <span class="uver">4.8.0 → 4.9.2</span>
+              <span class="uactions"><button class="btn accent" type="button">Actualizar Gentle Shell</button><button class="btn" type="button">Omitir esta versión</button></span>
+            </li>
+          </ul>
+          <p class="note">Actualizar y Actualizar Gentle Shell abren una ventana de terminal; lee lo que dice allí.</p>
+          <div class="ext">
+            <div>
+              <p class="glabel">Extensiones</p>
+              <p class="etext">No se puede saber cuáles están desactualizadas con este Gentle Shell. Actualizar extensiones las actualiza todas, así que este botón se ofrece siempre y es seguro usarlo en cualquier momento.</p>
+            </div>
+            <button class="btn" type="button">Actualizar extensiones</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div></div>
+  <p class="figcap"><b>La anatomía es una fila por pieza y una hairline entre filas.</b> La etiqueta del resumen, la hora de la última comprobación y <b>Comprobar de nuevo</b> comparten la línea de estado: la acción de leer está donde vive el dato. Los botones de terminal quedan a la derecha, alineados en una columna que no se mueve entre estados —el defecto 05 de la auditoría—, y el bloque de extensiones se separa con una hairline y una etiqueta en vez de ser una segunda tarjeta. La puerta de chats abiertos (<code>.gate</code>, hoy una banda <code>--tint</code>) se dibuja igual, solo que ahora ocupa el ancho de la columna.</p>
+</section>
+
+<!-- 3 · CUENTA -->
+<section class="sheet">
+  <p class="cap">A3 · Cuenta — la lista de proveedores a la izquierda y el traspaso a la terminal a la derecha, separados por una hairline</p>
+  <div class="wrap"><div class="frame">
+    <div class="app">
+      <aside class="side" aria-hidden="true">
+        <div class="wm">GENTLE SHELL</div>
+        <div class="neww">Nueva sesión</div>
+        <p class="gh">Espacios</p>
+        <div class="row"><span>gentle-desk</span></div>
+        <div class="row chat"><span>Ajustes: tres direcciones</span></div>
+        <div class="row chat"><span>Notas de la 0.8.1</span></div>
+        <div class="foot"><span>⚙</span><span>Vista previa</span></div>
+      </aside>
+      <div class="main">
+        <header class="mh"><h2>Ajustes: tres direcciones</h2><span class="grow"></span><span class="tabsfake"><span>Chat</span><span>Helpers</span></span></header>
+        <div class="thread"><div class="tin">
+          <p class="msg-u">¿Puedes enseñarme tres direcciones para Ajustes, con las mismas tres pantallas?</p>
+          <p class="msg-a">Sí: una ventana amplia, una página entera y una hoja que se abre desde el buscador.</p>
+        </div></div>
+        <div class="dock"><div class="composer">Pide algo…</div></div>
+      </div>
+    </div>
+    <div class="ovl"></div>
+
+    <div class="dlg" role="dialog" aria-modal="true" aria-label="Ajustes">
+      <div class="dtrow"><h2 class="dt">Ajustes</h2><span class="grow"></span>
+        <button class="ic" type="button" aria-label="Cerrar"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+      </div>
+      <div class="body">
+        <div class="side2">
+          <div class="find"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+            <input type="search" placeholder="Buscar un ajuste…" aria-label="Buscar un ajuste"></div>
+          <div class="rail" role="tablist" aria-orientation="vertical" aria-label="Secciones de ajustes">
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10"/><path d="M12 18a6 6 0 0 0 0-12v12z"/></svg><span>Apariencia</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span>Home del shell</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg><span>Actualizaciones</span></button>
+            <button type="button" role="tab" id="a-t3" aria-controls="a-p3" aria-selected="true"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg><span>Cuenta</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg><span>Uso</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/></svg><span>Idioma</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/><path d="M10.268 21a2 2 0 0 0 3.464 0"/></svg><span>Notificaciones</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg><span>Acerca de</span></button>
+          </div>
+        </div>
+
+        <div class="pane" role="tabpanel" id="a-p3" aria-labelledby="a-t3">
+          <h3>Cuenta</h3>
+          <p class="hint">Qué proveedores tienen sesión abierta y dónde iniciar o cerrar sesión.</p>
+          <div class="cuenta">
+            <div class="clist">
+              <p class="glabel">Proveedores</p>
+              <ul class="crows">
+                <li class="crow"><span class="cname">anthropic</span><span class="tag ok">Conectado</span></li>
+                <li class="crow"><span class="cname">openai-codex</span><span class="tag quiet">Sesión iniciada (no verificable)</span></li>
+                <li class="crow"><span class="cname">commandcode</span><span class="tag warn">No está listo</span><p class="creason">OAuth token expired</p></li>
+              </ul>
+            </div>
+            <div class="chand">
+              <p class="glabel">La sesión la escribe la shell</p>
+              <p class="ctext">La shell se abre en una ventana de terminal: escribe /login para iniciar sesión o /logout para cerrarla, y luego pulsa Comprobar de nuevo aquí.</p>
+              <button class="btn accent" type="button">Abrir la shell para iniciar o cerrar sesión</button>
+              <button class="btn" type="button">Comprobar de nuevo</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div></div>
+  <p class="figcap"><b>El traspaso a la terminal deja de ser una nota al pie y pasa a tener columna propia.</b> Es la única acción de la sección y la única que necesita explicación, así que vive en la mitad derecha con su frase completa y su botón de acento a todo el ancho de la columna; la lista de proveedores se queda a la izquierda con sus tres tonos de etiqueta (<code>ok</code>, <code>quiet</code>, <code>warn</code>) y el motivo de la shell tal y como llega. Así el aire que el panel deja —es corto— se reparte entre dos columnas en vez de quedar como un hueco bajo una tarjeta.</p>
+</section>
+
+<!-- 4 · LA VENTANA MÍNIMA -->
+<section class="sheet">
+  <p class="cap">A4 · la ventana mínima, 800 × 560 — la tarjeta queda en 744 × 504 y el cuerpo en 388: la fila se recompone, no se corta</p>
+  <div class="wrap"><div class="frame small">
+    <div class="app"><div class="main">
+      <header class="mh"><span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M3 6h18"/><path d="M3 12h18"/><path d="M3 18h18"/></svg></span><h2>Ajustes: tres direcciones</h2></header>
+      <div class="thread"><div class="tin">
+        <p class="msg-u">Tres direcciones, mismo contenido.</p>
+        <p class="msg-a">La más barata de construir es la A.</p>
+      </div></div>
+      <div class="dock"><div class="composer">Pide algo…</div></div>
+    </div></div>
+    <div class="ovl"></div>
+    <div class="dlg sm" role="dialog" aria-modal="true" aria-label="Ajustes">
+      <div class="dtrow"><h2 class="dt">Ajustes</h2><span class="grow"></span>
+        <button class="ic" type="button" aria-label="Cerrar"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+      </div>
+      <div class="body">
+        <div class="side2">
+          <div class="find"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+            <input type="search" placeholder="Buscar un ajuste…" aria-label="Buscar un ajuste"></div>
+          <div class="rail" role="tablist" aria-orientation="vertical" aria-label="Secciones de ajustes">
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><span>Apariencia</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><span>Home del shell</span></button>
+            <button type="button" role="tab" aria-selected="true"><span>Actualizaciones</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><span>Cuenta</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><span>Uso</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><span>Idioma</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><span>Notificaciones</span></button>
+            <button type="button" role="tab" aria-selected="false" tabindex="-1"><span>Acerca de</span></button>
+          </div>
+        </div>
+        <div class="pane">
+          <h3>Actualizaciones</h3>
+          <p class="hint">Lo que corre en esta máquina y si hay algo más nuevo.</p>
+          <div class="uhead">
+            <span class="tag warn">Actualización disponible</span>
+            <span class="ucheck">Última comprobación: hace 3 min</span>
+            <button class="btn" type="button">Comprobar de nuevo</button>
+          </div>
+          <ul class="ulist">
+            <li class="uitem">
+              <span class="uname">Esta app</span>
+              <span class="uver">0.8.1 → 0.9.0</span>
+              <p class="ureason">Esta app se actualiza sola: usa el aviso de actualización de la parte superior.</p>
+            </li>
+            <li class="uitem">
+              <span class="uname">pi</span>
+              <span class="uver">1.5.2 → 2.0.5</span>
+              <span class="uactions"><button class="btn accent" type="button">Actualizar</button></span>
+            </li>
+            <li class="uitem">
+              <span class="uname">Gentle Shell</span>
+              <span class="uver">4.8.0 → 4.9.2</span>
+              <span class="uactions"><button class="btn accent" type="button">Actualizar Gentle Shell</button><button class="btn" type="button">Omitir esta versión</button></span>
+            </li>
+          </ul>
+          <div class="ext">
+            <div>
+              <p class="glabel">Extensiones</p>
+              <p class="etext">No se puede saber cuáles están desactualizadas con este Gentle Shell. Actualizar extensiones las actualiza todas, así que este botón se ofrece siempre y es seguro usarlo en cualquier momento.</p>
+            </div>
+            <button class="btn" type="button">Actualizar extensiones</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div></div>
+  <p class="figcap"><b>A la ventana mínima el riel baja a 176 y las entradas a 30, y cada fila de Actualizaciones recompone sus botones debajo del nombre</b> —en vez de comprimir la columna o cortar palabras—. La tarjeta sigue ocupando el 93 % del ancho y el 90 % del alto, y el cuerpo baja de 544 a 388: Apariencia (528 px de contenido) pedirá scroll, Actualizaciones entra casi entera. Con un chat abierto, el riel del fondo de la app es el de hoy: colapsado a mano; aquí se dibuja así porque es el estado real de una ventana de 800.</p>
+</section>
+
+<!-- 5 · LOS SEIS TEMAS -->
+<section class="sheet">
+  <p class="cap">A5 · la misma fila bajo los seis temas — ninguna regla de esta hoja escribe un color</p>
+  <div class="strip">
+    <div class="tcell" data-theme="dark"><p class="sk">dark</p><div class="srow"><span class="sn">pi</span><span class="sv">1.5.2</span><button class="btn accent" type="button">Actualizar</button></div><span class="tag ok">Conectado</span></div>
+    <div class="tcell" data-theme="light"><p class="sk">light</p><div class="srow"><span class="sn">pi</span><span class="sv">1.5.2</span><button class="btn accent" type="button">Actualizar</button></div><span class="tag ok">Conectado</span></div>
+    <div class="tcell" data-theme="Gentle"><p class="sk">Gentle</p><div class="srow"><span class="sn">pi</span><span class="sv">1.5.2</span><button class="btn accent" type="button">Actualizar</button></div><span class="tag ok">Conectado</span></div>
+    <div class="tcell" data-theme="Gentleman-Cute"><p class="sk">Gentleman-Cute</p><div class="srow"><span class="sn">pi</span><span class="sv">1.5.2</span><button class="btn accent" type="button">Actualizar</button></div><span class="tag ok">Conectado</span></div>
+    <div class="tcell" data-theme="Gentleman-Sexy"><p class="sk">Gentleman-Sexy</p><div class="srow"><span class="sn">pi</span><span class="sv">1.5.2</span><button class="btn accent" type="button">Actualizar</button></div><span class="tag ok">Conectado</span></div>
+    <div class="tcell" data-theme="system"><p class="sk">system</p><div class="srow"><span class="sn">pi</span><span class="sv">1.5.2</span><button class="btn accent" type="button">Actualizar</button></div><span class="tag ok">Conectado</span></div>
+  </div>
+</section>
+
+<section class="head" style="margin-top:0">
+  <div class="notes">
+    <section>
+      <h4>Lo que hay que construir</h4>
+      <p><span class="new">nuevo</span><b>La fila de tema.</b> Una caja por tema (hoy son dos: la tarjeta y su miniatura). Reusa el <code>data-theme</code> de <code>ThemeCards</code>, sus siete puntos y su check; cambia la geometría, no la idea.</p>
+      <p><span class="new">nuevo</span><b>La hairline de sección.</b> Ya existe como <code>1px solid var(--border)</code> en <code>.urow + .urow</code>; aquí se usa además entre el estado de Actualizaciones y sus filas, y sobre el bloque de extensiones.</p>
+      <p><span class="new">nuevo</span><b>La columna del traspaso</b> (Cuenta): un <code>grid-template-columns: minmax(0,1fr) 288px</code> con <code>border-left</code>. Ni un token nuevo.</p>
+      <p>Todo lo demás son piezas que ya existen: <code>.btn</code>, <code>.btn.accent</code>, <code>.tag</code>, <code>.settings-find</code>, el riel con su patrón de tablist, <code>.hint</code>, <code>.quiet</code>, <code>.note</code>, <code>.gate</code>, <code>.seg</code>.</p>
+    </section>
+    <section>
+      <h4>Teclado, foco y movimiento</h4>
+      <ol>
+        <li><b>Cerrar</b> (arriba a la derecha) es el primer control del diálogo.</li>
+        <li>El foco entra en la entrada del riel seleccionada, como hoy; <kbd>↑</kbd>/<kbd>↓</kbd>, Inicio y Fin recorren el riel y seleccionan al pasar.</li>
+        <li>El campo de búsqueda estrecha el riel y nunca mueve el panel; Escape en el campo lo vacía.</li>
+        <li>Dentro de un panel, el orden es: control, acciones, nota. Las seis filas de tema son seis paradas de tabulación, como los seis botones de hoy.</li>
+        <li>El fondo no cierra; Escape sí. Sin cambios de comportamiento.</li>
+      </ol>
+      <p>El único movimiento es el <code>120ms ease</code> del riel y las filas de tema; <code>prefers-reduced-motion</code> lo apaga entero. El pane-in de 120ms se queda, como hoy.</p>
+    </section>
+    <section>
+      <h4>Las dos lenguas</h4>
+      <p>Los textos dibujados son los de la app en español, carácter por carácter. Las palabras de esta hoja que <b>no</b> son de la app: «Proveedores» y «La sesión la escribe la shell» (etiquetas de grupo de Cuenta) y «Extensiones» (etiqueta del bloque). En inglés: <b>Providers</b> · <b>The shell writes the session</b> · <b>Extensions</b>. Hay que añadirlas a <code>account-copy.ts</code> y <code>updates-copy.ts</code>, o quitar las etiquetas.</p>
+      <p>Todo lo demás ya está en los diccionarios: <i>Tema</i>, <i>Apariencia</i>, <i>Buscar un ajuste…</i>, <i>Actualización disponible</i>, <i>Última comprobación: hace 3 min</i>, <i>Omitir esta versión</i>, <i>Conectado</i>, <i>Sesión iniciada (no verificable)</i>, <i>No está listo</i>, <i>Comprobar de nuevo</i>, <i>Abrir la shell para iniciar o cerrar sesión</i>.</p>
+      <p><b>Los seis temas:</b> la tira A5 dibuja la anatomía bajo los seis bloques de <code>theme.css</code>; el «system» sigue al lector y por eso puede verse claro u oscuro.</p>
+    </section>
+  </div>
+</section>
+
+</main>
+</body></html>
