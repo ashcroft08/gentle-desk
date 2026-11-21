@@ -157,13 +157,15 @@ describe('the Settings dialog’s touch-ups', () => {
   })
 
   // PRESERVE: the theme previews are the card S2 keeps - six of them, still three
-  // to a row - and one provider's gauges are still one block, only quieter.
-  it('keeps a card where a card is a unit, the theme previews and a provider', () => {
+  // to a row. The OTHER card this test used to keep - one Usage provider - is gone
+  // by the maintainer's own ruling on that pane (settings-redesign L5, S8): a
+  // provider is a section of the whole column now, separated by a hairline, and
+  // `UsagePane.test.ts` pins that instead. The theme previews are not touched.
+  it('keeps a card where a card is a unit, the theme previews', () => {
     expect(declarations('.tc')).toMatch(/border:\s*1px solid var\(--border\)\s*;/)
     expect(declarations('.tc-grid')).toMatch(
       /grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)\s*;/,
     )
-    expect(declarations('.settings-pane .card.usage-provider')).toMatch(/border:\s*1px solid/)
   })
 
   // S7 · the tiles take the card's new width: the miniature is a step bigger, so a

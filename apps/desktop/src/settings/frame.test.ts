@@ -70,12 +70,15 @@ describe('the Settings frame the maintainer approved', () => {
   // D4/P5 · the rail column's gap, and the pane's symmetric padding plus the
   // scrollbar channel reserved in all eight sections. S7 raised both by the one
   // step the sheet already uses: 12 -> 14 between field and rail, 2 -> 4 at the
-  // pane's two edges.
+  // pane's two edges. The BOTTOM edge is the one thing this design changed here:
+  // settings-redesign R2 (approved as D5/D9) puts 24px of air under the content so
+  // no pane ends flush against the Close row, with a 24px veil over the cut
+  // (pinned in `scrollend.test.ts`). Top, right and left are unchanged.
   it('separates the field from the rail and keeps the pane symmetric and gutter-stable', () => {
     expect(declarations('.settings-side')).toMatch(/gap:\s*14px\s*;/)
 
     const pane = declarations('.settings-pane')
-    expect(pane).toMatch(/padding:\s*4px\s+0\s+0\s+4px\s*;/)
+    expect(pane).toMatch(/padding:\s*4px\s+0\s+24px\s+4px\s*;/)
     expect(pane).toMatch(/scrollbar-gutter:\s*stable\s*;/)
   })
 

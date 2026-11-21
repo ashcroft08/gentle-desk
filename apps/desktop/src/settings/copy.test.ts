@@ -25,6 +25,9 @@ const ENGLISH = {
     'My pi uses the pi installation already on the machine: sign-ins, local models and chats appear in the terminal. Separate creates a clean space at ~/.gentle-shell/agent and touches nothing else.',
   appName: 'Gentle Shell Desktop',
   versionUnknown: 'Version unknown',
+  // The About pane's repository row and the What's-new button (S9, L7 D7).
+  repository: 'Repository',
+  whatsNew: 'What is new in this version',
   close: 'Close',
 }
 
@@ -41,6 +44,8 @@ const SPANISH = {
     'Mi pi usa la instalación de pi que ya está en la máquina: los inicios de sesión, los modelos locales y los chats aparecen en la terminal. Separado crea un espacio limpio en ~/.gentle-shell/agent y no toca nada más.',
   appName: 'Gentle Shell Desktop',
   versionUnknown: 'Versión desconocida',
+  repository: 'Repositorio',
+  whatsNew: 'Novedades de esta versión',
   close: 'Cerrar',
 }
 

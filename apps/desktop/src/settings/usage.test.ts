@@ -3,7 +3,7 @@
 // provider that answered "no data" stays "no data" all the way to the drawn row.
 import { describe, expect, it } from 'vitest'
 import type { UsageView_Serialize as UsageView } from '../contract/bindings'
-import { paneOf } from './usage'
+import { paneOf, windowCount } from './usage'
 
 /** One provider as Rust pushes it, overridable field by field. */
 function provider(over: Partial<UsageView['providers'][number]> = {}): UsageView['providers'][number] {
@@ -170,6 +170,37 @@ describe('the Usage pane state', () => {
 
     expect(state.providers[0].status).toBe('Failed')
     expect(state.providers[0].error).toBe('timed out after 10000ms')
+  })
+
+  // D3 (L7): a provider that reported no window gets its own sentence, so the
+  // pane has to be able to tell "no windows at all" from "some limits, and not
+  // one drawable window in them" - a limit whose every share the contract could
+  // not carry draws no row either.
+  it('counts the window rows a provider really has', () => {
+    const state = paneOf(usage())
+    if (state.kind !== 'installed') throw new Error('installed expected')
+    expect(windowCount(state.providers[0])).toBe(2)
+
+    const empty = paneOf(
+      usage({
+        providers: [
+          provider({ provider: 'empty', limits: [] }),
+          provider({
+            provider: 'hollow',
+            limits: [
+              { name: 'claude', limit_reached: false, windows: [] },
+              {
+                name: 'credits',
+                limit_reached: false,
+                windows: [{ label: 'billing', used_percent: null, resets_in: null }],
+              },
+            ],
+          }),
+        ],
+      }),
+    )
+    if (empty.kind !== 'installed') throw new Error('installed expected')
+    expect(empty.providers.map(windowCount)).toEqual([0, 0])
   })
 
   it('names the three states that are not a card', () => {

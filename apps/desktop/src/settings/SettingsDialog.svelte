@@ -56,6 +56,7 @@
   import { language } from '../i18n/language.svelte'
   import HomeSetting from '../sidebar/HomeSetting.svelte'
   import AccountPane from './AccountPane.svelte'
+  import AboutPane from './AboutPane.svelte'
   import LanguagePane from './LanguagePane.svelte'
   import NotificationsPane from './NotificationsPane.svelte'
   import ThemeCards from './ThemeCards.svelte'
@@ -295,15 +296,12 @@
                      which follows the live push, and the Try it action. -->
                 <NotificationsPane {notifications} />
               {:else}
-                <!-- About (S5): the name and the version this run runs as. What
-                     is installed, and whether something newer is out, is the
-                     Updates section's own card. -->
-                <p class="about">
-                  <span class="about-name">{copy.appName}</span>
-                  <span class="about-version">
-                    {version === null ? copy.versionUnknown : copy.version(version)}
-                  </span>
-                </p>
+                <!-- About (S5; settings-redesign S9): the app and its version, the
+                     two installed versions and the moment of the read the Updates
+                     slice in this same dialog already carries, and the repository.
+                     The what's-new button waits for T5's read: no `onWhatsNew` is
+                     passed yet, so no dead control is drawn. -->
+                <AboutPane version={version} updates={updatesView} />
               {/if}
             </div>
           {/key}

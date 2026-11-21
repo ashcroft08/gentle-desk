@@ -55,6 +55,18 @@ export interface SettingsCopy {
   version: (version: string) => string
   /** What the version line says while the bridge has named none: never a guess. */
   versionUnknown: string
+  /**
+   * The About pane's repository row (settings-redesign S9): the link's name, and a
+   * link's name is a word of this app, so it is translated. The address it opens is
+   * not a word and never changes.
+   */
+  repository: string
+  /**
+   * The What's-new button (D6, D7): declared here so the wiring that follows T5 has
+   * its label waiting, and drawn only once that read exists - today the About pane
+   * receives no `onWhatsNew` and shows no button at all.
+   */
+  whatsNew: string
   close: string
 }
 
@@ -93,6 +105,8 @@ const ENGLISH: SettingsCopy = {
   appName: 'Gentle Shell Desktop',
   version: (version) => `Version ${version}`,
   versionUnknown: 'Version unknown',
+  repository: 'Repository',
+  whatsNew: 'What is new in this version',
   close: 'Close',
 }
 
@@ -132,6 +146,8 @@ const SPANISH: typeof ENGLISH = {
   appName: 'Gentle Shell Desktop',
   version: (version) => `Versión ${version}`,
   versionUnknown: 'Versión desconocida',
+  repository: 'Repositorio',
+  whatsNew: 'Novedades de esta versión',
   close: 'Cerrar',
 }
 
