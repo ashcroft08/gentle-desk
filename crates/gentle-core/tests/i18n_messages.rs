@@ -879,6 +879,34 @@ fn every_profiles_file_refusal_says_which_file_and_why() {
     );
 }
 
+/// The three quiet lines the About pane draws when a read on demand of this
+/// version's notes brought none (T5, S9, D6): each names its own reason, so a
+/// page never draws a blank where the news would have been.
+#[test]
+fn the_notes_a_read_on_demand_could_not_bring_read_in_both_languages() {
+    pair(
+        "whats_new_unreadable",
+        messages::whats_new_unreadable(Language::En),
+        "The notes could not be read: no connection.",
+        messages::whats_new_unreadable(Language::Es),
+        "No se pudieron leer las novedades: sin conexión.",
+    );
+    pair(
+        "whats_new_another_version",
+        messages::whats_new_another_version(Language::En),
+        "No notes were published for this version.",
+        messages::whats_new_another_version(Language::Es),
+        "No se publicaron novedades para esta versión.",
+    );
+    pair(
+        "whats_new_no_text",
+        messages::whats_new_no_text(Language::En),
+        "This version's notes are empty.",
+        messages::whats_new_no_text(Language::Es),
+        "Las novedades de esta versión están vacías.",
+    );
+}
+
 /// The two words the app adds to a provider's own error, and the line a command
 /// answers once the window is closing.
 #[test]

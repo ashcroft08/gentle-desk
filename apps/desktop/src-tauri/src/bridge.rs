@@ -143,10 +143,12 @@ pub struct AppStateHolder {
     /// `ViewState.sessions_notice` carries it: the same kind of shell-owned line
     /// (`bridge::session_notice`).
     sessions_notice: Mutex<Option<String>>,
-    /// The notes of the version this run follows, as `ViewState.whats_new`
-    /// carries them: pushed by the what's-new step of the run and cleared by the
-    /// dismiss that stores the version (`bridge::whats_new`).
-    whats_new: Mutex<Option<crate::contract::WhatsNewView>>,
+    /// The notes of the version this run follows, or the notes the About pane
+    /// read on demand, as `ViewState.whats_new` carries them: pushed by the
+    /// what's-new step of the run and cleared by the dismiss that stores the
+    /// version, or by the dismiss of a read on demand, which stores nothing
+    /// (`bridge::whats_new`).
+    whats_new: Mutex<Option<whats_new::Notes>>,
     /// The version this run runs as, `None` until the what's-new step names it:
     /// what the dismiss stores, never the manifest's version (S5), and what
     /// every slice carries as `ViewState.app_version` for the Settings

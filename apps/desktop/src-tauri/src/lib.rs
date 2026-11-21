@@ -75,6 +75,7 @@ pub fn contract_builder() -> Builder<tauri::Wry> {
             commands::pick_files,
             commands::describe_attachments,
             commands::store_last_run_version,
+            commands::show_whats_new,
             commands::settings_snapshot,
             terminal_commands::open_terminal,
         ])
