@@ -17,6 +17,7 @@
 import '../test-support/dom-env'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, within } from '@testing-library/svelte'
+import { tick } from 'svelte'
 import type { ThemeView } from '../contract/bindings'
 import { intents, openSettings, pane } from '../test-support/settings'
 import { resetTauriMock } from '../test-support/tauri-mock'
@@ -208,15 +209,36 @@ describe('the theme cards', () => {
     }
   })
 
-  it('lays the cards three to a row, two on a medium window and one on a narrow one', () => {
+  // The dialog card is 680px wide at EVERY window the app allows (its minimum is
+  // 800), so the grid is three to a row there and nowhere else: the two viewport
+  // queries that used to narrow it described a range the grid never really got
+  // (design/settings-polish/02-frame.html, finding 03).
+  it('lays the cards three to a row, with no viewport query to narrow that', () => {
     expect(declarations(APP_CSS, '.tc-grid')).toMatch(
       /grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/,
     )
-    expect(scoped('max-width: 900px', '.tc-grid')).toMatch(
-      /grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/,
-    )
-    expect(scoped('max-width: 640px', '.tc-grid')).toMatch(
-      /grid-template-columns:\s*minmax\(0,\s*1fr\)/,
+    expect(scoped('max-width: 900px', '.tc-grid')).toBe('')
+    expect(scoped('max-width: 640px', '.tc-grid')).toBe('')
+  })
+
+  // The pane's word for what the cards choose (finding 07, D2): the group already
+  // had an accessible name, and now the same word is drawn above the grid - in
+  // the dictionary's own word, never a second string that could drift from it.
+  it('draws the theme label above the grid, in both languages', async () => {
+    const panel = await appearance()
+
+    const label = panel.querySelector('.pane-label')
+    expect(label?.textContent).toBe('Theme')
+    // The grid keeps its own accessible name: the visible word adds to it.
+    const grid = within(panel).getByRole('group', { name: 'Theme' })
+    expect(grid.classList.contains('tc-grid')).toBe(true)
+
+    setLanguage('es')
+    await tick()
+
+    expect(panel.querySelector('.pane-label')?.textContent).toBe('Tema')
+    expect(within(panel).getByRole('group', { name: 'Tema' }).classList.contains('tc-grid')).toBe(
+      true,
     )
   })
 })

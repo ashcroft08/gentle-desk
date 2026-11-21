@@ -2162,6 +2162,13 @@ p {
   margin-top: 16px;
 }
 
+/* The Settings card's own Close row (finding 06): the card's 14px gap already
+   separates it from the body, so it adds no margin of its own - 14px above and
+   below, not 14 and 30. */
+.dlg.settings .acts {
+  margin-top: 0;
+}
+
 /* The workspace a dialog names: plain monospaced text with its middle elided by
    `removal.ts` (S3), never a boxed code card - the boxed `code` line the delete
    dialog used before the removal anatomy replaced it. */
@@ -2267,7 +2274,6 @@ p {
 .settings-body {
   display: flex;
   gap: 18px;
-  min-height: 240px;
   max-height: calc(100vh - var(--settings-chrome));
 }
 
@@ -2276,7 +2282,7 @@ p {
   width: 184px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
   padding: 2px 14px 0 0;
   border-right: 1px solid var(--border);
 }
@@ -2288,9 +2294,9 @@ p {
 .settings-find {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   height: 28px;
-  padding: 0 8px;
+  padding: 0 9px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--surface2);
@@ -2306,6 +2312,11 @@ p {
 .settings-find input {
   flex: 1;
   min-width: 0;
+  /* The field draws its own box, so the generic `.dlg input` padding (7px 10px,
+     written for a full-width field with no glyph) is put back here: it pushed the
+     placeholder 10px away from the search icon and made a 32.75px input overflow
+     its 28px wrapper (finding 01). */
+  padding: 0;
   border: 0;
   background: transparent;
   color: var(--text);
@@ -2342,7 +2353,7 @@ p {
 .settings-rail [role='tab'] {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 8px;
   height: 32px;
   padding: 0 10px;
   border: 0;
@@ -2386,7 +2397,11 @@ p {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  padding: 2px 8px 0 2px;
+  /* Symmetric with the card's own padding, and the scrollbar's channel reserved,
+     so the content's right edge does not move 10px between a section that fits
+     and one that overflows (findings 09 and 10, D4). */
+  padding: 2px 0 0 2px;
+  scrollbar-gutter: stable;
 }
 
 .settings-pane .pane-body {
@@ -2420,6 +2435,15 @@ p {
   color: var(--muted);
   font-size: 12px;
   line-height: 1.5;
+}
+
+/* The visible name over a pane's one control (finding 07, D2): `.mode-label`'s ink
+   without its bottom border, since a grid is not a row to separate. */
+.pane-label {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .settings-pane .why {
@@ -2468,8 +2492,9 @@ p {
 }
 
 /* The theme cards, the Appearance section's choice (the reference's theme_cards):
-   a grid of six miniatures, three to a row on a wide window: two even rows, and
-   wide enough for the longest name (Gentleman-Classic) to read in full. */
+   a grid of six miniatures, three to a row in two even rows - always, since the
+   card is 680px wide at every window the app allows, and wide enough for the
+   longest name (Gentleman-Classic) to read in full. */
 .tc-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2592,21 +2617,6 @@ p {
   stroke-width: 2.4;
   stroke-linecap: round;
   stroke-linejoin: round;
-}
-
-/* The grid on a medium window: two miniatures to a row, where four would be too
-   narrow to read. */
-@media (max-width: 900px) {
-  .tc-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-/* ...and on a narrow one: the whole width for each card. */
-@media (max-width: 640px) {
-  .tc-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
 /* --- the 0.1.12 panes (S1-S4) ------------------------------------------- */

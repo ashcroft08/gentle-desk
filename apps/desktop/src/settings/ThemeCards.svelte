@@ -49,6 +49,7 @@
   }
 </script>
 
+<p class="pane-label">{copy.themeGroup}</p>
 <div class="tc-grid" role="group" aria-label={copy.themeGroup}>
   {#each THEMES as option (option)}
     <button
