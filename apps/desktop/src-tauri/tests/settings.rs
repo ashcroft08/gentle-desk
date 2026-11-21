@@ -24,7 +24,9 @@ use gentle_desk_lib::commands::{Bridge, Emit};
 use gentle_desk_lib::contract::{
     AuthStatusView, ProviderStatusView, UiIntent, UpdatesStatusView, ViewState,
 };
-use gentle_desk_lib::settings::{ProviderAnswer, ProviderProbe, VersionProbe, WebGet};
+use gentle_desk_lib::settings::{
+    ProviderAnswer, ProviderProbe, VersionProbe, WebGet, SHELL_REGISTRY,
+};
 
 /// The wait of the update check's own thread.
 const WAIT: Duration = Duration::from_secs(10);
@@ -200,16 +202,24 @@ fn versions(pi: &'static str) -> VersionProbe {
     })
 }
 
-/// One GET that answers the test's bodies and records every URL it was asked.
+/// One GET that answers the test's three bodies and records every URL it was
+/// asked: the desk's manifest, pi's npm entry and the shell's (S6).
 fn web(
     manifest: Option<&'static str>,
     registry: Option<&'static str>,
+    shell: Option<&'static str>,
     asked: &Arc<Mutex<Vec<String>>>,
 ) -> WebGet {
     let asked = Arc::clone(asked);
     Arc::new(move |url: &str| {
         lock(&asked).push(url.to_owned());
-        let body = if url == REGISTRY { registry } else { manifest };
+        let body = if url == REGISTRY {
+            registry
+        } else if url == SHELL_REGISTRY {
+            shell
+        } else {
+            manifest
+        };
         body.map(str::to_owned)
             .ok_or_else(|| format!("{url} did not answer"))
     })
@@ -272,7 +282,7 @@ fn the_auth_store_is_read_for_its_names_and_never_its_values() {
 }
 
 #[test]
-fn the_update_check_covers_the_desk_pi_and_never_the_shell() {
+fn the_update_check_covers_the_desk_pi_and_the_shell() {
     let _harness = Harness::new();
     let asked = Arc::new(Mutex::new(Vec::new()));
     let (emit, views) = recorder();
@@ -282,12 +292,13 @@ fn the_update_check_covers_the_desk_pi_and_never_the_shell() {
         .with_web_get(web(
             Some(r#"{"version":"0.1.12","notes":"..."}"#),
             Some(r#"{"name":"@earendil-works/pi-coding-agent","version":"2.0.5"}"#),
+            Some(r#"{"name":"gentle-pi","version":"4.8.0"}"#),
             &asked,
         ));
     bridge.holder.set_app_version("0.1.12");
 
-    // A run that named no manifest address can still compare pi; the desk's own
-    // row then has nothing to compare and says so by staying unknown.
+    // A run that named no manifest address cannot compare the desk; its own row
+    // then has nothing to compare and says so by staying unknown.
     bridge.start_updates(None);
 
     let ready = wait_for("the check to push its versions", || {
@@ -304,14 +315,16 @@ fn the_update_check_covers_the_desk_pi_and_never_the_shell() {
     assert_eq!(ready.updates.pi.current.as_deref(), Some("1.5.2"));
     assert_eq!(ready.updates.pi.latest.as_deref(), Some("2.0.5"));
     assert_eq!(ready.updates.pi.update_available, Some(true));
-    // gentle-shell: its version is known, its channel is not, so no claim.
+    // gentle-shell, measured against npm's stable entry (S6): 4.7.0 behind 4.8.0.
     assert_eq!(ready.updates.shell.current.as_deref(), Some("4.7.0"));
-    assert_eq!(ready.updates.shell.latest, None);
-    assert_eq!(ready.updates.shell.update_available, None);
+    assert_eq!(ready.updates.shell.latest.as_deref(), Some("4.8.0"));
+    assert_eq!(ready.updates.shell.update_available, Some(true));
+    // The check says when it read the machine (S8), which is not a zero.
+    assert!(ready.updates.checked_ms.is_some_and(|ms| ms > 0.0));
     assert_eq!(
         *lock(&asked),
-        vec![REGISTRY.to_owned()],
-        "one GET: the manifest address was not named, so nothing else was asked"
+        vec![REGISTRY.to_owned(), SHELL_REGISTRY.to_owned()],
+        "one GET each: pi's registry and the shell's, since no manifest was named"
     );
 }
 
@@ -326,6 +339,7 @@ fn the_check_runs_once_when_the_app_opens() {
         .with_web_get(web(
             Some(r#"{"version":"0.1.13"}"#),
             Some(r#"{"version":"2.0.5"}"#),
+            Some(r#"{"version":"4.8.0"}"#),
             &asked,
         ));
     bridge.holder.set_app_version("0.1.12");
@@ -352,7 +366,8 @@ fn the_check_runs_once_when_the_app_opens() {
         *lock(&asked),
         vec![
             "https://releases.test/latest.json".to_owned(),
-            REGISTRY.to_owned()
+            REGISTRY.to_owned(),
+            SHELL_REGISTRY.to_owned()
         ]
     );
 
@@ -370,7 +385,7 @@ fn the_check_runs_once_when_the_app_opens() {
             .ge(&2)
             .then_some(())
     });
-    assert_eq!(lock(&asked).len(), 4, "two checks, two addresses each");
+    assert_eq!(lock(&asked).len(), 6, "two checks, three addresses each");
 }
 
 #[test]
@@ -428,7 +443,7 @@ fn the_check_that_runs_at_open_does_not_offer_the_version_the_user_skipped() {
     let bridge = Bridge::new()
         .with_emit(emit)
         .with_version_probe(versions("1.5.2"))
-        .with_web_get(web(None, Some(r#"{"version":"2.0.5"}"#), &asked));
+        .with_web_get(web(None, Some(r#"{"version":"2.0.5"}"#), None, &asked));
     bridge.holder.set_app_version("0.1.12");
     bridge.holder.replace_config(skipping("2.0.5"));
 
@@ -458,7 +473,7 @@ fn a_version_newer_than_the_skipped_one_is_offered_as_usual() {
     let bridge = Bridge::new()
         .with_emit(emit)
         .with_version_probe(versions("1.5.2"))
-        .with_web_get(web(None, Some(r#"{"version":"2.0.5"}"#), &asked));
+        .with_web_get(web(None, Some(r#"{"version":"2.0.5"}"#), None, &asked));
     bridge.holder.set_app_version("0.1.12");
     bridge.holder.replace_config(skipping("2.0.4"));
 
@@ -482,7 +497,7 @@ fn the_check_the_user_asks_for_reports_a_skipped_version_as_it_is() {
     let bridge = Bridge::new()
         .with_emit(emit)
         .with_version_probe(versions("1.5.2"))
-        .with_web_get(web(None, Some(r#"{"version":"2.0.5"}"#), &asked));
+        .with_web_get(web(None, Some(r#"{"version":"2.0.5"}"#), None, &asked));
     bridge.holder.set_app_version("0.1.12");
     bridge.holder.replace_config(skipping("2.0.5"));
     bridge.start_updates(None);
@@ -525,7 +540,7 @@ fn a_check_that_learned_nothing_when_the_app_opened_says_nothing() {
     let bridge = Bridge::new()
         .with_emit(emit)
         .with_version_probe(failing)
-        .with_web_get(web(None, None, &asked));
+        .with_web_get(web(None, None, None, &asked));
     bridge.holder.set_app_version("0.1.12");
 
     bridge.start_updates(None);
@@ -553,7 +568,7 @@ fn a_check_that_learned_nothing_when_the_user_asked_is_still_shown() {
     let bridge = Bridge::new()
         .with_emit(emit)
         .with_version_probe(failing)
-        .with_web_get(web(None, None, &asked));
+        .with_web_get(web(None, None, None, &asked));
     bridge.holder.set_app_version("0.1.12");
     bridge.start_updates(None);
     nothing_pushed_for(Duration::from_millis(200), &views);

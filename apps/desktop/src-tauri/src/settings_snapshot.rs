@@ -176,6 +176,8 @@ pub fn gather(config: SettingsConfig, reads: &Reads) -> SettingsSnapshot {
             &reads.versions,
             reads.language,
             skipped.as_deref(),
+            // The dialog's own load IS a check, so its rows were read just now.
+            gentle_runtime::clock::now_ms(),
         ),
         usage: settings::usage_view(
             &reads.files,

@@ -963,6 +963,9 @@ impl Bridge {
                     &versions,
                     holder.language(),
                     skipped.as_deref(),
+                    // The instant the check finished: what the pane's last-checked
+                    // line is worded from (0.8.1 settings-polish S8).
+                    gentle_runtime::clock::now_ms(),
                 );
                 if let Some(view) = update_answer(&holder, checked, reason) {
                     push(&thread_emit, view);

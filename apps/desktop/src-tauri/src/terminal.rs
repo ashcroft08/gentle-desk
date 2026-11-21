@@ -56,6 +56,11 @@ pub fn action_args(action: TerminalActionView) -> &'static [&'static str] {
         TerminalActionView::Login => &[],
         TerminalActionView::Logout => &[],
         TerminalActionView::Update => &["update"],
+        // The shell's own stable upgrade (0.8.1 settings-polish S7): the command
+        // that moves a stable install to npm's `latest`, which is the version the
+        // pane's shell row is measured against. A separate action and not a flag
+        // on `update`, because it is a different command.
+        TerminalActionView::UpgradeShell => &["upgrade"],
         // `gentle-shell update` FORWARDS to pi's updater, so pi's own
         // `--extensions` flag passes straight through (L5) and the run touches
         // only the packages the shell has installed, never pi itself.
@@ -131,6 +136,7 @@ pub fn action_label(language: Language, action: TerminalActionView) -> &'static 
         TerminalActionView::Login => messages::terminal_action_login(language),
         TerminalActionView::Logout => messages::terminal_action_logout(language),
         TerminalActionView::Update => messages::terminal_action_update(language),
+        TerminalActionView::UpgradeShell => messages::terminal_action_upgrade_shell(language),
         TerminalActionView::UpdateExtensions => {
             messages::terminal_action_update_extensions(language)
         }
@@ -148,6 +154,7 @@ fn action_slug(action: TerminalActionView) -> &'static str {
         TerminalActionView::Login => "login",
         TerminalActionView::Logout => "logout",
         TerminalActionView::Update => "update",
+        TerminalActionView::UpgradeShell => "upgrade-shell",
         TerminalActionView::UpdateExtensions => "update-extensions",
         TerminalActionView::InstallUsageSources => "install-usage-sources",
     }
@@ -345,6 +352,9 @@ mod tests {
             &[] as &[&str]
         );
         assert_eq!(action_args(TerminalActionView::Update), &["update"]);
+        // S7: the shell's own stable upgrade is a SECOND action, not a flag on
+        // the update: it runs `gentle-shell upgrade` and nothing else.
+        assert_eq!(action_args(TerminalActionView::UpgradeShell), &["upgrade"]);
         // The maintainer's rule: an install is explicit and never silent, so the
         // button hands pi the exact command the pane's note names.
         assert_eq!(
@@ -483,6 +493,10 @@ mod tests {
             (TerminalActionView::Logout, "gentle-desk-logout.cmd"),
             (TerminalActionView::Update, "gentle-desk-update.cmd"),
             (
+                TerminalActionView::UpgradeShell,
+                "gentle-desk-upgrade-shell.cmd",
+            ),
+            (
                 TerminalActionView::UpdateExtensions,
                 "gentle-desk-update-extensions.cmd",
             ),
@@ -517,6 +531,7 @@ mod tests {
             TerminalActionView::Login,
             TerminalActionView::Logout,
             TerminalActionView::Update,
+            TerminalActionView::UpgradeShell,
             TerminalActionView::UpdateExtensions,
             TerminalActionView::InstallUsageSources,
         ];
@@ -533,6 +548,7 @@ mod tests {
                 "Sign in",
                 "Sign out",
                 "Update",
+                "Update Gentle Shell",
                 "Update extensions",
                 "Install usage sources"
             ]
@@ -540,6 +556,12 @@ mod tests {
         for label in labels {
             assert!(label.is_ascii() && !label.is_empty(), "{label:?}");
         }
+        // The escalation says the product's whole name in both languages, because
+        // this is the first time the pane asks for that name on the machine.
+        assert_eq!(
+            action_label(Language::Es, TerminalActionView::UpgradeShell),
+            "Actualizar Gentle Shell"
+        );
     }
 
     /// Windows Terminal gets one new window, one tab with the action's title,

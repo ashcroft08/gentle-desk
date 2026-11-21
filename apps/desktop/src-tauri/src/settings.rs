@@ -40,7 +40,7 @@ pub use auth::view as auth_view;
 pub use paths::SettingsPaths;
 pub use updates::{
     learned_nothing as updates_learned_nothing, view as updates_view,
-    without_skipped as updates_without_skipped, PI_REGISTRY,
+    without_skipped as updates_without_skipped, PI_REGISTRY, SHELL_REGISTRY,
 };
 pub use usage::view as usage_view;
 pub use watch::{Changed, Dirs, SettingsWatch};
@@ -77,7 +77,8 @@ pub type ProviderProbe =
 pub type VersionProbe = Arc<dyn Fn(Language) -> Result<String, String> + Send + Sync>;
 
 /// One GET of an https address, answering the body. Used for the release
-/// manifest (the desk's own version) and for the npm registry (pi's).
+/// manifest (the desk's own version), for pi's npm entry and for the shell's
+/// (0.8.1 settings-polish S6).
 pub type WebGet = Arc<dyn Fn(&str) -> Result<String, String> + Send + Sync>;
 
 /// How long one GET of the update check may take, connection included: the
