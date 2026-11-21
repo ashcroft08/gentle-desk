@@ -11,9 +11,9 @@
 //! What it carries is the plain data of the five sections that show the machine:
 //!
 //! - the part of the slice [`ViewState`](crate::contract::ViewState) already
-//!   holds (theme, language, the notifications mode, home, running version, the
-//!   open-chat gate and what became of the config file), which costs no read at
-//!   all;
+//!   holds (theme, language, the notifications mode, the skipped update version,
+//!   home, running version, the open-chat gate and what became of the config
+//!   file), which costs no read at all;
 //! - the Account pane's auth view, the Usage pane's usage view and the Updates
 //!   pane's update view, each of which IS a read.
 //!
@@ -52,6 +52,13 @@ pub struct SettingsConfig {
     /// When the app notifies the user about a chat that needs them, as the app
     /// config remembers it.
     pub notifications: NotificationsMode,
+    /// The version the user skipped, as the app config remembers it (0.8.0
+    /// settings-polish S1, S2), `None` while nothing is skipped. Live, like the
+    /// theme: the pane changes it from inside this card, and the dialog's load
+    /// carries it so a skip is visible without waiting for the next check. It is
+    /// carried and never applied - the load reports the real state, which is what
+    /// offers to stop skipping.
+    pub skipped_update: Option<String>,
     /// The shell and the home this run sees, which the Home section draws.
     pub shell: ShellView,
     /// The version this run RUNS as, which the About section draws.
@@ -147,6 +154,7 @@ pub struct SettingsSnapshot {
 /// failing source leaves its section saying why and the rest of the snapshot
 /// whole.
 pub fn gather(config: SettingsConfig, reads: &Reads) -> SettingsSnapshot {
+    let skipped = config.skipped_update;
     SettingsSnapshot {
         theme: config.theme,
         language: config.language,
@@ -167,6 +175,7 @@ pub fn gather(config: SettingsConfig, reads: &Reads) -> SettingsSnapshot {
             &reads.web,
             &reads.versions,
             reads.language,
+            skipped.as_deref(),
         ),
         usage: settings::usage_view(
             &reads.files,

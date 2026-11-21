@@ -29,6 +29,10 @@ use gentle_desk_lib::settings::{ProviderAnswer, ProviderProbe, VersionProbe, Web
 /// The wait of the update check's own thread.
 const WAIT: Duration = Duration::from_secs(10);
 
+/// How long one read of the pushed slices may wait for the recorder's lock: a
+/// read that waits longer is one taken from inside itself.
+const LOCK_WAIT: Duration = Duration::from_secs(2);
+
 /// The npm entry pi's published version lives in.
 const REGISTRY: &str = "https://registry.npmjs.org/@earendil-works/pi-coding-agent/latest";
 
@@ -118,6 +122,37 @@ fn recorder() -> (Emit, Arc<Mutex<Vec<ViewState>>>) {
 
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(|poison| poison.into_inner())
+}
+
+/// The slices pushed so far, as one read of the recorder.
+///
+/// ONE lock, taken with a bounded wait: a closure that waits for a push must not
+/// hold the recorder's lock while it reads it again, because `std::sync::Mutex`
+/// is not reentrant and the second read would wait forever. A read that cannot
+/// get the lock in `LOCK_WAIT` therefore panics with that cause instead of
+/// hanging the suite.
+fn pushed(views: &Arc<Mutex<Vec<ViewState>>>) -> Vec<ViewState> {
+    let deadline = Instant::now() + LOCK_WAIT;
+    loop {
+        match views.try_lock() {
+            Ok(guard) => return guard.clone(),
+            Err(std::sync::TryLockError::Poisoned(poison)) => return poison.into_inner().clone(),
+            Err(std::sync::TryLockError::WouldBlock) if Instant::now() < deadline => {
+                std::thread::sleep(Duration::from_millis(1));
+            }
+            Err(std::sync::TryLockError::WouldBlock) => panic!(
+                "the recorder stayed locked for {LOCK_WAIT:?}: a wait must not read it from                  inside its own lock"
+            ),
+        }
+    }
+}
+
+/// The last slice pushed that is a check answer, `None` before the first one:
+/// what a wait below polls for.
+fn last_answer(views: &Arc<Mutex<Vec<ViewState>>>) -> Option<ViewState> {
+    pushed(views)
+        .into_iter()
+        .rfind(|view| view.updates.status == UpdatesStatusView::Ready)
 }
 
 /// Waits for the pushed slice a predicate holds for, failing instead of hanging.
@@ -305,11 +340,7 @@ fn the_check_runs_once_when_the_app_opens() {
     bridge.start_updates(Some("https://releases.test/latest.json"));
 
     let ready = wait_for("the opening check to push its versions", || {
-        lock(&views)
-            .iter()
-            .rev()
-            .find(|view| view.updates.status == UpdatesStatusView::Ready)
-            .cloned()
+        last_answer(&views)
     });
     assert_eq!(
         ready.updates.desk.update_available,
@@ -368,4 +399,176 @@ fn the_context_reading_of_the_foreground_chat_reaches_the_slice() {
     assert_eq!(view.context_usage.tokens, Some(38_000));
     assert_eq!(view.context_usage.percent, Some(19.0));
     assert_eq!(view.context_usage.window, Some(200_000));
+}
+
+/// A config that skips `version`, as the pane's "Skip this version" leaves it.
+fn skipping(version: &str) -> gentle_runtime::app_config::AppConfig {
+    let mut config = gentle_runtime::app_config::AppConfig::default();
+    assert!(config.set_skipped_update(version));
+    config
+}
+
+/// Asserts nothing is pushed for `window`: how a silent step is pinned (S3).
+fn nothing_pushed_for(window: Duration, views: &Arc<Mutex<Vec<ViewState>>>) {
+    let deadline = Instant::now() + window;
+    while Instant::now() < deadline {
+        assert!(
+            pushed(views).is_empty(),
+            "a step that must say nothing pushed a slice"
+        );
+        std::thread::sleep(Duration::from_millis(10));
+    }
+}
+
+#[test]
+fn the_check_that_runs_at_open_does_not_offer_the_version_the_user_skipped() {
+    let _harness = Harness::new();
+    let asked = Arc::new(Mutex::new(Vec::new()));
+    let (emit, views) = recorder();
+    let bridge = Bridge::new()
+        .with_emit(emit)
+        .with_version_probe(versions("1.5.2"))
+        .with_web_get(web(None, Some(r#"{"version":"2.0.5"}"#), &asked));
+    bridge.holder.set_app_version("0.1.12");
+    bridge.holder.replace_config(skipping("2.0.5"));
+
+    bridge.start_updates(None);
+
+    let ready = wait_for("the opening check to push its versions", || {
+        last_answer(&views)
+    });
+    assert_eq!(
+        ready.updates.pi.latest.as_deref(),
+        Some("2.0.5"),
+        "the published version is still carried"
+    );
+    assert_eq!(
+        ready.updates.pi.update_available,
+        Some(false),
+        "the check that runs at open does not offer the skipped version again"
+    );
+    assert_eq!(ready.updates.skipped.as_deref(), Some("2.0.5"));
+}
+
+#[test]
+fn a_version_newer_than_the_skipped_one_is_offered_as_usual() {
+    let _harness = Harness::new();
+    let asked = Arc::new(Mutex::new(Vec::new()));
+    let (emit, views) = recorder();
+    let bridge = Bridge::new()
+        .with_emit(emit)
+        .with_version_probe(versions("1.5.2"))
+        .with_web_get(web(None, Some(r#"{"version":"2.0.5"}"#), &asked));
+    bridge.holder.set_app_version("0.1.12");
+    bridge.holder.replace_config(skipping("2.0.4"));
+
+    bridge.start_updates(None);
+
+    let ready = wait_for("the opening check to push its versions", || {
+        last_answer(&views)
+    });
+    assert_eq!(
+        ready.updates.pi.update_available,
+        Some(true),
+        "a newer version than the skipped one is offered as usual"
+    );
+}
+
+#[test]
+fn the_check_the_user_asks_for_reports_a_skipped_version_as_it_is() {
+    let _harness = Harness::new();
+    let asked = Arc::new(Mutex::new(Vec::new()));
+    let (emit, views) = recorder();
+    let bridge = Bridge::new()
+        .with_emit(emit)
+        .with_version_probe(versions("1.5.2"))
+        .with_web_get(web(None, Some(r#"{"version":"2.0.5"}"#), &asked));
+    bridge.holder.set_app_version("0.1.12");
+    bridge.holder.replace_config(skipping("2.0.5"));
+    bridge.start_updates(None);
+    wait_for("the opening check to answer", || {
+        last_answer(&views).map(|_| ())
+    });
+
+    // "Check again": the user asked, so the answer is the real state - the
+    // skipped version included - and the pane decides what to draw with it.
+    bridge
+        .dispatch(UiIntent::CheckUpdates)
+        .expect("the check starts again");
+    // Two answers counted in ONE read of the recorder: the startup pass's and the
+    // user's own. The second must carry the skipped version as it is.
+    let ready = wait_for("the check the user asked for to answer", || {
+        let answers: Vec<ViewState> = pushed(&views)
+            .into_iter()
+            .filter(|view| view.updates.status == UpdatesStatusView::Ready)
+            .collect();
+        (answers.len() >= 2).then(|| answers.last().cloned().expect("the second answer"))
+    });
+    assert_eq!(
+        ready.updates.pi.update_available,
+        Some(true),
+        "an explicit check never hides the skipped version"
+    );
+    assert_eq!(
+        ready.updates.skipped.as_deref(),
+        Some("2.0.5"),
+        "and it names the skip, which is what offers to undo it"
+    );
+}
+
+#[test]
+fn a_check_that_learned_nothing_when_the_app_opened_says_nothing() {
+    let _harness = Harness::new();
+    let asked = Arc::new(Mutex::new(Vec::new()));
+    let (emit, views) = recorder();
+    let failing: VersionProbe = Arc::new(|_language: Language| Err("the shell is gone".to_owned()));
+    let bridge = Bridge::new()
+        .with_emit(emit)
+        .with_version_probe(failing)
+        .with_web_get(web(None, None, &asked));
+    bridge.holder.set_app_version("0.1.12");
+
+    bridge.start_updates(None);
+    wait_for("the one read the check makes", || {
+        (!lock(&asked).is_empty()).then_some(())
+    });
+
+    // S3: no notice, no error state, nothing on the wire.
+    nothing_pushed_for(Duration::from_millis(300), &views);
+    assert_eq!(
+        bridge.holder.view().updates.status,
+        UpdatesStatusView::Unknown,
+        "a check that learned nothing leaves the pane saying it has not checked"
+    );
+}
+
+#[test]
+fn a_check_that_learned_nothing_when_the_user_asked_is_still_shown() {
+    // PRESERVE (S3): the same failure, but the user asked for it, so it is
+    // reported exactly as it was before the startup pass went quiet.
+    let _harness = Harness::new();
+    let asked = Arc::new(Mutex::new(Vec::new()));
+    let (emit, views) = recorder();
+    let failing: VersionProbe = Arc::new(|_language: Language| Err("the shell is gone".to_owned()));
+    let bridge = Bridge::new()
+        .with_emit(emit)
+        .with_version_probe(failing)
+        .with_web_get(web(None, None, &asked));
+    bridge.holder.set_app_version("0.1.12");
+    bridge.start_updates(None);
+    nothing_pushed_for(Duration::from_millis(200), &views);
+
+    let answer = bridge
+        .dispatch(UiIntent::CheckUpdates)
+        .expect("the check starts again");
+    assert_eq!(answer.updates.status, UpdatesStatusView::Checking);
+    let ready = wait_for("the check the user asked for to answer", || {
+        last_answer(&views)
+    });
+    assert_eq!(ready.updates.pi.latest, None);
+    assert_eq!(
+        ready.updates.pi.update_available, None,
+        "unknown is never an update, and the pane says so"
+    );
+    assert_eq!(ready.updates.desk.latest, None);
 }

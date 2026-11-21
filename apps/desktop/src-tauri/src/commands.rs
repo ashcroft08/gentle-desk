@@ -827,21 +827,29 @@ impl Bridge {
     /// answer to the click says the check is running, and the check's own thread
     /// pushes the versions it found. A check only ever CHECKS: no update is
     /// installed from here.
+    ///
+    /// This is the USER's check (0.8.0 settings-polish S2, S3): it reports the
+    /// real state - the version they skipped included - and a check that fails
+    /// still says so, exactly as it did before the startup pass went quiet.
     pub fn check_updates(&self) -> Result<ViewState, String> {
         self.accepting_work()?;
         let emit = self.emitter();
         let view = self.holder.note_updates_checking();
         emit_view(&emit, &view)?;
-        self.run_update_check(emit);
+        self.run_update_check(emit, CheckReason::Manual);
         Ok(view)
     }
 
     /// The automatic check of this run (S3): once, when the app opens, and never
     /// on the thread that draws. The endpoint is kept so a later "Check again"
     /// reads the same manifest.
+    ///
+    /// This is the STARTUP pass (0.8.0 settings-polish S2, S3): it does not offer
+    /// the version the user skipped, and a check that learned nothing says
+    /// nothing at all.
     pub fn start_updates(&self, desk_endpoint: Option<&str>) {
         *lock(&self.desk_endpoint) = desk_endpoint.map(str::to_owned);
-        self.run_update_check(self.emitter());
+        self.run_update_check(self.emitter(), CheckReason::Startup);
     }
 
     /// The Settings dialog's one read (settings-snapshot): every page's data
@@ -876,6 +884,7 @@ impl Bridge {
             theme: view.theme,
             language: view.language,
             notifications: view.notifications,
+            skipped_update: view.updates.skipped,
             shell: view.shell,
             app_version: view.app_version,
             open_chats: view.open_chats,
@@ -933,11 +942,15 @@ impl Bridge {
     /// The check itself, on a thread of its own: the two versions the shell
     /// prints, the desk's own manifest and pi's registry entry, gathered outside
     /// every lock and pushed when they are all in.
-    fn run_update_check(&self, emit: Emit) {
+    ///
+    /// `reason` is what separates the two passes (0.8.0 settings-polish S2, S3):
+    /// see [`update_answer`].
+    fn run_update_check(&self, emit: Emit, reason: CheckReason) {
         let desk = self.holder.app_version();
         let manifest = lock(&self.desk_endpoint).clone();
         let web = Arc::clone(&self.settings.web);
         let versions = Arc::clone(&self.settings.versions);
+        let skipped = self.holder.skipped_update();
         let holder = Arc::clone(&self.holder);
         let thread_emit = Arc::clone(&emit);
         let spawned = std::thread::Builder::new()
@@ -949,19 +962,57 @@ impl Bridge {
                     &web,
                     &versions,
                     holder.language(),
+                    skipped.as_deref(),
                 );
-                push(&thread_emit, holder.note_updates(checked));
+                if let Some(view) = update_answer(&holder, checked, reason) {
+                    push(&thread_emit, view);
+                }
             });
         if spawned.is_err() {
             // No thread to check on: the version probe and the two GETs are not
-            // moved onto the thread that draws, so the pane says the check ran
-            // and learned nothing rather than staying on "checking".
-            let view = self.holder.note_updates(UpdatesView {
-                status: UpdatesStatusView::Ready,
-                ..UpdatesView::default()
-            });
-            push(&emit, view);
+            // moved onto the thread that draws. A check the user asked for says
+            // the check ran and learned nothing rather than staying on
+            // "checking"; the one that runs when the app opens says nothing at
+            // all (S3).
+            if reason == CheckReason::Manual {
+                let view = self.holder.note_updates(UpdatesView {
+                    status: UpdatesStatusView::Ready,
+                    ..UpdatesView::default()
+                });
+                push(&emit, view);
+            }
         }
+    }
+}
+
+/// Why an update check ran (0.8.0 settings-polish S2, S3): the one the app makes
+/// when it opens, or the one the user asked for. The two differ in exactly two
+/// rules, both in [`update_answer`]: a skipped version is offered only to the
+/// user's own check, and a check that learned nothing is silent only at startup.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CheckReason {
+    Startup,
+    Manual,
+}
+
+/// What a finished check pushes: [`CheckReason::Startup`] is silent when it
+/// learned nothing (S3: no notice, no error state, nothing user-visible) and
+/// never offers the version the user skipped (S2), while the check the user asked
+/// for always reports the real state, exactly as it did before this slice.
+///
+/// `None` is a startup pass with nothing to say: no push at all, so the pane keeps
+/// saying it has not checked and the gear keeps no dot.
+fn update_answer(
+    holder: &AppStateHolder,
+    checked: UpdatesView,
+    reason: CheckReason,
+) -> Option<ViewState> {
+    match reason {
+        CheckReason::Startup if settings::updates_learned_nothing(&checked) => None,
+        CheckReason::Startup => {
+            Some(holder.note_updates(settings::updates_without_skipped(checked)))
+        }
+        CheckReason::Manual => Some(holder.note_updates(checked)),
     }
 }
 

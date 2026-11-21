@@ -38,7 +38,10 @@ mod web;
 
 pub use auth::view as auth_view;
 pub use paths::SettingsPaths;
-pub use updates::{view as updates_view, PI_REGISTRY};
+pub use updates::{
+    learned_nothing as updates_learned_nothing, view as updates_view,
+    without_skipped as updates_without_skipped, PI_REGISTRY,
+};
 pub use usage::view as usage_view;
 pub use watch::{Changed, Dirs, SettingsWatch};
 

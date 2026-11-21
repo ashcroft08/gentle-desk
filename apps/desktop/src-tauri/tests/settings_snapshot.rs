@@ -59,6 +59,7 @@ fn config() -> SettingsConfig {
         theme: ThemeView::Gentle,
         language: Some(LanguageView::Es),
         notifications: NotificationsMode::Off,
+        skipped_update: None,
         shell: ShellView {
             pi_path: Some("C:/pi/agent".to_owned()),
             choice: Some(HomeChoiceView::Link),
@@ -366,4 +367,34 @@ fn no_value_of_the_auth_store_reaches_the_snapshot() {
     assert!(!carried.contains("SECRET"), "{carried}");
     assert!(!carried.contains("api_key"), "{carried}");
     assert!(!carried.contains("oauth"), "{carried}");
+}
+
+/// The same Settings, with a version the user skipped (0.8.0 settings-polish S1).
+fn skipping(version: &str) -> SettingsConfig {
+    SettingsConfig {
+        skipped_update: Some(version.to_owned()),
+        ..config()
+    }
+}
+
+#[test]
+fn one_load_carries_the_skipped_version_and_still_reports_it_as_published() {
+    let seams = Seams::healthy();
+
+    let read = gather(skipping("2.0.5"), &seams.reads);
+
+    assert_eq!(read.updates.skipped.as_deref(), Some("2.0.5"));
+    assert_eq!(read.updates.pi.latest.as_deref(), Some("2.0.5"));
+    assert_eq!(
+        read.updates.pi.update_available,
+        Some(true),
+        "the dialog's own load is an explicit read: it never hides the skipped version"
+    );
+}
+
+#[test]
+fn one_load_of_a_run_that_skips_nothing_carries_no_skip() {
+    let read = snapshot(&Seams::healthy());
+
+    assert_eq!(read.updates.skipped, None);
 }

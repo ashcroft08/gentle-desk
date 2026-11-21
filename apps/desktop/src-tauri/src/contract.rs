@@ -434,7 +434,29 @@ pub enum UiIntent {
     /// Check the three versions again (0.1.12, S2, S7), the same check the app
     /// runs once when it opens. It only ever CHECKS: no update is installed
     /// from here. The answer travels back on [`ViewState::updates`].
+    ///
+    /// Unlike the check that runs when the app opens, this one always reports
+    /// the real state: a version the user skipped is offered here with
+    /// [`UpdatesView::skipped`] beside it, so the pane can say so and offer to
+    /// stop skipping (0.8.0 settings-polish S2).
     CheckUpdates,
+    /// Skip the version the Updates pane offered (0.8.0 settings-polish S1): the
+    /// version the check reported, remembered in the app config so it survives a
+    /// restart, and beside the rows of every later push as
+    /// [`UpdatesView::skipped`]. From then on the check that runs when the app
+    /// opens does not offer it again; a version NEWER than the skipped one is
+    /// offered as usual (S2).
+    ///
+    /// Versions are compared as versions, never as text, and a `version` this
+    /// app cannot read as a strict `x.y.z` stores nothing - the same rule the
+    /// stored value is read with - so a bad value hides no update.
+    SkipUpdate {
+        version: String,
+    },
+    /// Stop skipping that version (S2): the next check offers it again. Answers
+    /// the re-emitted slice like every other config intent, and nothing is
+    /// installed or uninstalled by it.
+    UnskipUpdate,
     /// Read the subscription usage the shell's own sources report, and run them
     /// if they are installed: what the Usage pane asks for when it appears and
     /// on "Check again". This is the ONE run the pane makes, on the intent's own
@@ -997,6 +1019,22 @@ pub enum UpdatesStatusView {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, Type)]
 pub struct UpdatesView {
     pub status: UpdatesStatusView,
+    /// The version the user skipped (0.8.0 settings-polish S1, S2), `None`
+    /// while nothing is skipped, and always the config's own value - so it is
+    /// here before the first check has run and right after a restart.
+    ///
+    /// It travels BESIDE the rows and never instead of them: a row keeps what is
+    /// published, and only the check the app runs when it opens stops offering
+    /// that version (`update_available: false`). A check the user asked for
+    /// reports the real state with this field set, which is what the pane draws
+    /// its offer to stop skipping from. A value that is not a strict `x.y.z` is
+    /// no skip at all, so it never hides anything.
+    ///
+    /// Absent from the push while nothing is skipped, like the config's own
+    /// optional fields: a run that skipped nothing sends what older builds sent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[specta(optional)]
+    pub skipped: Option<String>,
     /// The desk itself, against the release manifest the updater reads.
     pub desk: VersionRowView,
     /// pi, against the npm registry's published version.
