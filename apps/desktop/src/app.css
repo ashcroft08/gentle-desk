@@ -2980,15 +2980,30 @@ p {
   font-size: 12px;
 }
 
-/* The Updates pane's one card: the tag and the headline, the quiet versions,
-   then the buttons and - while a chat is open - the gate's reason. */
-.settings-pane .card.updates {
+/* The sentence under a row of the Updates card is a paragraph of its own: it gets
+   the reading line-height, scoped here so the Account pane's own `.reason` reads
+   exactly as it did. The reset already gives it no margin. */
+.settings-pane .urow .reason {
+  line-height: 1.5;
+}
+
+/* The Updates pane's two cards: the three rows with their tag and - while a chat
+   is open - the gate's reason, and the extensions block, which is a card of its
+   own because no data drives it (0.8.1 settings-polish D14). */
+.settings-pane .card.updates,
+.settings-pane .card.ext {
   width: 100%;
   box-sizing: border-box;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--surface2);
   padding: 12px 16px;
+}
+
+/* The two cards of the pane are separated the way the Usage pane separates its
+   own: one declaration, no new token. */
+.settings-pane .card.updates + .card.ext {
+  margin-top: 10px;
 }
 
 .settings-pane .card.updates .head {
@@ -3004,8 +3019,26 @@ p {
   font-weight: 600;
 }
 
-.settings-pane .card.updates .headline + .headline {
-  flex-basis: 100%;
+/* The three rows of the Updates card (0.8.1 settings-polish S8): one piece each,
+   its version and its own action. The declarations are the Account pane's
+   `.provider` rows without the container's border and background, which the card
+   already draws, so both panes read at the same rhythm. */
+.settings-pane .urows {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+
+.settings-pane .urow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  padding: 7px 0;
+}
+
+.settings-pane .urow + .urow {
+  border-top: 1px dashed var(--border);
 }
 
 .settings-pane .versions {

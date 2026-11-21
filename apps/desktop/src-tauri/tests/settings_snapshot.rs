@@ -16,7 +16,7 @@ use gentle_desk_lib::contract::{
     UsageStatusView,
 };
 use gentle_desk_lib::settings::{
-    FileRead, NodeProbe, ProviderAnswer, ProviderProbe, VersionProbe, WebGet,
+    FileRead, NodeProbe, ProviderAnswer, ProviderProbe, VersionProbe, WebGet, SHELL_REGISTRY,
 };
 use gentle_desk_lib::settings_snapshot::{gather, Reads, SettingsConfig, SettingsSnapshot};
 
@@ -25,6 +25,9 @@ const REGISTRY: &str = "https://registry.npmjs.org/@earendil-works/pi-coding-age
 
 /// The release manifest the desk's own row is compared against.
 const MANIFEST: &str = "https://example.invalid/latest.json";
+
+/// The npm entry gentle-shell's published version lives in (0.8.1 S6).
+const SHELL_ENTRY: &str = SHELL_REGISTRY;
 
 /// The auth store, as the shell writes it: two providers and four values that
 /// must never travel.
@@ -59,6 +62,7 @@ fn config() -> SettingsConfig {
         theme: ThemeView::Gentle,
         language: Some(LanguageView::Es),
         notifications: NotificationsMode::Off,
+        skipped_update: None,
         shell: ShellView {
             pi_path: Some("C:/pi/agent".to_owned()),
             choice: Some(HomeChoiceView::Link),
@@ -142,6 +146,7 @@ fn web(asked: &Arc<Mutex<Vec<String>>>) -> WebGet {
         lock(&asked).push(url.to_owned());
         match url {
             REGISTRY => Ok(r#"{"version":"2.0.5"}"#.to_owned()),
+            SHELL_ENTRY => Ok(r#"{"version":"4.8.0"}"#.to_owned()),
             MANIFEST => Ok(r#"{"version":"0.2.0"}"#.to_owned()),
             other => Err(format!("{other} did not answer")),
         }
@@ -267,9 +272,14 @@ fn one_load_answers_every_section_of_the_dialog() {
     assert_eq!(read.updates.pi.current.as_deref(), Some("1.5.2"));
     assert_eq!(read.updates.pi.latest.as_deref(), Some("2.0.5"));
     assert_eq!(read.updates.pi.update_available, Some(true));
+    // The shell's row, measured against npm's stable entry (0.8.1 S6): 4.7.0
+    // against 4.8.0, so the stable upgrade is offered.
     assert_eq!(read.updates.shell.current.as_deref(), Some("4.7.0"));
-    // The shell's channel is the desk's blind spot: never measured against npm.
-    assert_eq!(read.updates.shell.update_available, None);
+    assert_eq!(read.updates.shell.latest.as_deref(), Some("4.8.0"));
+    assert_eq!(read.updates.shell.update_available, Some(true));
+    assert_eq!(read.updates.shell.reason, None);
+    // And the load says when it read all this (S8).
+    assert!(read.updates.checked_ms.is_some_and(|ms| ms > 0.0));
 }
 
 #[test]
@@ -287,8 +297,12 @@ fn one_load_asks_every_source_once_and_no_more() {
     assert_eq!(*lock(&seams.version_runs), 1, "one version probe");
     assert_eq!(
         *lock(&seams.web_gets),
-        vec![MANIFEST.to_owned(), REGISTRY.to_owned()],
-        "the desk's manifest and pi's registry, one GET each"
+        vec![
+            MANIFEST.to_owned(),
+            REGISTRY.to_owned(),
+            SHELL_ENTRY.to_owned()
+        ],
+        "the desk's manifest, pi's registry and the shell's, one GET each"
     );
 }
 
@@ -366,4 +380,34 @@ fn no_value_of_the_auth_store_reaches_the_snapshot() {
     assert!(!carried.contains("SECRET"), "{carried}");
     assert!(!carried.contains("api_key"), "{carried}");
     assert!(!carried.contains("oauth"), "{carried}");
+}
+
+/// The same Settings, with a version the user skipped (0.8.0 settings-polish S1).
+fn skipping(version: &str) -> SettingsConfig {
+    SettingsConfig {
+        skipped_update: Some(version.to_owned()),
+        ..config()
+    }
+}
+
+#[test]
+fn one_load_carries_the_skipped_version_and_still_reports_it_as_published() {
+    let seams = Seams::healthy();
+
+    let read = gather(skipping("2.0.5"), &seams.reads);
+
+    assert_eq!(read.updates.skipped.as_deref(), Some("2.0.5"));
+    assert_eq!(read.updates.pi.latest.as_deref(), Some("2.0.5"));
+    assert_eq!(
+        read.updates.pi.update_available,
+        Some(true),
+        "the dialog's own load is an explicit read: it never hides the skipped version"
+    );
+}
+
+#[test]
+fn one_load_of_a_run_that_skips_nothing_carries_no_skip() {
+    let read = snapshot(&Seams::healthy());
+
+    assert_eq!(read.updates.skipped, None);
 }

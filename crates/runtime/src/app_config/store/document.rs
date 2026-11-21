@@ -48,6 +48,11 @@ struct DocumentRef<'a> {
     /// older builds wrote.
     #[serde(skip_serializing_if = "Option::is_none")]
     last_run_version: Option<&'a str>,
+    /// The version the user skipped, written only once one is skipped, for the
+    /// same reason: a run that skipped nothing writes the document older builds
+    /// wrote.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    skipped_update: Option<&'a str>,
     workspaces: &'a [WorkspaceEntry],
 }
 
@@ -68,6 +73,7 @@ pub(super) fn bytes(config: &AppConfig) -> std::io::Result<Vec<u8>> {
         shell_home: config.shell_home,
         window: config.window,
         last_run_version: config.last_run_version.as_deref(),
+        skipped_update: config.skipped_update.as_deref(),
         workspaces: &config.workspaces,
     };
     serde_json::to_vec(&document)

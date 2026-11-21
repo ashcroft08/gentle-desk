@@ -837,7 +837,8 @@ impl AppStateHolder {
     /// workspace's chats away is the config's (D8), choosing the theme is the
     /// config's (the v1 Appearance setting), choosing the language is the
     /// config's (0.2.0, S4), choosing the notifications mode is the config's
-    /// (notifications S4), and a workspace that names no folder starts nothing.
+    /// (notifications S4), the version the user skipped is the config's (0.8.0
+    /// settings-polish S1), and a workspace that names no folder starts nothing.
     /// Answers the slice to push, `None` for the reducer's intents.
     fn config_intent(&self, intent: &UiIntent) -> Option<ViewState> {
         match intent {
@@ -848,6 +849,8 @@ impl AppStateHolder {
             UiIntent::SetLanguage { language } => Some(self.set_language(*language)),
             UiIntent::SetNotifications { mode } => Some(self.set_notifications(*mode)),
             UiIntent::SetShellHome { choice } => Some(self.set_shell_home(*choice)),
+            UiIntent::SkipUpdate { version } => Some(self.skip_update(version)),
+            UiIntent::UnskipUpdate => Some(self.unskip_update()),
             UiIntent::NewChatInWorkspace { path } if path.trim().is_empty() => Some(self.view()),
             _ => None,
         }

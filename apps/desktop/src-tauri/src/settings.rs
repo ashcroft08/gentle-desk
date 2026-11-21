@@ -38,7 +38,10 @@ mod web;
 
 pub use auth::view as auth_view;
 pub use paths::SettingsPaths;
-pub use updates::{view as updates_view, PI_REGISTRY};
+pub use updates::{
+    learned_nothing as updates_learned_nothing, view as updates_view,
+    without_skipped as updates_without_skipped, PI_REGISTRY, SHELL_REGISTRY,
+};
 pub use usage::view as usage_view;
 pub use watch::{Changed, Dirs, SettingsWatch};
 
@@ -74,7 +77,8 @@ pub type ProviderProbe =
 pub type VersionProbe = Arc<dyn Fn(Language) -> Result<String, String> + Send + Sync>;
 
 /// One GET of an https address, answering the body. Used for the release
-/// manifest (the desk's own version) and for the npm registry (pi's).
+/// manifest (the desk's own version), for pi's npm entry and for the shell's
+/// (0.8.1 settings-polish S6).
 pub type WebGet = Arc<dyn Fn(&str) -> Result<String, String> + Send + Sync>;
 
 /// How long one GET of the update check may take, connection included: the
@@ -202,12 +206,28 @@ pub fn web_get() -> WebGet {
 fn run(language: Language, args: &[OsString]) -> Result<std::process::Output, String> {
     let launcher = launcher::resolve(&LauncherEnv::from_process())
         .map_err(|error| messages::shell_could_not_be_resolved(language, &error.to_string()))?;
-    std::process::Command::new(&launcher.program)
+    let mut command = std::process::Command::new(&launcher.program);
+    command
         .args(&launcher.args)
         .args(args)
-        .stdin(std::process::Stdio::null())
+        .stdin(std::process::Stdio::null());
+    without_console(&mut command)
         .output()
         .map_err(|error| messages::shell_could_not_run(language, &error.to_string()))
+}
+
+/// Keeps a background probe from opening a console window of its own over the
+/// app (Windows only; a no-op elsewhere). Every read Settings starts on the
+/// user's behalf - versions, the sign-in checks, the usage script - runs through
+/// this, so opening the dialog never flashes a terminal. The runs that are MEANT
+/// to be seen (the update actions in `terminal.rs`) do not use it.
+pub(crate) fn without_console(command: &mut std::process::Command) -> &mut std::process::Command {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(0x0800_0000);
+    }
+    command
 }
 
 #[cfg(test)]

@@ -153,11 +153,13 @@ pub fn node_probe() -> NodeProbe {
 fn run(language: Language, script: &Path, budget: Duration) -> Result<String, String> {
     use std::process::{Command, Stdio};
 
-    let mut child = Command::new("node")
+    let mut command = Command::new("node");
+    command
         .arg(script)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
+        .stderr(Stdio::piped());
+    let mut child = super::without_console(&mut command)
         .spawn()
         .map_err(|error| messages::usage_sources_could_not_start(language, &error.to_string()))?;
     let stdout = child.stdout.take().map(drained);

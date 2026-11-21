@@ -227,6 +227,13 @@ fn every_message_without_parameters_carries_its_two_texts() {
         "Actualizar extensiones",
     );
     pair(
+        "terminal_action_upgrade_shell",
+        messages::terminal_action_upgrade_shell(Language::En),
+        "Update Gentle Shell",
+        messages::terminal_action_upgrade_shell(Language::Es),
+        "Actualizar Gentle Shell",
+    );
+    pair(
         "terminal_action_install_usage_sources",
         messages::terminal_action_install_usage_sources(Language::En),
         "Install usage sources",

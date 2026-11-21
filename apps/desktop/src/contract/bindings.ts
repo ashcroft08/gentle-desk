@@ -2211,6 +2211,12 @@ export type TerminalActionView =
  */
 "UpdateExtensions" | 
 /**
+ *  The shell's own `upgrade` (0.8.1 settings-polish S7): its stable-channel
+ *  upgrade, run from a terminal window like its `update`, and offered only
+ *  when the shell's own row is behind against npm's stable `latest`.
+ */
+"UpgradeShell" | 
+/**
  *  The shell's own install of the usage sources
  *  (`pi install git:github.com/ashcroft08/pi-usage-sources`): the one way
  *  the Usage pane offers to add them, EXPLICIT and in a terminal window the
@@ -2762,25 +2768,26 @@ export type UiIntent_Deserialize = { type: "SendPrompt"; data: {
 	mode: SessionModeChoice,
 } } | 
 /**
- *  Re-read the provider names and re-run one `auth check` per provider
- *  (0.1.12, T3). The answer travels back on [`ViewState::auth`].
+ *  Skip the version the Updates pane offered (0.8.0 settings-polish S1): the
+ *  version the check reported, remembered in the app config so it survives a
+ *  restart, and beside the rows of every later push as
+ *  [`UpdatesView::skipped`]. From then on the check that runs when the app
+ *  opens does not offer it again; a version NEWER than the skipped one is
+ *  offered as usual (S2).
+ * 
+ *  Versions are compared as versions, never as text, and a `version` this
+ *  app cannot read as a strict `x.y.z` stores nothing - the same rule the
+ *  stored value is read with - so a bad value hides no update.
  */
-{ type: "RefreshAuth" } | 
+{ type: "SkipUpdate"; data: {
+	version: string,
+} } | 
 /**
- *  Check the three versions again (0.1.12, S2, S7), the same check the app
- *  runs once when it opens. It only ever CHECKS: no update is installed
- *  from here. The answer travels back on [`ViewState::updates`].
+ *  Stop skipping that version (S2): the next check offers it again. Answers
+ *  the re-emitted slice like every other config intent, and nothing is
+ *  installed or uninstalled by it.
  */
-{ type: "CheckUpdates" } | 
-/**
- *  Read the subscription usage the shell's own sources report, and run them
- *  if they are installed: what the Usage pane asks for when it appears and
- *  on "Check again". This is the ONE run the pane makes, on the intent's own
- *  thread, because a run takes seconds and the keyboard must not wait.
- *  Nothing of it reads a chat, so no open chat can hold it back. The answer
- *  travels back on [`ViewState::usage`].
- */
-{ type: "RefreshUsage" };
+{ type: "UnskipUpdate" };
 
 /**
  *  What the user asked for, as the web side sends it. Only the intents the
@@ -3117,25 +3124,53 @@ export type UiIntent_Serialize = { type: "SendPrompt"; data: {
 	mode: SessionModeChoice,
 } } | 
 /**
- *  Re-read the provider names and re-run one `auth check` per provider
- *  (0.1.12, T3). The answer travels back on [`ViewState::auth`].
+ *  Skip the version the Updates pane offered (0.8.0 settings-polish S1): the
+ *  version the check reported, remembered in the app config so it survives a
+ *  restart, and beside the rows of every later push as
+ *  [`UpdatesView::skipped`]. From then on the check that runs when the app
+ *  opens does not offer it again; a version NEWER than the skipped one is
+ *  offered as usual (S2).
+ * 
+ *  Versions are compared as versions, never as text, and a `version` this
+ *  app cannot read as a strict `x.y.z` stores nothing - the same rule the
+ *  stored value is read with - so a bad value hides no update.
  */
-{ type: "RefreshAuth" } | 
+{ type: "SkipUpdate"; data: {
+	version: string,
+} } | 
 /**
- *  Check the three versions again (0.1.12, S2, S7), the same check the app
- *  runs once when it opens. It only ever CHECKS: no update is installed
- *  from here. The answer travels back on [`ViewState::updates`].
+ *  Stop skipping that version (S2): the next check offers it again. Answers
+ *  the re-emitted slice like every other config intent, and nothing is
+ *  installed or uninstalled by it.
  */
-{ type: "CheckUpdates" } | 
+{ type: "UnskipUpdate" };
+
 /**
- *  Read the subscription usage the shell's own sources report, and run them
- *  if they are installed: what the Usage pane asks for when it appears and
- *  on "Check again". This is the ONE run the pane makes, on the intent's own
- *  thread, because a run takes seconds and the keyboard must not wait.
- *  Nothing of it reads a chat, so no open chat can hold it back. The answer
- *  travels back on [`ViewState::usage`].
+ *  Why one row of the Updates pane has no answer (0.8.1 settings-polish S8): the
+ *  SHORT clause the pane words its row with, never the address, the status or the
+ *  client message a read failed with (D12).
+ * 
+ *  It is a reason and not a message: `None` on a row that answered, and one of
+ *  these exactly when that row's own read failed, so an unknown row always says
+ *  which read failed and why and is never drawn as "up to date".
  */
-{ type: "RefreshUsage" };
+export type UpdateReasonView = 
+/**
+ *  The lookup never reached the network: no connection, a machine that is
+ *  offline. The common failure, and the one the user can fix.
+ */
+"Offline" | 
+/**
+ *  The lookup produced no usable answer: a server that did not answer, a
+ *  status that is not a success, a body that is not the entry asked for.
+ */
+"NoAnswer" | 
+/**
+ *  The installed version could not be read: the `--version` probe did not
+ *  answer, so the row has no `current` and draws the unknown word beside this
+ *  clause.
+ */
+"InstalledUnreadable";
 
 /**
  *  Where the update check stands. It runs once when the app opens (S3) and again
@@ -3151,6 +3186,9 @@ export type UpdatesStatusView =
  *  The Updates pane (0.1.12, S2, S7): the three pieces this machine runs, and
  *  the one check the app made for them. It is read-only: no update is installed
  *  from the contract.
+ * 
+ *  It carries `f64` milliseconds, so it is `PartialEq` and not `Eq`, like
+ *  [`WelcomeChat`].
  */
 export type UpdatesView = UpdatesView_Serialize | UpdatesView_Deserialize;
 
@@ -3158,16 +3196,51 @@ export type UpdatesView = UpdatesView_Serialize | UpdatesView_Deserialize;
  *  The Updates pane (0.1.12, S2, S7): the three pieces this machine runs, and
  *  the one check the app made for them. It is read-only: no update is installed
  *  from the contract.
+ * 
+ *  It carries `f64` milliseconds, so it is `PartialEq` and not `Eq`, like
+ *  [`WelcomeChat`].
  */
 export type UpdatesView_Deserialize = {
 	status: UpdatesStatusView,
+	/**
+	 *  The version the user skipped (0.8.0 settings-polish S1, S2), `None`
+	 *  while nothing is skipped, and always the config's own value - so it is
+	 *  here before the first check has run and right after a restart.
+	 * 
+	 *  It travels BESIDE the rows and never instead of them: a row keeps what is
+	 *  published, and only the check the app runs when it opens stops offering
+	 *  that version (`update_available: false`). A check the user asked for
+	 *  reports the real state with this field set, which is what the pane draws
+	 *  its offer to stop skipping from. A value that is not a strict `x.y.z` is
+	 *  no skip at all, so it never hides anything.
+	 * 
+	 *  Absent from the push while nothing is skipped, like the config's own
+	 *  optional fields: a run that skipped nothing sends what older builds sent.
+	 */
+	skipped?: string | null,
+	/**
+	 *  When the last check that FINISHED read the machine, in epoch milliseconds
+	 *  (0.8.1 settings-polish S8): what the card's "last checked" line is worded
+	 *  from, so the pane can say when it last knew instead of leaving a blank.
+	 * 
+	 *  `None` is a run that has not finished a check at all - the card says
+	 *  "never" - and it is kept while a new check is on its way, because what is
+	 *  being checked now does not erase what was last known. An `f64` for the
+	 *  same reason [`WelcomeChat::modified_ms`] is: the generated bindings refuse
+	 *  a 64-bit integer on the wire, and a real millisecond count is exact in a
+	 *  double.
+	 */
+	checked_ms?: number | null,
 	/**  The desk itself, against the release manifest the updater reads. */
 	desk: VersionRowView_Deserialize,
 	/**  pi, against the npm registry's published version. */
 	pi: VersionRowView_Deserialize,
 	/**
-	 *  gentle-shell. Its channel decides where a newer version lives and the
-	 *  desk cannot tell the channel, so this row never claims an update.
+	 *  gentle-shell, against the npm registry's STABLE published version
+	 *  (`gentle-pi`, 0.8.1 settings-polish S6). The row carries no published
+	 *  version at all when the installed shell is not a stable `x.y.z`: a
+	 *  main-channel shell compares commit SHAs, and no npm version is its newer
+	 *  one.
 	 */
 	shell: VersionRowView_Deserialize,
 };
@@ -3176,16 +3249,51 @@ export type UpdatesView_Deserialize = {
  *  The Updates pane (0.1.12, S2, S7): the three pieces this machine runs, and
  *  the one check the app made for them. It is read-only: no update is installed
  *  from the contract.
+ * 
+ *  It carries `f64` milliseconds, so it is `PartialEq` and not `Eq`, like
+ *  [`WelcomeChat`].
  */
 export type UpdatesView_Serialize = {
 	status: UpdatesStatusView,
+	/**
+	 *  The version the user skipped (0.8.0 settings-polish S1, S2), `None`
+	 *  while nothing is skipped, and always the config's own value - so it is
+	 *  here before the first check has run and right after a restart.
+	 * 
+	 *  It travels BESIDE the rows and never instead of them: a row keeps what is
+	 *  published, and only the check the app runs when it opens stops offering
+	 *  that version (`update_available: false`). A check the user asked for
+	 *  reports the real state with this field set, which is what the pane draws
+	 *  its offer to stop skipping from. A value that is not a strict `x.y.z` is
+	 *  no skip at all, so it never hides anything.
+	 * 
+	 *  Absent from the push while nothing is skipped, like the config's own
+	 *  optional fields: a run that skipped nothing sends what older builds sent.
+	 */
+	skipped?: string,
+	/**
+	 *  When the last check that FINISHED read the machine, in epoch milliseconds
+	 *  (0.8.1 settings-polish S8): what the card's "last checked" line is worded
+	 *  from, so the pane can say when it last knew instead of leaving a blank.
+	 * 
+	 *  `None` is a run that has not finished a check at all - the card says
+	 *  "never" - and it is kept while a new check is on its way, because what is
+	 *  being checked now does not erase what was last known. An `f64` for the
+	 *  same reason [`WelcomeChat::modified_ms`] is: the generated bindings refuse
+	 *  a 64-bit integer on the wire, and a real millisecond count is exact in a
+	 *  double.
+	 */
+	checked_ms?: number | null,
 	/**  The desk itself, against the release manifest the updater reads. */
 	desk: VersionRowView_Serialize,
 	/**  pi, against the npm registry's published version. */
 	pi: VersionRowView_Serialize,
 	/**
-	 *  gentle-shell. Its channel decides where a newer version lives and the
-	 *  desk cannot tell the channel, so this row never claims an update.
+	 *  gentle-shell, against the npm registry's STABLE published version
+	 *  (`gentle-pi`, 0.8.1 settings-polish S6). The row carries no published
+	 *  version at all when the installed shell is not a stable `x.y.z`: a
+	 *  main-channel shell compares commit SHAs, and no npm version is its newer
+	 *  one.
 	 */
 	shell: VersionRowView_Serialize,
 };
@@ -3349,8 +3457,8 @@ export type UsageWindowView_Serialize = {
  *  One version row of the Updates pane: what is installed, what is published,
  *  and whether the second is newer. `update_available: None` means the
  *  comparison cannot be made - a probe that failed, a registry that did not
- *  answer, or gentle-shell's channel, which the desk cannot tell - and it is
- *  never drawn as "up to date".
+ *  answer, or a shell whose channel the desk cannot compare against npm - and it
+ *  is never drawn as "up to date".
  */
 export type VersionRowView = VersionRowView_Serialize | VersionRowView_Deserialize;
 
@@ -3358,26 +3466,44 @@ export type VersionRowView = VersionRowView_Serialize | VersionRowView_Deseriali
  *  One version row of the Updates pane: what is installed, what is published,
  *  and whether the second is newer. `update_available: None` means the
  *  comparison cannot be made - a probe that failed, a registry that did not
- *  answer, or gentle-shell's channel, which the desk cannot tell - and it is
- *  never drawn as "up to date".
+ *  answer, or a shell whose channel the desk cannot compare against npm - and it
+ *  is never drawn as "up to date".
  */
 export type VersionRowView_Deserialize = {
 	current?: string | null,
 	latest?: string | null,
 	update_available?: boolean | null,
+	/**
+	 *  Why THIS row has no answer, when its own read failed (0.8.1
+	 *  settings-polish S8): the lookup that would have named the published
+	 *  version, or the installed-version probe that would have named `current`.
+	 * 
+	 *  Absent from the push for a row that answered, like the config's own
+	 *  optional fields, so a healthy machine sends what older builds sent.
+	 */
+	reason?: UpdateReasonView | null,
 };
 
 /**
  *  One version row of the Updates pane: what is installed, what is published,
  *  and whether the second is newer. `update_available: None` means the
  *  comparison cannot be made - a probe that failed, a registry that did not
- *  answer, or gentle-shell's channel, which the desk cannot tell - and it is
- *  never drawn as "up to date".
+ *  answer, or a shell whose channel the desk cannot compare against npm - and it
+ *  is never drawn as "up to date".
  */
 export type VersionRowView_Serialize = {
 	current: string | null,
 	latest: string | null,
 	update_available: boolean | null,
+	/**
+	 *  Why THIS row has no answer, when its own read failed (0.8.1
+	 *  settings-polish S8): the lookup that would have named the published
+	 *  version, or the installed-version probe that would have named `current`.
+	 * 
+	 *  Absent from the push for a row that answered, like the config's own
+	 *  optional fields, so a healthy machine sends what older builds sent.
+	 */
+	reason?: UpdateReasonView,
 };
 
 /**

@@ -73,6 +73,9 @@ export function viewState(overrides: Partial<ViewState_Serialize> = {}): ViewSta
     auth: { status: { type: 'Unknown' }, providers: [] },
     updates: {
       status: 'Unknown',
+      // `skipped` is absent while nothing is skipped: the field is the config's
+      // own, read by the pane and the gear's dot (0.8.0 settings-polish S1), and
+      // the push leaves it out until the user skips a version.
       desk: { current: null, latest: null, update_available: null },
       pi: { current: null, latest: null, update_available: null },
       shell: { current: null, latest: null, update_available: null },

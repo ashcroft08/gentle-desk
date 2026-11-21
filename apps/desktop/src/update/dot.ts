@@ -7,11 +7,26 @@
 // only repeat it. A row the check could not read (`null`) is unknown, never
 // "behind", and a check on its way keeps the rows it already read, so the dot
 // does not blink off while "Check again" runs.
+//
+// The version the user skipped is no promise either (0.8.0 settings-polish S2):
+// they already said no to it, and the check the app runs when it opens does not
+// offer it again. A version NEWER than the skipped one is a promise as usual, and
+// the skip is read as a version, so a value this app cannot compare hides nothing.
 
-import type { UpdatesView_Serialize as UpdatesView } from '../contract/bindings'
+import type {
+  UpdatesView_Serialize as UpdatesView,
+  VersionRowView_Serialize as VersionRow,
+} from '../contract/bindings'
+import { sameVersion } from './version'
+
+/** Whether `row` is behind and is not the version the user skipped. */
+function waiting(row: VersionRow, skipped: string | null): boolean {
+  return row.update_available === true && !sameVersion(row.latest, skipped)
+}
 
 /** Whether a row the app updates from a terminal is behind. */
 export function updateWaiting(updates: UpdatesView | null): boolean {
   if (updates === null) return false
-  return updates.pi.update_available === true || updates.shell.update_available === true
+  const skipped = updates.skipped ?? null
+  return waiting(updates.pi, skipped) || waiting(updates.shell, skipped)
 }

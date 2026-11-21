@@ -453,6 +453,14 @@ pub const fn terminal_action_update_extensions(language: Language) -> &'static s
     }
 }
 
+/// "Actualizar Gentle Shell" / "Update Gentle Shell"
+pub const fn terminal_action_upgrade_shell(language: Language) -> &'static str {
+    match language {
+        Language::En => "Update Gentle Shell",
+        Language::Es => "Actualizar Gentle Shell",
+    }
+}
+
 /// "Install usage sources"
 pub const fn terminal_action_install_usage_sources(language: Language) -> &'static str {
     match language {

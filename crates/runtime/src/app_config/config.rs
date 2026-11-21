@@ -14,7 +14,9 @@
 //! ([`AppConfig::notifications`]) is additive too: a file written before it
 //! existed loads with the default, and a value this version does not know loads
 //! the same way; it is not written while it IS the default, so such a file stays
-//! what older builds wrote.
+//! what older builds wrote. So is the version the user skipped
+//! ([`AppConfig::skipped_update`]): absent, mistyped or a value this app cannot
+//! compare as a version reads as "nothing skipped".
 
 use serde::{Deserialize, Deserializer, Serialize};
 
@@ -86,6 +88,19 @@ pub struct AppConfig {
         skip_serializing_if = "Option::is_none"
     )]
     pub last_run_version: Option<String>,
+    /// The version the user chose not to be offered again (0.8.0 settings-polish
+    /// S1, S2): the one the Updates pane's "Skip this version" skipped, `None`
+    /// while nothing is skipped. An ADDITIVE field like the theme, read
+    /// leniently: an absent value, a value that is not text, and a text that is
+    /// not the strict `x.y.z` this app compares versions as
+    /// ([`crate::updates::parse`]) are all `None`, never a damaged file - and a
+    /// version the app cannot compare is no skip at all, so it hides nothing.
+    ///
+    /// What a saved file holds is the write shape's decision alone
+    /// (`store::document`'s `DocumentRef`), so this field carries no
+    /// `skip_serializing_if` of its own.
+    #[serde(default, deserialize_with = "skipped_version_or_none")]
+    pub skipped_update: Option<String>,
     /// The added workspaces, in the order they were added.
     pub workspaces: Vec<WorkspaceEntry>,
 }
@@ -100,6 +115,7 @@ impl Default for AppConfig {
             shell_home: None,
             window: None,
             last_run_version: None,
+            skipped_update: None,
             workspaces: Vec::new(),
         }
     }
@@ -122,6 +138,30 @@ where
         .as_ref()
         .and_then(serde_json::Value::as_str)
         .and_then(Language::parse))
+}
+
+/// `version` as the skip stores it: trimmed, and only while it is the strict
+/// `x.y.z` the comparison reads.
+fn stored_version(version: &str) -> Option<String> {
+    let version = version.trim();
+    crate::updates::parse(version).map(|_| version.to_owned())
+}
+
+/// Reads the stored skipped version through [`crate::updates::parse`], the one
+/// reader of a version this app compares: a strict `x.y.z` (trimmed) is kept,
+/// and anything else - a number, a flag, a list, an empty string, `v2.0.5`,
+/// `2.0.5-beta.1`, a word - reads as "nothing skipped". A skip this version
+/// cannot compare must hide no update, and it must not turn the document into a
+/// damaged one either, so the workspaces under it survive what the field holds.
+fn skipped_version_or_none<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let stored = Option::<serde_json::Value>::deserialize(deserializer)?;
+    Ok(stored
+        .as_ref()
+        .and_then(serde_json::Value::as_str)
+        .and_then(stored_version))
 }
 
 /// One folder the user added, with its state in the sidebar.
@@ -185,6 +225,35 @@ impl AppConfig {
             return false;
         }
         self.last_run_version = Some(version.to_owned());
+        true
+    }
+
+    /// Skips `version`: what the Updates pane's "Skip this version" stores, so
+    /// the check that runs when the app opens stops offering it (S2).
+    ///
+    /// Answers whether it changed: the same version again changes nothing, so
+    /// nothing is saved and no revision moves, and a value that is not the
+    /// strict `x.y.z` this app compares versions as stores nothing at all
+    /// ([`stored_version`]) - the same rule the stored value is read with.
+    pub fn set_skipped_update(&mut self, version: &str) -> bool {
+        let Some(version) = stored_version(version) else {
+            return false;
+        };
+        if self.skipped_update.as_deref() == Some(version.as_str()) {
+            return false;
+        }
+        self.skipped_update = Some(version);
+        true
+    }
+
+    /// Stops skipping: the pane's "Stop skipping", so the next check offers that
+    /// version again. Answers whether there was a skip to stop: a second stop
+    /// changes nothing, so nothing is saved and no revision moves.
+    pub fn clear_skipped_update(&mut self) -> bool {
+        if self.skipped_update.is_none() {
+            return false;
+        }
+        self.skipped_update = None;
         true
     }
 

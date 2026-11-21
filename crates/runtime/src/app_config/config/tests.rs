@@ -330,3 +330,62 @@ fn the_two_notification_modes_are_named_the_way_the_file_stores_them() {
     );
     assert_eq!(Notifications::from_name("WhenUnfocused"), None);
 }
+
+#[test]
+fn a_default_config_skips_no_version() {
+    assert_eq!(AppConfig::default().skipped_update, None);
+}
+
+#[test]
+fn skipping_a_version_reports_whether_it_changed_and_keeps_one_skip() {
+    let mut config = AppConfig::default();
+    assert!(config.set_skipped_update(" 2.0.5 "));
+    assert_eq!(
+        config.skipped_update.as_deref(),
+        Some("2.0.5"),
+        "the stored version is trimmed, so it compares as the one the check reported"
+    );
+    assert!(
+        !config.set_skipped_update("2.0.5"),
+        "the same skip again changes nothing, so nothing is saved"
+    );
+    assert!(
+        config.set_skipped_update("2.0.6"),
+        "one skip at a time: a newer skip replaces the one before it"
+    );
+    assert_eq!(config.skipped_update.as_deref(), Some("2.0.6"));
+}
+
+#[test]
+fn a_version_that_is_not_a_strict_xyz_stores_no_skip() {
+    // The comparison the pane and the check make is `x.y.z`'s own
+    // (gentle_runtime::updates::parse): a value it cannot compare is no skip at
+    // all, so it never hides an update.
+    let mut config = AppConfig::default();
+    for bad in [
+        "",
+        "   ",
+        "2",
+        "2.0",
+        "2.0.5.1",
+        "v2.0.5",
+        "2.0.5-beta.1",
+        "latest",
+    ] {
+        assert!(!config.set_skipped_update(bad), "{bad:?} was stored");
+        assert_eq!(config.skipped_update, None, "{bad:?} was stored");
+    }
+}
+
+#[test]
+fn stopping_the_skip_answers_whether_anything_was_skipped() {
+    let mut config = AppConfig::default();
+    assert!(!config.clear_skipped_update(), "nothing was skipped");
+    assert!(config.set_skipped_update("2.0.5"));
+    assert!(config.clear_skipped_update());
+    assert_eq!(config.skipped_update, None);
+    assert!(
+        !config.clear_skipped_update(),
+        "a second stop changes nothing, so nothing is saved"
+    );
+}

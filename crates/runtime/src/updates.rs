@@ -15,10 +15,12 @@
 //!
 //! - pi: `pi --version` (read from `gentle-shell --version`, which prints both)
 //!   against `registry.npmjs.org/@earendil-works/pi-coding-agent/latest`.
-//! - gentle-shell: its channel decides. A main-channel shell compares GitHub
-//!   commit SHAs and is never compared against npm, and the desk cannot tell the
-//!   channel cheaply, so the shell's `latest` stays unknown here: the pane shows
-//!   its version and says nothing about an update it cannot prove.
+//! - gentle-shell: its channel used to decide, and the desk could not tell the
+//!   channel, so its `latest` stayed unknown. 0.8.1 (settings-polish S6) measures
+//!   it against npm's STABLE `latest` instead (`registry.npmjs.org/gentle-pi`),
+//!   and keeps the channel rule as a safety rule: a main-channel shell compares
+//!   GitHub commit SHAs, so a version that is not a stable `x.y.z` is never
+//!   measured against npm at all ([`stable_row`]).
 
 use std::cmp::Ordering;
 
@@ -68,12 +70,6 @@ pub fn is_older(current: &str, latest: &str) -> bool {
 /// only made when both are there, so a probe that failed never looks like an
 /// update, and a registry that did not answer never looks like "up to date".
 pub fn row(current: Option<&str>, latest: Option<&str>) -> VersionRow {
-    let clean = |version: Option<&str>| {
-        version
-            .map(str::trim)
-            .filter(|version| !version.is_empty())
-            .map(str::to_owned)
-    };
     let current = clean(current);
     let latest = clean(latest);
     let update_available = match (current.as_deref(), latest.as_deref()) {
@@ -85,6 +81,36 @@ pub fn row(current: Option<&str>, latest: Option<&str>) -> VersionRow {
         latest,
         update_available,
     }
+}
+
+/// One version as a row carries it: trimmed, and `None` for nothing at all.
+fn clean(version: Option<&str>) -> Option<String> {
+    version
+        .map(str::trim)
+        .filter(|version| !version.is_empty())
+        .map(str::to_owned)
+}
+
+/// The shell's own row against the npm registry's stable `latest` (0.8.1
+/// settings-polish S6), with the safety rule the channel decision used to be:
+/// only an INSTALLED version that is a stable `x.y.z` is measured.
+///
+/// A main-channel shell compares GitHub commit SHAs (`4.9.0-main.abc123`), and
+/// no npm version can be shown as its newer one without announcing an update
+/// that channel cannot install. So a version that `parse` does not accept - a
+/// prerelease, a build suffix, a channel marker, a word - leaves the row with
+/// the version it RUNS, no published version, and no claim either way: unknown
+/// stays unknown, never behind and never "up to date".
+pub fn stable_row(current: Option<&str>, latest: Option<&str>) -> VersionRow {
+    let installed = current.map(str::trim);
+    if !installed.is_some_and(|installed| parse(installed).is_some()) {
+        return VersionRow {
+            current: clean(current),
+            latest: None,
+            update_available: None,
+        };
+    }
+    row(current, latest)
 }
 
 /// What `gentle-shell --version` printed, split into the two versions it names.
@@ -234,6 +260,66 @@ mod tests {
                 pi: None
             }
         );
+    }
+
+    /// S6's safety rule: the shell's row is compared against npm's stable
+    /// `latest` only when the version it RUNS is a stable `x.y.z` too.
+    #[test]
+    fn a_stable_installed_shell_is_measured_against_the_registry() {
+        assert_eq!(
+            stable_row(Some("4.8.0"), Some("4.9.2")),
+            VersionRow {
+                current: Some("4.8.0".to_owned()),
+                latest: Some("4.9.2".to_owned()),
+                update_available: Some(true),
+            }
+        );
+        assert_eq!(
+            stable_row(Some("4.9.2"), Some("4.9.2")).update_available,
+            Some(false)
+        );
+    }
+
+    /// A main-channel build compares GitHub commit SHAs; measuring it against
+    /// npm's `latest` would announce an update nobody can install that way. The
+    /// row keeps the version it runs, carries no published version at all, and
+    /// claims nothing - neither an update nor "up to date".
+    #[test]
+    fn an_installed_version_that_is_not_a_stable_version_is_never_measured() {
+        for installed in [
+            "4.9.0-main.abc123",
+            "4.9.2-beta.1",
+            "4.9.2+build.7",
+            "dev",
+            "v4.9.2",
+            "",
+        ] {
+            let row = stable_row(Some(installed), Some("4.9.2"));
+            assert_eq!(row.latest, None, "{installed:?} carries no latest");
+            assert_eq!(
+                row.update_available, None,
+                "{installed:?} is unknown, never behind and never up to date"
+            );
+        }
+        assert_eq!(
+            stable_row(Some("4.9.0-main.abc123"), Some("4.9.2")).current,
+            Some("4.9.0-main.abc123".to_owned()),
+            "the version it runs is still shown"
+        );
+        assert_eq!(
+            stable_row(None, Some("4.9.2")).update_available,
+            None,
+            "a probe that did not answer leaves nothing to compare"
+        );
+    }
+
+    /// The published side keeps the strict rule: a prerelease on npm is no
+    /// update for a stable install either.
+    #[test]
+    fn a_published_prerelease_is_no_update_for_a_stable_shell() {
+        let row = stable_row(Some("4.9.2"), Some("4.10.0-rc.1"));
+        assert_eq!(row.latest.as_deref(), Some("4.10.0-rc.1"));
+        assert_eq!(row.update_available, Some(false));
     }
 
     #[test]

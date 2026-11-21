@@ -496,3 +496,132 @@ fn a_rewrite_for_the_notifications_field_keeps_every_other_setting() {
     assert_eq!(back.config.workspaces.len(), 1);
     assert!(back.config.workspaces[0].collapsed);
 }
+
+/// A v1 document as the version BEFORE "skip this version" wrote it.
+const WITHOUT_SKIP: &[u8] = br#"{"version":1,"theme":"dark","language":"es","notifications":"off","shell_home":"isolated","workspaces":[{"path":"C:/dev/p","collapsed":true}]}"#;
+
+#[test]
+fn a_config_without_the_skipped_field_skips_no_version() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = config_file(dir.path());
+    write_damaged(&path, WITHOUT_SKIP);
+
+    let loaded = load(&path);
+
+    assert_eq!(loaded.notice, None, "an older file is still this document");
+    assert_eq!(
+        loaded.config.skipped_update, None,
+        "nothing skipped is what a file written before the field says"
+    );
+    assert_eq!(loaded.config.theme, crate::app_config::Theme::Dark);
+    assert_eq!(
+        loaded.config.workspaces.len(),
+        1,
+        "the rest of the file is kept"
+    );
+}
+
+#[test]
+fn the_skipped_version_survives_the_file() {
+    // S1: the skip is remembered in the app config, so a restart keeps it.
+    let dir = tempfile::tempdir().unwrap();
+    let path = config_file(dir.path());
+    let mut config = AppConfig::default();
+    assert!(config.add_workspace(r"C:\dev\p"));
+    assert!(config.set_skipped_update("2.0.5"));
+
+    save(&path, &config).unwrap();
+
+    let loaded = load(&path);
+    assert_eq!(loaded.notice, None);
+    assert_eq!(loaded.config, config, "the skip did not survive the file");
+    assert_eq!(loaded.config.skipped_update.as_deref(), Some("2.0.5"));
+}
+
+#[test]
+fn the_saved_document_carries_the_skipped_version_and_omits_it_while_unset() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = config_file(dir.path());
+    let mut config = AppConfig::default();
+    save(&path, &config).unwrap();
+    let document: serde_json::Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    assert_eq!(
+        document.get("skipped_update"),
+        None,
+        "a run that skipped nothing writes the document older builds wrote"
+    );
+
+    assert!(config.set_skipped_update("2.0.5"));
+    save(&path, &config).unwrap();
+    let document: serde_json::Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    assert_eq!(document["skipped_update"], serde_json::json!("2.0.5"));
+    assert_eq!(document["version"], serde_json::json!(CONFIG_VERSION));
+}
+
+#[test]
+fn a_mistyped_or_unparsable_skipped_value_reads_as_no_skip_and_keeps_the_rest_of_the_file() {
+    for value in [
+        serde_json::json!(2),
+        serde_json::json!(true),
+        serde_json::json!(["2.0.5"]),
+        serde_json::json!({"version": "2.0.5"}),
+        serde_json::json!(""),
+        serde_json::json!("v2.0.5"),
+        serde_json::json!("2.0.5-beta.1"),
+        serde_json::json!("latest"),
+    ] {
+        let dir = tempfile::tempdir().unwrap();
+        let path = config_file(dir.path());
+        let document = format!(
+            r#"{{"version":1,"theme":"Gentle","notifications":"off","skipped_update":{},"workspaces":[{{"path":"C:/dev/p","collapsed":true}}]}}"#,
+            value
+        );
+        write_damaged(&path, document.as_bytes());
+
+        let loaded = load(&path);
+
+        assert_eq!(
+            loaded.notice, None,
+            "{value} is not a damaged file: the skip is one field of it"
+        );
+        assert_eq!(
+            loaded.config.skipped_update, None,
+            "{value} is not a version this app compares, so it skips nothing"
+        );
+        assert_eq!(loaded.config.theme, crate::app_config::Theme::Gentle);
+        assert_eq!(
+            loaded.config.notifications,
+            crate::app_config::Notifications::Off
+        );
+        assert_eq!(loaded.config.workspaces.len(), 1);
+        assert!(loaded.config.workspaces[0].collapsed);
+        assert!(path.exists(), "the file is not moved aside");
+    }
+}
+
+#[test]
+fn a_rewrite_for_the_skip_keeps_every_other_setting() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = config_file(dir.path());
+    write_damaged(&path, WITHOUT_SKIP);
+    let mut loaded = load(&path).config;
+
+    assert!(loaded.set_skipped_update("2.0.5"));
+    save(&path, &loaded).unwrap();
+
+    let back = load(&path);
+    assert_eq!(back.notice, None);
+    assert_eq!(back.config.skipped_update.as_deref(), Some("2.0.5"));
+    assert_eq!(back.config.theme, crate::app_config::Theme::Dark);
+    assert_eq!(back.config.language, Some(gentle_core::i18n::Language::Es));
+    assert_eq!(
+        back.config.notifications,
+        crate::app_config::Notifications::Off
+    );
+    assert_eq!(
+        back.config.shell_home,
+        Some(gentle_backend::home::HomeChoice::Isolated)
+    );
+    assert_eq!(back.config.workspaces.len(), 1);
+    assert!(back.config.workspaces[0].collapsed);
+}

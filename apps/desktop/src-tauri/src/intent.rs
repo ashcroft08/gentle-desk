@@ -42,6 +42,9 @@ pub fn to_intent(state: &gentle_app::AppState, intent: &UiIntent) -> Option<gent
         UiIntent::SetNotifications { .. } => return None,
         // So is the chosen home (shell-choice): a field of the config.
         UiIntent::SetShellHome { .. } => return None,
+        // And so is the version the user skipped (0.8.0 settings-polish S1): a
+        // field of the config, answered by `bridge::settings` the same way.
+        UiIntent::SkipUpdate { .. } | UiIntent::UnskipUpdate => return None,
         // The relaunch is the bridge's: it needs the window handle.
         UiIntent::RestartApp => return None,
         // So are the install and the look for the launcher.
@@ -95,10 +98,7 @@ pub fn to_intent(state: &gentle_app::AppState, intent: &UiIntent) -> Option<gent
         // is that chat's OWN child's, asked through a per-chat command of the
         // shell's own (`AppStateHolder::dispatch_commands`).
         | UiIntent::ReadSessionMode { .. }
-        | UiIntent::SetSessionMode { .. }
-        | UiIntent::RefreshAuth
-        | UiIntent::CheckUpdates
-        | UiIntent::RefreshUsage => return None,
+        | UiIntent::SetSessionMode { .. } => return None,
     })
 }
 

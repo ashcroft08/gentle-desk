@@ -16,13 +16,15 @@ function row(update_available: boolean | null): VersionRow {
   }
 }
 
-/** The pushed check with the three rows a test names. */
+/** The pushed check with the three rows a test names, and the skip beside them. */
 function updates(
   rows: { desk?: VersionRow; pi?: VersionRow; shell?: VersionRow },
   status: UpdatesView['status'] = 'Ready',
+  skipped: string | undefined = undefined,
 ): UpdatesView {
   return {
     status,
+    skipped,
     desk: rows.desk ?? row(false),
     pi: rows.pi ?? row(false),
     shell: rows.shell ?? row(false),
@@ -58,5 +60,25 @@ describe('The gear dot', () => {
     // blink off while "Check again" runs.
     expect(updateWaiting(null)).toBe(false)
     expect(updateWaiting(updates({ pi: row(true) }, 'Checking'))).toBe(true)
+  })
+
+  it('stays dark for the version the user skipped', () => {
+    // S2: a skipped version is not offered again by the check the app runs when
+    // it opens, and the gear must not promise it either.
+    expect(updateWaiting(updates({ pi: row(true) }, 'Ready', '2.0.5'))).toBe(false)
+    expect(updateWaiting(updates({ shell: row(true) }, 'Ready', '2.0.5'))).toBe(false)
+  })
+
+  it('lights up again for a version newer than the skipped one', () => {
+    expect(updateWaiting(updates({ pi: row(true) }, 'Ready', '2.0.4'))).toBe(true)
+  })
+
+  it('reads the skip as a version, and a skip it cannot read hides nothing', () => {
+    // The same version spelled with a leading zero is still the skipped one.
+    expect(updateWaiting(updates({ pi: row(true) }, 'Ready', '02.0.5'))).toBe(false)
+    // A stored value that is not a version is no skip at all.
+    expect(updateWaiting(updates({ pi: row(true) }, 'Ready', 'latest'))).toBe(true)
+    // Nothing skipped at all: the field is absent from the push.
+    expect(updateWaiting(updates({ pi: row(true) }))).toBe(true)
   })
 })
