@@ -22,8 +22,17 @@ import { accountCopy } from './account-copy'
 vi.mock('@tauri-apps/api/core', () => import('../test-support/tauri-mock').then((m) => m.coreModule()))
 vi.mock('@tauri-apps/api/event', () => import('../test-support/tauri-mock').then((m) => m.eventModule()))
 
-/** The rail's seven entries, in the order the dialog draws them. */
-const RAIL = ['Appearance', 'Shell home', 'Updates', 'Account', 'Usage', 'Language', 'About']
+/** The rail's eight entries, in the order the dialog draws them. */
+const RAIL = [
+  'Appearance',
+  'Shell home',
+  'Updates',
+  'Account',
+  'Usage',
+  'Language',
+  'Notifications',
+  'About',
+]
 const USAGE = 'Usage'
 const ACCOUNT = 'Account'
 const CLOSE = 'Close'

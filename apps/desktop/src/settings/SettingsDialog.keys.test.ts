@@ -32,8 +32,10 @@ describe('the Settings dialog keys', () => {
     const dialog = await openSettings()
 
     // Only the selected entry takes the tab: the rest are reached by key.
+    // Eight entries since notifications T4 put Notifications after Language.
     expect(rail(dialog).map((entry) => entry.getAttribute('tabindex'))).toEqual([
       '0',
+      '-1',
       '-1',
       '-1',
       '-1',

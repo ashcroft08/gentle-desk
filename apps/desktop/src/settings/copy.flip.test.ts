@@ -25,6 +25,7 @@ const RAIL_EN = [
   'Account',
   'Usage',
   'Language',
+  'Notifications',
   'About',
 ]
 const RAIL_ES = [
@@ -34,6 +35,7 @@ const RAIL_ES = [
   'Cuenta',
   'Uso',
   'Idioma',
+  'Notificaciones',
   'Acerca de',
 ]
 

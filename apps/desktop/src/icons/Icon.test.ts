@@ -15,6 +15,8 @@ const NAMES: IconName[] = [
   'settings',
   'house',
   'info',
+  // The Notifications rail entry (notifications T4): Lucide's `bell`.
+  'bell',
 ]
 
 describe('Icon', () => {

@@ -59,6 +59,7 @@ mod fatal;
 mod images;
 mod language;
 mod notice;
+mod notifications;
 mod session_mode;
 mod session_notice;
 mod settings;
@@ -784,6 +785,7 @@ impl AppStateHolder {
             fatal: self.fatal(),
             theme: self.theme_value(),
             language: self.language_value(),
+            notifications: self.notifications_value(),
             shell: self.shell_view(),
             chat_profile: self.chat_profile(),
             session_mode: self.session_mode(),
@@ -834,7 +836,8 @@ impl AppStateHolder {
     /// The intents the reducer has no answer for, answered here: folding a
     /// workspace's chats away is the config's (D8), choosing the theme is the
     /// config's (the v1 Appearance setting), choosing the language is the
-    /// config's (0.2.0, S4), and a workspace that names no folder starts nothing.
+    /// config's (0.2.0, S4), choosing the notifications mode is the config's
+    /// (notifications S4), and a workspace that names no folder starts nothing.
     /// Answers the slice to push, `None` for the reducer's intents.
     fn config_intent(&self, intent: &UiIntent) -> Option<ViewState> {
         match intent {
@@ -843,6 +846,7 @@ impl AppStateHolder {
             }
             UiIntent::SetTheme { theme } => Some(self.set_theme(*theme)),
             UiIntent::SetLanguage { language } => Some(self.set_language(*language)),
+            UiIntent::SetNotifications { mode } => Some(self.set_notifications(*mode)),
             UiIntent::SetShellHome { choice } => Some(self.set_shell_home(*choice)),
             UiIntent::NewChatInWorkspace { path } if path.trim().is_empty() => Some(self.view()),
             _ => None,
@@ -861,6 +865,13 @@ impl AppStateHolder {
     /// leaves the file exactly as it found it.
     fn language_value(&self) -> Option<Language> {
         self.config_snapshot().config.language
+    }
+
+    /// When this run notifies the user, taken off the config lock before any
+    /// state lock is taken, as the theme is. The default while no choice is
+    /// stored, which is what the config's own lenient read answers.
+    fn notifications_value(&self) -> app_config::Notifications {
+        self.config_snapshot().config.notifications
     }
 
     /// The flattened tree of the revision the state is at: built once per

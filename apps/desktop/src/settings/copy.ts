@@ -74,6 +74,7 @@ const ENGLISH: SettingsCopy = {
     account: 'Account',
     usage: 'Usage',
     language: 'Language',
+    notifications: 'Notifications',
     about: 'About',
   },
   hints: {
@@ -83,6 +84,8 @@ const ENGLISH: SettingsCopy = {
     account: 'Which providers are signed in, and where to sign in or out.',
     usage: "What each subscription has used, as the shell's own sources report it.",
     language: 'The words this app says, in English or Spanish.',
+    // The pane's one-line hint, verbatim from the approved artboard (01-pane).
+    notifications: 'A tone and a system notification while the window is not in front.',
     about: 'Which build this is.',
   },
   homeExplain:
@@ -109,6 +112,7 @@ const SPANISH: typeof ENGLISH = {
     account: 'Cuenta',
     usage: 'Uso',
     language: 'Idioma',
+    notifications: 'Notificaciones',
     about: 'Acerca de',
   },
   hints: {
@@ -118,6 +122,7 @@ const SPANISH: typeof ENGLISH = {
     account: 'Qué proveedores tienen sesión abierta y dónde iniciar o cerrar sesión.',
     usage: 'Lo que consumió cada suscripción, según las propias fuentes del shell.',
     language: 'Las palabras de esta app, en inglés o en español.',
+    notifications: 'Un tono y un aviso del sistema cuando la ventana no está al frente.',
     about: 'Qué versión es esta.',
   },
   // The two answers keep the names the home setting itself draws in Spanish

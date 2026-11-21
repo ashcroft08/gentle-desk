@@ -26,7 +26,7 @@
 // so the accents stay here for the reader.
 import type { IconName } from '../icons/shapes'
 
-/** The seven sections, as the dialog names them. */
+/** The eight sections, as the dialog names them. */
 export type Section =
   | 'appearance'
   | 'home'
@@ -34,6 +34,8 @@ export type Section =
   | 'account'
   | 'usage'
   | 'language'
+  // The tone and the toast (notifications T4): after Language and before About.
+  | 'notifications'
   | 'about'
 
 /** One rail entry: the section it draws, its glyph and its search words. */
@@ -100,6 +102,17 @@ export const SECTIONS: SectionEntry[] = [
       'language', 'words', 'english', 'spanish', 'idioma', 'palabras', 'inglés', 'español',
     ],
   },
+  // The tone and the toast (notifications S4, S5; L3): the section sits after
+  // Idioma and before Acerca de, which stays the last entry Home and End walk
+  // to. Its glyph is Lucide's `bell`, the shape the approved artboard draws.
+  {
+    id: 'notifications',
+    icon: 'bell',
+    keywords: [
+      'notifications', 'notificaciones', 'aviso', 'avisos', 'sonido', 'sound', 'alerta', 'alert',
+      'toast', 'probar', 'try',
+    ],
+  },
   {
     id: 'about',
     icon: 'info',
@@ -121,6 +134,7 @@ export const TAB_IDS: Record<Section, string> = {
   account: 'settings-tab-account',
   usage: 'settings-tab-usage',
   language: 'settings-tab-language',
+  notifications: 'settings-tab-notifications',
   about: 'settings-tab-about',
 }
 

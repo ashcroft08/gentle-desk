@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="es" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Notificaciones — 01 · el panel, con la elección por defecto</title>
+<style>
+/* Todos los valores de este bloque son los TOKENS del sistema (design/system.md,
+   tema `dark`, el de por defecto): ninguna regla de más abajo escribe un color. */
+:root{--bg:#0e1116;--surface:#151a21;--surface2:#1c222b;--border:#2b333d;--text:#e4e8ee;--muted:#9aa4b2;--faint:#7d8593;--accent:#7aa2f7;--tint:rgba(122,162,247,.14);--success:#7edc9a;--warning:#e7b455;--danger:#ff8585;--shadow:0 8px 24px rgba(0,0,0,.45)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif}
+.page{max-width:900px;margin:0 auto;padding:22px 18px 44px}
+.sheet{margin:0 0 30px}
+.kicker{margin:0 0 10px;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--faint)}
+.wrap{display:flex;justify-content:center}
+
+/* --- la tarjeta de Ajustes, como la dibuja app.css (.dlg.settings) --- */
+.dlg{container-type:inline-size;width:min(680px,100%);background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);padding:18px;display:flex;flex-direction:column;gap:14px}
+.dt{margin:0 0 6px;font-size:15px;font-weight:600}
+.body{display:flex;gap:18px;min-height:240px}
+.side{flex:none;width:184px;display:flex;flex-direction:column;gap:8px;padding:2px 14px 0 0;border-right:1px solid var(--border)}
+.find{display:flex;align-items:center;gap:6px;height:28px;padding:0 8px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--faint)}
+.find svg{flex:none;width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.find input{flex:1;min-width:0;border:0;background:transparent;color:var(--text);font:inherit;font-size:12.5px;outline:none}
+.find input::placeholder{color:var(--faint)}
+.rail{display:flex;flex-direction:column;gap:2px}
+.rail [role=tab]{display:flex;align-items:center;gap:9px;height:32px;padding:0 10px;border:0;background:transparent;color:var(--muted);border-radius:8px;font:inherit;font-size:13px;text-align:left;cursor:pointer;transition:background-color 120ms ease,color 120ms ease}
+.rail [role=tab] svg{flex:none;width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.rail [role=tab]:hover{background:var(--surface2);color:var(--text)}
+.rail [role=tab][aria-selected=true]{background:var(--tint);color:var(--accent)}
+.rail [role=tab]:focus-visible{outline:1px solid var(--accent);outline-offset:-1px}
+.pane{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;padding:2px 8px 0 2px}
+.pbody{display:flex;flex-direction:column;align-items:flex-start;width:100%}
+.pane h3{margin:0 0 4px;font-size:15px;font-weight:600}
+.hint{margin:0 0 14px;color:var(--muted);font-size:12px;line-height:1.5}
+.foot{display:flex;justify-content:flex-end;gap:8px}
+
+/* --- el panel: la fila de elección es la misma `.seg` que usa Idioma --- */
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.seg [role=radio]{border:0;background:transparent;color:var(--muted);font:inherit;font-size:12.5px;padding:5px 12px;cursor:pointer}
+.seg [role=radio]:hover{background:var(--surface2);color:var(--text)}
+.seg [role=radio][aria-checked=true]{background:var(--accent);color:var(--bg);font-weight:600}
+.seg [role=radio]:focus-visible{outline:2px solid var(--text);outline-offset:-2px}
+.why{margin:10px 0 12px;font-size:13px;line-height:1.5}
+
+/* --- acciones y sus líneas de estado, todas del panel (.settings-pane .acts / .quiet / .note) --- */
+.acts{display:flex;flex-wrap:wrap;justify-content:flex-start;gap:8px;align-items:center;margin:0}
+.btn{border:1px solid var(--border);background:var(--surface2);color:var(--text);border-radius:8px;padding:6px 14px;font:inherit;font-size:13px;cursor:pointer;transition:border-color 120ms ease,background-color 120ms ease}
+.btn:hover{border-color:var(--accent)}
+.btn:focus-visible{outline:2px solid var(--text);outline-offset:2px}
+.quiet{margin:10px 0 0;color:var(--muted);font-size:12.5px;line-height:1.5}
+.quiet .tag{margin-right:6px}
+.note{margin:8px 0 0;color:var(--faint);font-size:12px;font-style:italic;line-height:1.5}
+.tag{font-size:11px;font-weight:600;padding:3px 8px;border-radius:999px;border:1px solid currentColor;white-space:nowrap}
+.tag.ok{color:var(--success)}
+.tag.warn{color:var(--warning)}
+
+/* --- la única regla responsiva: con la VENTANA de la tarjeta estrecha (no la
+   del navegador) la elección se apila a lo ancho y el riel pasa a fila. En la
+   app, la ventana tiene minWidth 800, así que la tarjeta mide siempre 680: esto
+   es la red de seguridad, no un estado que se vea hoy. --- */
+@container (max-width:520px){
+  .body{flex-direction:column;gap:14px}
+  .side{width:auto;padding:0 0 12px;border-right:0;border-bottom:1px solid var(--border)}
+  .rail{flex-direction:row;flex-wrap:wrap}
+  .seg{flex-direction:column;width:100%}
+  .seg [role=radio]{text-align:left;padding:7px 12px}
+  .seg [role=radio]+[role=radio]{border-top:1px solid var(--border)}
+}
+
+/* --- notas del artboard: no son la app --- */
+.notes{max-width:680px;margin:14px auto 0;color:var(--muted);font-size:12.5px;line-height:1.55}
+.notes h4{margin:0 0 6px;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--faint)}
+.notes p{margin:0 0 7px}
+.notes b{color:var(--text);font-weight:600}
+.notes code{font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:12px;background:var(--surface2);border-radius:4px;padding:1px 5px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style></head><body>
+<main class="page">
+
+<div class="sheet">
+  <p class="kicker">01 · el panel, con la elección por defecto</p>
+  <div class="wrap">
+    <div class="dlg" role="dialog" aria-modal="true" aria-label="Ajustes">
+      <h2 class="dt">Ajustes</h2>
+
+      <div class="body">
+        <div class="side">
+          <div class="find">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+            <input type="search" placeholder="Buscar un ajuste…" aria-label="Buscar un ajuste">
+          </div>
+          <div class="rail" role="tablist" aria-label="Secciones de ajustes" aria-orientation="vertical">
+            <button type="button" role="tab" id="settings-tab-appearance" aria-controls="settings-pane" aria-selected="false" tabindex="-1">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10"/><path d="M12 18a6 6 0 0 0 0-12v12z"/></svg><span>Apariencia</span>
+            </button>
+            <button type="button" role="tab" id="settings-tab-home" aria-controls="settings-pane" aria-selected="false" tabindex="-1">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span>Home del shell</span>
+            </button>
+            <button type="button" role="tab" id="settings-tab-updates" aria-controls="settings-pane" aria-selected="false" tabindex="-1">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg><span>Actualizaciones</span>
+            </button>
+            <button type="button" role="tab" id="settings-tab-account" aria-controls="settings-pane" aria-selected="false" tabindex="-1">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg><span>Cuenta</span>
+            </button>
+            <button type="button" role="tab" id="settings-tab-usage" aria-controls="settings-pane" aria-selected="false" tabindex="-1">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg><span>Uso</span>
+            </button>
+            <button type="button" role="tab" id="settings-tab-language" aria-controls="settings-pane" aria-selected="false" tabindex="-1">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/></svg><span>Idioma</span>
+            </button>
+            <button type="button" role="tab" id="settings-tab-notifications" aria-controls="settings-pane" aria-selected="true" tabindex="0">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/><path d="M10.268 21a2 2 0 0 0 3.464 0"/></svg><span>Notificaciones</span>
+            </button>
+            <button type="button" role="tab" id="settings-tab-about" aria-controls="settings-pane" aria-selected="false" tabindex="-1">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg><span>Acerca de</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="pane" role="tabpanel" id="settings-pane" aria-labelledby="settings-tab-notifications" tabindex="0">
+          <div class="pbody">
+            <h3>Notificaciones</h3>
+            <p class="hint">Un tono y un aviso del sistema cuando la ventana no está al frente.</p>
+
+            <div class="seg" role="radiogroup" aria-label="Cuándo avisar">
+              <button type="button" role="radio" aria-checked="true">Cuando la ventana no está al frente</button>
+              <button type="button" role="radio" aria-checked="false" tabindex="-1">Desactivado</button>
+            </div>
+
+            <p class="why">Un tono breve y un aviso del sistema cuando una respuesta termina, cuando el agente te necesita o cuando algo falla. Sólo ocurren mientras la ventana no está al frente: con la ventana al frente, la app se queda en silencio.</p>
+
+            <div class="acts">
+              <button type="button" class="btn">Probar</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="foot"><button type="button" class="btn">Cerrar</button></div>
+    </div>
+  </div>
+
+  <div class="notes">
+    <h4>Notas del artboard</h4>
+    <p>La elección es <b>la misma fila segmentada que ya usa Idioma</b> (<code>.seg</code> del panel, <code>app.css</code>): dos respuestas, la actual en acento. No hay control nuevo, ni casilla, ni interruptor, ni tarjeta.</p>
+    <p>El riel dibuja la sección <b>después de Idioma y antes de Acerca de</b>: el orden real de hoy es Apariencia, Home del shell, Actualizaciones, Cuenta, Uso, Idioma, Acerca de, así que «entre Idioma y Cuenta» no es literal (Cuenta va cuarta). Decisión para el mantenedor.</p>
+    <p>El valor por defecto es <b>una propuesta del padre, todavía sin confirmar</b> (S4): empezar apagado es cambiar una palabra, no un control.</p>
+    <p>«Probar» es el botón normal, no el relleno de acento: la acción del panel es la elección, no la prueba. Si el mantenedor la quiere como acción principal, es <code>.btn.accent</code>.</p>
+    <p>Columna inglesa para la implementación: título <b>Notifications</b> · pista <i>A tone and a system notification while the window is not in front.</i> · grupo <b>When to notify</b> · opciones <b>When the window is not in front</b> / <b>Off</b> · botón <b>Try it</b>.</p>
+  </div>
+</div>
+
+<div class="sheet">
+  <p class="kicker">01b · la misma tarjeta a 452 px de ancho</p>
+  <div class="wrap">
+    <div class="dlg" style="width:452px" role="dialog" aria-modal="true" aria-label="Ajustes (ventana estrecha)">
+      <h2 class="dt">Ajustes</h2>
+      <div class="body">
+        <div class="side">
+          <div class="find">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+            <input type="search" placeholder="Buscar un ajuste…" aria-label="Buscar un ajuste">
+          </div>
+          <div class="rail" role="tablist" aria-label="Secciones de ajustes" aria-orientation="vertical">
+            <button type="button" role="tab" aria-controls="settings-pane-narrow" aria-selected="false" tabindex="-1">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10"/><path d="M12 18a6 6 0 0 0 0-12v12z"/></svg><span>Apariencia</span>
+            </button>
+            <button type="button" role="tab" aria-controls="settings-pane-narrow" aria-selected="false" tabindex="-1">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span>Home del shell</span>
+            </button>
+            <button type="button" role="tab" aria-controls="settings-pane-narrow" aria-selected="false" tabindex="-1">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg><span>Actualizaciones</span>
+            </button>
+            <button type="button" role="tab" aria-controls="settings-pane-narrow" aria-selected="false" tabindex="-1">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg><span>Cuenta</span>
+            </button>
+            <button type="button" role="tab" aria-controls="settings-pane-narrow" aria-selected="false" tabindex="-1">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg><span>Uso</span>
+            </button>
+            <button type="button" role="tab" aria-controls="settings-pane-narrow" aria-selected="false" tabindex="-1">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/></svg><span>Idioma</span>
+            </button>
+            <button type="button" role="tab" aria-controls="settings-pane-narrow" aria-selected="true" tabindex="0">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/><path d="M10.268 21a2 2 0 0 0 3.464 0"/></svg><span>Notificaciones</span>
+            </button>
+            <button type="button" role="tab" aria-controls="settings-pane-narrow" aria-selected="false" tabindex="-1">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg><span>Acerca de</span>
+            </button>
+          </div>
+        </div>
+        <div class="pane" role="tabpanel" id="settings-pane-narrow" tabindex="0">
+          <div class="pbody">
+            <h3>Notificaciones</h3>
+            <p class="hint">Un tono y un aviso del sistema cuando la ventana no está al frente.</p>
+            <div class="seg" role="radiogroup" aria-label="Cuándo avisar">
+              <button type="button" role="radio" aria-checked="true">Cuando la ventana no está al frente</button>
+              <button type="button" role="radio" aria-checked="false" tabindex="-1">Desactivado</button>
+            </div>
+            <p class="why">Un tono breve y un aviso del sistema cuando una respuesta termina, cuando el agente te necesita o cuando algo falla. Sólo ocurren mientras la ventana no está al frente: con la ventana al frente, la app se queda en silencio.</p>
+            <div class="acts"><button type="button" class="btn">Probar</button></div>
+          </div>
+        </div>
+      </div>
+      <div class="foot"><button type="button" class="btn">Cerrar</button></div>
+    </div>
+  </div>
+  <div class="notes">
+    <p>Es <b>una container query sobre la tarjeta</b> (<code>@container (max-width:520px)</code>): el riel pasa a fila y la elección se apila a lo ancho. Cuesta <code>container-type:inline-size</code> en <code>.dlg.settings</code> y unas diez líneas; la ventana de la app tiene <code>minWidth: 800</code>, así que hoy la tarjeta mide siempre 680 y este estado no se ve. Si el mantenedor no lo quiere, se borra esta hoja y el panel a 680 px queda igual.</p>
+  </div>
+</div>
+
+</main>
+</body></html>

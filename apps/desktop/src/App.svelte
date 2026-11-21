@@ -35,6 +35,7 @@
   import { appCopy } from './app-copy'
   import { renameSession } from './bridge'
   import { language } from './i18n/language.svelte'
+  import { startNotifications } from './notifications/notify'
 
   const thread = createThreadView()
   const chrome = createChatView()
@@ -130,6 +131,11 @@
     thread.dispose()
     chrome.dispose()
   })
+
+  // The tone and the system toast (notifications S1-S3, S6): one subscription for
+  // the run, announcing what each push says while the window is not in front. The
+  // effect's own teardown stops it and releases the focus listeners.
+  $effect(() => startNotifications({ language: () => language.current }))
 </script>
 
 <UpdateNotice

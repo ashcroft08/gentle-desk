@@ -53,3 +53,10 @@ notification plugin, detector in the web store (every trigger already arrives in
   suenan eso es algo pesado de implementar en nuestra app?"
 - L2 (2026-11-20, the maintainer, asked which): when = "Sólo si la ventana no está en foco"; kind =
   "Sonido y aviso del sistema".
+- L3 (2026-11-20, the maintainer, on the design question): "has lo mejor y mas optimo". Parent's
+  choices, recorded as decisions: the pane sits after Idioma and before Acerca de (Cuenta is 4th and
+  Idioma 6th today, so "between Language and Account" was not literal); default = on, "when the
+  window is not in front"; "Probar" is the plain button. Design: `design/notifications/` (01-pane,
+  02-try-denied, 03-off). Implementation notes from the design worker: add a `bell` icon to
+  `src/icons/shapes.ts`, search words in `sections.ts`, `.settings-pane .quiet .tag{margin-right:6px}`.
+  Exact copy, ES and EN, lives in the artboards' text (reuse verbatim).

@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="es" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ajustes 0.8.0 — 03 · Actualizaciones con «Omitir esta versión»</title>
+<style>
+/* TOKENS del sistema (design/system.md). El bloque `:root` es una copia literal
+   de theme.css: ninguna regla de más abajo escribe un color. */
+:root{--bg:#0e1116;--surface:#151a21;--surface2:#1c222b;--border:#2b333d;--text:#e4e8ee;--muted:#9aa4b2;--faint:#7d8593;--accent:#7aa2f7;--tint:rgba(122,162,247,.14);--success:#7edc9a;--warning:#e7b455;--danger:#ff8585;--shadow:0 8px 24px rgba(0,0,0,.45)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif}
+.page{max-width:900px;margin:0 auto;padding:26px 20px 44px}
+.kicker{margin:0 0 8px;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--faint)}
+.lede{margin:0 0 26px;color:var(--muted);font-size:13px;line-height:1.6}
+.lede b{color:var(--text);font-weight:600}
+.lede code{font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:12px;background:var(--surface2);border-radius:4px;padding:1px 5px}
+.wrap{display:flex;justify-content:center}
+
+/* --- la tarjeta de Ajustes, como la dibuja app.css (.dlg.settings), con los
+   arreglos de 02 ya dentro: buscador contenido, riel a 8 px de glifo y panel
+   con el relleno simétrico. --- */
+.dlg{width:min(680px,100%);background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);padding:18px;display:flex;flex-direction:column;gap:14px}
+.dt{margin:0 0 6px;font-size:15px;font-weight:600}
+.body{display:flex;gap:18px}
+.side{flex:none;width:184px;display:flex;flex-direction:column;gap:12px;padding:2px 14px 0 0;border-right:1px solid var(--border)}
+.find{display:flex;align-items:center;gap:8px;height:28px;padding:0 9px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--faint)}
+.find svg{flex:none;width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.find input{flex:1;min-width:0;padding:0;border:0;background:transparent;color:var(--text);font:inherit;font-size:12.5px;outline:none}
+.find input::placeholder{color:var(--faint)}
+.rail{display:flex;flex-direction:column;gap:2px}
+.rail [role=tab]{display:flex;align-items:center;gap:8px;height:32px;padding:0 10px;border:0;background:transparent;color:var(--muted);border-radius:8px;font:inherit;font-size:13px;text-align:left;cursor:pointer;transition:background-color 120ms ease,color 120ms ease}
+.rail [role=tab] svg{flex:none;width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.rail [role=tab]:hover{background:var(--surface2);color:var(--text)}
+.rail [role=tab][aria-selected=true]{background:var(--tint);color:var(--accent)}
+.rail [role=tab]:focus-visible{outline:1px solid var(--accent);outline-offset:-1px}
+.pane{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;padding:2px 0 0 2px}
+.pbody{display:flex;flex-direction:column;align-items:flex-start;width:100%}
+.pane h3{margin:0 0 4px;font-size:15px;font-weight:600}
+.hint{margin:0 0 14px;color:var(--muted);font-size:12px;line-height:1.5}
+.foot{display:flex;justify-content:flex-end;gap:8px;margin:0}
+.btn{border:1px solid var(--border);background:var(--surface2);color:var(--text);border-radius:8px;padding:6px 14px;font:inherit;font-size:13px;cursor:pointer;transition:border-color 120ms ease,background-color 120ms ease;white-space:nowrap}
+.btn:hover{border-color:var(--accent)}
+.btn.accent{border-color:var(--accent);background:var(--accent);color:var(--bg);font-weight:600}
+.btn[aria-disabled=true]{opacity:.55;cursor:not-allowed}
+.btn:focus-visible{outline:2px solid var(--text);outline-offset:2px}
+
+/* --- el panel de Actualizaciones (.settings-pane .card.updates y sus líneas) --- */
+.card{width:100%;border:1px solid var(--border);border-radius:12px;background:var(--surface2);padding:12px 16px}
+.head{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px}
+.tag{font-size:11px;font-weight:600;padding:3px 8px;border-radius:999px;border:1px solid currentColor;white-space:nowrap}
+.tag.warn{color:var(--warning)}
+.tag.ok{color:var(--success)}
+.headline{margin:0;font-size:13px;font-weight:600}
+.versions{margin:8px 0 0;color:var(--faint);font-size:12px;font-family:ui-monospace,'Cascadia Code',Consolas,monospace}
+
+/* La fila de acciones. DOS filas, no una: la primera es de la versión ofrecida
+   y la segunda no la conduce ningún dato (Actualizar extensiones se ofrece
+   siempre). Así el botón de extensiones no salta cuando aparece «Actualizar». */
+.acts{display:flex;flex-wrap:wrap;justify-content:flex-start;gap:8px;align-items:center;margin:12px 0 0}
+.acts.second{margin-top:8px}
+.note{margin:8px 0 0;color:var(--faint);font-size:12px;font-style:italic;line-height:1.5}
+/* La línea del omitir, con el mismo 10 px que ya usa `.seg + .why`
+   (app.css:2754) para una línea que sigue a un control. */
+.quiet{margin:10px 0 0;color:var(--muted);font-size:12.5px;line-height:1.5}
+.quiet + .acts{margin-top:12px}
+
+.figcap{margin:12px auto 0;max-width:680px;color:var(--muted);font-size:12.5px;line-height:1.55}
+.figcap b{color:var(--text);font-weight:600}
+.figcap code{font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:12px;background:var(--surface2);border-radius:4px;padding:1px 5px}
+.sheet{margin:0 0 34px}
+
+.notes{max-width:680px;margin:8px auto 0;color:var(--muted);font-size:12.5px;line-height:1.6}
+.notes h4{margin:0 0 8px;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--faint)}
+.notes p{margin:0 0 9px}
+.notes b{color:var(--text);font-weight:600}
+.notes code{font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:12px;background:var(--surface2);border-radius:4px;padding:1px 5px}
+.notes table{width:100%;border-collapse:collapse;margin:0 0 12px;font-size:12.5px}
+.notes th{text-align:left;font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);padding:0 8px 6px 0;border-bottom:1px solid var(--border)}
+.notes td{padding:6px 8px 6px 0;border-bottom:1px dashed var(--border);vertical-align:top}
+.notes td:first-child{color:var(--text);width:38%}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style></head><body>
+<main class="page">
+
+<p class="kicker">03 · Actualizaciones con «Omitir esta versión»</p>
+<p class="lede">El panel de verdad (<code>UpdatesPane.svelte</code>) en sus tres estados, con la acción nueva dibujada donde ya hay sitio para un botón normal. Lo único estructural que cambia es que las acciones pasan de <b>una fila que se recompone</b> a <b>dos filas estables</b>: la de la versión ofrecida, y la de lo que no conduce ningún dato.</p>
+
+<div class="sheet">
+  <p class="kicker">03a · hay una versión más nueva, y no se ha omitido nada</p>
+  <div class="wrap">
+    <div class="dlg" role="dialog" aria-modal="true" aria-label="Ajustes">
+      <h2 class="dt">Ajustes</h2>
+      <div class="body">
+        <div class="side">
+          <div class="find">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+            <input type="search" placeholder="Buscar un ajuste…" aria-label="Buscar un ajuste">
+          </div>
+          <div class="rail" role="tablist" aria-label="Secciones de ajustes" aria-orientation="vertical">
+            <button type="button" role="tab" aria-controls="pane-a" aria-selected="false" tabindex="-1">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10"/><path d="M12 18a6 6 0 0 0 0-12v12z"/></svg><span>Apariencia</span>
+            </button>
+            <button type="button" role="tab" aria-controls="pane-a" aria-selected="false" tabindex="-1">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span>Home del shell</span>
+            </button>
+            <button type="button" role="tab" id="tab-updates-a" aria-controls="pane-a" aria-selected="true" tabindex="0">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg><span>Actualizaciones</span>
+            </button>
+            <button type="button" role="tab" aria-controls="pane-a" aria-selected="false" tabindex="-1">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg><span>Cuenta</span>
+            </button>
+            <button type="button" role="tab" aria-controls="pane-a" aria-selected="false" tabindex="-1">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg><span>Uso</span>
+            </button>
+            <button type="button" role="tab" aria-controls="pane-a" aria-selected="false" tabindex="-1">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/></svg><span>Idioma</span>
+            </button>
+            <button type="button" role="tab" aria-controls="pane-a" aria-selected="false" tabindex="-1">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/><path d="M10.268 21a2 2 0 0 0 3.464 0"/></svg><span>Notificaciones</span>
+            </button>
+            <button type="button" role="tab" aria-controls="pane-a" aria-selected="false" tabindex="-1">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg><span>Acerca de</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="pane" role="tabpanel" id="pane-a" aria-labelledby="tab-updates-a" tabindex="0">
+          <div class="pbody">
+            <h3>Actualizaciones</h3>
+            <p class="hint">Lo que corre en esta máquina y si hay algo más nuevo.</p>
+
+            <div class="card">
+              <div class="head">
+                <span class="tag warn">Actualización disponible</span>
+                <p class="headline">pi 1.2.0 → 2.0.5</p>
+              </div>
+              <p class="versions">Esta app 0.8.0 · pi 1.2.0 · shell 4.7.0</p>
+              <div class="acts">
+                <button type="button" class="btn">Comprobar de nuevo</button>
+                <button type="button" class="btn accent">Actualizar</button>
+                <button type="button" class="btn">Omitir esta versión</button>
+              </div>
+              <div class="acts second">
+                <button type="button" class="btn">Actualizar extensiones</button>
+              </div>
+              <p class="note">Actualizar abre una ventana de terminal y ejecuta la actualización de la propia shell; lee lo que dice allí.</p>
+              <p class="note">Actualizar extensiones abre una ventana de terminal y actualiza los paquetes que tienes instalados en la shell. No hay forma de saber cuáles están atrasados, así que este botón se ofrece siempre y es seguro usarlo en cualquier momento.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="foot"><button type="button" class="btn">Cerrar</button></div>
+    </div>
+  </div>
+  <p class="figcap"><b>Omitir esta versión</b> es un botón normal (<code>.btn</code>, sin acento) y va el tercero de la fila: primero la comprobación (barata), luego la acción de acento, luego la negativa. «Actualizar» no se mueve al omitir ni al dejar de omitir, porque el botón nuevo entra siempre detrás.</p>
+</div>
+
+<div class="sheet">
+  <p class="kicker">03b · la versión ofrecida es la que se omitió: se puede dejar de omitir</p>
+  <div class="wrap">
+    <div class="dlg" role="dialog" aria-modal="true" aria-label="Ajustes">
+      <h2 class="dt">Ajustes</h2>
+      <div class="body">
+        <div class="side">
+          <div class="find">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+            <input type="search" placeholder="Buscar un ajuste…" aria-label="Buscar un ajuste">
+          </div>
+          <div class="rail" role="tablist" aria-label="Secciones de ajustes" aria-orientation="vertical">
+            <button type="button" role="tab" aria-controls="pane-b" aria-selected="false" tabindex="-1">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10"/><path d="M12 18a6 6 0 0 0 0-12v12z"/></svg><span>Apariencia</span>
+            </button>
+            <button type="button" role="tab" aria-controls="pane-b" aria-selected="false" tabindex="-1">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span>Home del shell</span>
+            </button>
+            <button type="button" role="tab" id="tab-updates-b" aria-controls="pane-b" aria-selected="true" tabindex="0">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg><span>Actualizaciones</span>
+            </button>
+            <button type="button" role="tab" aria-controls="pane-b" aria-selected="false" tabindex="-1">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg><span>Cuenta</span>
+            </button>
+            <button type="button" role="tab" aria-controls="pane-b" aria-selected="false" tabindex="-1">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg><span>Uso</span>
+            </button>
+            <button type="button" role="tab" aria-controls="pane-b" aria-selected="false" tabindex="-1">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/></svg><span>Idioma</span>
+            </button>
+            <button type="button" role="tab" aria-controls="pane-b" aria-selected="false" tabindex="-1">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/><path d="M10.268 21a2 2 0 0 0 3.464 0"/></svg><span>Notificaciones</span>
+            </button>
+            <button type="button" role="tab" aria-controls="pane-b" aria-selected="false" tabindex="-1">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg><span>Acerca de</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="pane" role="tabpanel" id="pane-b" aria-labelledby="tab-updates-b" tabindex="0">
+          <div class="pbody">
+            <h3>Actualizaciones</h3>
+            <p class="hint">Lo que corre en esta máquina y si hay algo más nuevo.</p>
+
+            <div class="card">
+              <div class="head">
+                <span class="tag warn">Actualización disponible</span>
+                <p class="headline">pi 1.2.0 → 2.0.5</p>
+              </div>
+              <p class="versions">Esta app 0.8.0 · pi 1.2.0 · shell 4.7.0</p>
+              <p class="quiet">Omitiste la 2.0.5: no se vuelve a ofrecer al abrir la app.</p>
+              <div class="acts">
+                <button type="button" class="btn">Comprobar de nuevo</button>
+                <button type="button" class="btn accent">Actualizar</button>
+                <button type="button" class="btn">Dejar de omitir</button>
+              </div>
+              <div class="acts second">
+                <button type="button" class="btn">Actualizar extensiones</button>
+              </div>
+              <p class="note">Actualizar abre una ventana de terminal y ejecuta la actualización de la propia shell; lee lo que dice allí.</p>
+              <p class="note">Actualizar extensiones abre una ventana de terminal y actualiza los paquetes que tienes instalados en la shell. No hay forma de saber cuáles están atrasados, así que este botón se ofrece siempre y es seguro usarlo en cualquier momento.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="foot"><button type="button" class="btn">Cerrar</button></div>
+    </div>
+  </div>
+  <p class="figcap">El estado real no se esconde: la etiqueta sigue diciendo <b>Actualización disponible</b> y la versión sigue a la vista, porque una comprobación pedida por el usuario siempre muestra la verdad. Lo que cambia es una línea que dice <b>qué se omitió</b> y el tercer botón, que pasa de «Omitir esta versión» a <b>«Dejar de omitir»</b> en el mismo sitio. «Actualizar» queda donde estaba.</p>
+</div>
+
+<div class="sheet">
+  <p class="kicker">03c · todo está al día</p>
+  <div class="wrap">
+    <div class="dlg" role="dialog" aria-modal="true" aria-label="Ajustes">
+      <h2 class="dt">Ajustes</h2>
+      <div class="body">
+        <div class="side">
+          <div class="find">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+            <input type="search" placeholder="Buscar un ajuste…" aria-label="Buscar un ajuste">
+          </div>
+          <div class="rail" role="tablist" aria-label="Secciones de ajustes" aria-orientation="vertical">
+            <button type="button" role="tab" aria-controls="pane-c" aria-selected="false" tabindex="-1">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10"/><path d="M12 18a6 6 0 0 0 0-12v12z"/></svg><span>Apariencia</span>
+            </button>
+            <button type="button" role="tab" aria-controls="pane-c" aria-selected="false" tabindex="-1">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span>Home del shell</span>
+            </button>
+            <button type="button" role="tab" id="tab-updates-c" aria-controls="pane-c" aria-selected="true" tabindex="0">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg><span>Actualizaciones</span>
+            </button>
+            <button type="button" role="tab" aria-controls="pane-c" aria-selected="false" tabindex="-1">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg><span>Cuenta</span>
+            </button>
+            <button type="button" role="tab" aria-controls="pane-c" aria-selected="false" tabindex="-1">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg><span>Uso</span>
+            </button>
+            <button type="button" role="tab" aria-controls="pane-c" aria-selected="false" tabindex="-1">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/></svg><span>Idioma</span>
+            </button>
+            <button type="button" role="tab" aria-controls="pane-c" aria-selected="false" tabindex="-1">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/><path d="M10.268 21a2 2 0 0 0 3.464 0"/></svg><span>Notificaciones</span>
+            </button>
+            <button type="button" role="tab" aria-controls="pane-c" aria-selected="false" tabindex="-1">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg><span>Acerca de</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="pane" role="tabpanel" id="pane-c" aria-labelledby="tab-updates-c" tabindex="0">
+          <div class="pbody">
+            <h3>Actualizaciones</h3>
+            <p class="hint">Lo que corre en esta máquina y si hay algo más nuevo.</p>
+
+            <div class="card">
+              <div class="head">
+                <span class="tag ok">Todo está al día</span>
+              </div>
+              <p class="versions">Esta app 0.8.0 · pi 2.0.5 · shell 4.7.0</p>
+              <div class="acts">
+                <button type="button" class="btn">Comprobar de nuevo</button>
+              </div>
+              <div class="acts second">
+                <button type="button" class="btn">Actualizar extensiones</button>
+              </div>
+              <p class="note">Actualizar extensiones abre una ventana de terminal y actualiza los paquetes que tienes instalados en la shell. No hay forma de saber cuáles están atrasados, así que este botón se ofrece siempre y es seguro usarlo en cualquier momento.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="foot"><button type="button" class="btn">Cerrar</button></div>
+    </div>
+  </div>
+  <p class="figcap">Sin versión ofrecida no hay nada que omitir: la acción nueva desaparece con «Actualizar» y queda sólo la comprobación. <b>Actualizar extensiones no se mueve</b>: sigue en la segunda fila, en la misma x que en los otros dos estados.</p>
+</div>
+
+<div class="notes">
+  <h4>La acción nueva, en las dos lenguas</h4>
+  <table>
+    <thead><tr><th>Español (lo dibujado)</th><th>Inglés</th></tr></thead>
+    <tbody>
+      <tr><td>Omitir esta versión</td><td>Skip this version</td></tr>
+      <tr><td>Dejar de omitir</td><td>Stop skipping</td></tr>
+      <tr><td>Omitiste la 2.0.5: no se vuelve a ofrecer al abrir la app.</td><td>You skipped 2.0.5: it is not offered again when the app opens.</td></tr>
+    </tbody>
+  </table>
+  <p>La línea se compone con la versión que trae la comprobación (el número nunca se escribe a mano, como ya hace <code>headline</code>).</p>
+
+  <h4>Qué cambia frente a hoy</h4>
+  <p><b>1 · Dos filas de acciones en vez de una.</b> <code>UpdatesPane.svelte:104-116</code> mete hoy los tres botones en un solo <code>.acts</code> con <code>flex-wrap</code>; por eso «Actualizar extensiones» salta ~100 px cuando aparece «Actualizar» (defecto 05 de la auditoría). La fila 1 pasa a ser de la versión ofrecida (Comprobar de nuevo · Actualizar · Omitir/Dejar de omitir) y la fila 2 de lo que no conduce ningún dato (Actualizar extensiones, que el propio código ya documenta como «el único botón que ningún dato conduce»). Las dos filas son <code>.settings-pane .acts</code> y siguen alineadas a la izquierda.</p>
+  <p><b>2 · El botón de omitir va tercero, no primero.</b> Primero la comprobación (barata, y así lo decidió L22), luego la acción de acento, luego la negativa. Ni «Actualizar» ni «Comprobar de nuevo» cambian de sitio entre 03a y 03b: sólo cambia la palabra del tercer botón.</p>
+  <p><b>3 · Una línea de estado, no un aviso.</b> Al omitir, el panel dice qué se omitió con <code>.quiet</code> (12,5 px en <code>--muted</code>), entre la fila de versiones y las acciones, con el mismo <code>margin-top: 10px</code> que ya usa <code>.seg + .why</code> (app.css:2754). No hay diálogo dentro del diálogo, ni etiqueta nueva, ni color nuevo: la etiqueta de la cabecera sigue siendo la de siempre.</p>
+  <p><b>4 · Nada más se mueve.</b> El anillo del bloqueo por chats abiertos (<code>.gate</code>) no aparece en estas tres hojas porque es ortogonal a omitir; sigue debajo de las acciones exactamente como hoy.</p>
+
+  <h4>Decisiones para el mantenedor</h4>
+  <p><b>D5 · qué versión manda el botón cuando hay dos filas atrás.</b> El contrato que está aterrizando guarda <b>una</b> versión (<code>UpdatesView.skipped</code>) y la compara fila por fila contra <code>row.latest</code>, así que omitir <code>2.0.5</code> silencia cualquier fila cuya versión publicada sea esa. Lo que falta decidir es qué versión manda <b>un solo botón</b> cuando pi y esta app están atrás a la vez: (a) la de pi, la fila que la terminal actualiza; (b) la más nueva de las filas atrás; (c) un «Omitir esta versión» por fila, que es el único que no elige por el usuario pero mete un control en cada titular. Dibujado queda el caso de una sola fila; recomiendo (b) mientras el botón sea uno solo.</p>
+  <p><b>D6 · qué ve el usuario al abrir Ajustes con la versión omitida · resuelto por el contrato.</b> La comprobación de arranque es la única que aplica la omisión; la lectura que hace el propio diálogo al abrirse reporta el estado real con <code>skipped</code> al lado. Por eso <b>03b es exactamente lo que el panel dibuja al abrirlo</b>, y la consecuencia que conviene confirmar es ésa: omitir calla el aviso de arranque, pero la oferta vuelve en cuanto se abre Ajustes. Es lo que pide S2 («una comprobación explícita nunca esconde información»), y si el mantenedor prefiere que el panel abra en un estado más callado, hace falta un cuarto estado que no está dibujado.</p>
+  <p><b>D7 · «Dejar de omitir» sin comprobar.</b> En 03b el botón está junto a «Actualizar», en el mismo sitio que ocupaba «Omitir esta versión». Si se prefiere como enlace discreto bajo la línea de estado, es un cambio de sitio, no de control.</p>
+  <p><b>D8 · Las notas en cursiva (defecto 08 de la auditoría).</b> Estas hojas conservan el copy de hoy, carácter por carácter, para que el cableado pueda aterrizar el botón sin tocar los textos. Unificarlas en una sola nota de dos líneas es un cambio de <code>updates-copy.ts</code> en las dos lenguas: se hace aparte, cuando el mantenedor lo pida.</p>
+</div>
+
+</main>
+</body></html>

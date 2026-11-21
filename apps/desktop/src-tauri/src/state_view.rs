@@ -16,14 +16,14 @@
 use gentle_app::{AppState, ModelsStatus};
 use gentle_core::chat::ChatMessage;
 use gentle_core::i18n::Language;
-use gentle_runtime::app_config::Theme;
+use gentle_runtime::app_config::{Notifications, Theme};
 use gentle_runtime::badge::{Badge, BadgeMark};
 
 use crate::contract::{
     AuthView, BranchView, ChatActivityMark, ChatActivityView, ChatProfileView, ContextUsageView,
     FolderView, ImageView, LanguageView, ModelChipView, ModelChoiceView, ModelListStatusView,
-    NoticeActionView, NoticeLevel, NoticeView, SessionModeView, ShellView, ThemeView, UpdatesView,
-    UsageView, ViewState, WelcomeView, WhatsNewView,
+    NoticeActionView, NoticeLevel, NoticeView, NotificationsMode, SessionModeView, ShellView,
+    ThemeView, UpdatesView, UsageView, ViewState, WelcomeView, WhatsNewView,
 };
 use crate::images::Images;
 use crate::{dialogs, helper_thread, helpers, sessions, view};
@@ -56,6 +56,8 @@ pub struct ShellParts<'a> {
     /// no preference is stored, which is when the web side starts from the
     /// system's own locale.
     pub language: Option<Language>,
+    /// When this run notifies the user, as the app config remembers it.
+    pub notifications: Notifications,
     /// The shell and home this run sees.
     pub shell: ShellView,
     /// The Profile tab's view of one chat (profiles-editor T2b-2, L11), as the
@@ -112,6 +114,7 @@ pub fn view_state(state: &AppState, sessions_revision: u32, shell: ShellParts<'_
         fatal,
         theme,
         language,
+        notifications,
         shell,
         chat_profile,
         session_mode,
@@ -179,6 +182,7 @@ pub fn view_state(state: &AppState, sessions_revision: u32, shell: ShellParts<'_
     ViewState {
         theme: view_theme(theme),
         language: view_language(language),
+        notifications: view_notifications(notifications),
         shell,
         foreground_chat: foreground.clone(),
         foreground_title: state
@@ -342,6 +346,16 @@ fn view_language(language: Option<Language>) -> Option<LanguageView> {
         Language::En => LanguageView::En,
         Language::Es => LanguageView::Es,
     })
+}
+
+/// When the app notifies the user, as the contract names it: the two enums
+/// carry the same two stored names, so the mode never travels as a string that
+/// could drift from the config file.
+fn view_notifications(notifications: Notifications) -> NotificationsMode {
+    match notifications {
+        Notifications::WhenUnfocused => NotificationsMode::WhenUnfocused,
+        Notifications::Off => NotificationsMode::Off,
+    }
 }
 
 /// The marks of the chats with something to show, in id order. The rule that

@@ -17,6 +17,9 @@ export function viewState(overrides: Partial<ViewState_Serialize> = {}): ViewSta
     theme: 'system',
     // No preference stored yet: the web starts from the system's own locale.
     language: null,
+    // Nothing was turned off: a chat that needs the user says so while the
+    // window is not in front (notifications S4).
+    notifications: 'when-unfocused',
     // No pi found, nothing chosen, nothing asked.
     shell: {
       pi_path: null,

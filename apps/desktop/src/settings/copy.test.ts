@@ -52,6 +52,7 @@ const ENGLISH_TITLES: Record<Section, string> = {
   account: 'Account',
   usage: 'Usage',
   language: 'Language',
+  notifications: 'Notifications',
   about: 'About',
 }
 
@@ -62,6 +63,7 @@ const SPANISH_TITLES: Record<Section, string> = {
   account: 'Cuenta',
   usage: 'Uso',
   language: 'Idioma',
+  notifications: 'Notificaciones',
   about: 'Acerca de',
 }
 
@@ -72,6 +74,7 @@ const ENGLISH_HINTS: Record<Section, string> = {
   account: 'Which providers are signed in, and where to sign in or out.',
   usage: "What each subscription has used, as the shell's own sources report it.",
   language: 'The words this app says, in English or Spanish.',
+  notifications: 'A tone and a system notification while the window is not in front.',
   about: 'Which build this is.',
 }
 
@@ -82,6 +85,7 @@ const SPANISH_HINTS: Record<Section, string> = {
   account: 'Qué proveedores tienen sesión abierta y dónde iniciar o cerrar sesión.',
   usage: 'Lo que consumió cada suscripción, según las propias fuentes del shell.',
   language: 'Las palabras de esta app, en inglés o en español.',
+  notifications: 'Un tono y un aviso del sistema cuando la ventana no está al frente.',
   about: 'Qué versión es esta.',
 }
 

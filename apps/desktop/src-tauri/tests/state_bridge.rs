@@ -10,7 +10,8 @@ use gentle_app::{ChatId, Input, Intent};
 use gentle_desk_lib::bridge::AppStateHolder;
 use gentle_desk_lib::contract::{
     AuthView, ContextUsageView, InstallView, ListStatusView, ModelChipView, ModelListStatusView,
-    NoticeLevel, ShellView, ThemeView, UiIntent, UpdatesView, UsageView, ViewState, WelcomeView,
+    NoticeLevel, NotificationsMode, ShellView, ThemeView, UiIntent, UpdatesView, UsageView,
+    ViewState, WelcomeView,
 };
 
 #[test]
@@ -80,6 +81,9 @@ fn the_view_state_slice_has_no_invented_fields() {
             // No language was chosen yet, so the web side starts from the
             // system's own locale.
             language: None,
+            // Nothing was turned off, so a chat that needs the user says so
+            // while the window is not in front (notifications S4).
+            notifications: NotificationsMode::WhenUnfocused,
             // No pi found, nothing chosen, so nothing is asked.
             shell: ShellView {
                 pi_path: None,
