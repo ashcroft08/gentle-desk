@@ -91,4 +91,61 @@ describe('the Updates card', () => {
     expect(app.appOnly).toBe(true)
     expect(app.headlines).toEqual([{ label: 'This app', current: '0.1.11', latest: '0.1.12' }])
   })
+  it('names the version Skip this version would skip, from a row a terminal updates', () => {
+    const card = drawn(updates())
+
+    expect(card.skipTarget).toBe('2.0.5')
+    expect(card.skipping).toBe(false)
+  })
+
+  it('offers nothing left to skip once that version is the skipped one', () => {
+    // The check the user asks for reports the real state, so the row is still
+    // behind and the pane keeps saying so - with the way to stop skipping.
+    const card = drawn(updates({ skipped: '2.0.5' }))
+
+    expect(card.available).toBe(true)
+    expect(card.skipTarget).toBeNull()
+    expect(card.skipping).toBe(true)
+  })
+
+  it('offers a version newer than the skipped one as usual', () => {
+    const card = drawn(updates({ skipped: '2.0.4' }))
+
+    expect(card.skipTarget).toBe('2.0.5')
+    expect(card.skipping).toBe(false)
+  })
+
+  it("never names this app's own release: the banner installs that one", () => {
+    const card = drawn(
+      updates({
+        desk: { current: '0.1.11', latest: '0.1.12', update_available: true },
+        pi: { current: '2.0.5', latest: '2.0.5', update_available: false },
+      }),
+    )
+
+    expect(card.available).toBe(true)
+    expect(card.appOnly).toBe(true)
+    expect(card.skipTarget).toBeNull()
+  })
+
+  it('names what a terminal updates when only the shell is behind', () => {
+    const card = drawn(
+      updates({
+        pi: { current: '2.0.5', latest: '2.0.5', update_available: false },
+        shell: { current: '4.7.0', latest: '4.8.0', update_available: true },
+      }),
+    )
+
+    expect(card.skipTarget).toBe('4.8.0')
+  })
+
+  it('reads the skip as a version, and a skip it cannot read hides nothing', () => {
+    const other = drawn(updates({ skipped: '02.0.5' }))
+    expect(other.skipTarget).toBeNull()
+    expect(other.skipping).toBe(true)
+
+    const unreadable = drawn(updates({ skipped: 'latest' }))
+    expect(unreadable.skipTarget).toBe('2.0.5')
+    expect(unreadable.skipping).toBe(false)
+  })
 })

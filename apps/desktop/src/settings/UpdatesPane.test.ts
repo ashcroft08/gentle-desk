@@ -151,7 +151,7 @@ describe('the Updates pane', () => {
       button.textContent?.replace(/\s+/g, ' ').trim(),
     )
 
-    expect(names).toEqual([copy.checkAgain, copy.update, copy.updateExtensions])
+    expect(names).toEqual([copy.checkAgain, copy.update, copy.skipVersion, copy.updateExtensions])
     const check = within(pane).getByRole('button', { name: copy.checkAgain })
     expect(check.classList.contains('accent')).toBe(false)
     expect([...row.querySelectorAll('.accent')].map((button) => button.textContent?.trim())).toEqual([
@@ -208,5 +208,42 @@ describe('the Updates pane', () => {
     // A check, never an install: no terminal window opens and no intent leaves.
     expect(handlerArgs('dispatch_intent')).toEqual([])
     expect(handlerArgs('open_terminal')).toEqual([])
+  })
+  it('offers Skip this version beside the one on offer, plain and unaccented', async () => {
+    const again = ask()
+    const pane = draw(updates(), 0, false, again)
+    const skip = within(pane).getByRole('button', { name: copy.skipVersion })
+
+    expect(skip.classList.contains('accent')).toBe(false)
+    await fireEvent.click(skip)
+    // The version the check offered is the one the intent names, and the pane
+    // asks for the one read again so the card shows the skip it just made.
+    expect(handlerArgs('dispatch_intent')).toEqual([
+      { intent: { type: 'SkipUpdate', data: { version: '2.0.5' } } },
+    ])
+    expect(again).toHaveBeenCalledTimes(1)
+  })
+
+  it('draws no Skip this version while nothing newer is offered, and none before a check', () => {
+    const upToDate = draw(current())
+    expect(within(upToDate).queryByRole('button', { name: copy.skipVersion })).toBeNull()
+    expect(within(upToDate).queryByRole('button', { name: copy.stopSkipping })).toBeNull()
+
+    const notChecked = draw(updates({ status: 'Unknown' }))
+    expect(within(notChecked).queryByRole('button', { name: copy.skipVersion })).toBeNull()
+  })
+
+  it('offers Stop skipping when the version on offer is the skipped one', async () => {
+    const again = ask()
+    const pane = draw(updates({ skipped: '2.0.5' }), 0, false, again)
+
+    // The check the user asked for says the truth: the version is published, and
+    // it is the one they skipped - so the way back is what is offered.
+    expect(within(pane).queryByRole('button', { name: copy.skipVersion })).toBeNull()
+    const stop = within(pane).getByRole('button', { name: copy.stopSkipping })
+    expect(stop.classList.contains('accent')).toBe(false)
+    await fireEvent.click(stop)
+    expect(handlerArgs('dispatch_intent')).toEqual([{ intent: { type: 'UnskipUpdate' } }])
+    expect(again).toHaveBeenCalledTimes(1)
   })
 })

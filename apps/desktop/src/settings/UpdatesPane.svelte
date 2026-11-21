@@ -23,7 +23,17 @@
   // touches the packages the shell has installed, and nothing can tell which of
   // them are behind, so there is no check to wait for and it is drawn in every
   // state, safe to press any time. It obeys the same chats-closed gate.
-  import { openTerminal } from '../bridge'
+  //
+  // "Skip this version" (0.8.0 settings-polish S1, S2) is the quiet one: a plain
+  // secondary `.btn` beside the version on offer, drawn only while there is
+  // something to skip, and "Stop skipping" once the version on offer is the one
+  // the user skipped. Both are intents the bridge answers - the skip is a field of
+  // the app config - and the pane asks for the dialog's one read again after them,
+  // so the card shows the skip it just made. Neither is held back by the
+  // chats-closed gate: skipping installs nothing, it only says which version the
+  // app should stop offering. No layout or CSS is invented here: the design pass
+  // restyles these buttons with the rest of the row.
+  import { dispatchIntent, openTerminal } from '../bridge'
   import type { UpdatesView_Serialize as UpdatesView } from '../contract/bindings'
   import { language } from '../i18n/language.svelte'
   import { cardOf } from './updates'
@@ -74,6 +84,25 @@
     if (blocked) return
     terminalError = await openTerminal('UpdateExtensions')
   }
+
+  /**
+   * Skips the version on offer: the one the card named, never one this pane
+   * guessed. Nothing is installed or uninstalled by it - the next check simply
+   * stops offering that version - and the dialog's one read is asked again so the
+   * card draws the skip it just made.
+   */
+  async function skip(): Promise<void> {
+    const version = card.skipTarget
+    if (version === null) return
+    await dispatchIntent({ type: 'SkipUpdate', data: { version } })
+    onRefresh()
+  }
+
+  /** Stops skipping that version, so the next check offers it again. */
+  async function unskip(): Promise<void> {
+    await dispatchIntent({ type: 'UnskipUpdate' })
+    onRefresh()
+  }
 </script>
 
 <!-- The extensions button is drawn in every state of the pane, because nothing
@@ -111,6 +140,11 @@
           aria-describedby={blocked ? hintId : undefined}
           onclick={() => void update()}>{copy.update}</button
         >
+      {/if}
+      {#if card.skipTarget !== null}
+        <button class="btn" type="button" onclick={() => void skip()}>{copy.skipVersion}</button>
+      {:else if card.skipping}
+        <button class="btn" type="button" onclick={() => void unskip()}>{copy.stopSkipping}</button>
       {/if}
       {@render extensionsButton()}
     </div>

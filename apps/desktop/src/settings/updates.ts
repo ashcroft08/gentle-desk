@@ -11,11 +11,20 @@
 //   (the Rust half says why);
 // - only pi and the shell are updated from a terminal, so only they offer the
 //   Update button; the app's own release installs itself from the update banner.
+//
+// "Skip this version" (0.8.0 settings-polish S1, S2) adds two more answers to the
+// card, both read from `UpdatesView::skipped` beside the rows: the version the
+// button would skip (one a terminal updates, since that is what the pane's own
+// Update runs) and whether the version on offer is already the skipped one, which
+// is what offers the way back. The check itself always reports the real state, so
+// a skipped version is still drawn as published here - hiding it is the startup
+// check's business, never this rule's.
 
 import type {
   UpdatesView_Serialize as UpdatesView,
   VersionRowView_Serialize as VersionRow,
 } from '../contract/bindings'
+import { sameVersion } from '../update/version'
 import type { UpdatesCopy } from './updates-copy'
 
 /** One piece of this machine, as the quiet versions row names it. */
@@ -40,14 +49,31 @@ export type UpdatesCard = {
   terminal: boolean
   /** Only the app itself is behind: the update banner installs that one. */
   appOnly: boolean
+  /**
+   * The version "Skip this version" would skip, or `null` when there is nothing
+   * to skip: no row a terminal updates is behind, or the one that is holds the
+   * version the user already skipped.
+   */
+  skipTarget: string | null
+  /**
+   * Whether a row publishes the version the user skipped, which is what draws
+   * "Stop skipping" instead of the skip itself. It is read beside the row and not
+   * from `update_available`, so it holds for both halves of S2: the explicit check
+   * that still reports the skipped version, and the startup pass that does not
+   * offer it.
+   */
+  skipping: boolean
 }
 
+/** One row of the check, with the label it is drawn under and who updates it. */
+type Row = { label: string; row: VersionRow; terminal: boolean }
+
 /** The three rows of the check, with the labels the pane draws them under. */
-function rows(updates: UpdatesView, copy: UpdatesCopy): { label: string; row: VersionRow }[] {
+function rows(updates: UpdatesView, copy: UpdatesCopy): Row[] {
   return [
-    { label: copy.appLabel, row: updates.desk },
-    { label: copy.piLabel, row: updates.pi },
-    { label: copy.shellLabel, row: updates.shell },
+    { label: copy.appLabel, row: updates.desk, terminal: false },
+    { label: copy.piLabel, row: updates.pi, terminal: true },
+    { label: copy.shellLabel, row: updates.shell, terminal: true },
   ]
 }
 
@@ -65,6 +91,8 @@ export function cardOf(updates: UpdatesView | null, copy: UpdatesCopy): UpdatesC
     versions: [],
     terminal: false,
     appOnly: false,
+    skipTarget: null,
+    skipping: false,
   }
   if (updates === null) return empty
 
@@ -73,6 +101,13 @@ export function cardOf(updates: UpdatesView | null, copy: UpdatesCopy): UpdatesC
   const behind = all.filter(({ row }) => row.update_available === true)
   const available = behind.length > 0
   const terminal = updates.pi.update_available === true || updates.shell.update_available === true
+  // The skip is the check's own version string, never a mode: it names one
+  // version, compared as a version (so `2.0.5` and `02.0.5` are one).
+  const skipped = updates.skipped ?? null
+  const skipping = all.some(({ row }) => sameVersion(row.latest, skipped))
+  const target = behind.find(
+    ({ row, terminal }) => terminal && row.latest !== null && !sameVersion(row.latest, skipped),
+  )
 
   if (updates.status === 'Checking') {
     return { ...empty, checking: true, versions }
@@ -90,5 +125,7 @@ export function cardOf(updates: UpdatesView | null, copy: UpdatesCopy): UpdatesC
     versions,
     terminal,
     appOnly: available && !terminal && updates.desk.update_available === true,
+    skipTarget: target?.row.latest ?? null,
+    skipping,
   }
 }

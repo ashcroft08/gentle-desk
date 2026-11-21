@@ -22,6 +22,14 @@ export interface UpdatesCopy {
   checkAgain: string
   update: string
   updateExtensions: string
+  /**
+   * The two halves of "skip this version" (0.8.0 settings-polish S1, S2): the
+   * action offered beside a newer version, and the way back once that version is
+   * the one the user skipped. Plain words, no version: the version itself is the
+   * check's (D7) and the two buttons sit beside the headline that names it.
+   */
+  skipVersion: string
+  stopSkipping: string
   /** The card's two tags. */
   updateAvailable: string
   upToDate: string
@@ -65,6 +73,8 @@ const ENGLISH: UpdatesCopy = {
   checkAgain: 'Check again',
   update: 'Update',
   updateExtensions: 'Update extensions',
+  skipVersion: 'Skip this version',
+  stopSkipping: 'Stop skipping',
   updateAvailable: 'Update available',
   upToDate: 'Everything is up to date',
   appLabel: 'This app',
@@ -94,6 +104,8 @@ const SPANISH: typeof ENGLISH = {
   checkAgain: 'Comprobar de nuevo',
   update: 'Actualizar',
   updateExtensions: 'Actualizar extensiones',
+  skipVersion: 'Omitir esta versión',
+  stopSkipping: 'Dejar de omitir',
   updateAvailable: 'Actualización disponible',
   upToDate: 'Todo está al día',
   appLabel: 'Esta app',
