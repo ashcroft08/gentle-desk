@@ -30,6 +30,7 @@ package install are NOT in this release: they go to 0.9.0 as their own feature.
   worker.
 - T2 (S4) Remove the dead intents. Route: worker, AFTER T1 (same surfaces).
 - T4 (S6, S7, S8) Updates: the shell row, the upgrade action, last-checked and failure reasons. Route: worker, AFTER T1 (same surfaces); design first (the `03-updates` artboard gains these rows).
+- T5 (S5) Wire the approved frame of `design/settings-polish/02-frame.html` (D1-D4): CSS declarations in `app.css` and the visible "Tema" label in `ThemeCards`. Route: worker, disjoint from T1/T4 (no Updates files).
 - T3 (S5) Design pass: artboards in `design/settings-polish/`, approved on the canvas, then wired. Route:
   design worker first.
 
