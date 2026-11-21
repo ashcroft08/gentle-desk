@@ -298,10 +298,13 @@
               {:else}
                 <!-- About (S5; settings-redesign S9): the app and its version, the
                      two installed versions and the moment of the read the Updates
-                     slice in this same dialog already carries, and the repository.
-                     The what's-new button waits for T5's read: no `onWhatsNew` is
-                     passed yet, so no dead control is drawn. -->
-                <AboutPane version={version} updates={updatesView} />
+                     slice in this same dialog already carries, the repository, and
+                     the what's-new button that asks T5's read for the notes of the
+                     version this run runs as. The pane owns that click and draws
+                     the one quiet line of a read that had nothing to show; when
+                     the notes are shown they arrive in `ViewState.whats_new` and
+                     the app's own modal opens over this card. -->
+                <AboutPane version={version} updates={updatesView} onShown={() => (open = false)} />
               {/if}
             </div>
           {/key}

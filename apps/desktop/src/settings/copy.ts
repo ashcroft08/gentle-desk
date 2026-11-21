@@ -62,9 +62,8 @@ export interface SettingsCopy {
    */
   repository: string
   /**
-   * The What's-new button (D6, D7): declared here so the wiring that follows T5 has
-   * its label waiting, and drawn only once that read exists - today the About pane
-   * receives no `onWhatsNew` and shows no button at all.
+   * The What's-new button's label (D6, D7): the About pane's one button, which asks
+   * the shell for the running version's notes and has no note under it.
    */
   whatsNew: string
   close: string

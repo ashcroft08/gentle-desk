@@ -6,7 +6,7 @@
 // that is gone, a name Windows would not take) or `ViewState.config_notice`
 // (what became of the config file) in the next push, which the sidebar draws.
 
-import { commands, type AttachmentView, type SettingsSnapshot_Serialize as SettingsSnapshot, type TerminalActionView, type UiIntent } from './contract/bindings'
+import { commands, type AttachmentView, type SettingsSnapshot_Serialize as SettingsSnapshot, type TerminalActionView, type UiIntent, type WhatsNewRead } from './contract/bindings'
 
 /** Sends one user intent; the answer is drawn through the next pushed state. */
 export async function dispatchIntent(intent: UiIntent): Promise<void> {
@@ -181,6 +181,31 @@ export async function settingsSnapshot(): Promise<SettingsSnapshot | null> {
   try {
     const answer = await commands.settingsSnapshot()
     // The command answers its refusals in the envelope, so a load that did not
+    // run is the same here as one that said nothing: `null`.
+    return answer.status === 'ok' ? answer.data : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * "What is new in this version" (settings-redesign T4, S9, D6): the one read on
+ * demand of the RUNNING version's notes, so the About pane can open the modal on
+ * every run and not only right after an update. It takes no argument - the shell
+ * knows which version this run runs as and fetches the notes off the window's
+ * thread.
+ *
+ * The answer says what the pane draws and nothing more: `Shown` means the notes
+ * reached `ViewState.whats_new` and the modal is up by itself, so the pane draws
+ * NOTHING of its own; `Unavailable(line)` carries the one quiet line it shows
+ * instead, already worded in the app's language, and leaves the modal closed.
+ * A refusal - the shell closing under the click - is the same as no answer:
+ * `null`, and the pane stays as quiet as it was.
+ */
+export async function showWhatsNew(): Promise<WhatsNewRead | null> {
+  try {
+    const answer = await commands.showWhatsNew()
+    // The command answers its refusals in the envelope, so a read that did not
     // run is the same here as one that said nothing: `null`.
     return answer.status === 'ok' ? answer.data : null
   } catch {
