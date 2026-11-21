@@ -44,13 +44,26 @@
   )
   const ready = $derived(auth !== null && auth.status.type === 'Ready')
 
+  /** The shortest time between two loads that a focus asked for. */
+  const FOCUS_COOLDOWN_MS = 10_000
+
   /**
    * The terminal window closes and the desk is focused again, while this pane is
-   * the one on screen: one more load, the same path, never a timer.
+   * the one on screen: one more load, the same path, never a timer. A load is a
+   * full read (the checks, the usage script, the versions) and a minimise and
+   * restore fires `focus` repeatedly, so at most one ask per cooldown goes out;
+   * a sign-in that ended inside it is still caught by the watcher's notice.
    */
   $effect(() => {
-    window.addEventListener('focus', onRefresh)
-    return () => window.removeEventListener('focus', onRefresh)
+    let lastAsk = Number.NEGATIVE_INFINITY
+    const onFocus = (): void => {
+      const now = Date.now()
+      if (now - lastAsk < FOCUS_COOLDOWN_MS) return
+      lastAsk = now
+      onRefresh()
+    }
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
   })
 
   /**

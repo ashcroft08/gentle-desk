@@ -105,6 +105,35 @@ describe('the Account pane', () => {
     await vi.waitFor(() => expect(again).toHaveBeenCalledTimes(1))
   })
 
+  // Every ask is a full read of the dialog (the checks run in the shell, the usage
+  // script, the versions), and a minimise-and-restore fires `focus` again and
+  // again. One ask per cooldown keeps a burst of focus events from becoming a
+  // burst of reads; the native watcher's notice still covers a sign-in that ended.
+  it('asks for one load per cooldown however often the desk is focused', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      const again = ask()
+      draw(auth(), again)
+
+      window.dispatchEvent(new Event('focus'))
+      window.dispatchEvent(new Event('focus'))
+      window.dispatchEvent(new Event('focus'))
+      expect(again).toHaveBeenCalledTimes(1)
+
+      // Still inside the cooldown: nothing more.
+      vi.setSystemTime(Date.now() + 5_000)
+      window.dispatchEvent(new Event('focus'))
+      expect(again).toHaveBeenCalledTimes(1)
+
+      // Past it, the next focus is a real return and asks once more.
+      vi.setSystemTime(Date.now() + 6_000)
+      window.dispatchEvent(new Event('focus'))
+      expect(again).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   // `pi auth login|logout` need a provider the desk does not have, so signing in
   // or out is pi's own /login and /logout INSIDE the shell: one button opens the
   // shell, and there is no second button that would open the very same window.
