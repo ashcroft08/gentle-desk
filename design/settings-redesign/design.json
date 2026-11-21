@@ -1,6 +1,6 @@
 {
-  "title": "Ajustes, tres direcciones (0.9.0)",
-  "brief": "S1-S6 of odd/tasks/settings-redesign.md. The maintainer: 'lo veo pequeño y que todo está apretado también mucho uso de cards' and 'puedes hacerlo desde cero osea tienes libertad creativa'. Three genuinely different directions, each drawn at the app's real sizes with the same three screens (Appearance with its visible Tema label, Updates with the three rows, the skip, the last-checked line and the extensions block, Account with its providers and the sign-in hand-off), each with its behaviour at the 800x560 window minimum and a strip proving the same row under the six themes. Every artboard uses the tokens of design/system.md (synced 2026-11-21 from apps/desktop/src/theme.css and app.css) and the app's own components (.btn, .tag, .seg, .settings-find, the rail's tablist, the theme miniatures); every new component is flagged in its own notes.",
+  "title": "Ajustes: las tres direcciones (0.9.0) y los dos paneles que el mantenedor mandó rehacer",
+  "brief": "odd/tasks/settings-redesign.md. Dos rondas en una carpeta. La primera (S1-S6, T1; L3) fueron tres direcciones genuinamente distintas para el marco entero, cada una dibujada a tamaño real con las mismas tres pantallas, el mínimo de ventana 800x560 y la tira de los seis temas: las tres quedaron descartadas por el mantenedor en L4 y se conservan como registro (00-04). La segunda (S7, T3, L4: 'ningun diseno me gusto, hasta me termino gustando el que tenemos... dale unos toques para mejorarlo') fueron los toques al diálogo actual, juzgados en la app. De esa revisión salieron L5 y esta tercera tanda: una sola propuesta por pantalla, sin direcciones alternativas, para Uso (05, S8) y Acerca de (06, S9), más la hoja de las reglas que ambas comparten y que los demás paneles cortos pueden adoptar (07). Todas usan los tokens de design/system.md (re-sincronizado el 2026-11-21 desde apps/desktop/src/theme.css y app.css), los componentes que ya existen y ningún dato inventado; cada clase nueva va marcada en las notas de su hoja.",
   "feature": "odd/tasks/settings-redesign.md",
   "artboards": [
     {
@@ -37,6 +37,27 @@
       "tradeoff": "Optimiza el acceso directo y la lectura: el campo es la puerta, la lista de secciones ya dice el valor de cada una y la columna nunca se comprime (712 → 696), con el chat a la vista. Cuesta un nivel más para pasearse, que cada fila necesite un valor (texto y datos que hoy no se componen) y que a 800 la hoja casi cubra la ventana.",
       "width": 1400,
       "height": 5750
+    },
+    {
+      "file": "05-usage.html",
+      "title": "U · Uso: una sección por proveedor y las ventanas en cuatro columnas fijas",
+      "tradeoff": "Una sola propuesta sobre el diálogo aprobado (860 de tarjeta, riel de 184, cuerpo de 480): cada proveedor es una sección de la columna entera con su nombre en mono y su plan al borde derecho, una hairline entre proveedores, las sub-etiquetas de límite como etiqueta de sección, y las ventanas en una rejilla de cuatro columnas declarada UNA vez (96 · barra · 46 · 112), así el «reinicia en 24d» y el «reinicia en 4h» empiezan en la misma x; el pane estrena 24px de relleno inferior y un velo de 24 para que el último bloque nunca toque el botón. Cuesta la caja que separaba un proveedor de otro —ahora lo hacen la hairline y 18px de aire, así que dos proveedores de una sola ventana se leen más juntos— y que el ancho del reinicio (112) hay que subirlo si el paquete escribe reinicios más largos.",
+      "width": 1400,
+      "height": 4650
+    },
+    {
+      "file": "06-about.html",
+      "title": "A · Acerca de: los hechos reales en dos columnas, sin una cifra inventada",
+      "tradeoff": "Una sola propuesta: el bloque del nombre y su versión como hoy, y debajo dos grupos con hairline —las versiones instaladas de Gentle Shell y pi que la lectura de Actualizaciones ya trae (con «desconocida» cuando no hay lectura), el enlace al repositorio y el botón que abre el modal de novedades que la app ya tiene— en dos columnas alineadas (132 · resto). No estrena lectura ni dato: sigue siendo un panel corto (≈308 de 480) y ese es el punto, ahora con forma en vez de una línea en el aire. Cuesta que el botón de novedades, para funcionar en toda corrida, necesita una lectura de Rust que hoy no existe (el slice solo vive en la corrida que sigue a una actualización).",
+      "width": 1400,
+      "height": 3650
+    },
+    {
+      "file": "07-gap-and-rules.html",
+      "title": "R · las cuatro reglas que comparten y los otros paneles cortos contra ellas",
+      "tradeoff": "La hoja pequeña que hace mecánico el cableado: secciones separadas por 1px --border sin caja (R1), 24px de relleno inferior más un velo de 24 en todo pane que scrollee (R2), columnas fijas declaradas una vez en --ucols (R3) y la sub-etiqueta de 11px/600 mayúsculas en --faint (R4), con las declaraciones exactas. Idioma, Notificaciones y Home ya cumplen R1 y R4 y no scrollean, así que R2 les es indiferente; Cuenta, Actualizaciones y Apariencia son los que heredan R2. No estrena cadenas ni tokens; cuesta que la regla general cambia el borde inferior de tres paneles que no eran el pedido.",
+      "width": 1400,
+      "height": 2450
     }
   ]
 }
