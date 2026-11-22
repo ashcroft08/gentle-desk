@@ -271,6 +271,8 @@ describe('the Settings dialog', () => {
         desk: { current: '0.1.12', latest: '0.1.12', update_available: false },
         pi: { current: '1.5.2', latest: '2.0.5', update_available: true },
         shell: { current: '4.7.0', latest: null, update_available: null },
+
+        packages: { available: false, behind: [], unknown: false, truncated: false, checked: null },
       },
     })
 

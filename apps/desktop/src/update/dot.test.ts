@@ -28,6 +28,7 @@ function updates(
     desk: rows.desk ?? row(false),
     pi: rows.pi ?? row(false),
     shell: rows.shell ?? row(false),
+    packages: { available: false, behind: [], unknown: false, truncated: false, checked: null },
   }
 }
 

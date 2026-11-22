@@ -323,3 +323,35 @@ fn the_listing_is_one_plain_read_of_get_update_status() {
         vec![("gentle-pi", Some("4.9.0"))]
     );
 }
+
+#[test]
+fn the_check_time_reads_the_shells_iso_instant_and_a_plain_number() {
+    // The shell's real shape: `checkedAt` is `isoTime`'s ISO instant, not a
+    // number (lib/desktop-updates-service.ts:266, read on this machine). A
+    // number keeps working, and anything else is nothing, never a guess.
+    let cases: [(&str, Option<f64>); 5] = [
+        // 2026-11-22T02:10:03Z = 2026-11-22T00:00:00Z (1_795_305_600_000) + 2h10m3s.
+        ("2026-11-22T02:10:03.000Z", Some(1_795_313_403_000.0)),
+        ("2026-11-22T02:10:03Z", Some(1_795_313_403_000.0)),
+        ("2026-11-22T02:10:03.000+03:00", Some(1_795_302_603_000.0)),
+        ("2026-11-22T02:10:03.000-08:00", Some(1_795_342_203_000.0)),
+        ("not-a-time", None),
+    ];
+    for (checked_at, expected) in cases {
+        let channel = FakeChannel::new(
+            ADVERTISED,
+            Answer::Data(json!({
+                "packages": {
+                    "available": true,
+                    "items": [],
+                    "checkedAt": checked_at,
+                }
+            })),
+        );
+        let read = packages_status(&mut connected(&channel));
+        let PackagesRead::Read(status) = read else {
+            panic!("the child answered its listing: {read:?}");
+        };
+        assert_eq!(status.checked_ms, expected, "checkedAt = {checked_at}");
+    }
+}

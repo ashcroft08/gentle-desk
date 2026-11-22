@@ -27,6 +27,8 @@ function updates(behind: boolean): UpdatesView {
     desk: { current: '0.1.14', latest: '0.1.14', update_available: false },
     pi: row,
     shell: { current: '0.4.0', latest: null, update_available: null },
+
+    packages: { available: false, behind: [], unknown: false, truncated: false, checked: null },
   }
 }
 

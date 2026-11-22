@@ -45,6 +45,8 @@ function updates(over: Partial<UpdatesView> = {}): UpdatesView {
     desk: { current: '0.1.12', latest: '0.1.12', update_available: false },
     pi: { current: '1.5.2', latest: '2.0.5', update_available: true },
     shell: { current: '4.8.0', latest: '4.9.2', update_available: true },
+
+    packages: { available: false, behind: [], unknown: false, truncated: false, checked: null },
     checked_ms: CHECKED_MS,
     ...over,
   }
@@ -55,6 +57,8 @@ function current(): UpdatesView {
   return updates({
     pi: { current: '2.0.5', latest: '2.0.5', update_available: false },
     shell: { current: '4.9.2', latest: '4.9.2', update_available: false },
+
+    packages: { available: false, behind: [], unknown: false, truncated: false, checked: null },
   })
 }
 

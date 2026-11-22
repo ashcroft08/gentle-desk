@@ -75,8 +75,10 @@ pub struct PackagesStatus {
     /// Whether the listing this app holds is cut: the child's own `truncated`, or
     /// the contract's [`MAX_ITEMS`] bound cutting what the child sent.
     pub truncated: bool,
-    /// When pi's check last read the machine, in epoch milliseconds, when the
-    /// child reports it as a number. Any other shape is `None`, never a guess.
+    /// When pi's check last read the machine, in epoch milliseconds. The shell
+    /// reports it as an ISO instant (`isoTime`, e.g. `2026-11-22T02:10:03.000Z`,
+    /// what `checkedAt` is in its answer) or as a plain number; any other shape
+    /// is `None`, never a guess.
     pub checked_ms: Option<f64>,
 }
 
@@ -100,7 +102,7 @@ impl PackagesStatus {
             .get("truncated")
             .and_then(Value::as_bool)
             .unwrap_or(false);
-        let checked_ms = packages.get("checkedAt").and_then(Value::as_f64);
+        let checked_ms = checked_ms(packages.get("checkedAt"));
         let named = packages
             .get("items")
             .and_then(Value::as_array)
@@ -233,4 +235,112 @@ impl ChatRuntime {
         let mut client = super::lock(&client);
         packages_status(&mut client)
     }
+}
+/// The check time as the shell reports it: `isoTime`'s ISO instant, or a plain
+/// epoch-ms number. Anything else is nothing, never a guess.
+fn checked_ms(value: Option<&Value>) -> Option<f64> {
+    match value {
+        Some(Value::Number(n)) => n.as_f64(),
+        Some(Value::String(s)) => parse_instant(s).map(|ms| ms as f64),
+        _ => None,
+    }
+}
+
+/// One ISO 8601 instant (`2026-11-22T02:10:03.000Z`, optional fraction, `Z` or
+/// an offset) into epoch milliseconds. The instant is only ever DRAWN as an age,
+/// so a hand-rolled read with one month of headroom instead of a leap rule can
+/// never flip that.
+fn parse_instant(s: &str) -> Option<u128> {
+    let b = s.as_bytes();
+    if b.len() < 20
+        || b[4] != b'-'
+        || b[7] != b'-'
+        || b[10] != b'T'
+        || b[13] != b':'
+        || b[16] != b':'
+    {
+        return None;
+    }
+    let num = |from: usize, len: usize| -> Option<u32> {
+        let slice = b.get(from..from + len)?;
+        if !slice.iter().all(u8::is_ascii_digit) {
+            return None;
+        }
+        std::str::from_utf8(slice).ok()?.parse().ok()
+    };
+    let (year, month, day) = (num(0, 4)?, num(5, 2)?, num(8, 2)?);
+    let (hour, minute, second) = (num(11, 2)?, num(14, 2)?, num(17, 2)?);
+    if !(1..=12).contains(&month)
+        || !(1..=31).contains(&day)
+        || hour > 23
+        || minute > 59
+        || second > 60
+    {
+        return None;
+    }
+    let secs = days_from_civil(i64::from(year), i64::from(month), i64::from(day)) * 86_400
+        + i64::from(hour) * 3_600
+        + i64::from(minute) * 60
+        + i64::from(second);
+    let (frac_ms, zone) = read_rest(&s[19..])?;
+    let ms = u128::try_from(secs).ok()? * 1_000 + frac_ms;
+    // The offset arrives as MINUTES (hh*60+mm); a millisecond is 60_000 of
+    // them, not 1_000 - the first cut read it as seconds and shifted every
+    // non-Z instant by 60x too little.
+    let off_ms = u128::from(zone.1) * 60_000;
+    // UTC = local − offset: a `+03:00` clock that says 02:10 is 23:10 the day
+    // before in UTC, so '+' SUBTRACTS and '-' adds.
+    match zone.0 {
+        Some('+') => ms.checked_sub(off_ms),
+        Some('-') | None => ms.checked_add(off_ms),
+        _ => None,
+    }
+}
+
+/// The fraction and the zone the rest after `HH:MM:SS` carries.
+fn read_rest(rest: &str) -> Option<(u128, (Option<char>, u32))> {
+    let (whole, zone) = match rest.split_once('.') {
+        Some((_w, after)) => {
+            let digits: String = after.chars().take_while(|c| c.is_ascii_digit()).collect();
+            let mut ms: u128 = 0;
+            for c in digits.chars() {
+                ms = ms * 10 + u128::from(c.to_digit(10)?);
+            }
+            let ms = match digits.len() {
+                0..=3 => ms * 10u128.pow(3 - digits.len() as u32),
+                n => ms / 10u128.pow(n as u32 - 3),
+            };
+            (ms, &after[digits.len()..])
+        }
+        None => (0, rest),
+    };
+    let zone = zone.trim_start();
+    let zone = match zone.as_bytes().first() {
+        Some(b'Z') | Some(b'z') => Some((None, 0u32)),
+        Some(b'+') | Some(b'-') => {
+            let sign = char::from(zone.as_bytes()[0]);
+            let mut it = zone[1..].split(':');
+            let hh = it.next()?.parse::<u32>().ok()?;
+            if hh > 23 {
+                return None;
+            }
+            let mm = it.next().unwrap_or("0").parse::<u32>().ok()?;
+            if mm > 59 {
+                return None;
+            }
+            Some((Some(sign), hh * 60 + mm))
+        }
+        _ => None,
+    }?;
+    Some((whole, zone))
+}
+
+/// Howard Hinnant's `days_from_civil`: the one calendar rule this needs.
+fn days_from_civil(y: i64, m: i64, d: i64) -> i64 {
+    let y = if m <= 2 { y - 1 } else { y };
+    let era = if y >= 0 { y } else { y - 399 } / 400;
+    let yoe = y - era * 400;
+    let doy = (153 * (if m > 2 { m - 3 } else { m + 9 }) + 2) / 5 + d - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    era * 146_097 + doe - 719_468
 }

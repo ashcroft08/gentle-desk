@@ -2414,10 +2414,11 @@ p {
   align-items: flex-start;
   /* A little air on the two edges the rail does not already give (S7), the 24px
      of air under the content that answers "el botón está pegado a la card"
-     (settings-redesign R2, D5), and the scrollbar's channel reserved, so the
-     content's right edge does not move 10px between a section that fits and one
-     that overflows (findings 09 and 10, D4). */
-  padding: 4px 0 24px 4px;
+     (settings-redesign R2, D5). The RIGHT padding is real (12px) and not a
+     `scrollbar-gutter`: Windows 11's overlay scrollbar collapses the gutter to
+     zero, so with `stable` alone the content ran under the floating bar - the
+     plan's right edge glued to the pane (the maintainer, 0.8.2's test). */
+  padding: 4px 12px 24px 4px;
   scrollbar-gutter: stable;
   /* The veil where the scroll is cut (R2, D5): the last 24px fade, exactly the
      air the padding above leaves, so at the end of the scroll the veil falls on
