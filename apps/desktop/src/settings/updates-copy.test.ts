@@ -34,6 +34,9 @@ const ENGLISH = {
     'There is no way to tell which ones are behind with this Gentle Shell. Update extensions updates all of them, so this button is always offered and safe to use any time.',
   appUpdatesItself: 'This app updates itself: use the update banner at the top.',
   checkedNever: 'Last checked: never',
+  packagesUpToDate: 'The extensions are up to date.',
+  packagesUnreadable: 'Could not check the extensions: pi did not answer.',
+  packagesNeedsSession: 'You can check it by opening a session.',
 }
 
 /** The Spanish words: neutral Spanish, accents allowed. */
@@ -58,6 +61,9 @@ const SPANISH = {
     'No se puede saber cuáles están desactualizadas con este Gentle Shell. Actualizar extensiones las actualiza todas, así que este botón se ofrece siempre y es seguro usarlo en cualquier momento.',
   appUpdatesItself: 'Esta app se actualiza sola: usa el aviso de actualización de la parte superior.',
   checkedNever: 'Última comprobación: nunca',
+  packagesUpToDate: 'Las extensiones están al día.',
+  packagesUnreadable: 'No se pudo revisar las extensiones: pi no respondió.',
+  packagesNeedsSession: 'Se puede revisar al abrir una sesión.',
 }
 
 const WORDS = Object.keys(ENGLISH) as (keyof typeof ENGLISH)[]
@@ -181,5 +187,27 @@ describe('the updates copy', () => {
       'Las actualizaciones necesitan todos los chats cerrados. 1 chat está abierto - Cerrar chat en el menú de su fila y los botones de actualización se activan.',
     )
     expect(spanish.gateHint(3)).toContain('3 chats están abiertos')
+  })
+
+  it('counts the extensions that are behind, one or many (packages-status S1)', () => {
+    const english = updatesCopy('en')
+    const spanish = updatesCopy('es')
+
+    // The plural-safe line: the number is the count, and both languages carry
+    // the singular of it.
+    expect(english.packagesBehind(1)).toBe('1 extension has an update available')
+    expect(english.packagesBehind(4)).toBe('4 extensions have an update available')
+    expect(spanish.packagesBehind(1)).toBe('1 extensión con actualización disponible')
+    expect(spanish.packagesBehind(4)).toBe('4 extensiones con actualización disponible')
+  })
+
+  it('never claims a read that did not run: the clause is the app\'s own', () => {
+    // The packages read carries no reason of its own, so the block says the short
+    // generic clause - never the client's message, never an address (S1, S4).
+    for (const language of ['en', 'es'] as const) {
+      const sentence = updatesCopy(language).packagesUnreadable
+      expect(sentence).not.toMatch(/https?:|\d{3}/)
+      expect(sentence.endsWith('.')).toBe(true)
+    }
   })
 })

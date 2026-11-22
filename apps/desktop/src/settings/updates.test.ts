@@ -5,8 +5,11 @@
 // shell's being its own `upgrade` (S7). The pane's drawing is
 // UpdatesPane.test.ts's and the rows' is UpdateRows.test.ts's.
 import { describe, expect, it } from 'vitest'
-import type { UpdatesView_Serialize as UpdatesView } from '../contract/bindings'
-import { cardOf } from './updates'
+import type {
+  PackagesView_Serialize as PackagesView,
+  UpdatesView_Serialize as UpdatesView,
+} from '../contract/bindings'
+import { cardOf, packagesOf } from './updates'
 import { updatesCopy } from './updates-copy'
 
 /** The card's labels in English, read through the dictionary (0.2.0, D4). */
@@ -25,6 +28,11 @@ function updates(over: Partial<UpdatesView> = {}): UpdatesView {
     checked_ms: 1_700_000_000_000,
     ...over,
   }
+}
+
+/** The Extensions block's slice: unasked unless a test says otherwise. */
+function packages(over: Partial<PackagesView> = {}): PackagesView {
+  return { available: false, behind: [], unknown: false, truncated: false, checked: null, ...over }
 }
 
 /** The one row a test asks about, by the key the pane draws it under. */
@@ -185,6 +193,63 @@ describe('the Updates card', () => {
   it('carries when the rows were last read (S8, D11)', () => {
     expect(drawn(updates()).checkedMs).toBe(1_700_000_000_000)
     expect(drawn(updates({ checked_ms: undefined })).checkedMs).toBeNull()
+  })
+
+  it("dates the one line with the newest read, the rows or pi's own check", () => {
+    // packages-status T2: the packages slice carries pi's own check instant. When
+    // it is NEWER than the rows' read (the RPC read just ran) the one line says
+    // so; when it is older it adds nothing and the rows' instant still dates it.
+    const newer = 1_700_000_120_000
+    const older = 1_699_999_000_000
+    const rowsNewer = drawn(updates({ packages: packages({ available: true, checked: newer }) }))
+    const rowsOlder = drawn(updates({ packages: packages({ available: true, checked: older }) }))
+
+    expect(rowsNewer.checkedMs).toBe(newer)
+    expect(rowsOlder.checkedMs).toBe(1_700_000_000_000)
+    // A rows read that never landed leaves pi's instant as the only one there is.
+    const onlyPackages = drawn(updates({ checked_ms: undefined, packages: packages({ checked: newer }) }))
+    expect(onlyPackages.checkedMs).toBe(newer)
+    // Neither read has an instant: the line still says never, once.
+    expect(drawn(updates({ checked_ms: undefined })).checkedMs).toBeNull()
+  })
+
+  describe('the Extensions block (packages-status S1, S3)', () => {
+    it('names and counts every extension pi reports as behind', () => {
+      // Only `update_available` reads as behind in Rust, so whatever reaches this
+      // list is behind: the block counts it and draws each name (S1).
+      expect(
+        packagesOf(
+          packages({
+            available: true,
+            behind: [{ name: 'pi-hud', current: '0.3.1' }, { name: 'pi-tools' }],
+          }),
+        ),
+      ).toEqual({
+        state: 'behind',
+        count: 2,
+        rows: [
+          { name: 'pi-hud', version: '0.3.1' },
+          { name: 'pi-tools', version: null },
+        ],
+      })
+    })
+
+    it('says the extensions are up to date only when the read answered with none behind', () => {
+      expect(packagesOf(packages({ available: true }))).toEqual({ state: 'upToDate' })
+    })
+
+    it('never reads a read that could not run as up to date', () => {
+      // S1: a listing that did not answer says the read could not run.
+      expect(packagesOf(packages({ unknown: true }))).toEqual({ state: 'unreadable' })
+      // A listing that does not answer and is not marked unknown is unasked too:
+      // the block never guesses which of the two it is.
+      expect(packagesOf(packages())).toEqual({ state: 'unasked' })
+    })
+
+    it('is unasked when nothing asked: no chat open, or a shell without the read', () => {
+      // S3, S5: the honest state, never an empty "nothing is behind".
+      expect(packagesOf(null)).toEqual({ state: 'unasked' })
+    })
   })
 
   describe('the one skip (D9)', () => {

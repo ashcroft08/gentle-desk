@@ -10,12 +10,13 @@
   // The rules that pick a shape live in `./updates`; the rows are drawn by
   // `UpdateRows.svelte`.
   //
-  // The second card is "Update extensions", and it is a card of its own because it
-  // is the one action NO data drives (D14): the shell's updater with pi's
-  // `--extensions` flag only touches the packages the shell has installed, nothing
-  // can tell which of them are behind, so there is no state to wait for and the
-  // sentence says exactly that. It is drawn in every state and obeys the same
-  // chats-closed gate.
+  // The second group is "Update extensions" (D14; packages-status T2, S1, S3): the
+  // shell's updater with pi's `--extensions` flag only touches the packages the
+  // shell has installed, so that button is always offered - but WHICH of them are
+  // behind is knowable while a chat is open, through pi's own check. So the block
+  // counts and names them, says they are up to date only when the read answered
+  // that, says the read could not run when it could not, and keeps the approved
+  // honest sentence plus its condition when nothing asked. Same chats-closed gate.
   //
   // The terminal actions are the shell's own - `update` on pi's row and `upgrade`
   // on the shell's (S7) - and both are DEAD while any chat is open (S4), with the
@@ -34,7 +35,7 @@
   import { ago, isJustNow } from '../home/ago'
   import { language } from '../i18n/language.svelte'
   import UpdateRows from './UpdateRows.svelte'
-  import { cardOf, type RowAction } from './updates'
+  import { cardOf, packagesOf, type RowAction } from './updates'
   import { updatesCopy } from './updates-copy'
 
   let {
@@ -60,6 +61,11 @@
   let terminalError = $state<string | null>(null)
 
   const card = $derived(cardOf(updates, copy))
+  /**
+   * The Extensions block's one honest state (packages-status T2, S1, S3): the
+   * packages slice of the same load, never a read of its own.
+   */
+  const ext = $derived(packagesOf(updates?.packages ?? null))
   /** Whether a check is on its way: the pushed one, or the one the user asked for. */
   const checking = $derived(card.checking || refreshing)
   const blocked = $derived(openChats > 0)
@@ -159,9 +165,31 @@
   <p class="quiet" role="status">{terminalError}</p>
 {/if}
 
-<!-- The one action no data drives, in a card of its own that says so (D14). -->
+<!-- The extensions block: pi's own check when it could ask (packages-status T2),
+     and the approved honest sentence plus its condition when it could not (S3). -->
 <div class="card ext">
-  <p class="quiet">{copy.extensionsNote}</p>
+  {#if ext.state === 'behind'}
+    <p class="quiet">{copy.packagesBehind(ext.count)}</p>
+    <ul class="urows">
+      {#each ext.rows as one (one.name)}
+        <li class="urow" data-package={one.name}>
+          <span class="headline">{one.name}</span>
+          {#if one.version !== null}
+            <span class="mono">{one.version}</span>
+          {/if}
+        </li>
+      {/each}
+    </ul>
+  {:else if ext.state === 'upToDate'}
+    <p class="quiet">{copy.packagesUpToDate}</p>
+  {:else if ext.state === 'unreadable'}
+    <p class="quiet">{copy.packagesUnreadable}</p>
+  {:else}
+    <!-- No chat open, or a shell that does not advertise the read (S5): the
+         honest sentence, and the condition that would let it check (S3). -->
+    <p class="quiet">{copy.extensionsNote}</p>
+    <p class="quiet">{copy.packagesNeedsSession}</p>
+  {/if}
   <div class="acts">
     <button
       class="btn"

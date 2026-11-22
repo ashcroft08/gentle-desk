@@ -5,7 +5,10 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/svelte'
-import type { UpdatesView_Serialize as UpdatesView } from '../contract/bindings'
+import type {
+  PackagesView_Serialize as PackagesView,
+  UpdatesView_Serialize as UpdatesView,
+} from '../contract/bindings'
 import { resetTauriMock, viewState, workspaceRow, chatRow } from '../test-support/tauri-mock'
 import { serveSidebar } from '../test-support/sidebar'
 import Sidebar from './Sidebar.svelte'
@@ -17,8 +20,13 @@ vi.mock('@tauri-apps/api/event', () => import('../test-support/tauri-mock').then
 const SETTINGS = 'Settings'
 const WAITING = 'Settings - an update is available'
 
+/** The Extensions block's slice: unasked unless a test says otherwise. */
+function packages(over: Partial<PackagesView> = {}): PackagesView {
+  return { available: false, behind: [], unknown: false, truncated: false, checked: null, ...over }
+}
+
 /** The pushed check, with pi behind or level. */
-function updates(behind: boolean): UpdatesView {
+function updates(behind: boolean, packagesView: PackagesView = packages()): UpdatesView {
   const row = behind
     ? { current: '1.5.2', latest: '2.0.5', update_available: true }
     : { current: '2.0.5', latest: '2.0.5', update_available: false }
@@ -28,7 +36,7 @@ function updates(behind: boolean): UpdatesView {
     pi: row,
     shell: { current: '0.4.0', latest: null, update_available: null },
 
-    packages: { available: false, behind: [], unknown: false, truncated: false, checked: null },
+    packages: packagesView,
   }
 }
 
@@ -74,5 +82,34 @@ describe('The gear that promises an update', () => {
     const gear = await screen.findByRole('button', { name: SETTINGS })
     expect(container.querySelector('.dot')).toBeNull()
     expect(gear.getAttribute('aria-label')).toBe(SETTINGS)
+  })
+
+  it('draws the dot for a package pi reports as behind (packages-status T3)', async () => {
+    // The packages slice joins the waiting rule: a behind extension is a promise
+    // exactly like a behind pi or shell row.
+    const container = draw(
+      updates(false, packages({ available: true, behind: [{ name: 'pi-hud' }] })),
+    )
+
+    const gear = await screen.findByRole('button', { name: WAITING })
+    expect(container.querySelector('.foot .ic .dot')).not.toBeNull()
+    expect(gear.getAttribute('aria-label')).toBe(WAITING)
+  })
+
+  it('stays dark for a packages read that never ran or could not run', async () => {
+    // Unasked and unknown are never a promise, and neither is an answered
+    // listing with nothing behind.
+    for (const slice of [
+      packages(),
+      packages({ unknown: true }),
+      packages({ available: true }),
+    ]) {
+      cleanup()
+      const container = draw(updates(false, slice))
+
+      const gear = await screen.findByRole('button', { name: SETTINGS })
+      expect(container.querySelector('.dot')).toBeNull()
+      expect(gear.getAttribute('aria-label')).toBe(SETTINGS)
+    }
   })
 })

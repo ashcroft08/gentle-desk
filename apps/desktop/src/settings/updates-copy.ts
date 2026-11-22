@@ -16,6 +16,13 @@
 // clause and never as the client's message, the "not checked yet" line is gone
 // because the last-checked line says `never`, and the extensions note is the one
 // sentence that explains why that button has no state.
+//
+// packages-status (T2, S1, S3) adds four lines to the extensions block: the
+// plural-safe count of what pi's own check reports as behind, the "up to date"
+// line only an answered listing earns, the short clause of a read that ran and
+// could not answer, and the condition that makes the read possible when no chat
+// is open. The approved sentence about this Gentle Shell not knowing stays, in
+// that last state.
 import type { LanguageView, UpdateReasonView } from '../contract/bindings'
 
 /** Which piece a row is, for the one sentence that names it. */
@@ -55,6 +62,19 @@ export interface UpdatesCopy {
   updateInTerminal: string
   /** Why the extensions button has no state to wait for (D14). */
   extensionsNote: string
+  /**
+   * The Extensions block's states (packages-status T2, S1, S3): how many
+   * extensions pi's own check reports as behind - the count is spoken with the
+   * plural the line needs - and the three exceptions, each said in the pane's
+   * own short words and never as the client's message.
+   */
+  packagesBehind: (count: number) => string
+  /** The read answered and none is behind: the only honest "up to date". */
+  packagesUpToDate: string
+  /** The read ran and could not produce a listing: never "up to date" (S1). */
+  packagesUnreadable: string
+  /** No chat is open, or this shell cannot ask: what would make it possible (S3, S5). */
+  packagesNeedsSession: string
   /** The app's own release is not a terminal's job: the banner installs it. */
   appUpdatesItself: string
   /**
@@ -111,6 +131,15 @@ const ENGLISH: UpdatesCopy = {
   extensionsNote:
     'There is no way to tell which ones are behind with this Gentle Shell. Update extensions updates all of them, so this button is always offered and safe to use any time.',
   appUpdatesItself: 'This app updates itself: use the update banner at the top.',
+  packagesBehind: (count) =>
+    count === 1
+      ? '1 extension has an update available'
+      : `${count} extensions have an update available`,
+  packagesUpToDate: 'The extensions are up to date.',
+  // The packages read carries no reason of its own, so the failure is the short
+  // generic clause: pi's own check is what does not answer.
+  packagesUnreadable: 'Could not check the extensions: pi did not answer.',
+  packagesNeedsSession: 'You can check it by opening a session.',
   checkedAt: (age, justNow) => (justNow ? 'Last checked: just now' : `Last checked: ${age} ago`),
   checkedNever: 'Last checked: never',
   gateHint: (openChats) => {
@@ -160,6 +189,13 @@ const SPANISH: typeof ENGLISH = {
   extensionsNote:
     'No se puede saber cuáles están desactualizadas con este Gentle Shell. Actualizar extensiones las actualiza todas, así que este botón se ofrece siempre y es seguro usarlo en cualquier momento.',
   appUpdatesItself: 'Esta app se actualiza sola: usa el aviso de actualización de la parte superior.',
+  packagesBehind: (count) =>
+    count === 1
+      ? '1 extensión con actualización disponible'
+      : `${count} extensiones con actualización disponible`,
+  packagesUpToDate: 'Las extensiones están al día.',
+  packagesUnreadable: 'No se pudo revisar las extensiones: pi no respondió.',
+  packagesNeedsSession: 'Se puede revisar al abrir una sesión.',
   checkedAt: (age, justNow) =>
     justNow ? 'Última comprobación: ahora mismo' : `Última comprobación: hace ${age}`,
   checkedNever: 'Última comprobación: nunca',
