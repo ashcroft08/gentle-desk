@@ -1016,6 +1016,65 @@ pub struct VersionRowView {
     pub reason: Option<UpdateReasonView>,
 }
 
+/// One extension pi's own update check says is behind (packages-status T1, S1):
+/// the shell's own display name and the version it runs. Never a raw source, a
+/// path or a scope (S4), and never `latest`, which is always null today.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub struct PackagesBehindView {
+    pub name: String,
+    /// The version installed, when pi's check reports one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[specta(optional)]
+    pub current: Option<String>,
+}
+
+/// The Updates pane's Extensions block (packages-status T1, S1-S5): which
+/// extensions pi's own check reports as behind, and what this app could learn.
+///
+/// The members are DERIVED, never the child's own words: only
+/// `update_available` reads as behind ([`Self::behind`]), while
+/// `no_update_reported`, `skipped`, `unknown` and any state this build has not
+/// learned never do.
+///
+/// `unknown` is a read that ran and could not produce a listing - the child said
+/// `available: false`, its answer carried no packages slice, or no answer came
+/// at all - so the block says the read could not run and never "up to date"
+/// (S1). "Up to date" is only ever `available: true` with an empty `behind`.
+///
+/// [`Self::default`] is [`Self::unasked`], the value a block draws as its honest
+/// sentence (S3) and what an older shell that does not advertise the method
+/// degrades to (S5). It travels as a VALUE, never as an absence that could be
+/// read as "nothing is behind".
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, Type)]
+pub struct PackagesView {
+    /// Whether pi's check produced a listing at all: the child's own
+    /// `available`, and `false` for every read that did not answer.
+    pub available: bool,
+    /// The extensions pi reports as behind, in its own order, each with its own
+    /// display name (the block counts them, S1).
+    pub behind: Vec<PackagesBehindView>,
+    /// A read that ran and could not produce a listing: the block says the read
+    /// could not run, never "up to date" (S1).
+    pub unknown: bool,
+    /// Whether the listing is cut by the contract's own bound, so the block can
+    /// say there are more than it draws.
+    pub truncated: bool,
+    /// When pi's check last read the machine, in epoch milliseconds, when the
+    /// child reports one. `None` is a child that does not report it, never a
+    /// clock of this app's.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[specta(optional)]
+    pub checked: Option<f64>,
+}
+
+impl PackagesView {
+    /// Nothing was asked: no chat has a child to ask, or the child does not
+    /// advertise the method (S3, S5).
+    pub fn unasked() -> Self {
+        Self::default()
+    }
+}
+
 /// Where the update check stands. It runs once when the app opens (S3) and again
 /// only when the user asks.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, Type)]
@@ -1076,6 +1135,15 @@ pub struct UpdatesView {
     /// main-channel shell compares commit SHAs, and no npm version is its newer
     /// one.
     pub shell: VersionRowView,
+    /// The extensions pi's own update check reports (packages-status T1, S1-S5):
+    /// which are behind, and what this app could learn.
+    ///
+    /// Additive and optional on the wire: a payload without it reads as
+    /// [`PackagesView::unasked`], which is exactly the block today's builds
+    /// draw. This build always carries it as a VALUE, so an unanswered read is
+    /// never an absence that could look like "nothing is behind".
+    #[serde(default)]
+    pub packages: PackagesView,
 }
 
 /// How one provider of the usage document stands: the three statuses the

@@ -1722,6 +1722,152 @@ export type OrchestratorModeView =
  */
 "organic" | "full-delegation";
 
+/**
+ *  One extension pi's own update check says is behind (packages-status T1, S1):
+ *  the shell's own display name and the version it runs. Never a raw source, a
+ *  path or a scope (S4), and never `latest`, which is always null today.
+ */
+export type PackagesBehindView = PackagesBehindView_Serialize | PackagesBehindView_Deserialize;
+
+/**
+ *  One extension pi's own update check says is behind (packages-status T1, S1):
+ *  the shell's own display name and the version it runs. Never a raw source, a
+ *  path or a scope (S4), and never `latest`, which is always null today.
+ */
+export type PackagesBehindView_Deserialize = {
+	name: string,
+	/**  The version installed, when pi's check reports one. */
+	current?: string | null,
+};
+
+/**
+ *  One extension pi's own update check says is behind (packages-status T1, S1):
+ *  the shell's own display name and the version it runs. Never a raw source, a
+ *  path or a scope (S4), and never `latest`, which is always null today.
+ */
+export type PackagesBehindView_Serialize = {
+	name: string,
+	/**  The version installed, when pi's check reports one. */
+	current?: string,
+};
+
+/**
+ *  The Updates pane's Extensions block (packages-status T1, S1-S5): which
+ *  extensions pi's own check reports as behind, and what this app could learn.
+ * 
+ *  The members are DERIVED, never the child's own words: only
+ *  `update_available` reads as behind ([`Self::behind`]), while
+ *  `no_update_reported`, `skipped`, `unknown` and any state this build has not
+ *  learned never do.
+ * 
+ *  `unknown` is a read that ran and could not produce a listing - the child said
+ *  `available: false`, its answer carried no packages slice, or no answer came
+ *  at all - so the block says the read could not run and never "up to date"
+ *  (S1). "Up to date" is only ever `available: true` with an empty `behind`.
+ * 
+ *  [`Self::default`] is [`Self::unasked`], the value a block draws as its honest
+ *  sentence (S3) and what an older shell that does not advertise the method
+ *  degrades to (S5). It travels as a VALUE, never as an absence that could be
+ *  read as "nothing is behind".
+ */
+export type PackagesView = PackagesView_Serialize | PackagesView_Deserialize;
+
+/**
+ *  The Updates pane's Extensions block (packages-status T1, S1-S5): which
+ *  extensions pi's own check reports as behind, and what this app could learn.
+ * 
+ *  The members are DERIVED, never the child's own words: only
+ *  `update_available` reads as behind ([`Self::behind`]), while
+ *  `no_update_reported`, `skipped`, `unknown` and any state this build has not
+ *  learned never do.
+ * 
+ *  `unknown` is a read that ran and could not produce a listing - the child said
+ *  `available: false`, its answer carried no packages slice, or no answer came
+ *  at all - so the block says the read could not run and never "up to date"
+ *  (S1). "Up to date" is only ever `available: true` with an empty `behind`.
+ * 
+ *  [`Self::default`] is [`Self::unasked`], the value a block draws as its honest
+ *  sentence (S3) and what an older shell that does not advertise the method
+ *  degrades to (S5). It travels as a VALUE, never as an absence that could be
+ *  read as "nothing is behind".
+ */
+export type PackagesView_Deserialize = {
+	/**
+	 *  Whether pi's check produced a listing at all: the child's own
+	 *  `available`, and `false` for every read that did not answer.
+	 */
+	available: boolean,
+	/**
+	 *  The extensions pi reports as behind, in its own order, each with its own
+	 *  display name (the block counts them, S1).
+	 */
+	behind: PackagesBehindView_Deserialize[],
+	/**
+	 *  A read that ran and could not produce a listing: the block says the read
+	 *  could not run, never "up to date" (S1).
+	 */
+	unknown: boolean,
+	/**
+	 *  Whether the listing is cut by the contract's own bound, so the block can
+	 *  say there are more than it draws.
+	 */
+	truncated: boolean,
+	/**
+	 *  When pi's check last read the machine, in epoch milliseconds, when the
+	 *  child reports one. `None` is a child that does not report it, never a
+	 *  clock of this app's.
+	 */
+	checked?: number | null,
+};
+
+/**
+ *  The Updates pane's Extensions block (packages-status T1, S1-S5): which
+ *  extensions pi's own check reports as behind, and what this app could learn.
+ * 
+ *  The members are DERIVED, never the child's own words: only
+ *  `update_available` reads as behind ([`Self::behind`]), while
+ *  `no_update_reported`, `skipped`, `unknown` and any state this build has not
+ *  learned never do.
+ * 
+ *  `unknown` is a read that ran and could not produce a listing - the child said
+ *  `available: false`, its answer carried no packages slice, or no answer came
+ *  at all - so the block says the read could not run and never "up to date"
+ *  (S1). "Up to date" is only ever `available: true` with an empty `behind`.
+ * 
+ *  [`Self::default`] is [`Self::unasked`], the value a block draws as its honest
+ *  sentence (S3) and what an older shell that does not advertise the method
+ *  degrades to (S5). It travels as a VALUE, never as an absence that could be
+ *  read as "nothing is behind".
+ */
+export type PackagesView_Serialize = {
+	/**
+	 *  Whether pi's check produced a listing at all: the child's own
+	 *  `available`, and `false` for every read that did not answer.
+	 */
+	available: boolean,
+	/**
+	 *  The extensions pi reports as behind, in its own order, each with its own
+	 *  display name (the block counts them, S1).
+	 */
+	behind: PackagesBehindView_Serialize[],
+	/**
+	 *  A read that ran and could not produce a listing: the block says the read
+	 *  could not run, never "up to date" (S1).
+	 */
+	unknown: boolean,
+	/**
+	 *  Whether the listing is cut by the contract's own bound, so the block can
+	 *  say there are more than it draws.
+	 */
+	truncated: boolean,
+	/**
+	 *  When pi's check last read the machine, in epoch milliseconds, when the
+	 *  child reports one. `None` is a child that does not report it, never a
+	 *  clock of this app's.
+	 */
+	checked?: number | null,
+};
+
 /**  How one provider's `auth check` stands: the four states the shell reports. */
 export type ProviderStatusView = "Ready" | "NotReady" | 
 /**
@@ -3255,6 +3401,16 @@ export type UpdatesView_Deserialize = {
 	 *  one.
 	 */
 	shell: VersionRowView_Deserialize,
+	/**
+	 *  The extensions pi's own update check reports (packages-status T1, S1-S5):
+	 *  which are behind, and what this app could learn.
+	 * 
+	 *  Additive and optional on the wire: a payload without it reads as
+	 *  [`PackagesView::unasked`], which is exactly the block today's builds
+	 *  draw. This build always carries it as a VALUE, so an unanswered read is
+	 *  never an absence that could look like "nothing is behind".
+	 */
+	packages?: PackagesView_Deserialize,
 };
 
 /**
@@ -3308,6 +3464,16 @@ export type UpdatesView_Serialize = {
 	 *  one.
 	 */
 	shell: VersionRowView_Serialize,
+	/**
+	 *  The extensions pi's own update check reports (packages-status T1, S1-S5):
+	 *  which are behind, and what this app could learn.
+	 * 
+	 *  Additive and optional on the wire: a payload without it reads as
+	 *  [`PackagesView::unasked`], which is exactly the block today's builds
+	 *  draw. This build always carries it as a VALUE, so an unanswered read is
+	 *  never an absence that could look like "nothing is behind".
+	 */
+	packages: PackagesView_Serialize,
 };
 
 /**

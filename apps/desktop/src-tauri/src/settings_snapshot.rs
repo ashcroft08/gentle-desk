@@ -29,11 +29,13 @@
 //! reasons, exactly as `settings::auth_view` builds it.
 
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
 use gentle_core::i18n::Language;
+use gentle_runtime::chat_runtime::PackagesRead;
 
 use crate::contract::{
     AuthView, LanguageView, NotificationsMode, ShellView, ThemeView, UpdatesView, UsageView,
@@ -92,6 +94,11 @@ pub struct Reads {
     pub web: WebGet,
     /// One run of the usage sources' own script.
     pub node: NodeProbe,
+    /// The extensions read over ONE open chat's child (packages-status T1, S1-S5):
+    /// `Unasked` when no chat is open, so a load with nothing to ask touches no
+    /// host and starts no child. Called exactly once per load, which is the one
+    /// read the dialog open (and its "Check again") makes (S2).
+    pub packages: Arc<dyn Fn() -> PackagesRead + Send + Sync>,
     /// The version this run runs as, which the desk's row is compared against.
     pub desk_version: Option<String>,
     /// The desk's release manifest, named once at startup by the update check.
@@ -155,6 +162,10 @@ pub struct SettingsSnapshot {
 /// whole.
 pub fn gather(config: SettingsConfig, reads: &Reads) -> SettingsSnapshot {
     let skipped = config.skipped_update;
+    // The one chat's extensions, read ONCE here (S2): the ask blocks on the
+    // channel's own deadline, which is why the caller gathers off the window's
+    // thread, and `Unasked` costs nothing at all.
+    let packages = (reads.packages)();
     SettingsSnapshot {
         theme: config.theme,
         language: config.language,
@@ -178,6 +189,7 @@ pub fn gather(config: SettingsConfig, reads: &Reads) -> SettingsSnapshot {
             skipped.as_deref(),
             // The dialog's own load IS a check, so its rows were read just now.
             gentle_runtime::clock::now_ms(),
+            &packages,
         ),
         usage: settings::usage_view(
             &reads.files,

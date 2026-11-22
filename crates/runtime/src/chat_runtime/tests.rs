@@ -18,6 +18,7 @@ mod folder;
 mod mark;
 mod mode;
 mod open_chat;
+mod packages;
 mod pin;
 mod profile;
 mod rekey;

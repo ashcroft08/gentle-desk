@@ -20,8 +20,9 @@
 
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use gentle_app::Command;
+use gentle_app::{ChatId, Command};
 use gentle_core::i18n::{messages, Language};
+use gentle_runtime::chat_runtime::PackagesRead;
 use gentle_runtime::whats_new::{self, Decision, Latest, UpdateRun};
 use tauri::{AppHandle, Manager};
 use tauri_specta::Event;
@@ -854,6 +855,13 @@ impl Bridge {
     pub async fn settings_snapshot(&self) -> Result<SettingsSnapshot, String> {
         self.accepting_work()?;
         let view = self.holder.view();
+        // The Extensions block's one read (packages-status T1, S2): an open chat's
+        // own child, and nothing at all when there is no chat to ask.
+        let packages = packages_probe(
+            Arc::clone(&self.pump),
+            view.open_chats,
+            view.foreground_chat.clone(),
+        );
         let reads = Reads {
             files: Arc::clone(&self.settings.files),
             auth: self.settings.paths.auth.clone(),
@@ -862,6 +870,7 @@ impl Bridge {
             versions: Arc::clone(&self.settings.versions),
             web: Arc::clone(&self.settings.web),
             node: Arc::clone(&self.settings.node),
+            packages,
             desk_version: view.app_version.clone(),
             desk_manifest: lock(&self.desk_endpoint).clone(),
             language: self.holder.language(),
@@ -911,12 +920,49 @@ impl Bridge {
                     // The instant the check finished: what the pane's last-checked
                     // line is worded from (0.8.1 settings-polish S8).
                     gentle_runtime::clock::now_ms(),
+                    // This pass runs when the app opens, and the extensions read is
+                    // an explicit ask only (packages-status T1, S2): a launch never
+                    // asks a chat, so this slice carries no packages at all and the
+                    // dialog's own load is what fills them.
+                    &PackagesRead::Unasked,
                 );
                 if let Some(view) = update_answer(&holder, checked) {
                     push(&thread_emit, view);
                 }
             });
     }
+}
+
+/// What reads the open chat's extensions for ONE Settings load (packages-status
+/// T1, S1-S5): a closure over the runtime the pump holds, bound to the chat that
+/// is in front when the dialog opens.
+///
+/// It answers [`PackagesRead::Unasked`] - and touches NO host - while no chat is
+/// open (`open_chats` is the reducer's own gate and the pane's), while no chat is
+/// in front, and while this run never built a host at all: [`EventPump::runtime`]
+/// hands back the runtime it was fed and never builds one, so a Settings open can
+/// never start a child, arm the event thread or read the machine at launch (S2).
+///
+/// The id the slice carries is a chat's own text (`foreground_chat`, the
+/// `of_session` form); a fresh chat this run cannot name again is `Unasked`,
+/// never a guess at another chat's child.
+fn packages_probe(
+    pump: Arc<EventPump>,
+    open_chats: u32,
+    chat: Option<String>,
+) -> Arc<dyn Fn() -> PackagesRead + Send + Sync> {
+    Arc::new(move || {
+        if open_chats == 0 {
+            return PackagesRead::Unasked;
+        }
+        let Some(path) = chat.as_deref().and_then(ChatId::session_path_of) else {
+            return PackagesRead::Unasked;
+        };
+        let Some(runtime) = pump.runtime() else {
+            return PackagesRead::Unasked;
+        };
+        runtime.read_packages(&ChatId::of_session(path))
+    })
 }
 
 /// What a finished check pushes: `None` is a startup pass with nothing to say
@@ -1434,15 +1480,125 @@ pub async fn settings_snapshot(
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::{Arc, Mutex};
 
     use gentle_app::{ChatId, Input, Intent};
+    use gentle_backend::chat_host::{ChatHost, ChatKey, Child, Limits, ManualClock, Spawner};
+    use gentle_core::i18n::Language;
     use gentle_core::rpc::config_store::{self, StoreId, StoreValue};
-    use gentle_runtime::chat_runtime::{ChatConfigRead, StoreRead};
+    use gentle_runtime::chat_runtime::{ChatConfigRead, ChatRuntime, PackagesRead, StoreRead};
 
-    use super::{fold_and_push, Emit, Ran};
+    use super::{fold_and_push, packages_probe, Emit, Ran};
     use crate::bridge::AppStateHolder;
-    use crate::contract::ViewState;
+    use crate::contract::{PackagesView, ViewState};
+    use crate::events::EventPump;
+    use crate::settings_snapshot::{self, Reads, SettingsConfig};
+
+    /// A spawner that starts nothing and counts every ask: the no-launch rule is
+    /// asserted by this counter staying at zero.
+    struct CountingSpawner {
+        spawns: Arc<AtomicUsize>,
+    }
+
+    impl Spawner for CountingSpawner {
+        fn spawn(&self, _key: &ChatKey, _folder: Option<&Path>) -> std::io::Result<Box<dyn Child>> {
+            self.spawns.fetch_add(1, Ordering::SeqCst);
+            Err(std::io::Error::other("this test starts no child"))
+        }
+
+        fn interactive(&self) -> bool {
+            true
+        }
+    }
+
+    /// packages-status T1, S2 and S3: a Settings load with no chat open asks NO
+    /// host - even a host that exists - and carries the honest block as a VALUE.
+    #[test]
+    fn a_load_with_no_chat_open_touches_no_host_and_carries_the_honest_block() {
+        // The host IS built and its runtime IS in the pump, so it is the chat gate
+        // that declines - not the absence of a runtime.
+        let spawns = Arc::new(AtomicUsize::new(0));
+        let host = ChatHost::with_parts(
+            Limits::default(),
+            Arc::new(CountingSpawner {
+                spawns: Arc::clone(&spawns),
+            }) as Arc<dyn Spawner>,
+            Arc::new(ManualClock::new()) as Arc<dyn gentle_backend::chat_host::Clock>,
+        );
+        let (runtime, events) = ChatRuntime::new(host);
+        let pump = Arc::new(EventPump::new(Arc::new(AppStateHolder::default())));
+        pump.feed(Arc::new(runtime), events);
+
+        let probe = packages_probe(
+            Arc::clone(&pump),
+            0,
+            Some("session:/sessions/a.jsonl".to_owned()),
+        );
+        assert_eq!(
+            probe(),
+            PackagesRead::Unasked,
+            "no chat open is no read at all"
+        );
+
+        let reads = Reads {
+            files: Arc::new(|_path: &Path, _language: Language| Ok(None)),
+            auth: None,
+            agent: None,
+            probe: Arc::new(|_provider: &str, _language: Language| {
+                Err("this test asks no provider".to_owned())
+            }),
+            versions: Arc::new(|_language: Language| Err("this test runs no probe".to_owned())),
+            web: Arc::new(|_url: &str| Err("this test reaches no network".to_owned())),
+            node: Arc::new(|_script: &Path, _language: Language| {
+                Err("this test runs no script".to_owned())
+            }),
+            packages: probe,
+            desk_version: None,
+            desk_manifest: None,
+            language: Language::En,
+        };
+        let config = SettingsConfig {
+            theme: crate::contract::ThemeView::System,
+            language: None,
+            notifications: crate::contract::NotificationsMode::WhenUnfocused,
+            skipped_update: None,
+            shell: crate::contract::ShellView {
+                pi_path: None,
+                choice: None,
+                ask: false,
+                launcher_found: false,
+                install: crate::contract::InstallView::Idle,
+                restart_needed: false,
+            },
+            app_version: None,
+            open_chats: 0,
+            config_notice: None,
+        };
+
+        let snapshot = settings_snapshot::gather(config, &reads);
+
+        assert_eq!(
+            snapshot.updates.packages,
+            PackagesView::default(),
+            "the honest block, as a value"
+        );
+        assert!(!snapshot.updates.packages.available);
+        assert!(
+            !snapshot.updates.packages.unknown,
+            "nothing was asked, which is not a read that failed (S3)"
+        );
+        assert_eq!(
+            spawns.load(Ordering::SeqCst),
+            0,
+            "a Settings load never starts a child"
+        );
+        assert!(
+            pump.runtime().is_some(),
+            "the host exists, so the gate is what declined"
+        );
+    }
 
     /// One chat's profile read, as the channel's own parser answers it: the
     /// profiles store alone is all a fold test needs to know it reached a store.

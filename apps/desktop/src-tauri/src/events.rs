@@ -95,6 +95,17 @@ impl EventPump {
         self.start_once();
     }
 
+    /// The runtime the pump was fed, `None` until a host exists.
+    ///
+    /// Read-only on purpose: it never builds a host, starts a child or reads the
+    /// machine, so a caller that only WANTS to ask a child - the Settings load's
+    /// packages read (packages-status T1, S2) - can never start one by asking.
+    pub fn runtime(&self) -> Option<Arc<ChatRuntime>> {
+        lock(&self.tagged)
+            .as_ref()
+            .map(|tagged| Arc::clone(&tagged.runtime))
+    }
+
     /// Starts the translating thread and the pump behind it when both halves are
     /// here. Called from both `arm` and `feed`, so whichever arrives last starts
     /// them; the started flag keeps the other call, and every later one, out.

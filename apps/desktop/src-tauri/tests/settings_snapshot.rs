@@ -11,7 +11,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use gentle_core::i18n::Language;
 use gentle_desk_lib::contract::{
-    AuthStatusView, HomeChoiceView, InstallView, LanguageView, NotificationsMode,
+    AuthStatusView, HomeChoiceView, InstallView, LanguageView, NotificationsMode, PackagesView,
     ProviderStatusView, ShellView, ThemeView, UpdatesStatusView, UsageProviderStatusView,
     UsageStatusView,
 };
@@ -19,6 +19,7 @@ use gentle_desk_lib::settings::{
     FileRead, NodeProbe, ProviderAnswer, ProviderProbe, VersionProbe, WebGet, SHELL_REGISTRY,
 };
 use gentle_desk_lib::settings_snapshot::{gather, Reads, SettingsConfig, SettingsSnapshot};
+use gentle_runtime::chat_runtime::{PackagesItem, PackagesRead, PackagesState, PackagesStatus};
 
 /// The npm entry pi's published version lives in, as the Updates read names it.
 const REGISTRY: &str = "https://registry.npmjs.org/@earendil-works/pi-coding-agent/latest";
@@ -153,6 +154,40 @@ fn web(asked: &Arc<Mutex<Vec<String>>>) -> WebGet {
     })
 }
 
+/// The extensions read of one load (packages-status T1): the answer a test names,
+/// and the number of times the load asked for it.
+pub type PackagesProbe = Arc<dyn Fn() -> PackagesRead + Send + Sync>;
+
+/// A packages seam answering `read` and recording every ask.
+fn packages(read: PackagesRead, asked: &Arc<Mutex<usize>>) -> PackagesProbe {
+    let asked = Arc::clone(asked);
+    Arc::new(move || {
+        *lock(&asked) += 1;
+        read.clone()
+    })
+}
+
+/// The one open chat's child, reporting one extension behind and one up to date.
+fn behind() -> PackagesRead {
+    PackagesRead::Read(PackagesStatus {
+        available: true,
+        items: vec![
+            PackagesItem {
+                name: "gentle-pi".to_owned(),
+                current: Some("4.9.0".to_owned()),
+                state: PackagesState::UpdateAvailable,
+            },
+            PackagesItem {
+                name: "pi-usage-sources".to_owned(),
+                current: Some("0.2.0".to_owned()),
+                state: PackagesState::NoUpdateReported,
+            },
+        ],
+        truncated: false,
+        checked_ms: Some(1_700_000_000_000.0),
+    })
+}
+
 /// One load's reads, every seam recording what it was asked.
 struct Seams {
     reads: Reads,
@@ -160,6 +195,7 @@ struct Seams {
     node_runs: Arc<Mutex<usize>>,
     version_runs: Arc<Mutex<usize>>,
     web_gets: Arc<Mutex<Vec<String>>>,
+    packages_asked: Arc<Mutex<usize>>,
 }
 
 impl Seams {
@@ -169,6 +205,7 @@ impl Seams {
         let node_runs = Arc::new(Mutex::new(0));
         let version_runs = Arc::new(Mutex::new(0));
         let web_gets = Arc::new(Mutex::new(Vec::new()));
+        let packages_asked = Arc::new(Mutex::new(0));
         Self {
             reads: Reads {
                 files: machine(),
@@ -178,6 +215,7 @@ impl Seams {
                 versions: versions(&version_runs),
                 web: web(&web_gets),
                 node: node(&node_runs),
+                packages: packages(behind(), &packages_asked),
                 desk_version: Some("0.1.9".to_owned()),
                 desk_manifest: Some(MANIFEST.to_owned()),
                 language: Language::En,
@@ -186,7 +224,15 @@ impl Seams {
             node_runs,
             version_runs,
             web_gets,
+            packages_asked,
         }
+    }
+
+    /// The same reads, with the open chat's answer replaced (a run with no chat
+    /// open asks nothing at all).
+    fn with_packages(mut self, read: PackagesRead) -> Self {
+        self.reads.packages = packages(read, &self.packages_asked);
+        self
     }
 
     /// The same reads, with the file reader replaced.
@@ -278,8 +324,56 @@ fn one_load_answers_every_section_of_the_dialog() {
     assert_eq!(read.updates.shell.latest.as_deref(), Some("4.8.0"));
     assert_eq!(read.updates.shell.update_available, Some(true));
     assert_eq!(read.updates.shell.reason, None);
+    // The Extensions block (packages-status T1, S1): the one chat's own child
+    // reported two extensions, and only the one pi marks is behind.
+    assert!(read.updates.packages.available);
+    assert!(!read.updates.packages.unknown);
+    assert!(!read.updates.packages.truncated);
+    assert_eq!(read.updates.packages.checked, Some(1_700_000_000_000.0));
+    assert_eq!(
+        read.updates
+            .packages
+            .behind
+            .iter()
+            .map(|behind| (behind.name.as_str(), behind.current.as_deref()))
+            .collect::<Vec<_>>(),
+        vec![("gentle-pi", Some("4.9.0"))]
+    );
     // And the load says when it read all this (S8).
     assert!(read.updates.checked_ms.is_some_and(|ms| ms > 0.0));
+}
+
+#[test]
+fn the_extensions_are_read_once_and_carried_into_the_snapshot() {
+    let seams = Seams::healthy();
+
+    let read = snapshot(&seams);
+
+    assert_eq!(
+        *lock(&seams.packages_asked),
+        1,
+        "one read per dialog open, and never a second one (S2)"
+    );
+    assert_eq!(read.updates.packages.behind.len(), 1);
+}
+
+#[test]
+fn a_load_with_no_chat_to_ask_carries_the_honest_block_and_reads_nothing() {
+    // S3 and S5: nothing was asked, so the snapshot carries that VALUE - no
+    // absence, and never a shape that reads as "nothing is behind".
+    let seams = Seams::healthy().with_packages(PackagesRead::Unasked);
+
+    let read = snapshot(&seams);
+
+    assert_eq!(read.updates.packages, PackagesView::unasked());
+    assert!(!read.updates.packages.available, "nothing was read");
+    assert!(
+        !read.updates.packages.unknown,
+        "the block draws its own sentence here, not a failed read (S3)"
+    );
+    assert!(read.updates.packages.behind.is_empty());
+    assert_eq!(read.updates.packages.checked, None);
+    assert_eq!(*lock(&seams.packages_asked), 1, "the load still asked once");
 }
 
 #[test]
@@ -295,6 +389,11 @@ fn one_load_asks_every_source_once_and_no_more() {
     );
     assert_eq!(*lock(&seams.node_runs), 1, "the sources run once");
     assert_eq!(*lock(&seams.version_runs), 1, "one version probe");
+    assert_eq!(
+        *lock(&seams.packages_asked),
+        1,
+        "the extensions are read once, like every other source"
+    );
     assert_eq!(
         *lock(&seams.web_gets),
         vec![

@@ -17,6 +17,13 @@
 //! version of the pi it runs, so the pane needs no second process and no
 //! `pi` on `PATH`.
 //!
+//! The Extensions block is the fourth piece and it is NOT a probe of this module
+//! (packages-status T1): it is one open chat's own child answering pi's own
+//! `get_update_status` (`gentle_runtime::chat_runtime::packages`), and this module
+//! only derives the block's slice from that typed read ([`packages_view`]):
+//! `update_available` is behind, everything else is not, and a listing the child
+//! could not produce is "the read could not run" rather than "up to date".
+//!
 //! Every read that fails is carried as a SHORT clause on its own row (S8, D12):
 //! the client's message names addresses and lives in English, so it is turned
 //! into "offline" or "the registry did not answer" here and never travels up.
@@ -26,11 +33,15 @@
 //! terminal's own commands.
 
 use gentle_core::i18n::Language;
+use gentle_runtime::chat_runtime::PackagesRead;
 use gentle_runtime::updates::{self as rule, ShellVersions};
 use gentle_runtime::whats_new::Latest;
 
 use super::{VersionProbe, WebGet};
-use crate::contract::{UpdateReasonView, UpdatesStatusView, UpdatesView, VersionRowView};
+use crate::contract::{
+    PackagesBehindView, PackagesView, UpdateReasonView, UpdatesStatusView, UpdatesView,
+    VersionRowView,
+};
 
 /// Where pi's published version lives: the registry entry gentle-pi's own update
 /// check reads.
@@ -51,6 +62,15 @@ pub const SHELL_REGISTRY: &str = "https://registry.npmjs.org/gentle-pi/latest";
 /// `skipped` is the version the user refused before this check ran (S1, S2), and
 /// `now_ms` is the instant the check finished (S8): the pane words its last-checked
 /// line from it and never from a clock of its own.
+///
+/// `packages` is the one open chat's extensions read (packages-status T1, S1-S5),
+/// carried beside the rows as [`PackagesView`] and never instead of them: a chat
+/// that could not answer leaves the three version rows exactly as they are.
+///
+/// Eight arguments, one per seam of ONE check, and no grouping type: the callers
+/// are the bridge's two check paths, and a struct for the sake of one call would
+/// be a type they each build only to take apart here.
+#[allow(clippy::too_many_arguments)]
 pub fn view(
     desk_version: Option<&str>,
     manifest: Option<&str>,
@@ -59,6 +79,7 @@ pub fn view(
     language: Language,
     skipped: Option<&str>,
     now_ms: u64,
+    packages: &PackagesRead,
 ) -> UpdatesView {
     let ShellVersions {
         shell: shell_installed,
@@ -89,6 +110,46 @@ pub fn view(
             rule::stable_row(shell_installed.as_deref(), shell.version.as_deref()),
             shell.reason,
         ),
+        packages: packages_view(packages),
+    }
+}
+
+/// The Extensions block's slice, from what the one chat's child answered
+/// (packages-status T1, S1-S5).
+///
+/// The members are DERIVED and nothing is the child's own wording: only
+/// `update_available` is behind ([`PackagesStatus::behind`]), a listing the child
+/// could not produce (or a read that did not answer at all) is `unknown` - the
+/// block says the read could not run, never "up to date" (S1) - and a block with
+/// nothing asked is [`PackagesView::unasked`], today's honest sentence (S3) and
+/// the state an older shell degrades to (S5).
+fn packages_view(read: &PackagesRead) -> PackagesView {
+    match read {
+        PackagesRead::Read(status) => PackagesView {
+            available: status.available,
+            behind: status
+                .behind()
+                .map(|item| PackagesBehindView {
+                    name: item.name.clone(),
+                    current: item.current.clone(),
+                })
+                .collect(),
+            unknown: status.unknown(),
+            truncated: status.truncated,
+            checked: status.checked_ms,
+        },
+        // The read ran and did not answer, or the owner refused it: the block says
+        // the read could not run. Never "up to date".
+        PackagesRead::Deadline | PackagesRead::Refused(_) => PackagesView {
+            available: false,
+            behind: Vec::new(),
+            unknown: true,
+            truncated: false,
+            checked: None,
+        },
+        // Nothing was asked: no chat has a child to ask, or the shell does not
+        // advertise the method. The honest value, never an absence (S3, S5).
+        PackagesRead::Unasked => PackagesView::unasked(),
     }
 }
 
@@ -261,7 +322,130 @@ fn row_view(row: rule::VersionRow, lookup: Option<UpdateReasonView>) -> VersionR
 mod tests {
     use std::sync::Arc;
 
+    use gentle_runtime::chat_runtime::{PackagesItem, PackagesRead, PackagesState, PackagesStatus};
+
     use super::*;
+
+    /// The Extensions block reads ONE chat's own child's answer (packages-status
+    /// T1); every other slice test here asks nothing.
+    fn nothing_asked() -> PackagesRead {
+        PackagesRead::Unasked
+    }
+
+    /// One child's listing, typed as the runtime's step answers it.
+    fn listing(available: bool, items: Vec<PackagesItem>) -> PackagesRead {
+        PackagesRead::Read(PackagesStatus {
+            available,
+            items,
+            truncated: false,
+            checked_ms: Some(1_700_000_000_000.0),
+        })
+    }
+
+    /// One extension the child reports.
+    fn extension(name: &str, current: Option<&str>, state: PackagesState) -> PackagesItem {
+        PackagesItem {
+            name: name.to_owned(),
+            current: current.map(str::to_owned),
+            state,
+        }
+    }
+
+    #[test]
+    fn only_the_extensions_pi_reports_as_behind_are_the_ones_the_block_counts() {
+        let read = listing(
+            true,
+            vec![
+                extension("gentle-pi", Some("4.9.0"), PackagesState::UpdateAvailable),
+                extension(
+                    "pi-usage-sources",
+                    Some("0.2.0"),
+                    PackagesState::NoUpdateReported,
+                ),
+                extension("skipped-one", None, PackagesState::Skipped),
+                extension("unknown-one", None, PackagesState::Unknown),
+            ],
+        );
+
+        let view = packages_view(&read);
+
+        assert!(view.available);
+        assert!(!view.unknown, "the listing was read");
+        assert!(!view.truncated);
+        assert_eq!(view.checked, Some(1_700_000_000_000.0));
+        assert_eq!(
+            view.behind
+                .iter()
+                .map(|behind| (behind.name.as_str(), behind.current.as_deref()))
+                .collect::<Vec<_>>(),
+            vec![("gentle-pi", Some("4.9.0"))],
+            "`update_available` is behind and nothing else is (S1)"
+        );
+    }
+
+    #[test]
+    fn a_listing_the_child_could_not_read_is_unknown_and_never_up_to_date() {
+        let view = packages_view(&listing(false, Vec::new()));
+
+        assert!(!view.available);
+        assert!(
+            view.unknown,
+            "an unreadable listing says the read could not run (S1)"
+        );
+        assert!(view.behind.is_empty());
+    }
+
+    #[test]
+    fn a_read_that_did_not_answer_says_the_read_could_not_run() {
+        for read in [
+            PackagesRead::Deadline,
+            PackagesRead::Refused("not_found".to_owned()),
+        ] {
+            let view = packages_view(&read);
+
+            assert!(!view.available, "{read:?}");
+            assert!(view.unknown, "{read:?}");
+            assert!(view.behind.is_empty(), "{read:?}");
+            assert_eq!(view.checked, None, "{read:?}");
+        }
+    }
+
+    #[test]
+    fn nothing_asked_is_the_blocks_honest_value_and_not_up_to_date() {
+        let view = packages_view(&nothing_asked());
+
+        assert_eq!(view, PackagesView::unasked());
+        assert!(!view.available, "nothing was read, so nothing is claimed");
+        assert!(
+            !view.unknown,
+            "the block draws its own sentence here (S3), not a failed read"
+        );
+        assert!(view.behind.is_empty());
+    }
+
+    #[test]
+    fn the_checks_slice_carries_the_extensions_beside_its_rows() {
+        let checked = view(
+            Some("0.1.12"),
+            None,
+            &web(None, None, None),
+            &versions(shell_output("1.5.2")),
+            Language::En,
+            None,
+            1,
+            &listing(
+                true,
+                vec![extension(
+                    "gentle-pi",
+                    Some("4.9.0"),
+                    PackagesState::UpdateAvailable,
+                )],
+            ),
+        );
+
+        assert_eq!(checked.packages.behind.len(), 1);
+        assert_eq!(checked.packages.behind[0].name, "gentle-pi");
+    }
 
     const MANIFEST: &str = "https://releases.test/latest.json";
 
@@ -325,6 +509,7 @@ mod tests {
             Language::En,
             None,
             1_700_000_000_000,
+            &nothing_asked(),
         )
     }
 
@@ -572,6 +757,7 @@ mod tests {
             Language::En,
             skipped,
             1,
+            &nothing_asked(),
         )
     }
 
