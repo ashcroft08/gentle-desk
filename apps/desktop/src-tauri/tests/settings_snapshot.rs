@@ -11,12 +11,13 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use gentle_core::i18n::Language;
 use gentle_desk_lib::contract::{
-    AuthStatusView, HomeChoiceView, InstallView, LanguageView, NotificationsMode, PackagesView,
-    ProviderStatusView, ShellView, ThemeView, UpdatesStatusView, UsageProviderStatusView,
-    UsageStatusView,
+    AuthStatusView, GeneralView, HomeChoiceView, InstallView, LanguageView, NotificationsMode,
+    PackagesView, ProviderStatusView, ShellView, ThemeView, ToolKind, ToolState, UpdatesStatusView,
+    UsageProviderStatusView, UsageStatusView,
 };
 use gentle_desk_lib::settings::{
-    FileRead, NodeProbe, ProviderAnswer, ProviderProbe, VersionProbe, WebGet, SHELL_REGISTRY,
+    FileRead, NodeProbe, ProviderAnswer, ProviderProbe, ToolAnswer, ToolProbe, VersionProbe,
+    WebGet, SHELL_REGISTRY,
 };
 use gentle_desk_lib::settings_snapshot::{gather, Reads, SettingsConfig, SettingsSnapshot};
 use gentle_runtime::chat_runtime::{PackagesItem, PackagesRead, PackagesState, PackagesStatus};
@@ -139,6 +140,23 @@ fn versions(ran: &Arc<Mutex<usize>>) -> VersionProbe {
     })
 }
 
+/// The environment check's two bounded probes (general T2, S3): what `node
+/// --version` and `git --version` answered, and every tool the load asked about
+/// in the order it asked.
+fn tools(asked: &Arc<Mutex<Vec<ToolKind>>>, node: ToolAnswer, git: ToolAnswer) -> ToolProbe {
+    let asked = Arc::clone(asked);
+    Arc::new(move |tool: ToolKind, _language: Language| {
+        lock(&asked).push(tool);
+        match tool {
+            ToolKind::Node => node.clone(),
+            ToolKind::Git => git.clone(),
+            // S3: the shell's and pi's versions are the Updates rows' own, so a
+            // load that spawns them again is the bug this fake refuses.
+            other => panic!("the environment check must not spawn {other:?} again"),
+        }
+    })
+}
+
 /// One GET per address, answering the manifest and the registry and recording
 /// every URL it was asked for.
 fn web(asked: &Arc<Mutex<Vec<String>>>) -> WebGet {
@@ -196,6 +214,7 @@ struct Seams {
     version_runs: Arc<Mutex<usize>>,
     web_gets: Arc<Mutex<Vec<String>>>,
     packages_asked: Arc<Mutex<usize>>,
+    tools_asked: Arc<Mutex<Vec<ToolKind>>>,
 }
 
 impl Seams {
@@ -206,6 +225,7 @@ impl Seams {
         let version_runs = Arc::new(Mutex::new(0));
         let web_gets = Arc::new(Mutex::new(Vec::new()));
         let packages_asked = Arc::new(Mutex::new(0));
+        let tools_asked = Arc::new(Mutex::new(Vec::new()));
         Self {
             reads: Reads {
                 files: machine(),
@@ -215,6 +235,11 @@ impl Seams {
                 versions: versions(&version_runs),
                 web: web(&web_gets),
                 node: node(&node_runs),
+                tools: tools(
+                    &tools_asked,
+                    ToolAnswer::Installed("v24.11.1".to_owned()),
+                    ToolAnswer::Installed("2.51.0".to_owned()),
+                ),
                 packages: packages(behind(), &packages_asked),
                 desk_version: Some("0.1.9".to_owned()),
                 desk_manifest: Some(MANIFEST.to_owned()),
@@ -225,7 +250,14 @@ impl Seams {
             version_runs,
             web_gets,
             packages_asked,
+            tools_asked,
         }
+    }
+
+    /// The same reads, with the environment check's two probes replaced.
+    fn with_tools(mut self, node: ToolAnswer, git: ToolAnswer) -> Self {
+        self.reads.tools = tools(&self.tools_asked, node, git);
+        self
     }
 
     /// The same reads, with the open chat's answer replaced (a run with no chat
@@ -509,4 +541,208 @@ fn one_load_of_a_run_that_skips_nothing_carries_no_skip() {
     let read = snapshot(&Seams::healthy());
 
     assert_eq!(read.updates.skipped, None);
+}
+
+/// One load's environment check, as the page draws it: (tool, state, version).
+fn check_rows(view: &GeneralView) -> Vec<(ToolKind, ToolState, Option<String>)> {
+    view.tools
+        .iter()
+        .map(|row| (row.tool, row.state, row.version.clone()))
+        .collect()
+}
+
+/// The same Settings, on a machine whose launcher does not resolve.
+fn without_launcher() -> SettingsConfig {
+    SettingsConfig {
+        shell: ShellView {
+            launcher_found: false,
+            ..config().shell
+        },
+        ..config()
+    }
+}
+
+/// general T2, S2, S3: the environment check rides the snapshot, and its four
+/// rows come from the versions read the Updates rows already made plus the two
+/// bounded probes.
+#[test]
+fn the_environment_check_carries_its_four_rows_in_the_tools_order() {
+    let seams = Seams::healthy();
+
+    let read = snapshot(&seams);
+
+    assert_eq!(
+        check_rows(&read.general),
+        vec![
+            (
+                ToolKind::GentleShell,
+                ToolState::Installed,
+                Some("4.7.0".to_owned())
+            ),
+            (ToolKind::Pi, ToolState::Installed, Some("1.5.2".to_owned())),
+            (
+                ToolKind::Node,
+                ToolState::Installed,
+                Some("v24.11.1".to_owned())
+            ),
+            (
+                ToolKind::Git,
+                ToolState::Installed,
+                Some("2.51.0".to_owned())
+            ),
+        ],
+        "one row per tool, the shell first and git last"
+    );
+    // S4: the page's last-checked line is the same instant the Updates rows were
+    // worded from, read once.
+    assert_eq!(read.general.checked_ms, read.updates.checked_ms);
+    assert!(read.general.checked_ms.is_some_and(|ms| ms > 0.0));
+}
+
+/// general T2, S3: the shell's and pi's rows are the Updates read's own versions,
+/// so a load asks `node` and `git` once each and never the shell again.
+#[test]
+fn the_environment_check_asks_node_and_git_once_and_never_the_shell_again() {
+    let seams = Seams::healthy();
+
+    let read = snapshot(&seams);
+
+    assert_eq!(
+        *lock(&seams.tools_asked),
+        vec![ToolKind::Node, ToolKind::Git],
+        "the two bounded probes, in the order the rows are drawn"
+    );
+    assert_eq!(
+        *lock(&seams.version_runs),
+        1,
+        "THE one `gentle-shell --version` run answers both pages"
+    );
+    assert_eq!(read.general.tools[0].version.as_deref(), Some("4.7.0"));
+    assert_eq!(read.general.tools[1].version.as_deref(), Some("1.5.2"));
+}
+
+/// general T2, S2: with no launcher the shell and pi are MISSING - the one fact
+/// that says this machine does not have them - while node's own probe still
+/// answers for itself.
+#[test]
+fn a_machine_without_the_launcher_is_missing_and_leaves_the_other_rows_alone() {
+    let seams = Seams::healthy();
+    let failing: VersionProbe =
+        Arc::new(|_language: Language| Err("gentle-shell launcher not found".to_owned()));
+    let seams = seams.with_versions(failing);
+
+    let read = gather(without_launcher(), &seams.reads);
+
+    assert_eq!(read.general.tools[0].state, ToolState::Missing);
+    assert_eq!(read.general.tools[0].version, None);
+    assert_eq!(read.general.tools[1].state, ToolState::Missing);
+    assert_eq!(read.general.tools[2].state, ToolState::Installed);
+    assert_eq!(read.general.tools[3].state, ToolState::Installed);
+    // The Updates rows still say what they could not read, in their own words
+    // (S5): the environment check never rewrites them.
+    assert_eq!(read.updates.shell.current, None);
+    assert_eq!(read.auth.status, AuthStatusView::Ready);
+    assert_eq!(read.usage.status, UsageStatusView::Installed);
+}
+
+/// S5: a shell that is there and printed nothing parseable is UNREADABLE - a
+/// different fact from a missing shell - and pi keeps whatever the run said about
+/// it.
+#[test]
+fn a_shell_that_printed_nothing_readable_is_unreadable_and_not_missing() {
+    let seams = Seams::healthy();
+    let nothing: VersionProbe =
+        Arc::new(|_language: Language| Ok("home linked C:\\Users\\u\\.pi\\agent\n".to_owned()));
+    let seams = seams.with_versions(nothing);
+
+    let read = snapshot(&seams);
+
+    assert_eq!(read.general.tools[0].state, ToolState::Unreadable);
+    assert_eq!(read.general.tools[0].version, None);
+    assert_eq!(read.general.tools[1].state, ToolState::Unreadable);
+}
+
+/// S6: git's row exists whatever its probe answers, and a missing git is that
+/// row's state - nothing else of the snapshot takes a different path.
+#[test]
+fn a_git_that_is_not_there_is_only_its_own_row() {
+    let healthy = snapshot(&Seams::healthy());
+    let seams = Seams::healthy().with_tools(
+        ToolAnswer::Installed("v24.11.1".to_owned()),
+        ToolAnswer::Missing,
+    );
+
+    let read = snapshot(&seams);
+
+    assert_eq!(read.general.tools.len(), 4, "the row exists anyway");
+    assert_eq!(read.general.tools[3].tool, ToolKind::Git);
+    assert_eq!(read.general.tools[3].state, ToolState::Missing);
+    assert_eq!(read.general.tools[3].version, None);
+    assert_eq!(read.general.tools[2].state, ToolState::Installed);
+    // Nothing else moved: no section reads git, so nothing else can see it.
+    assert_eq!(read.auth, healthy.auth);
+    assert_eq!(read.usage, healthy.usage);
+    assert_eq!(read.updates.desk, healthy.updates.desk);
+    assert_eq!(read.updates.pi, healthy.updates.pi);
+    assert_eq!(read.updates.shell, healthy.updates.shell);
+    assert_eq!(read.updates.packages, healthy.updates.packages);
+    assert_eq!(read.theme, healthy.theme);
+}
+
+/// S5: no path, no command line and no raw output of a tool travels with the
+/// snapshot - not even the path the version probe prints on its own last line.
+#[test]
+fn no_path_and_no_raw_tool_output_reaches_the_snapshot() {
+    let seams = Seams::healthy();
+    let verbose: VersionProbe = Arc::new(|_language: Language| {
+        Ok(concat!(
+            "gentle-shell 4.7.0\n",
+            "pi 1.5.2\n",
+            "home linked C:\\Users\\someone\\.pi\\agent\n",
+            "warning: stderr said C:\\Program Files\\node\\node.exe\n",
+        )
+        .to_owned())
+    });
+    let seams = seams.with_versions(verbose);
+
+    let read = snapshot(&seams);
+    let carried = serde_json::to_string(&read).expect("the snapshot is serializable");
+
+    for secret in [
+        "Users",
+        "someone",
+        "Program Files",
+        "home linked",
+        "warning",
+        "node.exe",
+        ".pi",
+    ] {
+        assert!(!carried.contains(secret), "{secret:?} reached the wire");
+    }
+    // And the rows are still drawn from the same answer.
+    assert_eq!(read.general.tools[0].version.as_deref(), Some("4.7.0"));
+    assert_eq!(read.general.tools[1].version.as_deref(), Some("1.5.2"));
+}
+
+/// Additive on the wire, like the Extensions block: a payload written before
+/// this page existed reads as "nothing was read yet", never as four missing
+/// tools.
+#[test]
+fn a_payload_without_the_environment_check_reads_as_nothing_read_yet() {
+    let read = snapshot(&Seams::healthy());
+    let mut payload = serde_json::to_value(&read).expect("the snapshot is serializable");
+    payload
+        .as_object_mut()
+        .expect("the snapshot is an object")
+        .remove("general");
+
+    let parsed: SettingsSnapshot =
+        serde_json::from_value(payload).expect("an older payload still reads");
+
+    assert_eq!(parsed.general, GeneralView::default());
+    assert_eq!(parsed.general.tools.len(), 0);
+    assert_eq!(parsed.general.checked_ms, None);
+    // The rest of the object is what it always was.
+    assert!(parsed.updates.packages.available);
+    assert_eq!(parsed.theme, ThemeView::Gentle);
 }

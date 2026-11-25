@@ -880,6 +880,10 @@ impl Bridge {
             versions: Arc::clone(&self.settings.versions),
             web: Arc::clone(&self.settings.web),
             node: Arc::clone(&self.settings.node),
+            // The environment check's two bounded probes (0.9.0 general T2, S3):
+            // launcher-independent and console-free, run on the blocking worker
+            // that gathers the rest.
+            tools: Arc::clone(&self.settings.tools),
             packages,
             desk_version: view.app_version.clone(),
             desk_manifest: lock(&self.desk_endpoint).clone(),
@@ -1563,6 +1567,9 @@ mod tests {
             web: Arc::new(|_url: &str| Err("this test reaches no network".to_owned())),
             node: Arc::new(|_script: &Path, _language: Language| {
                 Err("this test runs no script".to_owned())
+            }),
+            tools: Arc::new(|_tool: crate::contract::ToolKind, _language: Language| {
+                crate::settings::ToolAnswer::Missing
             }),
             packages: probe,
             desk_version: None,

@@ -1075,6 +1075,92 @@ impl PackagesView {
     }
 }
 
+/// One tool the app and the shell depend on, as the General page's environment
+/// check draws it (0.9.0 general S2).
+///
+/// The order of the members IS the order of the rows: the shell first, the pi it
+/// runs second, then the two tools the shell's own work needs. The web draws the
+/// name, the words and the fix hint (S5); nothing of that is on the wire.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub enum ToolKind {
+    /// `gentle-shell`, resolved through the launcher.
+    GentleShell,
+    /// The `pi` the shell runs, named by the same `--version` run.
+    Pi,
+    /// `node`, which the usage sources' script needs.
+    Node,
+    /// `git`, which the folder chips read branch names with (S6).
+    Git,
+}
+
+/// How one tool of the environment check stands (0.9.0 general S2, S5).
+///
+/// `Missing` and `Unreadable` are two different facts and two different words:
+/// the tool is not on this machine at all, or it is there and did not answer
+/// with a version. The web never sees one drawn as the other.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub enum ToolState {
+    /// The tool answered with a version.
+    Installed,
+    /// The tool is not there: nothing resolved the launcher, or the program was
+    /// not found when it was started.
+    Missing,
+    /// The tool ran and printed nothing this app can read as a version (a
+    /// non-zero exit, no answer inside its budget, or words that are not one).
+    Unreadable,
+}
+
+/// One row of the environment check (0.9.0 general S2): the tool, how it
+/// stands, and the version it printed when it printed one.
+///
+/// Never a command line, never a path and never a tool's raw output (S5): the
+/// version is the token the tool itself printed (`v24.11.1`, `2.51.0`), and the
+/// fix hint the row draws is the web's own words for the state, not a message of
+/// this app's machine.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub struct ToolRow {
+    pub tool: ToolKind,
+    pub state: ToolState,
+    /// The version the tool printed, when it printed one: `None` for every row
+    /// that is not [`ToolState::Installed`], and never an empty string.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[specta(optional)]
+    pub version: Option<String>,
+}
+
+/// The General page's slice (0.9.0 general S2-S6): the environment check's rows,
+/// state only.
+///
+/// One row per tool, in [`ToolKind`]'s own order, always all of them: git's row
+/// exists whether or not git does (S6), so a failed probe is that row's state
+/// and nothing else in the app takes a different path.
+///
+/// The members are FACTS, never the tool's words: no path, no command line and
+/// no raw stderr travels (S5). The web words the row and its fix hint from
+/// [`ToolRow::state`] in both languages.
+///
+/// [`Self::default`] - no rows, no instant - is what a payload from a build
+/// without this page reads as: nothing was read yet, never "nothing is
+/// installed".
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, Type)]
+pub struct GeneralView {
+    /// The environment check's rows, in [`ToolKind`]'s order.
+    pub tools: Vec<ToolRow>,
+    /// When the load read the machine, in epoch milliseconds (S4): the dialog's
+    /// ONE read per open is this check, and "Check again" on the page re-runs it
+    /// once, so the page words its last-checked line from this and never from a
+    /// clock of its own. It is the same instant the Updates rows carry, read
+    /// from the same clock.
+    ///
+    /// `None` is a run that read nothing at all - the value of a payload written
+    /// before this page existed. An `f64` for the same reason
+    /// [`UpdatesView::checked_ms`] is: the generated bindings refuse a 64-bit
+    /// integer on the wire, and a real millisecond count is exact in a double.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[specta(optional)]
+    pub checked_ms: Option<f64>,
+}
+
 /// Where the update check stands. It runs once when the app opens (S3) and again
 /// only when the user asks.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, Type)]

@@ -29,7 +29,10 @@ use gentle_backend::home::HomeChoice;
 use gentle_backend::launcher::{self, LauncherEnv};
 use gentle_core::i18n::{messages, Language};
 
+use crate::contract::ToolKind;
+
 mod auth;
+mod general;
 mod paths;
 mod updates;
 mod usage;
@@ -37,6 +40,7 @@ pub mod watch;
 mod web;
 
 pub use auth::view as auth_view;
+pub use general::{view as general_view, ToolAnswer};
 pub use paths::SettingsPaths;
 pub use updates::{
     learned_nothing as updates_learned_nothing, view as updates_view,
@@ -104,6 +108,10 @@ pub struct SettingsSeams {
     /// prints the subscription usage as one document. A run that cannot start,
     /// exits non-zero or outruns its budget is the `Err`.
     pub node: NodeProbe,
+    /// One bounded `node --version` / `git --version` run each, for the General
+    /// page's environment check (0.9.0 general T2, S3): launcher-independent,
+    /// without a console window, with the same 8 s budget, and never the network.
+    pub tools: ToolProbe,
 }
 
 impl SettingsSeams {
@@ -119,6 +127,7 @@ impl SettingsSeams {
             versions: version_probe(home_args),
             web: web_get(),
             node: usage::node_probe(),
+            tools: general::probe(),
         }
     }
 }
@@ -178,6 +187,17 @@ pub fn provider_args(home_args: &[OsString], provider: &str) -> Vec<OsString> {
 /// the usage.
 pub type NodeProbe =
     Arc<dyn Fn(&std::path::Path, Language) -> Result<String, String> + Send + Sync>;
+
+/// One bounded `<tool> --version` run of the environment check (0.9.0 general
+/// T2, S3): the tool it is asked about, and the typed answer - installed with the
+/// version it printed, missing from the machine, or unreadable.
+///
+/// Only `node` and `git` are ever asked: the shell's and pi's rows are the
+/// versions read the Updates rows already made, and a second launch of that probe
+/// is exactly what this seam exists to avoid. The answer is typed rather than a
+/// message because nothing of a tool's own words may travel (S5): no raw stderr,
+/// no path, no command line.
+pub type ToolProbe = Arc<dyn Fn(ToolKind, Language) -> ToolAnswer + Send + Sync>;
 
 /// The real version probe: `gentle-shell --version`, which prints the shell's
 /// version and the version of the pi it runs, with the same home flags.
