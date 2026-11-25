@@ -98,11 +98,13 @@ describe('The gear that promises an update', () => {
 
   it('stays dark for a packages read that never ran or could not run', async () => {
     // Unasked and unknown are never a promise, and neither is an answered
-    // listing with nothing behind.
+    // listing with nothing behind - or one pi's own check has not run for yet
+    // (packages-status T6, S6).
     for (const slice of [
       packages(),
       packages({ unknown: true }),
       packages({ available: true }),
+      packages({ available: true, unchecked: true }),
     ]) {
       cleanup()
       const container = draw(updates(false, slice))

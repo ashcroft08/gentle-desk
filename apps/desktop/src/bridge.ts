@@ -6,7 +6,7 @@
 // that is gone, a name Windows would not take) or `ViewState.config_notice`
 // (what became of the config file) in the next push, which the sidebar draws.
 
-import { commands, type AttachmentView, type SettingsSnapshot_Serialize as SettingsSnapshot, type TerminalActionView, type UiIntent, type WhatsNewRead } from './contract/bindings'
+import { commands, type AttachmentView, type SettingsSnapshot_Serialize as SettingsSnapshot, type TerminalActionView, type UiIntent, type ViewState_Serialize as ViewState, type WhatsNewRead } from './contract/bindings'
 
 /** Sends one user intent; the answer is drawn through the next pushed state. */
 export async function dispatchIntent(intent: UiIntent): Promise<void> {
@@ -206,6 +206,27 @@ export async function showWhatsNew(): Promise<WhatsNewRead | null> {
   try {
     const answer = await commands.showWhatsNew()
     // The command answers its refusals in the envelope, so a read that did not
+    // run is the same here as one that said nothing: `null`.
+    return answer.status === 'ok' ? answer.data : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * The explicit extensions check (packages-status T6, S7): pi's own update check,
+ * run once over the chat in front's own child, on a thread of its own and with a
+ * deadline long enough for the shell's own refresh. `null` is a call that did not
+ * run at all - refused, or broken - and then nothing is pushed.
+ *
+ * The answer is the slice as it stands, NOT the check: the command returns at
+ * once and the result reaches the app as the pushed `updates.packages`, so the
+ * caller never waits for it to know whether Settings can be drawn.
+ */
+export async function checkPackages(): Promise<ViewState | null> {
+  try {
+    const answer = await commands.checkPackages()
+    // The command answers its refusals in the envelope, so a check that did not
     // run is the same here as one that said nothing: `null`.
     return answer.status === 'ok' ? answer.data : null
   } catch {

@@ -22,10 +22,15 @@
 // one stored version can only name one of them.
 //
 // packages-status T2 (S1, S3) adds one function beside the card, `packagesOf`,
-// with the Extensions block's four honest states, and lets the one last-checked
+// with the Extensions block's honest states, and lets the one last-checked
 // line take the newest instant either read reported.
 // The check itself always reports the real state, so a skipped version is still
 // drawn as published here: hiding it is the startup check's business.
+//
+// packages-status T6 (S6, S7) adds two things to that: a FIFTH state, `unchecked`
+// - the listing exists and pi's own check has not run in that child, so "al día"
+// would be a claim nobody made - and `updatesDrawn`, which is which packages
+// slice the dialog draws when the load's answer and the pushed check disagree.
 
 import type {
   PackagesView_Serialize as PackagesView,
@@ -91,12 +96,15 @@ export type PackageRow = {
 }
 
 /**
- * The Extensions block's one honest state (packages-status T2, S1, S3): the
- * listing that named the behind ones, the answer that named none, the read that
- * could not run, and the one nothing asked - never a fifth, and never a guess.
+ * The Extensions block's one honest state (packages-status T2, S1, S3; T6, S6):
+ * the listing that named the behind ones, the listing pi has not checked yet, the
+ * answer that named none, the read that could not run, and the one nothing asked -
+ * never a sixth, and never a guess. A `behind` block whose `unchecked` is set keeps
+ * drawing its line under the names: the list is not the whole story then.
  */
 export type PackagesCard =
-  | { state: 'behind'; count: number; rows: PackageRow[] }
+  | { state: 'behind'; count: number; rows: PackageRow[]; unchecked: boolean }
+  | { state: 'unchecked' }
   | { state: 'upToDate' }
   | { state: 'unreadable' }
   | { state: 'unasked' }
@@ -151,10 +159,15 @@ function newest(rows: number | null, packages: number | null): number | null {
 
 /**
  * Whether pi's own check names the extensions that are behind (packages-status
- * T2, S1, S3): only a listing that answered can be `behind` or `upToDate`, a read
- * that ran and could not answer is `unreadable`, and no answer at all - no chat
- * open, or an older shell that does not advertise the read (S5) - is `unasked`.
- * "Up to date" is only ever the answered listing with nothing behind it.
+ * T2, S1, S3; T6, S6): only a listing that answered can be `behind`,
+ * `unchecked` or `upToDate`, a read that ran and could not answer is `unreadable`,
+ * and no answer at all - no chat open, or an older shell that does not advertise
+ * the read (S5) - is `unasked`.
+ *
+ * "Up to date" is only ever the answered listing pi's own check ran for and that
+ * has nothing behind it: a listing with an item still `unknown` is `unchecked`,
+ * and one with names behind AND items unknown carries both, because a behind list
+ * nobody finished checking must never read as complete.
  */
 export function packagesOf(packages: PackagesView | null): PackagesCard {
   if (packages === null) return { state: 'unasked' }
@@ -165,7 +178,37 @@ export function packagesOf(packages: PackagesView | null): PackagesCard {
     name: each.name,
     version: each.current ?? null,
   }))
-  return rows.length === 0 ? { state: 'upToDate' } : { state: 'behind', count: rows.length, rows }
+  if (rows.length > 0) {
+    return { state: 'behind', count: rows.length, rows, unchecked: packages.unchecked }
+  }
+  return packages.unchecked ? { state: 'unchecked' } : { state: 'upToDate' }
+}
+
+/** Whether pi's own check has finished for the whole listing (S6). */
+function checkFinished(packages: PackagesView | null): packages is PackagesView {
+  return packages !== null && packages.available && !packages.unchecked
+}
+
+/**
+ * The updates the dialog draws (packages-status T6, S7): the push until the one
+ * load answers, and the load's answer afterwards - the expression the rail and the
+ * pane already shared - EXCEPT for the packages slice.
+ *
+ * The explicit check's result arrives by PUSH, so a check that finishes while
+ * Settings is open lives only in the live slice: the pushed packages are drawn
+ * when they are a FINISHED check (`available` and nothing left `unknown`) and the
+ * load's are not. A pushed slice pi has not checked never replaces one that was,
+ * and neither does anything a push carries about the three rows: only the
+ * packages move.
+ */
+export function updatesDrawn(
+  pushed: UpdatesView | null,
+  snapshot: UpdatesView | null,
+): UpdatesView | null {
+  const base = snapshot ?? pushed
+  const packages = pushed?.packages ?? null
+  const better = checkFinished(packages) && !checkFinished(snapshot?.packages ?? null)
+  return base === null || !better ? base : { ...base, packages }
 }
 
 /**

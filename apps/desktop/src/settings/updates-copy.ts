@@ -23,6 +23,10 @@
 // could not answer, and the condition that makes the read possible when no chat
 // is open. The approved sentence about this Gentle Shell not knowing stays, in
 // that last state.
+//
+// packages-status T6 (S6) adds the fifth line: the listing exists but pi's own check
+// has not run for it, so "al día" would be a claim nobody made. It says exactly
+// that, and it is drawn UNDER the behind list when only some packages are known.
 import type { LanguageView, UpdateReasonView } from '../contract/bindings'
 
 /** Which piece a row is, for the one sentence that names it. */
@@ -71,6 +75,13 @@ export interface UpdatesCopy {
   packagesBehind: (count: number) => string
   /** The read answered and none is behind: the only honest "up to date". */
   packagesUpToDate: string
+  /**
+   * The listing exists and pi's own check has not run in that child (T6, S6):
+   * "not checked yet" is its own sentence - never "up to date" (the claim this
+   * line exists to stop) and never the failed read's clause either, because
+   * nothing failed.
+   */
+  packagesUnchecked: string
   /** The read ran and could not produce a listing: never "up to date" (S1). */
   packagesUnreadable: string
   /** No chat is open, or this shell cannot ask: what would make it possible (S3, S5). */
@@ -143,6 +154,7 @@ const ENGLISH: UpdatesCopy = {
       ? '1 extension has an update available'
       : `${count} extensions have an update available`,
   packagesUpToDate: 'The extensions are up to date.',
+  packagesUnchecked: 'It has not been checked yet whether any extension has an update.',
   // The packages read carries no reason of its own, so the failure is the short
   // generic clause: pi's own check is what does not answer.
   packagesUnreadable: 'Could not check the extensions: pi did not answer.',
@@ -202,6 +214,7 @@ const SPANISH: typeof ENGLISH = {
       ? '1 extensión con actualización disponible'
       : `${count} extensiones con actualización disponible`,
   packagesUpToDate: 'Las extensiones están al día.',
+  packagesUnchecked: 'Todavía no se comprobó si hay extensiones por actualizar.',
   packagesUnreadable: 'No se pudo revisar las extensiones: pi no respondió.',
   packagesNeedsSession: 'Se puede revisar al abrir una sesión.',
   checkedAt: (age, justNow) =>

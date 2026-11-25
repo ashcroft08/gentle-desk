@@ -9,6 +9,7 @@
 import '../test-support/dom-env'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, within } from '@testing-library/svelte'
+import { tick } from 'svelte'
 import type {
   HomeChoiceView,
   PackagesView_Serialize as PackagesView,
@@ -286,6 +287,96 @@ describe('the Updates pane', () => {
     // A check, never an install: no terminal window opens and no intent leaves.
     expect(handlerArgs('dispatch_intent')).toEqual([])
     expect(handlerArgs('open_terminal')).toEqual([])
+  })
+
+  // packages-status T6 (S6, S7): one press asks both - the dialog's one coalesced
+  // load AND pi's own explicit check, whose answer arrives by push. Nothing here
+  // waits for that answer: the pane keeps drawing what it has.
+  describe('the explicit extensions check (S7)', () => {
+    it('asks it on the same press, and says it in the Extensions block only', async () => {
+      // The command answers the slice as it stands; the result comes by push.
+      setHandler('check_packages', () => ({}))
+      const again = ask()
+      const { container, rerender } = render(UpdatesPane, {
+        props: { updates: updates(), openChats: 1, refreshing: false, onRefresh: again, home: null },
+      })
+      const pane = container as HTMLElement
+
+      await fireEvent.click(within(pane).getByRole('button', { name: copy.checkAgain }))
+
+      // Both asks: the one load, and pi's check. Neither waits on the other.
+      expect(again).toHaveBeenCalledTimes(1)
+      expect(handlerArgs('check_packages')).toHaveLength(1)
+      // The block says it is checking; the card of the three rows is untouched.
+      expect(ext(pane).textContent).toContain(copy.checking)
+      expect(pane.querySelectorAll(`.versions`)).toHaveLength(1)
+      expect(within(pane).getByText(copy.updateAvailable)).toBeTruthy()
+
+      // The answer arrives as the push: the block stops saying it is checking and
+      // draws the extension pi found.
+      await rerender({
+        updates: updates({
+          packages: packages({
+            available: true,
+            behind: [{ name: 'pi-hud', current: '0.3.1' }],
+          }),
+        }),
+        openChats: 1,
+        refreshing: false,
+        onRefresh: again,
+        home: null,
+      })
+      await tick()
+
+      expect(ext(pane).textContent).not.toContain(copy.checking)
+      expect(ext(pane).textContent).toContain(copy.packagesBehind(1))
+      expect(ext(pane).textContent).toContain('pi-hud')
+    })
+
+    it('claims no check while no chat is open, where nothing could answer', async () => {
+      setHandler('check_packages', () => ({}))
+      const again = ask()
+      const pane = draw(updates(), 0, false, again)
+
+      await fireEvent.click(within(pane).getByRole('button', { name: copy.checkAgain }))
+      await tick()
+
+      // The ask still leaves (the shell answers `Unasked` and touches nothing),
+      // and the block keeps its honest sentence rather than a promise of an answer.
+      expect(again).toHaveBeenCalledTimes(1)
+      expect(handlerArgs('check_packages')).toHaveLength(1)
+      expect(ext(pane).textContent).not.toContain(copy.checking)
+      expect(ext(pane).textContent).toContain(copy.extensionsNote)
+    })
+
+    it('stops saying it is checking when the ask was refused: nothing will arrive', async () => {
+      setHandler('check_packages', () => {
+        throw 'the shell is closing'
+      })
+      const again = ask()
+      const pane = draw(updates(), 1, false, again)
+
+      await fireEvent.click(within(pane).getByRole('button', { name: copy.checkAgain }))
+      await vi.waitFor(() => {
+        expect(ext(pane).textContent).not.toContain(copy.checking)
+      })
+      // A refused check says nothing of its own: the block draws what it already had.
+      expect(ext(pane).textContent).toContain(copy.extensionsNote)
+    })
+
+    it('draws the fifth state: a listing pi has not checked yet (S6)', () => {
+      const pane = draw(
+        updates({ packages: packages({ available: true, unchecked: true }) }),
+        1,
+      )
+
+      expect(within(ext(pane)).getByText(copy.packagesUnchecked)).toBeTruthy()
+      expect(ext(pane).textContent).not.toContain(copy.packagesUpToDate)
+      // The one action is untouched by the state of the read.
+      expect(
+        within(ext(pane)).getByRole('button', { name: copy.updateExtensions }),
+      ).toBeTruthy()
+    })
   })
 
   it('offers Skip this version on the row whose version is the newest (D9)', async () => {

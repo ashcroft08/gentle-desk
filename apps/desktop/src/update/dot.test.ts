@@ -116,6 +116,29 @@ describe('The gear dot', () => {
     )
   })
 
+  it('stays dark for a listing pi has not checked yet (packages-status T6, S6)', () => {
+    // The listing exists and every checkable item is still `unknown`: pi's own
+    // check never ran in that child, so the app knows of nothing waiting - and the
+    // dot is a promise, not a maybe.
+    expect(
+      updateWaiting(
+        updates({}, 'Ready', undefined, packages({ available: true, unchecked: true })),
+      ),
+    ).toBe(false)
+    // A listing with one package behind lights it whatever the rest is: that much
+    // the check did learn.
+    expect(
+      updateWaiting(
+        updates(
+          {},
+          'Ready',
+          undefined,
+          packages({ available: true, unchecked: true, behind: [{ name: 'pi-hud' }] }),
+        ),
+      ),
+    ).toBe(true)
+  })
+
   it('never lets the skip darken a package: a package name is not a version', () => {
     // The skip is a version rule for the rows (S2). A package the user never
     // skipped still lights the dot, whatever version number sits beside it.

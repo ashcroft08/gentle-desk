@@ -387,6 +387,84 @@ describe('the Settings dialog', () => {
   })
 })
 
+// packages-status T6 (S6, S7): the check the user asks for answers by PUSH, after
+// the dialog's one load already landed. The block and the dot draw that answer -
+// but only when it is a FINISHED check, so a push pi has not checked never
+// overwrites what the load knows.
+describe('the packages a late check pushed (packages-status T6, S7)', () => {
+  const UNCHECKED_LINE = 'It has not been checked yet whether any extension has an update.'
+  const UP_TO_DATE_LINE = 'The extensions are up to date.'
+
+  /** One push of the whole state, the way the shell sends it. */
+  function push(updates: UpdatesView): void {
+    pushEvent(
+      'state-changed',
+      viewState({ shell: shell(), total_sessions: 1, updates }),
+    )
+  }
+
+  it('draws a checked result that arrives after the load said it was not checked', async () => {
+    // The load's own plain read found a listing pi had never checked.
+    const dialog = await openSettings({}, VERSION, {
+      updates: level({ packages: packages({ available: true, unchecked: true }) }),
+    })
+    await pick(dialog, UPDATES)
+    expect(pane(dialog).textContent).toContain(UNCHECKED_LINE)
+
+    // pi's own check finishes while Settings is open: only the push carries it.
+    push(
+      level({
+        packages: packages({ available: true, behind: [{ name: 'pi-hud', current: '0.3.1' }] }),
+      }),
+    )
+
+    await vi.waitFor(() => {
+      expect(pane(dialog).textContent).toContain('pi-hud')
+    })
+    expect(pane(dialog).textContent).not.toContain(UNCHECKED_LINE)
+    expect(pane(dialog).textContent).toContain('1 extension has an update available')
+    // The rail follows the same slice: where to go, on the way in.
+    expect(dotOf(within(dialog).getByRole('tab', { name: UPDATES }))).not.toBeNull()
+  })
+
+  it('never lets a push pi has not checked replace the load\'s finished one', async () => {
+    let settle: (snapshot: SettingsSnapshot) => void = () => {}
+    const held = new Promise<SettingsSnapshot>((resolve) => {
+      settle = resolve
+    })
+    const dialog = await openSettings(
+      {},
+      VERSION,
+      { updates: level({ packages: packages({ available: true, unchecked: true }) }) },
+      held,
+    )
+    await pick(dialog, UPDATES)
+    // No answer yet: the push is what the pane draws, and it says nobody checked.
+    expect(pane(dialog).textContent).toContain(UNCHECKED_LINE)
+
+    settle(
+      snapshotOf(
+        viewState({
+          shell: shell(),
+          total_sessions: 1,
+          updates: level({ packages: packages({ available: true, unchecked: false }) }),
+        }),
+      ),
+    )
+    await vi.waitFor(() => {
+      expect(pane(dialog).textContent).toContain(UP_TO_DATE_LINE)
+    })
+
+    // The rule is the slice's own: a checked answer outranks one nobody checked.
+    expect(pane(dialog).textContent).not.toContain(UNCHECKED_LINE)
+  })
+
+  /** The dot the Updates entry draws, or null when it draws none. */
+  function dotOf(entry: HTMLElement): Element | null {
+    return entry.querySelector('.dot')
+  }
+})
+
 // packages-status S8, T5 (L2): the gear's dot already promises something, but
 // once Settings is open - and it opens on General - nothing said WHERE to go. So
 // the "Actualizaciones" entry itself wears the same dot while `updateWaiting`
@@ -454,6 +532,16 @@ describe('the rail that points at Updates (packages-status S8)', () => {
     // is behind, so there is nothing to point at.
     const dialog = await openSettings({}, VERSION, {
       updates: level({ pi: UNKNOWN_ROW, shell: UNKNOWN_ROW, packages: packages({ unknown: true }) }),
+    })
+
+    expect(dotOf(within(dialog).getByRole('tab', { name: UPDATES }))).toBeNull()
+  })
+
+  it('stays bare for a listing pi has not checked yet (packages-status T6, S6)', async () => {
+    // The listing exists and nothing is known to be behind: the entry promises
+    // nothing, and it is not the "nothing is behind" claim either.
+    const dialog = await openSettings({}, VERSION, {
+      updates: level({ packages: packages({ available: true, unchecked: true }) }),
     })
 
     expect(dotOf(within(dialog).getByRole('tab', { name: UPDATES }))).toBeNull()

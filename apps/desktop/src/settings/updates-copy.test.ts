@@ -36,6 +36,7 @@ const ENGLISH = {
   noStableLatest: 'Without a measured stable version, nothing is installed.',
   checkedNever: 'Last checked: never',
   packagesUpToDate: 'The extensions are up to date.',
+  packagesUnchecked: 'It has not been checked yet whether any extension has an update.',
   packagesUnreadable: 'Could not check the extensions: pi did not answer.',
   packagesNeedsSession: 'You can check it by opening a session.',
 }
@@ -64,6 +65,7 @@ const SPANISH = {
   noStableLatest: 'Sin una versión estable medida, no se instala nada.',
   checkedNever: 'Última comprobación: nunca',
   packagesUpToDate: 'Las extensiones están al día.',
+  packagesUnchecked: 'Todavía no se comprobó si hay extensiones por actualizar.',
   packagesUnreadable: 'No se pudo revisar las extensiones: pi no respondió.',
   packagesNeedsSession: 'Se puede revisar al abrir una sesión.',
 }
@@ -210,6 +212,31 @@ describe('the updates copy', () => {
       const sentence = updatesCopy(language).packagesUnreadable
       expect(sentence).not.toMatch(/https?:|\d{3}/)
       expect(sentence.endsWith('.')).toBe(true)
+    }
+  })
+
+  // packages-status T6 (S6): the listing exists but pi's own check has not run for
+  // it, so the block says exactly that - never "al día", and never the failed
+  // read's clause either (nothing failed).
+  it('says the extensions have not been checked yet, in both languages', () => {
+    const english = updatesCopy('en')
+    const spanish = updatesCopy('es')
+
+    expect(english.packagesUnchecked).toBe(
+      'It has not been checked yet whether any extension has an update.',
+    )
+    expect(spanish.packagesUnchecked).toBe(
+      'Todavía no se comprobó si hay extensiones por actualizar.',
+    )
+    // Not the two claims it replaces: a machine nobody checked is neither up to
+    // date nor a read that could not run.
+    for (const language of ['en', 'es'] as const) {
+      expect(updatesCopy(language).packagesUnchecked).not.toBe(
+        updatesCopy(language).packagesUpToDate,
+      )
+      expect(updatesCopy(language).packagesUnchecked).not.toBe(
+        updatesCopy(language).packagesUnreadable,
+      )
     }
   })
 })

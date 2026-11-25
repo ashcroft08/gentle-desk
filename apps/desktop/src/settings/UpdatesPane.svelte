@@ -10,20 +10,24 @@
   // The rules that pick a shape live in `./updates`; the rows are drawn by
   // `UpdateRows.svelte`.
   //
-  // The second group is "Update extensions" (D14; packages-status T2, S1, S3): the
-  // shell's updater with pi's `--extensions` flag only touches the packages the
-  // shell has installed, so that button is always offered - but WHICH of them are
-  // behind is knowable while a chat is open, through pi's own check. So the block
-  // counts and names them, says they are up to date only when the read answered
-  // that, says the read could not run when it could not, and keeps the approved
-  // honest sentence plus its condition when nothing asked. Same chats-closed gate.
+  // The second group is "Update extensions" (D14; packages-status T2, S1, S3; T6,
+  // S6, S7), drawn by `ExtensionsBlock.svelte`: the shell's updater with pi's
+  // `--extensions` flag only touches the packages the shell has installed, so that
+  // button is always offered - but WHICH of them are behind is knowable while a
+  // chat is open, through pi's own check. So the block counts and names them, says
+  // they are up to date only when pi's own check ran for the whole listing, says
+  // nobody has checked yet when it did not, says the read could not run when it
+  // could not, and keeps the approved honest sentence plus its condition when
+  // nothing asked. Same chats-closed gate.
   //
   // The terminal actions are the shell's own - `update` on pi's row and `upgrade`
   // on the shell's (S7) - and both are DEAD while any chat is open (S4), with the
   // reason written under the rows: a chat whose child is mid-turn must not have its
   // pi change underneath. "Check again" only ever asks for a check; no update is
   // installed from here, and it is never held back by the gate because reading
-  // changes nothing.
+  // changes nothing. One press asks TWO things (packages-status T6, S7): the
+  // dialog's one coalesced load, and pi's own explicit check, whose answer arrives
+  // as a pushed packages slice.
   //
   // WHICH command an action runs is the home's (updates-by-home S4): under each
   // button is one quiet mono line with the exact line Rust will start -
@@ -37,17 +41,19 @@
   // publishes the version the user skipped. Both are intents the bridge answers,
   // and the pane asks for the dialog's one read again after them, so the card shows
   // the skip it just made.
-  import { dispatchIntent, openTerminal } from '../bridge'
+  import { checkPackages, dispatchIntent, openTerminal } from '../bridge'
   import type {
     HomeChoiceView,
+    PackagesView_Serialize as PackagesView,
     TerminalActionView,
     UpdatesView_Serialize as UpdatesView,
   } from '../contract/bindings'
   import { ago, isJustNow } from '../home/ago'
   import { language } from '../i18n/language.svelte'
+  import ExtensionsBlock from './ExtensionsBlock.svelte'
   import UpdateRows from './UpdateRows.svelte'
   import { commandAction, commandLine, drawnLine } from './update-commands'
-  import { cardOf, packagesOf, type RowAction } from './updates'
+  import { cardOf, type RowAction } from './updates'
   import { updatesCopy } from './updates-copy'
 
   let {
@@ -98,11 +104,6 @@
   )
 
   const card = $derived(cardOf(updates, copy))
-  /**
-   * The Extensions block's one honest state (packages-status T2, S1, S3): the
-   * packages slice of the same load, never a read of its own.
-   */
-  const ext = $derived(packagesOf(updates?.packages ?? null))
   /** Whether a check is on its way: the pushed one, or the one the user asked for. */
   const checking = $derived(card.checking || refreshing)
   const blocked = $derived(openChats > 0)
@@ -118,6 +119,49 @@
   const extensionsLine = $derived(
     drawnLine(commandLine('UpdateExtensions', home, shellLatest), copy.noStableLatest),
   )
+
+  /** The packages slice the dialog's one read answered, or null when it read none. */
+  const packages = $derived(updates?.packages ?? null)
+
+  /**
+   * What the pushed packages slice says, as one comparable value (T6, S7): the
+   * explicit check's result arrives as a PUSH, so this is how "the push changed"
+   * is read - and it changes only when the slice does, never on a push that
+   * carried something else.
+   */
+  function packagesTag(slice: PackagesView | null): string {
+    if (slice === null) return ''
+    const { available, unknown, unchecked, truncated, checked, behind } = slice
+    return JSON.stringify({ available, unknown, unchecked, truncated, checked, behind })
+  }
+
+  /**
+   * The tag the pushed slice had when the user pressed, and null when no check of
+   * theirs is out: the block's quiet "Comprobando..." is derived from it, so
+   * nothing polls and the line lasts exactly until the pushed slice changes.
+   */
+  let pressedPackages = $state<string | null>(null)
+  const checkingPackages = $derived(
+    pressedPackages !== null && packagesTag(packages) === pressedPackages,
+  )
+
+  /**
+   * "Check again" (packages-status T6, S7): ONE press asks both - the dialog's one
+   * coalesced snapshot load, and pi's own explicit check, which answers at once and
+   * delivers its result as the pushed packages slice. The card's readiness never
+   * waits for that check.
+   *
+   * That is also why the line is cleared by the PUSH and not by the call: a call
+   * that resolves at once would take "Comprobando..." away before pi had even run.
+   * With no chat open nothing can answer, so nothing is claimed; and a refused
+   * command answers nothing, so the line stops rather than wait for a push that
+   * will never come.
+   */
+  async function check(): Promise<void> {
+    onRefresh()
+    if (openChats > 0) pressedPackages = packagesTag(packages)
+    if ((await checkPackages()) === null) pressedPackages = null
+  }
 
   /** The card's one tag: something newer, nothing newer, or a row nobody read. */
   const tag = $derived(
@@ -200,7 +244,7 @@
     {/if}
     <p class="versions">{checkedLine}</p>
     <div class="acts">
-      <button class="btn" type="button" onclick={onRefresh}>{copy.checkAgain}</button>
+      <button class="btn" type="button" onclick={() => void check()}>{copy.checkAgain}</button>
     </div>
   </div>
 {:else}
@@ -212,7 +256,7 @@
   {/if}
   <p class="versions">{checkedLine}</p>
   <div class="acts">
-    <button class="btn" type="button" onclick={onRefresh}>{copy.checkAgain}</button>
+    <button class="btn" type="button" onclick={() => void check()}>{copy.checkAgain}</button>
   </div>
   {#if blocked}
     <p class="gate" id={hintId} role="status">{hint}</p>
@@ -220,43 +264,15 @@
 {/if}
 
 <!-- The extensions block: pi's own check when it could ask (packages-status T2),
-     and the approved honest sentence plus its condition when it could not (S3). -->
-<div class="card ext">
-  {#if ext.state === 'behind'}
-    <p class="quiet">{copy.packagesBehind(ext.count)}</p>
-    <ul class="urows">
-      {#each ext.rows as one (one.name)}
-        <li class="urow" data-package={one.name}>
-          <span class="headline">{one.name}</span>
-          {#if one.version !== null}
-            <span class="mono">{one.version}</span>
-          {/if}
-        </li>
-      {/each}
-    </ul>
-  {:else if ext.state === 'upToDate'}
-    <p class="quiet">{copy.packagesUpToDate}</p>
-  {:else if ext.state === 'unreadable'}
-    <p class="quiet">{copy.packagesUnreadable}</p>
-  {:else}
-    <!-- No chat open, or a shell that does not advertise the read (S5): the
-         honest sentence, and the condition that would let it check (S3). -->
-    <p class="quiet">{copy.extensionsNote}</p>
-    <p class="quiet">{copy.packagesNeedsSession}</p>
-  {/if}
-  <div class="acts">
-    <button
-      class="btn"
-      type="button"
-      disabled={blocked}
-      aria-describedby={blocked ? hintId : undefined}
-      onclick={() => void extensions()}>{copy.updateExtensions}</button
-    >
-  </div>
-  <!-- The exact line that button runs, on the home the push carries (S4), and the
-       terminal's own refusal when it could not run it. -->
-  <p class="reason mono" data-command>{extensionsLine}</p>
-  {#if extensionsError !== null}
-    <p class="quiet" role="status">{extensionsError}</p>
-  {/if}
-</div>
+     the "not checked yet" state (T6, S6), and the approved honest sentence plus
+     its condition when it could not (S3). -->
+<ExtensionsBlock
+  {packages}
+  checking={checkingPackages}
+  {blocked}
+  {hintId}
+  line={extensionsLine}
+  error={extensionsError}
+  onExtensions={() => void extensions()}
+  {copy}
+/>

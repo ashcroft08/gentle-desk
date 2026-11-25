@@ -67,6 +67,7 @@
   import { settingsCopy } from './copy'
   import { visibleSections } from './search'
   import { createSettingsRead } from './snapshot.svelte'
+  import { updatesDrawn } from './updates'
   import { DEFAULT_SECTION, PANEL_ID, RAIL_NOTE_ID, TAB_IDS, railNote, sectionAfter, type Section } from './sections'
 
   let {
@@ -139,7 +140,14 @@
    * keep following the live slice (the snapshot carries them for the record).
    */
   const authView = $derived(read.snapshot?.auth ?? auth)
-  const updatesView = $derived(read.snapshot?.updates ?? updates)
+  /**
+   * The Updates slice the section and the rail's dot both draw: the push until
+   * the one read answers, and that answer afterwards - EXCEPT the packages slice,
+   * which the pushed explicit check may finish later (packages-status T6, S7, the
+   * rule in `updatesDrawn`). One expression, so the rail and the pane can never
+   * say different things.
+   */
+  const updatesView = $derived(updatesDrawn(updates, read.snapshot?.updates ?? null))
   const usageView = $derived(read.snapshot?.usage ?? usage)
 
   /**

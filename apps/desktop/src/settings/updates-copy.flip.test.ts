@@ -244,10 +244,30 @@ describe('a drawn Updates pane', () => {
     const upToDate = draw(updates({ packages: packages({ available: true }) }))
     const unreadable = draw(updates({ packages: packages({ unknown: true }) }))
     const unasked = draw(updates())
+    // S6, T6: the listing exists and pi's own check has not run in that child.
+    const unchecked = draw(updates({ packages: packages({ available: true, unchecked: true }) }))
+    const behindUnchecked = draw(
+      updates({
+        packages: packages({
+          available: true,
+          unchecked: true,
+          behind: [{ name: 'pi-hud', current: '0.3.1' }],
+        }),
+      }),
+    )
 
     expect(ext(behind).textContent).toContain('2 extensions have an update available')
     expect(ext(behind).textContent).toContain('pi-hud')
     expect(ext(upToDate).textContent).toContain('The extensions are up to date.')
+    expect(ext(unchecked).textContent).toContain(
+      'It has not been checked yet whether any extension has an update.',
+    )
+    // The behind list is drawn, and the line under it keeps it from reading as
+    // the whole story.
+    expect(ext(behindUnchecked).textContent).toContain('pi-hud')
+    expect(ext(behindUnchecked).textContent).toContain(
+      'It has not been checked yet whether any extension has an update.',
+    )
     expect(ext(unreadable).textContent).toContain(
       'Could not check the extensions: pi did not answer.',
     )
@@ -262,6 +282,13 @@ describe('a drawn Updates pane', () => {
     expect(ext(behind).textContent).toContain('pi-hud')
     expect(ext(behind).textContent).toContain('0.3.1')
     expect(ext(upToDate).textContent).toContain('Las extensiones están al día.')
+    expect(ext(unchecked).textContent).toContain(
+      'Todavía no se comprobó si hay extensiones por actualizar.',
+    )
+    expect(ext(behindUnchecked).textContent).toContain('pi-hud')
+    expect(ext(behindUnchecked).textContent).toContain(
+      'Todavía no se comprobó si hay extensiones por actualizar.',
+    )
     expect(ext(unreadable).textContent).toContain(
       'No se pudo revisar las extensiones: pi no respondió.',
     )
