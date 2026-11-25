@@ -14,11 +14,13 @@ has to hunt for the way to close what made the notice possible.
   handled today, so the count, the stopped children and the foreground follow the existing close
   rules - including the phantom/never-started chats, and a closed chat stays closed). Stored sessions
   are untouched: closing a chat never deletes its session.
-- S3 If any open chat is WORKING (a turn in flight, queued input, or waiting for the user's answer),
-  the button first asks for confirmation in the app's existing confirm dialog pattern, naming the
-  count: "Hay N chats trabajando. Cerrarlos corta lo que están haciendo; las sesiones se guardan." /
-  "N chats are working. Closing them stops what they are doing; the sessions are kept." with Cancel
-  and "Cerrar los chats". With nothing working it closes at once, without a dialog.
+- S3 (REVISED, L2) A chat that is WORKING (a turn in flight, queued input, or waiting for the user's
+  answer) is NOT closed: `CloseChat` already refuses it (`close_chat` -> `close_working`, the user must stop
+  the turn first) and `CloseAllChats` keeps that guard instead of bypassing it. The button closes every
+  chat that is NOT working, silently skipping the working ones (no per-chat notices), and the pane then
+  says how many are still working and why they stay: "N chats siguen trabajando: detenlos y vuelve a
+  intentarlo." / "N chats are still working: stop them and try again." No confirmation dialog is needed
+  because nothing that is running is ever stopped by this button.
 - S4 After the chats close, the sentence and the button disappear and the three update buttons are
   enabled by the existing rule (open chats == 0): nothing else about the gate changes.
 - S5 One button, no timer, no auto-close, and nothing here runs an update.
@@ -36,3 +38,4 @@ has to hunt for the way to close what made the notice possible.
   abierto - Cerrar chat en el menú de su fila y los botones de actualización se activan." Asked which
   improvement; chose: "Un botón 'Cerrar los chats' en ese aviso (recomendado)" with confirmation when a
   chat is working.
+- L2 (2026-11-25, parent, from the worker's map): the app's existing rule (`close_chat` refuses a working chat) conflicts with the first S3 (confirm and close it). Decision: keep the guard; the button closes the idle chats only and the pane names the working ones. This is MORE conservative than the maintainer's choice, not less; a 'stop and close' action would be its own feature. Also approved: `apps/desktop/src-tauri/src/bridge.rs`, limited to `AppStateHolder::apply`'s closing bookkeeping (the post-fold `forget_transcript` for every chat that left the open set), so a chat closed in bulk reopens exactly like one closed alone.
