@@ -22,6 +22,14 @@
 //! launcher, so the terminal reads the home the desk is showing and no `pi` has
 //! to be on `PATH`.
 //!
+//! Which command an action runs is the HOME's (updates-by-home S1, [`command_for_home`]):
+//! "Separado" is the shell's own home, so every action is `gentle-shell ...`
+//! through the launcher, byte for byte what it always was; "Mi pi" is the
+//! user's own pi, so the three Updates actions run `pi ...` DIRECTLY - no
+//! launcher, no home flag that belongs to the shell - and "Update Gentle Shell"
+//! installs the npm `gentle-pi` version the pane measured against the registry
+//! (a stable `x.y.z`, or nothing runs at all).
+//!
 //! On Windows the window is opened by `cmd` with `CREATE_NEW_CONSOLE`: the new
 //! console IS the visible terminal, and the launcher runs inside it. Nothing is
 //! written to the process environment (`set_var`), so the desk's own environment
@@ -41,8 +49,9 @@ use std::path::{Path, PathBuf};
 
 use gentle_backend::launcher::{self, Launcher, LauncherEnv};
 use gentle_core::i18n::{messages, Language};
+use gentle_runtime::updates;
 
-use crate::contract::TerminalActionView;
+use crate::contract::{HomeChoiceView, TerminalActionView};
 
 /// What one action asks the shell to do: the arguments after the launcher's own
 /// and the home flags. Profiles opens the INTERACTIVE shell with no opening
@@ -112,17 +121,151 @@ pub fn command_for(
     (launcher.program.clone(), args)
 }
 
-/// Opens a visible terminal window on `action`, with the home flags the chats'
-/// children get.
+/// Opens a visible terminal window on `action`, on the home the user chose and
+/// with the arguments S1's table names ([`command_for_home`]).
+///
+/// The Separado home's commands keep the home flags the chats' children get; the
+/// "Mi pi" home's are `pi` itself, with no launcher and no flag of the shell's.
+/// A refusal is ONE line and no window (S2).
 pub fn open(
     language: Language,
     action: TerminalActionView,
+    home: HomeChoiceView,
+    shell_latest: Option<&str>,
     home_args: &[OsString],
 ) -> Result<(), String> {
-    let launcher = launcher::resolve(&LauncherEnv::from_process())
-        .map_err(|error| messages::terminal_shell_not_found(language, &error.to_string()))?;
-    let (program, args) = command_for(action, &launcher, home_args);
+    let command =
+        command_for_home(action, home, shell_latest).map_err(|refused| match refused {
+            Refused::NoStableLatest => messages::terminal_no_stable_latest(language).to_owned(),
+        })?;
+    let (program, args) = match command.program {
+        // "Mi pi": `pi` as this machine's `PATH` answers it, with the table's
+        // arguments and nothing else. No launcher is resolved, because none is
+        // used, and a `pi` that is not on the `PATH` is cmd's own error, kept
+        // visible by the wrapper's `pause` (S5): nothing here looks for another
+        // program.
+        PI => (
+            PathBuf::from(PI),
+            command.args.iter().map(OsString::from).collect(),
+        ),
+        // "Separado", and the shell's own screens: the resolved launcher's own
+        // program and leading arguments stand in for the name the table gives
+        // (an npm shim resolves to node plus the entry it points at), then the
+        // home flags, then the action. Today's bytes, unchanged (S3).
+        _ => {
+            let launcher = launcher::resolve(&LauncherEnv::from_process()).map_err(|error| {
+                messages::terminal_shell_not_found(language, &error.to_string())
+            })?;
+            command_for(action, &launcher, home_args)
+        }
+    };
     launch(language, action, &program, &args)
+}
+
+/// The `gentle-shell` launcher: the program the "Separado" home's commands are
+/// run through, and the one name the "Mi pi" home never uses.
+pub const LAUNCHER: &str = "gentle-shell";
+
+/// The user's own pi, run as it is in the "Mi pi" home (S1).
+///
+/// Deliberately a bare name: the `PATH` is the machine's, and S5 asks the app to
+/// let cmd's own error speak when there is nothing to run.
+pub const PI: &str = "pi";
+
+/// One logical command of S1's table: the program by NAME, and the arguments
+/// that follow it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Invocation {
+    pub program: &'static str,
+    pub args: Vec<String>,
+}
+
+/// Why an action runs nothing at all (S2).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Refused {
+    /// The pane's Gentle Shell row holds no stable `x.y.z` to install: no
+    /// version was measured, or what was measured is not one npm's stable
+    /// release can be (a channel build such as `4.9.0-main.abc123`, a `v5.0.0`,
+    /// a prerelease, nothing).
+    NoStableLatest,
+}
+
+/// S1's table: the command `action` runs on `home`, before this machine's
+/// launcher and home flags are resolved.
+///
+/// "Separado" is the shell's own home, so every action is the shell's own
+/// command, run through the launcher: the same arguments [`action_args`] names,
+/// which is what makes those lines byte for byte what they were (S3).
+///
+/// "Mi pi" is the user's own pi, so the Updates actions name `pi` directly and
+/// carry no home flag of the shell's. "Update Gentle Shell" is
+/// `pi install npm:gentle-pi@<latest>`, and `<latest>` is the version the pane's
+/// own row measured against npm's stable `latest` (settings-polish S6) - taken
+/// only while it is a plain stable `x.y.z` by the very rule that row applies
+/// ([`stable_latest`]). Anything else is [`Refused::NoStableLatest`]: no
+/// `@latest`, and never `gentle-shell upgrade` as a fallback.
+///
+/// The shell's own screens (profiles, sign in, sign out, install usage sources)
+/// are not in S1's table: they keep the launcher on both homes.
+pub fn command_for_home(
+    action: TerminalActionView,
+    home: HomeChoiceView,
+    shell_latest: Option<&str>,
+) -> Result<Invocation, Refused> {
+    // The shell's own command for `action`: the arguments today's `action_args`
+    // names, run through the launcher. Both the Separado arm and the shell's own
+    // screens answer this, so those lines never drift from what they were.
+    let shell = || Invocation {
+        program: LAUNCHER,
+        args: action_args(action)
+            .iter()
+            .map(|arg| (*arg).to_owned())
+            .collect(),
+    };
+
+    if home == HomeChoiceView::Isolated {
+        return Ok(shell());
+    }
+
+    match action {
+        // "Mi pi": the user's own pi, with pi's own flags and no home flag of the
+        // shell's, because `--link` and `--isolated` are not pi's arguments.
+        TerminalActionView::Update => Ok(pi(&["update"])),
+        TerminalActionView::UpdateExtensions => Ok(pi(&["update", "--extensions"])),
+        // The shell package itself, as npm's stable release names it. The
+        // version is the one the pane MEASURED, so a row that has none runs
+        // nothing: `@latest` would install whatever npm says when the window
+        // opens, and `gentle-shell upgrade` is the other home's command.
+        TerminalActionView::UpgradeShell => {
+            let Some(latest) = stable_latest(shell_latest) else {
+                return Err(Refused::NoStableLatest);
+            };
+            Ok(pi(&["install", &format!("npm:gentle-pi@{latest}")]))
+        }
+        // The shell's own screens are not in S1's table, so they keep the
+        // launcher on both homes.
+        TerminalActionView::Profiles
+        | TerminalActionView::Login
+        | TerminalActionView::Logout
+        | TerminalActionView::InstallUsageSources => Ok(shell()),
+    }
+}
+
+/// One `pi` command of the table: the user's own pi, then exactly `args`.
+fn pi(args: &[&str]) -> Invocation {
+    Invocation {
+        program: PI,
+        args: args.iter().map(|arg| (*arg).to_owned()).collect(),
+    }
+}
+
+/// The version `latest` names, when it is a plain stable `x.y.z` by the rule the
+/// Updates pane's own row applies (`gentle_runtime::updates::parse`, the one
+/// `stable_row` calls), trimmed. Anything else - a channel build, a `v` prefix,
+/// a prerelease, an empty string, nothing measured - is no version to install.
+fn stable_latest(latest: Option<&str>) -> Option<String> {
+    let latest = latest?.trim();
+    updates::parse(latest).map(|_| latest.to_owned())
 }
 
 /// The plain label one action's window and tab wear, in the pane's own words and
@@ -598,5 +741,259 @@ mod tests {
         );
         assert_eq!(home_flags(&os(&["--home"])), os(&["--home"]));
         assert!(home_flags(&os(&["--fullscreen"])).is_empty());
+    }
+
+    /// A launcher whose program is `gentle-shell` itself, so the Separado lines
+    /// of the table read exactly as the table does. What a real npm shim
+    /// resolves to (node plus the entry) is the test above's.
+    fn plain_launcher() -> Launcher {
+        Launcher {
+            program: PathBuf::from(LAUNCHER),
+            args: Vec::new(),
+        }
+    }
+
+    /// The line one action really runs on this machine, read out of the wrapper
+    /// cmd: the resolved launcher and the home flags for the Separado home, `pi`
+    /// and nothing else for "Mi pi".
+    fn command_line(
+        action: TerminalActionView,
+        home: HomeChoiceView,
+        latest: Option<&str>,
+        launcher: &Launcher,
+        home_args: &[OsString],
+    ) -> String {
+        let command = command_for_home(action, home, latest).expect("a runnable command");
+        let (program, args) = if command.program == LAUNCHER {
+            command_for(action, launcher, home_args)
+        } else {
+            (
+                PathBuf::from(command.program),
+                command.args.iter().map(OsString::from).collect(),
+            )
+        };
+        let script = wrapper_script(Language::En, &program, &args).expect("a quotable line");
+        script
+            .split("\r\n")
+            .nth(1)
+            .expect("the wrapper names its command")
+            .to_owned()
+    }
+
+    /// The table of updates-by-home S1, byte for byte and for both homes: the
+    /// Separado home is the shell's own, so these are today's commands; "Mi pi"
+    /// is the user's own pi, named directly, with no shell home flag, and
+    /// "Update Gentle Shell" installs the stable version the pane measured.
+    #[test]
+    fn the_updates_commands_follow_the_home() {
+        let latest = Some("5.0.0");
+        let launcher = plain_launcher();
+        let expected = [
+            (
+                TerminalActionView::UpdateExtensions,
+                "\"gentle-shell\" \"update\" \"--extensions\"",
+                "\"pi\" \"update\" \"--extensions\"",
+            ),
+            (
+                TerminalActionView::Update,
+                "\"gentle-shell\" \"update\"",
+                "\"pi\" \"update\"",
+            ),
+            (
+                TerminalActionView::UpgradeShell,
+                "\"gentle-shell\" \"upgrade\"",
+                "\"pi\" \"install\" \"npm:gentle-pi@5.0.0\"",
+            ),
+        ];
+
+        for (action, separado, mi_pi) in expected {
+            assert_eq!(
+                command_line(action, HomeChoiceView::Isolated, latest, &launcher, &[]),
+                separado,
+                "{action:?} on Separado"
+            );
+            assert_eq!(
+                command_line(action, HomeChoiceView::Link, latest, &launcher, &[]),
+                mi_pi,
+                "{action:?} on Mi pi"
+            );
+        }
+    }
+
+    /// S2: `pi install npm:gentle-pi@<latest>` only with the stable `x.y.z` the
+    /// pane measured - the very rule the shell row applies. Anything else runs
+    /// nothing, says the one typed refusal, and never falls back to
+    /// `gentle-shell upgrade` or to `@latest`.
+    #[test]
+    fn a_latest_that_is_not_a_stable_version_refuses_the_upgrade() {
+        for latest in [
+            None,
+            Some("4.9.0-main.abc123"),
+            Some("v5.0.0"),
+            Some(""),
+            Some("   "),
+        ] {
+            assert_eq!(
+                command_for_home(
+                    TerminalActionView::UpgradeShell,
+                    HomeChoiceView::Link,
+                    latest
+                ),
+                Err(Refused::NoStableLatest),
+                "{latest:?} is no version to install"
+            );
+        }
+    }
+
+    /// The measured version is used as the row measured it, trimmed: no `v`, no
+    /// `@latest`, no tag, nothing derived from a string the web sends.
+    #[test]
+    fn an_accepted_latest_is_the_plain_stable_version() {
+        assert_eq!(
+            command_for_home(
+                TerminalActionView::UpgradeShell,
+                HomeChoiceView::Link,
+                Some(" 5.0.0 ")
+            ),
+            Ok(Invocation {
+                program: PI,
+                args: vec!["install".to_owned(), "npm:gentle-pi@5.0.0".to_owned()],
+            })
+        );
+    }
+
+    /// S3: the Separado commands are today's, byte for byte - the resolved
+    /// launcher's own program and leading arguments, then the home flags the
+    /// children get, then the action - and no latest is needed for them.
+    #[test]
+    fn the_separado_home_keeps_todays_lines() {
+        let launcher = launcher();
+        let home_args = os(&["--home", "C:/h", "--link"]);
+        let prefix =
+            "\"C:\\node\\node.exe\" \"C:\\npm\\gentle-shell.mjs\" \"--home\" \"C:\\h\" \"--link\"";
+        let expected = [
+            (
+                TerminalActionView::UpdateExtensions,
+                format!("{prefix} \"update\" \"--extensions\""),
+            ),
+            (TerminalActionView::Update, format!("{prefix} \"update\"")),
+            (
+                TerminalActionView::UpgradeShell,
+                format!("{prefix} \"upgrade\""),
+            ),
+        ];
+
+        for (action, line) in expected {
+            assert_eq!(
+                command_line(
+                    action,
+                    HomeChoiceView::Isolated,
+                    None,
+                    &launcher,
+                    &home_args
+                ),
+                line,
+                "{action:?} runs today's line on the Separado home"
+            );
+            assert_eq!(
+                command_for_home(action, HomeChoiceView::Isolated, None),
+                Ok(Invocation {
+                    program: LAUNCHER,
+                    args: action_args(action)
+                        .iter()
+                        .map(|arg| (*arg).to_owned())
+                        .collect(),
+                }),
+                "{action:?} is the shell's own command, unchanged"
+            );
+        }
+    }
+
+    /// S1: in "Mi pi" the launcher is not used at all - no `gentle-shell`, no
+    /// home flag that belongs to the shell - and the tab still waits on `pause`,
+    /// exactly as it does today (S3).
+    #[test]
+    fn the_mi_pi_wrapper_names_pi_alone() {
+        let command = command_for_home(
+            TerminalActionView::UpgradeShell,
+            HomeChoiceView::Link,
+            Some("5.0.0"),
+        )
+        .expect("a measured stable version is a command");
+        let args: Vec<OsString> = command.args.iter().map(OsString::from).collect();
+        let script = wrapper_script(Language::En, Path::new(command.program), &args)
+            .expect("a quotable line");
+
+        assert!(!script.contains("gentle-shell"), "{script:?}");
+        for flag in ["--home", "--link", "--isolated"] {
+            assert!(
+                !script.contains(flag),
+                "{flag} belongs to the shell, not to pi: {script:?}"
+            );
+        }
+        assert_eq!(
+            script,
+            "@echo off\r\n\"pi\" \"install\" \"npm:gentle-pi@5.0.0\"\r\necho.\r\npause\r\n"
+        );
+    }
+
+    /// S1's table names the three Updates actions: the shell's own screens keep
+    /// the launcher on both homes (S3).
+    #[test]
+    fn the_shells_own_screens_keep_the_launcher_on_both_homes() {
+        for action in [
+            TerminalActionView::Profiles,
+            TerminalActionView::Login,
+            TerminalActionView::Logout,
+            TerminalActionView::InstallUsageSources,
+        ] {
+            for home in [HomeChoiceView::Isolated, HomeChoiceView::Link] {
+                assert_eq!(
+                    command_for_home(action, home, None),
+                    Ok(Invocation {
+                        program: LAUNCHER,
+                        args: action_args(action)
+                            .iter()
+                            .map(|arg| (*arg).to_owned())
+                            .collect(),
+                    }),
+                    "{action:?} on {home:?}"
+                );
+            }
+        }
+    }
+
+    /// The refusal is one honest line and NOTHING else: no window, no wrapper
+    /// written, no `gentle-shell upgrade` run instead (S2).
+    #[test]
+    fn the_refusal_opens_nothing() {
+        let wrapper = wrapper_path(TerminalActionView::UpgradeShell);
+        let before = std::fs::read(&wrapper).ok();
+
+        let error = open(
+            Language::En,
+            TerminalActionView::UpgradeShell,
+            HomeChoiceView::Link,
+            Some("4.9.0-main.abc123"),
+            &[],
+        )
+        .expect_err("a channel build's version is no stable latest");
+        assert_eq!(error, messages::terminal_no_stable_latest(Language::En));
+
+        let spanish = open(
+            Language::Es,
+            TerminalActionView::UpgradeShell,
+            HomeChoiceView::Link,
+            None,
+            &[],
+        )
+        .expect_err("nothing measured is nothing to install");
+        assert_eq!(spanish, messages::terminal_no_stable_latest(Language::Es));
+
+        assert_eq!(
+            std::fs::read(&wrapper).ok(),
+            before,
+            "no wrapper cmd is written for a refusal"
+        );
     }
 }

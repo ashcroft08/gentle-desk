@@ -32,7 +32,7 @@ use crate::clipboard::{self, Clipboard, SystemClipboard};
 use crate::close::{self, BridgeSteps, CloseFlow};
 use crate::config::{ConfigSnapshot, ConfigWriter};
 use crate::contract::{
-    AttachmentView, SettingsFilesChanged, SettingsFilesChangedView, StateChanged,
+    AttachmentView, HomeChoiceView, SettingsFilesChanged, SettingsFilesChangedView, StateChanged,
     TerminalActionView, UiIntent, UpdatesView, ViewState, WhatsNewRead,
 };
 use crate::effects::{self, Ran, RuntimeExecutor};
@@ -815,14 +815,24 @@ impl Bridge {
     /// or its own update. It is a COMMAND, like `open_link`: no intent folds and
     /// nothing of the slice changes, so no push follows it.
     ///
-    /// The window runs with the home flags this run's children get, so the
-    /// terminal reads and writes the home the pane is showing, and the refusal
-    /// (no launcher, no console) reaches the button that asked.
+    /// Which command it runs is the HOME's choice (updates-by-home S1): the
+    /// "Mi pi" home runs the user's own `pi`, and the Separado home runs
+    /// `gentle-shell` through the launcher with the home flags this run's
+    /// children get. "Update Gentle Shell" on "Mi pi" installs the stable
+    /// version the pane's own shell row measured against npm (S2), read from
+    /// this run's view and never from anything the page sends; a row with no
+    /// stable version refuses with one line and opens no window. The refusal
+    /// (and the missing launcher) reaches the button that asked.
     pub fn open_terminal(&self, action: TerminalActionView) -> Result<(), String> {
         self.accepting_work()?;
+        let view = self.holder.view();
         crate::terminal::open(
             self.holder.language(),
             action,
+            // No choice is the separate home, the rule the shell view and the
+            // config apply.
+            view.shell.choice.unwrap_or(HomeChoiceView::Isolated),
+            view.updates.shell.latest.as_deref(),
             &self.settings.paths.home_args,
         )
     }

@@ -413,6 +413,17 @@ pub fn terminal_open_failed(language: Language, error: &str) -> String {
     }
 }
 
+/// "No stable version of gentle-pi was measured, so nothing was installed.":
+/// the answer of "Update Gentle Shell" on the user's own pi when the pane's
+/// shell row holds no stable `x.y.z` to install (updates-by-home S2). It says
+/// what did NOT happen and why, and never names a command that was not run.
+pub const fn terminal_no_stable_latest(language: Language) -> &'static str {
+    match language {
+        Language::En => "No stable version of gentle-pi was measured, so nothing was installed.",
+        Language::Es => "No se midió una versión estable de gentle-pi, así que no se instaló nada.",
+    }
+}
+
 /// "Profiles"
 pub const fn terminal_action_profiles(language: Language) -> &'static str {
     match language {
