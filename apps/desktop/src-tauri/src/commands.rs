@@ -247,6 +247,19 @@ impl Bridge {
         self
     }
 
+    /// The arguments every child is started with, instead of this process's own.
+    ///
+    /// The running app hands its children the flags it was started with
+    /// (`RuntimeExecutor`), which is what carries `--isolated`, `--model` and
+    /// friends to every chat. A test binary's own arguments are its harness's
+    /// (`--ignored`, `--nocapture`) and are no app flags at all, so a live test
+    /// that starts the REAL launcher names the flags it means - the empty list a
+    /// windowed app started from a shortcut has.
+    pub fn with_forwarded_args(self, args: Vec<std::ffi::OsString>) -> Self {
+        self.executor.set_forwarded_args(args);
+        self
+    }
+
     /// The launcher probe this bridge asks, instead of the real one. It is asked
     /// here once, exactly as [`Bridge::new`] asks the real one, so the answer of
     /// this probe is what the run starts with, and again wherever the app asks
@@ -380,18 +393,8 @@ impl Bridge {
         // armed in this same step, before the pump starts delivering: a chat's own
         // first event is what proves its child is alive (`EventPump::pump` calls
         // `note_child_ready`), and the check then runs on a thread of its own, so
-        // neither the frame nor the dialog ever waits for it. Weak handles, like
-        // the sinks above - the holder owns this trigger.
-        let packages_holder = Arc::downgrade(&self.holder);
-        let packages_pump = Arc::downgrade(&self.pump);
-        let packages_emit = Arc::clone(&emit);
-        self.holder.arm_packages_trigger(Arc::new(move || {
-            let (Some(holder), Some(pump)) = (packages_holder.upgrade(), packages_pump.upgrade())
-            else {
-                return;
-            };
-            start_automatic_packages_check(&holder, &pump, &packages_emit);
-        }));
+        // neither the frame nor the dialog ever waits for it.
+        self.arm_packages_check();
         // The folder dialog is owned by the window, so it is modal to the app
         // instead of to the desktop. The window exists only from this step, and
         // it is the same step that arms the pump, for the same reason.
@@ -403,6 +406,27 @@ impl Bridge {
         self.writer.on_failure(Arc::new(move |message: String| {
             let view = holder.note_config_problem(message);
             push(&failure_emit, view);
+        }));
+    }
+
+    /// Arms the run's automatic extensions check (packages-status T4, S7, T7) on
+    /// the bridge's own state, the pump and the emit step installed NOW.
+    ///
+    /// It is the one place that wiring lives, so the setup step's `arm_events`
+    /// and a test that drives the real chain without a window arm the SAME
+    /// closure: weak handles, like the bridge's other sinks - the holder owns
+    /// this trigger - so the check never keeps the run alive, and a trigger that
+    /// finds either half gone runs nothing.
+    pub fn arm_packages_check(&self) {
+        let packages_holder = Arc::downgrade(&self.holder);
+        let packages_pump = Arc::downgrade(&self.pump);
+        let packages_emit = self.emitter();
+        self.holder.arm_packages_trigger(Arc::new(move || {
+            let (Some(holder), Some(pump)) = (packages_holder.upgrade(), packages_pump.upgrade())
+            else {
+                return;
+            };
+            start_automatic_packages_check(&holder, &pump, &packages_emit);
         }));
     }
 

@@ -210,7 +210,19 @@ pub enum PackagesState {
 /// Reads one extension listing over `client`, which is that chat's own: one
 /// `get_update_status` ask with the plain-read params, under the channel's
 /// deadline.
+///
+/// A client that has not resolved its contract yet asks `capabilities` first,
+/// exactly as every other desktop read does (`ask_config`, `helper_stop`,
+/// `permission`, `profile_apply`): this is the Settings dialog's ONE read per
+/// open (S2), so it must ASK - a read that writes nothing answers `Unasked`, which
+/// the pane words as a shell that cannot tell, and that was a false state on a
+/// child that was alive and advertised the method. The connect keeps the
+/// channel's own deadline (S4); the long [`REFRESH_DEADLINE`] belongs to the
+/// explicit check alone.
 pub fn packages_status<C: DesktopChannel>(client: &mut DesktopClient<C>) -> PackagesRead {
+    if client.capabilities().is_none() {
+        client.connect();
+    }
     let outcome = client.ask(GET_UPDATE_STATUS, plain_read());
     read_of(outcome)
 }

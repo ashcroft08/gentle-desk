@@ -63,6 +63,10 @@ pub struct RuntimeExecutor {
     /// the children started from now on (0.1.12, S1, T4): the host holds it as
     /// `Arc<dyn Spawner>`, and this is the same spawner.
     spawner: Mutex<Option<Arc<ProcessSpawner>>>,
+    /// The arguments every child is forwarded, when the caller named them
+    /// instead of this process's own (`Bridge::with_forwarded_args`). `None` is
+    /// the app's rule: the flags this run was started with.
+    forwarded_args: Mutex<Option<Vec<OsString>>>,
 }
 
 impl RuntimeExecutor {
@@ -79,7 +83,17 @@ impl RuntimeExecutor {
             closed: AtomicBool::new(false),
             home_choice: None,
             spawner: Mutex::new(None),
+            forwarded_args: Mutex::new(None),
         }
+    }
+
+    /// Names the arguments every child is started with, instead of this
+    /// process's own (see [`Bridge::with_forwarded_args`]
+    /// (crate::commands::Bridge::with_forwarded_args)). Set before the first
+    /// chat opens: the spawner is built once, on the first command that needs a
+    /// child.
+    pub fn set_forwarded_args(&self, args: Vec<OsString>) {
+        *lock(&self.forwarded_args) = Some(args);
     }
 
     /// The home the children are started with (the user's choice).
@@ -165,7 +179,12 @@ impl RuntimeExecutor {
     /// spawner's own mode plumbing is kept untouched in
     /// `gentle_backend::chat_host::spawner`; this run simply never arms it.
     fn spawner(&self) -> Result<Arc<ProcessSpawner>, String> {
-        let spawner = Arc::new(spawner(self.holder.language(), self.home_choice)?);
+        let forwarded = lock(&self.forwarded_args).clone();
+        let spawner = Arc::new(spawner(
+            self.holder.language(),
+            self.home_choice,
+            forwarded,
+        )?);
         *lock(&self.spawner) = Some(Arc::clone(&spawner));
         Ok(spawner)
     }
@@ -369,9 +388,13 @@ fn unasked_session_mode(chat: gentle_app::ChatId, change: Option<SessionMode>) -
 /// The spawner of one child per chat, with the launcher this run resolves and
 /// the arguments this process was started with (a home flag is added when they
 /// name none).
-fn spawner(language: Language, choice: Option<HomeChoice>) -> Result<ProcessSpawner, String> {
+fn spawner(
+    language: Language,
+    choice: Option<HomeChoice>,
+    forwarded: Option<Vec<OsString>>,
+) -> Result<ProcessSpawner, String> {
     let args: Vec<OsString> = with_home_flag(
-        std::env::args_os().skip(1).collect(),
+        forwarded.unwrap_or_else(|| std::env::args_os().skip(1).collect()),
         &HomeEnv {
             choice,
             ..HomeEnv::from_process()

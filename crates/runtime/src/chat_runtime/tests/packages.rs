@@ -165,17 +165,38 @@ fn a_child_that_does_not_advertise_the_method_is_unasked_and_asked_nothing() {
     );
 }
 
+/// The dialog's plain read is the ONE read of an open (S2), and a client that has
+/// not resolved its contract yet asks it first - the rule `ask_config`,
+/// `helper_stop`, `permission` and `profile_apply` all follow. Without it the
+/// FIRST read of any chat answered `Unasked` without writing a single request,
+/// which the pane words as "this shell cannot tell": the maintainer's 0.9.0
+/// report, on a machine where the child was alive and advertised the method.
 #[test]
-fn a_client_that_never_resolved_its_contract_is_unasked_and_asks_nothing() {
-    let channel = FakeChannel::new(ADVERTISED, Answer::Data(json!({})));
+fn a_plain_read_asks_the_contract_first_when_it_has_none() {
+    let channel = FakeChannel::new(
+        ADVERTISED,
+        Answer::Data(json!({
+            "packages": {
+                "available": true,
+                "items": [{"name": "gentle-pi", "state": "no_update_reported"}],
+            }
+        })),
+    );
 
     let read = packages_status(&mut DesktopClient::new(Arc::clone(&channel)));
 
-    assert_eq!(read, PackagesRead::Unasked);
-    assert!(
-        channel.asked().is_empty(),
-        "a client with no contract knows no method exists, so it writes nothing"
+    assert_eq!(
+        channel.asked(),
+        vec![
+            ("capabilities".to_owned(), json!({})),
+            ("get_update_status".to_owned(), json!({"refresh": false})),
+        ],
+        "the contract, then the one plain read: the read is asked, never declined"
     );
+    let PackagesRead::Read(status) = read else {
+        panic!("a child that advertises the method answers the read: {read:?}");
+    };
+    assert!(status.available);
 }
 
 #[test]
