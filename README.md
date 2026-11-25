@@ -13,6 +13,7 @@
 <p align="center">
   <a href="https://github.com/ashcroft08/gentle-desk/releases/latest"><img src="https://img.shields.io/github/v/release/ashcroft08/gentle-desk?style=for-the-badge&labelColor=1A1218&color=F095C8" alt="Latest release"></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/ashcroft08/gentle-desk?style=for-the-badge&labelColor=1A1218&color=F095C8" alt="MIT license"></a>
+  <a href="https://github.com/ashcroft08/gentle-desk/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/ashcroft08/gentle-desk/ci.yml?style=for-the-badge&labelColor=1A1218&color=F095C8" alt="CI"></a>
   <img src="https://img.shields.io/badge/Windows-x64-F095C8?style=for-the-badge&labelColor=1A1218" alt="Windows x64">
   <img src="https://img.shields.io/badge/Tauri-2-D7A0B8?style=for-the-badge&labelColor=1A1218" alt="Tauri 2">
   <a href="https://github.com/ashcroft08/gentle-desk/stargazers"><img src="https://img.shields.io/github/stars/ashcroft08/gentle-desk?style=for-the-badge&labelColor=1A1218&color=F095C8" alt="GitHub stars"></a>
