@@ -10,6 +10,7 @@ import '../test-support/dom-env'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, within } from '@testing-library/svelte'
 import type {
+  HomeChoiceView,
   PackagesView_Serialize as PackagesView,
   UpdatesView_Serialize as UpdatesView,
 } from '../contract/bindings'
@@ -87,11 +88,19 @@ function draw(
   openChats = 0,
   refreshing = false,
   onRefresh: () => void = ask(),
+  home: HomeChoiceView | null = null,
 ): HTMLElement {
   const { container } = render(UpdatesPane, {
-    props: { updates: view, openChats, refreshing, onRefresh },
+    props: { updates: view, openChats, refreshing, onRefresh, home },
   })
   return container as HTMLElement
+}
+
+/** The command lines the pane draws, in the order they appear (updates-by-home S4). */
+function commands(pane: HTMLElement): string[] {
+  return [...pane.querySelectorAll('[data-command]')].map(
+    (line) => line.textContent?.trim() ?? '',
+  )
 }
 
 /** One row's element, by the key it is drawn under. */
@@ -322,7 +331,8 @@ describe('the Updates pane', () => {
     expect(within(pane).queryByRole('button', { name: copy.skipVersion })).toBeNull()
     const stop = within(row(pane, 'shell')).getByRole('button', { name: copy.stopSkipping })
     expect(stop.classList.contains('accent')).toBe(false)
-    expect(row(pane, 'shell').querySelector('.reason')?.textContent).toBe(
+    // The shell's row also names the command its button runs (updates-by-home S4).
+    expect(row(pane, 'shell').querySelector('.reason:not([data-command])')?.textContent).toBe(
       copy.skippedNote('4.9.2'),
     )
     await fireEvent.click(stop)
@@ -412,5 +422,94 @@ describe('the Updates pane', () => {
     )
     expect(older.querySelectorAll('.versions')).toHaveLength(1)
     expect(older.querySelector('.versions')?.textContent).toBe('Last checked: 3m ago')
+  })
+
+  it('draws the exact command each action runs on the home the push chose', () => {
+    // updates-by-home S4: one quiet line under each button, for THIS home, so the
+    // home choice is never a surprise. The literals are Rust's table's (and its
+    // tests'), in the pane's own order: pi, Gentle Shell, then the extensions.
+    expect(commands(draw(updates(), 0, false, ask(), 'isolated'))).toEqual([
+      'gentle-shell update',
+      'gentle-shell upgrade',
+      'gentle-shell update --extensions',
+    ])
+    expect(commands(draw(updates(), 0, false, ask(), 'link'))).toEqual([
+      'pi update',
+      'pi install npm:gentle-pi@4.9.2',
+      'pi update --extensions',
+    ])
+    // A run that never chose reads as Separado, the way Rust unwraps it.
+    expect(commands(draw(updates(), 0, false, ask(), null))).toEqual([
+      'gentle-shell update',
+      'gentle-shell upgrade',
+      'gentle-shell update --extensions',
+    ])
+  })
+
+  it('never draws a guessed install: with no measured stable version it says so (S4)', () => {
+    const pane = draw(
+      updates({
+        shell: { current: '4.8.0', latest: '4.9.0-main.abc123', update_available: true },
+      }),
+      0,
+      false,
+      ask(),
+      'link',
+    )
+
+    expect(commands(pane)).toEqual(['pi update', copy.noStableLatest, 'pi update --extensions'])
+    // Neither `@latest` nor the other home's command stands in for it.
+    expect(pane.textContent).not.toContain('pi install')
+    expect(pane.textContent).not.toContain('gentle-shell upgrade')
+  })
+
+  it('draws each command as one quiet mono line, under its own action', () => {
+    const pane = draw(updates(), 0, false, ask(), 'link')
+    const lines = [...pane.querySelectorAll('[data-command]')]
+
+    expect(lines).toHaveLength(3)
+    for (const line of lines) {
+      // The pane's own quiet mono (`.reason mono`): no new look for this line.
+      expect(line.tagName).toBe('P')
+      expect(line.classList.contains('mono')).toBe(true)
+    }
+    expect(row(pane, 'pi').querySelector('[data-command]')?.textContent).toBe('pi update')
+    expect(row(pane, 'shell').querySelector('[data-command]')?.textContent).toBe(
+      'pi install npm:gentle-pi@4.9.2',
+    )
+    expect(ext(pane).querySelector('[data-command]')?.textContent).toBe('pi update --extensions')
+  })
+
+  it("draws the terminal's refusal as one quiet line under the action, and clears it", async () => {
+    const refusal = 'No stable version of gentle-pi was measured, so nothing was installed.'
+    setHandler('open_terminal', () => {
+      throw refusal
+    })
+    const pane = draw(
+      updates({
+        shell: { current: '4.8.0', latest: '4.9.0-main.abc123', update_available: true },
+      }),
+      0,
+      false,
+      ask(),
+      'link',
+    )
+
+    await fireEvent.click(within(pane).getByRole('button', { name: copy.updateShell }))
+    const line = within(pane).getByRole('status')
+    expect(line.textContent).toBe(refusal)
+    expect(line.classList.contains('quiet')).toBe(true)
+    // Under the rows whose buttons run those commands, in that card.
+    expect(pane.querySelector('.card.updates')?.contains(line)).toBe(true)
+
+    // The next press clears it, and an extensions refusal lands under its button.
+    setHandler('open_terminal', () => {
+      throw 'the extensions window could not open'
+    })
+    await fireEvent.click(within(pane).getByRole('button', { name: copy.updateExtensions }))
+    const moved = within(pane).getByRole('status')
+    expect(moved.textContent).toBe('the extensions window could not open')
+    expect(ext(pane).contains(moved)).toBe(true)
+    expect(pane.querySelector('.card.updates')?.contains(moved)).toBe(false)
   })
 })

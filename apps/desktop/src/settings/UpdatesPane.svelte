@@ -25,16 +25,28 @@
   // installed from here, and it is never held back by the gate because reading
   // changes nothing.
   //
+  // WHICH command an action runs is the home's (updates-by-home S4): under each
+  // button is one quiet mono line with the exact line Rust will start -
+  // `gentle-shell ...` on Separado, `pi ...` on Mi pi - read from the one table in
+  // `./update-commands`, and never a guess when Mi pi has no measured stable
+  // version to install. A terminal that refuses answers with its own line, drawn
+  // here as it always was, under the button that asked and cleared by the next one.
+  //
   // "Skip this version" (S1, S2, D9) is the quiet one: a plain secondary `.btn` on
   // the row whose version is the newest on offer, and "Stop skipping" once that row
   // publishes the version the user skipped. Both are intents the bridge answers,
   // and the pane asks for the dialog's one read again after them, so the card shows
   // the skip it just made.
   import { dispatchIntent, openTerminal } from '../bridge'
-  import type { UpdatesView_Serialize as UpdatesView } from '../contract/bindings'
+  import type {
+    HomeChoiceView,
+    TerminalActionView,
+    UpdatesView_Serialize as UpdatesView,
+  } from '../contract/bindings'
   import { ago, isJustNow } from '../home/ago'
   import { language } from '../i18n/language.svelte'
   import UpdateRows from './UpdateRows.svelte'
+  import { commandAction, commandLine, drawnLine } from './update-commands'
   import { cardOf, packagesOf, type RowAction } from './updates'
   import { updatesCopy } from './updates-copy'
 
@@ -42,6 +54,7 @@
     updates,
     openChats = 0,
     refreshing = false,
+    home = null,
     onRefresh = () => {},
   }: {
     /** The check as the dialog's one load answered, or null before any read. */
@@ -50,6 +63,12 @@
     openChats?: number
     /** Whether a load the user asked for is in flight: the checking line. */
     refreshing?: boolean
+    /**
+     * The home the live push carries (`shell.choice`), which decides WHICH command
+     * every terminal action runs (updates-by-home S4): it is drawn under each
+     * button, so the choice is never a surprise.
+     */
+    home?: HomeChoiceView | null
     /** Asks the dialog for one more load: the pane's only read path. */
     onRefresh?: () => void
   } = $props()
@@ -57,8 +76,26 @@
   /** The pane's own words in the language the app holds (0.2.0, D4). */
   const copy = $derived(updatesCopy(language.current))
 
-  /** What the terminal said when it could not open, or `null`. */
-  let terminalError = $state<string | null>(null)
+  /**
+   * What the terminal answered when it could not open, and the action that asked
+   * (updates-by-home S4): ONE quiet line, drawn under the button it belongs to.
+   */
+  let terminalError = $state<{ action: TerminalActionView; line: string } | null>(null)
+
+  /**
+   * The refusal under the card's two actions, and the one under the extensions
+   * button: the same state, so the next press clears whatever was said before.
+   */
+  const rowsError = $derived(
+    terminalError !== null && terminalError.action !== 'UpdateExtensions'
+      ? terminalError.line
+      : null,
+  )
+  const extensionsError = $derived(
+    terminalError !== null && terminalError.action === 'UpdateExtensions'
+      ? terminalError.line
+      : null,
+  )
 
   const card = $derived(cardOf(updates, copy))
   /**
@@ -71,6 +108,16 @@
   const blocked = $derived(openChats > 0)
   const hint = $derived(copy.gateHint(openChats))
   const hintId = 'updates-gate'
+
+  /**
+   * The measured Gentle Shell version the Mi pi install names (the same
+   * `updates.shell.latest` the row is drawn from), and the extensions line - which
+   * needs no version, so a dialog that has not checked yet still says it.
+   */
+  const shellLatest = $derived(updates?.shell.latest ?? null)
+  const extensionsLine = $derived(
+    drawnLine(commandLine('UpdateExtensions', home, shellLatest), copy.noStableLatest),
+  )
 
   /** The card's one tag: something newer, nothing newer, or a row nobody read. */
   const tag = $derived(
@@ -95,13 +142,16 @@
 
   async function open(action: RowAction): Promise<void> {
     if (blocked) return
-    terminalError = await openTerminal(action === 'upgrade' ? 'UpgradeShell' : 'Update')
+    const target = commandAction(action)
+    const line = await openTerminal(target)
+    terminalError = line === null ? null : { action: target, line }
   }
 
   /** The same terminal path, with pi's `--extensions` flag passed through. */
   async function extensions(): Promise<void> {
     if (blocked) return
-    terminalError = await openTerminal('UpdateExtensions')
+    const line = await openTerminal('UpdateExtensions')
+    terminalError = line === null ? null : { action: 'UpdateExtensions', line }
   }
 
   /**
@@ -132,10 +182,17 @@
       {copy}
       {blocked}
       {hintId}
+      {home}
+      {shellLatest}
       onAction={(action) => void open(action)}
       onSkip={(version) => void skip(version)}
       onUnskip={() => void unskip()}
     />
+    {#if rowsError !== null}
+      <!-- The terminal's own answer when the row's button could not run (S4): ONE
+           quiet line, under the actions that run those commands. -->
+      <p class="quiet" role="status">{rowsError}</p>
+    {/if}
     {#if blocked}
       <p class="gate" id={hintId} role="status">{hint}</p>
     {:else if card.terminal}
@@ -160,9 +217,6 @@
   {#if blocked}
     <p class="gate" id={hintId} role="status">{hint}</p>
   {/if}
-{/if}
-{#if terminalError !== null}
-  <p class="quiet" role="status">{terminalError}</p>
 {/if}
 
 <!-- The extensions block: pi's own check when it could ask (packages-status T2),
@@ -199,4 +253,10 @@
       onclick={() => void extensions()}>{copy.updateExtensions}</button
     >
   </div>
+  <!-- The exact line that button runs, on the home the push carries (S4), and the
+       terminal's own refusal when it could not run it. -->
+  <p class="reason mono" data-command>{extensionsLine}</p>
+  {#if extensionsError !== null}
+    <p class="quiet" role="status">{extensionsError}</p>
+  {/if}
 </div>

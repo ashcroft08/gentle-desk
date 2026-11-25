@@ -78,6 +78,12 @@ export interface UpdatesCopy {
   /** The app's own release is not a terminal's job: the banner installs it. */
   appUpdatesItself: string
   /**
+   * What the line under "Update Gentle Shell" says when Mi pi has no measured
+   * stable version to install (updates-by-home S4): the honest clause, never a
+   * guessed `@latest` and never the other home's upgrade.
+   */
+  noStableLatest: string
+  /**
    * When the rows were last read (S8, D11): the house's own age (`hace 3m`) or the
    * one word it answers for something just read, and `never` before any check.
    */
@@ -131,6 +137,7 @@ const ENGLISH: UpdatesCopy = {
   extensionsNote:
     'There is no way to tell which ones are behind with this Gentle Shell. Update extensions updates all of them, so this button is always offered and safe to use any time.',
   appUpdatesItself: 'This app updates itself: use the update banner at the top.',
+  noStableLatest: 'Without a measured stable version, nothing is installed.',
   packagesBehind: (count) =>
     count === 1
       ? '1 extension has an update available'
@@ -189,6 +196,7 @@ const SPANISH: typeof ENGLISH = {
   extensionsNote:
     'No se puede saber cuáles están desactualizadas con este Gentle Shell. Actualizar extensiones las actualiza todas, así que este botón se ofrece siempre y es seguro usarlo en cualquier momento.',
   appUpdatesItself: 'Esta app se actualiza sola: usa el aviso de actualización de la parte superior.',
+  noStableLatest: 'Sin una versión estable medida, no se instala nada.',
   packagesBehind: (count) =>
     count === 1
       ? '1 extensión con actualización disponible'

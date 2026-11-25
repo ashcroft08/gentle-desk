@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, within } from '@testing-library/svelte'
 import { tick } from 'svelte'
 import type {
+  HomeChoiceView,
   PackagesView_Serialize as PackagesView,
   UpdatesView_Serialize as UpdatesView,
 } from '../contract/bindings'
@@ -54,8 +55,12 @@ function updates(over: Partial<UpdatesView> = {}): UpdatesView {
   }
 }
 
-function draw(view: UpdatesView | null = updates(), openChats = 0): HTMLElement {
-  const { container } = render(UpdatesPane, { props: { updates: view, openChats } })
+function draw(
+  view: UpdatesView | null = updates(),
+  openChats = 0,
+  home: HomeChoiceView | null = null,
+): HTMLElement {
+  const { container } = render(UpdatesPane, { props: { updates: view, openChats, home } })
   return container as HTMLElement
 }
 
@@ -122,7 +127,10 @@ describe('a drawn Updates pane', () => {
     )
     expect(pane.querySelector('.tag')?.textContent?.trim()).toBe('Everything is up to date')
     // Nothing is behind, so no row carries a sentence and the terminal note is gone.
-    expect(pane.querySelectorAll('.reason')).toHaveLength(0)
+    // The extensions block still names the command its button runs (updates-by-home
+    // S4), which is the pane's one `.reason` line here.
+    expect(pane.querySelectorAll('.urow .reason:not([data-command])')).toHaveLength(0)
+    expect(pane.querySelectorAll('.reason')).toHaveLength(1)
     expect(pane.querySelector('.note')).toBeNull()
     expect(pane.textContent).toContain('There is no way to tell which ones are behind')
 
@@ -259,6 +267,31 @@ describe('a drawn Updates pane', () => {
     )
     expect(ext(unasked).textContent).toContain('No se puede saber cuáles están desactualizadas')
     expect(ext(unasked).textContent).toContain('Se puede revisar al abrir una sesión.')
+
+    setLanguage('en')
+  })
+  it('flips the line that says no stable version was measured, and never a command', async () => {
+    // updates-by-home S4: Mi pi's "Update Gentle Shell" installs the version the
+    // pane measured. With no stable one measured the pane says so in the app's own
+    // words - and the commands it does name are the same bytes in both languages.
+    setLanguage('en')
+    const pane = draw(
+      updates({
+        shell: { current: '4.8.0', latest: '4.9.0-main.abc123', update_available: true },
+      }),
+      0,
+      'link',
+    )
+    expect(pane.textContent).toContain('Without a measured stable version, nothing is installed.')
+    expect(pane.textContent).toContain('pi update')
+    expect(pane.textContent).not.toContain('pi install')
+
+    setLanguage('es')
+    await tick()
+
+    expect(pane.textContent).toContain('Sin una versión estable medida, no se instala nada.')
+    expect(pane.textContent).toContain('pi update')
+    expect(pane.textContent).not.toContain('pi install')
 
     setLanguage('en')
   })

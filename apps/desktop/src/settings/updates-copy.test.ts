@@ -33,6 +33,7 @@ const ENGLISH = {
   extensionsNote:
     'There is no way to tell which ones are behind with this Gentle Shell. Update extensions updates all of them, so this button is always offered and safe to use any time.',
   appUpdatesItself: 'This app updates itself: use the update banner at the top.',
+  noStableLatest: 'Without a measured stable version, nothing is installed.',
   checkedNever: 'Last checked: never',
   packagesUpToDate: 'The extensions are up to date.',
   packagesUnreadable: 'Could not check the extensions: pi did not answer.',
@@ -60,6 +61,7 @@ const SPANISH = {
   extensionsNote:
     'No se puede saber cuáles están desactualizadas con este Gentle Shell. Actualizar extensiones las actualiza todas, así que este botón se ofrece siempre y es seguro usarlo en cualquier momento.',
   appUpdatesItself: 'Esta app se actualiza sola: usa el aviso de actualización de la parte superior.',
+  noStableLatest: 'Sin una versión estable medida, no se instala nada.',
   checkedNever: 'Última comprobación: nunca',
   packagesUpToDate: 'Las extensiones están al día.',
   packagesUnreadable: 'No se pudo revisar las extensiones: pi no respondió.',

@@ -10,6 +10,7 @@ import '../test-support/dom-env'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, within } from '@testing-library/svelte'
 import { tick } from 'svelte'
+import type { UpdatesView_Serialize as UpdatesView } from '../contract/bindings'
 import { intents, openSettings, pane, pick, rail, shell } from '../test-support/settings'
 import { pushEvent, resetTauriMock, viewState } from '../test-support/tauri-mock'
 
@@ -45,6 +46,20 @@ const APP_NAME = 'Gentle Shell Desktop'
 const VERSION = '0.1.9'
 const VERSION_LINE = 'Version 0.1.9'
 const VERSION_UNKNOWN = 'Version unknown'
+
+/**
+ * The check the Updates section draws with Gentle Shell behind: what the two
+ * command lines of updates-by-home S4 are read from.
+ */
+function updateCheck(): UpdatesView {
+  return {
+    status: 'Ready',
+    desk: { current: '0.1.12', latest: '0.1.12', update_available: false },
+    pi: { current: '1.5.2', latest: '2.0.5', update_available: true },
+    shell: { current: '4.8.0', latest: '5.0.0', update_available: true },
+    packages: { available: false, behind: [], unknown: false, truncated: false, checked: null },
+  }
+}
 
 // The testing library only cleans up on its own with vitest globals on.
 afterEach(cleanup)
@@ -282,5 +297,33 @@ describe('the Settings dialog', () => {
     expect(update.textContent?.trim()).toBe('Update')
     expect((update as HTMLButtonElement).disabled).toBe(true)
     expect(pane(dialog).textContent).toContain('1 chat is open')
+  })
+
+  // updates-by-home S4 (T2): the two hidden facts the pane cannot read for itself
+  // arrive from the push - the home (the dialog's own live `shell` slice) and the
+  // measured version (the same `updates.shell.latest` the check carries).
+  it('hands the Updates pane the Mi pi commands the push chose', async () => {
+    const dialog = await openSettings({ choice: 'link' }, VERSION, { updates: updateCheck() })
+
+    await pick(dialog, UPDATES)
+    const lines = [...pane(dialog).querySelectorAll('[data-command]')].map(
+      (line) => line.textContent?.trim(),
+    )
+
+    expect(lines).toEqual([
+      'pi update',
+      'pi install npm:gentle-pi@5.0.0',
+      'pi update --extensions',
+    ])
+  })
+
+  it('keeps the Separado commands in a dialog left on Separado', async () => {
+    const dialog = await openSettings({ choice: 'isolated' }, VERSION, { updates: updateCheck() })
+
+    await pick(dialog, UPDATES)
+
+    expect(pane(dialog).textContent).toContain('gentle-shell upgrade')
+    expect(pane(dialog).textContent).toContain('gentle-shell update --extensions')
+    expect(pane(dialog).textContent).not.toContain('pi install')
   })
 })

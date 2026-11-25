@@ -6,7 +6,10 @@
 import '../test-support/dom-env'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, within } from '@testing-library/svelte'
-import type { UpdatesView_Serialize as UpdatesView } from '../contract/bindings'
+import type {
+  HomeChoiceView,
+  UpdatesView_Serialize as UpdatesView,
+} from '../contract/bindings'
 import UpdateRows from './UpdateRows.svelte'
 import { cardOf, type RowAction } from './updates'
 import { updatesCopy } from './updates-copy'
@@ -29,7 +32,12 @@ function updates(over: Partial<UpdatesView> = {}): UpdatesView {
 }
 
 /** One draw of the rows of a check, with the clicks it can receive recorded. */
-function draw(view: UpdatesView = updates(), blocked = false) {
+function draw(
+  view: UpdatesView = updates(),
+  blocked = false,
+  home: HomeChoiceView | null = null,
+  shellLatest: string | null = null,
+) {
   const onAction = vi.fn<(action: RowAction) => void>()
   const onSkip = vi.fn<(version: string) => void>()
   const onUnskip = vi.fn<() => void>()
@@ -39,6 +47,8 @@ function draw(view: UpdatesView = updates(), blocked = false) {
       copy,
       blocked,
       hintId: 'updates-gate',
+      home,
+      shellLatest,
       onAction,
       onSkip,
       onUnskip,
@@ -127,8 +137,10 @@ describe('the Updates rows', () => {
     await fireEvent.click(stop)
     expect(skipped.onUnskip).toHaveBeenCalledTimes(1)
     expect(skipped.onSkip).not.toHaveBeenCalled()
-    // What the skip means, on the row that carries it.
-    expect(row(skipped.pane, 'shell').querySelector('.reason')?.textContent).toBe(
+    // What the skip means, on the row that carries it. The row also names the
+    // command its button runs (updates-by-home S4), so the sentence is the `.reason`
+    // that is not that line.
+    expect(row(skipped.pane, 'shell').querySelector('.reason:not([data-command])')?.textContent).toBe(
       copy.skippedNote('4.9.2'),
     )
   })
@@ -144,5 +156,36 @@ describe('the Updates rows', () => {
     }
     expect(onAction).not.toHaveBeenCalled()
     expect(onSkip).not.toHaveBeenCalled()
+  })
+
+  it('draws the command of each action it offers, under it, for the home it was given', () => {
+    // updates-by-home S4: the row says the exact line its button runs, so the home
+    // choice is never a surprise. These are Rust's table's literals, byte for byte.
+    const separado = draw()
+    expect(row(separado.pane, 'pi').querySelector('[data-command]')?.textContent).toBe(
+      'gentle-shell update',
+    )
+    expect(row(separado.pane, 'shell').querySelector('[data-command]')?.textContent).toBe(
+      'gentle-shell upgrade',
+    )
+    // The app's own release installs itself from the banner: no button, no line.
+    expect(row(separado.pane, 'app').querySelector('[data-command]')).toBeNull()
+
+    const miPi = draw(updates(), false, 'link', '4.9.2')
+    expect(row(miPi.pane, 'pi').querySelector('[data-command]')?.textContent).toBe('pi update')
+    expect(row(miPi.pane, 'shell').querySelector('[data-command]')?.textContent).toBe(
+      'pi install npm:gentle-pi@4.9.2',
+    )
+  })
+
+  it('says nothing is installed when Mi pi has no measured stable version', () => {
+    // S2's rule, said before the press: no guessed `@latest`, and not the other
+    // home's upgrade either.
+    const { pane } = draw(updates(), false, 'link', '4.9.0-main.abc123')
+    const shell = row(pane, 'shell')
+
+    expect(shell.querySelector('[data-command]')?.textContent).toBe(copy.noStableLatest)
+    expect(shell.textContent).not.toContain('pi install')
+    expect(shell.textContent).not.toContain('gentle-shell upgrade')
   })
 })
