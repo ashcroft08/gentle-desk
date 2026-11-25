@@ -79,6 +79,7 @@ const ENGLISH: SettingsCopy = {
   noMatches: 'No settings match.',
   themeGroup: 'Theme',
   titles: {
+    general: 'General',
     appearance: 'Appearance',
     home: 'Shell home',
     updates: 'Updates',
@@ -89,6 +90,8 @@ const ENGLISH: SettingsCopy = {
     about: 'About',
   },
   hints: {
+    // Verbatim from the approved artboard's G4 table (0.9.0 general S2).
+    general: 'What this app needs on the machine, and how to fix what is missing.',
     appearance: 'The look of this window.',
     home: 'Which pi this shell runs on.',
     updates: 'What this machine runs, and whether something newer is out.',
@@ -119,6 +122,7 @@ const SPANISH: typeof ENGLISH = {
   noMatches: 'Ningún ajuste coincide.',
   themeGroup: 'Tema',
   titles: {
+    general: 'General',
     appearance: 'Apariencia',
     home: 'Home del shell',
     updates: 'Actualizaciones',
@@ -129,6 +133,7 @@ const SPANISH: typeof ENGLISH = {
     about: 'Acerca de',
   },
   hints: {
+    general: 'Lo que esta app necesita en la máquina, y cómo se arregla lo que falta.',
     appearance: 'El aspecto de esta ventana.',
     home: 'En qué pi corre este shell.',
     updates: 'Lo que corre en esta máquina y si hay algo más nuevo.',

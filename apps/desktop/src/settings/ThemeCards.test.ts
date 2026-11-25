@@ -19,7 +19,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, within } from '@testing-library/svelte'
 import { tick } from 'svelte'
 import type { ThemeView } from '../contract/bindings'
-import { intents, openSettings, pane } from '../test-support/settings'
+import { intents, openSettings, pane, pick } from '../test-support/settings'
 import { resetTauriMock } from '../test-support/tauri-mock'
 import { setLanguage } from '../i18n/language.svelte'
 import { THEMES, themeLabelsCopy } from '../theme/themes'
@@ -43,6 +43,9 @@ beforeEach(() => {
 /** The theme the pushed state carries: the card that must wear the check. */
 async function appearance(theme: ThemeView = 'system'): Promise<HTMLElement> {
   const dialog = await openSettings({}, '0.1.9', { theme })
+  // Settings opens on General (general T3, S1), so the theme cards' own section
+  // is picked here, the way the dialog tests do.
+  await pick(dialog, 'Appearance')
   return pane(dialog)
 }
 

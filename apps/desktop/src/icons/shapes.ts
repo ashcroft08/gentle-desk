@@ -72,6 +72,9 @@ export type IconName =
   // The notifications pane's rail entry (notifications T4): Lucide's `bell`, the
   // dome and its clapper, exactly the shape the approved artboard draws.
   | 'bell'
+  // The General rail entry (0.9.0 general S1): Lucide's `activity`, the one
+  // polyline the approved artboard `08-general.html` draws first in the rail.
+  | 'activity'
   // The model chip's two dropdowns (0.1.11): Lucide's `chevron-down`.
   | 'chevronDown'
   // The sidebar collapse toggle (responsive-sidebar S1): Lucide's `panel-left`
@@ -156,6 +159,9 @@ export const ICON_SHAPES: Record<IconName, IconShape[]> = {
     path('M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326'),
     path('M10.268 21a2 2 0 0 0 3.464 0'),
   ],
+  // The rail's General entry (0.9.0 general S1): Lucide's `activity`, the heartbeat
+  // line the approved artboard draws - one path, no circle.
+  activity: [path('M22 12h-4l-3 9L9 3l-3 9H2')],
   // The context rail's clock (design/composer-dock): Lucide's `clock`, the ring
   // and its two hands.
   clock: [circle(12, 12, 9), path('M12 7.5V12l3 2')],

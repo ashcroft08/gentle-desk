@@ -19,15 +19,19 @@ vi.mock('@tauri-apps/api/event', () => import('../test-support/tauri-mock').then
 
 /** The words the dialog draws, quoted here so a change of copy is a change here. */
 const TITLE = 'Settings'
+const GENERAL = 'General'
 const APPEARANCE = 'Appearance'
 const HOME = 'Shell home'
 const UPDATES = 'Updates'
 const ACCOUNT = 'Account'
 const USAGE = 'Usage'
 const ABOUT = 'About'
-/** The rail's eight entries, in the order the dialog draws them (0.1.12; 0.2.0;
- * T2d dropped Profiles; notifications T4 added Notifications after Language). */
-const RAIL = [APPEARANCE, HOME, UPDATES, ACCOUNT, USAGE, 'Language', 'Notifications', ABOUT]
+/** The rail's nine entries, in the order the dialog draws them (0.9.0 general S1
+ * put General first; 0.1.12; 0.2.0; T2d dropped Profiles; notifications T4 added
+ * Notifications after Language). */
+const RAIL = [GENERAL, APPEARANCE, HOME, UPDATES, ACCOUNT, USAGE, 'Language', 'Notifications', ABOUT]
+/** The General pane's own hint, verbatim from the approved artboard's G4 table. */
+const GENERAL_HINT = 'What this app needs on the machine, and how to fix what is missing.'
 const APPEARANCE_HINT = 'The look of this window.'
 const HOME_HINT = 'Which pi this shell runs on.'
 const UPDATES_HINT = 'What this machine runs, and whether something newer is out.'
@@ -69,25 +73,28 @@ beforeEach(() => {
 })
 
 describe('the Settings dialog', () => {
-  it('opens from the footer gear with the eight sections in its rail and Appearance first', async () => {
+  it('opens from the footer gear with the nine sections in its rail and General first', async () => {
     const dialog = await openSettings()
 
     expect(within(dialog).getByRole('heading', { level: 2, name: TITLE })).toBeTruthy()
     expect(rail(dialog).map((entry) => entry.textContent?.trim())).toEqual(RAIL)
     expect(
       rail(dialog).map((entry) => entry.getAttribute('aria-selected')),
-    ).toEqual(['true', 'false', 'false', 'false', 'false', 'false', 'false', 'false'])
+    ).toEqual(['true', 'false', 'false', 'false', 'false', 'false', 'false', 'false', 'false'])
     expect(within(dialog).getAllByRole('tabpanel')).toHaveLength(1)
-    expect(within(dialog).getByRole('tabpanel', { name: APPEARANCE })).toBeTruthy()
+    expect(within(dialog).getByRole('tabpanel', { name: GENERAL })).toBeTruthy()
+    expect(within(pane(dialog)).getByText(GENERAL_HINT)).toBeTruthy()
   })
 
   it('draws one short hint per section and drops the old generic line', async () => {
     const dialog = await openSettings()
 
-    expect(within(pane(dialog)).getByText(APPEARANCE_HINT)).toBeTruthy()
+    // The dialog opens on General (S1), whose hint is the line it draws there.
+    expect(within(pane(dialog)).getByText(GENERAL_HINT)).toBeTruthy()
     expect(within(dialog).queryByText(OLD_HINT)).toBeNull()
 
     for (const [name, hint] of [
+      [APPEARANCE, APPEARANCE_HINT],
       [HOME, HOME_HINT],
       [UPDATES, UPDATES_HINT],
       [ACCOUNT, ACCOUNT_HINT],
@@ -97,7 +104,7 @@ describe('the Settings dialog', () => {
     ]) {
       await pick(dialog, name)
       expect(within(pane(dialog)).getByText(hint)).toBeTruthy()
-      expect(within(dialog).queryByText(APPEARANCE_HINT)).toBeNull()
+      expect(within(dialog).queryByText(GENERAL_HINT)).toBeNull()
     }
   })
 
@@ -108,7 +115,7 @@ describe('the Settings dialog', () => {
   it('no longer offers a Profiles section: profiles live in the chat', async () => {
     const dialog = await openSettings()
 
-    expect(rail(dialog)).toHaveLength(8)
+    expect(rail(dialog)).toHaveLength(9)
     expect(within(dialog).queryByRole('tab', { name: 'Profiles' })).toBeNull()
     expect(within(dialog).queryByText('Your agent profiles, as the terminal keeps them.')).toBeNull()
     // The pane's read is gone with it: no intent left the dialog.
@@ -128,6 +135,8 @@ describe('the Settings dialog', () => {
 
   it('draws one theme card per theme in Appearance, the current one chosen', async () => {
     const dialog = await openSettings()
+    // The card opens on General (S1): Appearance is one pick away.
+    await pick(dialog, APPEARANCE)
     const chosen = within(pane(dialog)).getByRole('button', { name: 'System' })
 
     // The grid is the choice: six cards, the pushed theme pressed (ThemeCards
@@ -150,8 +159,9 @@ describe('the Settings dialog', () => {
     expect(
       within(home).getByRole('button', { name: 'Separate' }).getAttribute('aria-pressed'),
     ).toBe('false')
-    // Appearance left the pane, and the rail says which section is drawn.
-    expect(within(dialog).queryByRole('button', { name: 'System' })).toBeNull()
+    // The section the card opened on left the pane, and the rail says which one
+    // is drawn.
+    expect(within(dialog).queryByText(GENERAL_HINT)).toBeNull()
     expect(within(dialog).getByRole('tab', { name: HOME }).getAttribute('aria-selected')).toBe(
       'true',
     )

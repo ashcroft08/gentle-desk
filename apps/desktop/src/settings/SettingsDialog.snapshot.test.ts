@@ -22,8 +22,10 @@ import { accountCopy } from './account-copy'
 vi.mock('@tauri-apps/api/core', () => import('../test-support/tauri-mock').then((m) => m.coreModule()))
 vi.mock('@tauri-apps/api/event', () => import('../test-support/tauri-mock').then((m) => m.eventModule()))
 
-/** The rail's eight entries, in the order the dialog draws them. */
+/** The rail's nine entries, in the order the dialog draws them (0.9.0 general S1
+ * put General first, where the card opens). */
 const RAIL = [
+  'General',
   'Appearance',
   'Shell home',
   'Updates',
@@ -181,6 +183,39 @@ describe('the Settings dialog and its one read', () => {
     held.resolve(answered())
     // One follow-up for the burst, never one per ask.
     await vi.waitFor(() => expect(loads()).toBe(3))
+  })
+
+  it('draws the environment check the one load answered on the General page, and asks again once', async () => {
+    // The card opens on General (0.9.0 general S1), whose rows are the General
+    // slice of the SAME one load (S4): nothing was read, so the pane says so, and
+    // the answer lands in it without a second read.
+    const held = deferred<SettingsSnapshot>()
+    const dialog = await openSettings({}, '0.1.9', {}, held.promise)
+    expect(within(pane(dialog)).getByText('Checking...')).toBeTruthy()
+    expect(loads()).toBe(1)
+
+    held.resolve(
+      answered({
+        general: {
+          tools: [
+            { tool: 'GentleShell', state: 'Installed', version: '4.9.0' },
+            { tool: 'Node', state: 'Missing' },
+          ],
+          checked_ms: Date.now(),
+        },
+      }),
+    )
+
+    await vi.waitFor(() => expect(pane(dialog).textContent).toContain('4.9.0'))
+    expect(pane(dialog).textContent).toContain('Missing')
+    expect(pane(dialog).textContent).toContain('winget install OpenJS.NodeJS.LTS')
+    expect(loads()).toBe(1)
+
+    // Its one button is the same ask every other section makes: no intent, no
+    // second command, one more load of the card's one read.
+    await fireEvent.click(within(pane(dialog)).getByRole('button', { name: 'Check again' }))
+    await vi.waitFor(() => expect(loads()).toBe(2))
+    expect(intents()).toEqual([])
   })
 
   it('starts nothing after the card closes, not even an ask it had queued', async () => {

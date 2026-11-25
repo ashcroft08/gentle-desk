@@ -26,8 +26,12 @@
 // so the accents stay here for the reader.
 import type { IconName } from '../icons/shapes'
 
-/** The eight sections, as the dialog names them. */
+/** The nine sections, as the dialog names them. */
 export type Section =
+  // The environment check (0.9.0 general S1): FIRST in the rail, and the section
+  // the dialog opens on. It asks what the machine has before anything else is
+  // asked, which is why it goes above the pane that changes what it reports.
+  | 'general'
   | 'appearance'
   | 'home'
   | 'updates'
@@ -46,8 +50,20 @@ export interface SectionEntry {
   keywords: readonly string[]
 }
 
-/** The rail, in the order the dialog draws it: Appearance comes first. */
+/** The rail, in the order the dialog draws it: General comes first (S1). */
 export const SECTIONS: SectionEntry[] = [
+  // The environment check (0.9.0 general S1, S2): the four tools the app and the
+  // shell depend on. Its glyph is Lucide's `activity`, the line the approved
+  // artboard draws first in the rail; the keywords are the words the page does
+  // not draw - the other language's, and the two tools' own names.
+  {
+    id: 'general',
+    icon: 'activity',
+    keywords: [
+      'general', 'environment', 'tools', 'node', 'git', 'pi', 'version', 'check',
+      'entorno', 'herramientas', 'versión', 'comprobación',
+    ],
+  },
   {
     id: 'appearance',
     icon: 'theme',
@@ -128,6 +144,7 @@ export const DEFAULT_SECTION: Section = SECTIONS[0].id
 
 /** The id of each rail entry, so the pane can name it with `aria-labelledby`. */
 export const TAB_IDS: Record<Section, string> = {
+  general: 'settings-tab-general',
   appearance: 'settings-tab-appearance',
   home: 'settings-tab-home',
   updates: 'settings-tab-updates',

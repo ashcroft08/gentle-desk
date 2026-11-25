@@ -17,8 +17,10 @@ import { setLanguage } from '../i18n/language.svelte'
 vi.mock('@tauri-apps/api/core', () => import('../test-support/tauri-mock').then((m) => m.coreModule()))
 vi.mock('@tauri-apps/api/event', () => import('../test-support/tauri-mock').then((m) => m.eventModule()))
 
-/** The rail's words, in the order the dialog draws them. */
+/** The rail's words, in the order the dialog draws them. General opens it
+ * (0.9.0 general S1) and is spelled the same in both columns (its G4 table). */
 const RAIL_EN = [
+  'General',
   'Appearance',
   'Shell home',
   'Updates',
@@ -29,6 +31,7 @@ const RAIL_EN = [
   'About',
 ]
 const RAIL_ES = [
+  'General',
   'Apariencia',
   'Home del shell',
   'Actualizaciones',
@@ -38,6 +41,10 @@ const RAIL_ES = [
   'Notificaciones',
   'Acerca de',
 ]
+
+/** The General pane's own hint: the line the dialog opens on (S1). */
+const GENERAL_HINT_EN = 'What this app needs on the machine, and how to fix what is missing.'
+const GENERAL_HINT_ES = 'Lo que esta app necesita en la máquina, y cómo se arregla lo que falta.'
 
 /** The two-home line, drawn by the section that holds the choice. */
 const EXPLAIN_EN =
@@ -71,8 +78,8 @@ describe('a drawn Settings dialog', () => {
       railName: 'Settings sections',
       rail: RAIL_EN,
     })
-    expect(within(pane(dialog)).getByRole('heading', { level: 3 }).textContent).toBe('Appearance')
-    expect(within(pane(dialog)).getByText('The look of this window.')).toBeTruthy()
+    expect(within(pane(dialog)).getByRole('heading', { level: 3 }).textContent).toBe('General')
+    expect(within(pane(dialog)).getByText(GENERAL_HINT_EN)).toBeTruthy()
     expect(within(dialog).getByRole('button', { name: 'Close' })).toBeTruthy()
 
     setLanguage('es')
@@ -83,8 +90,8 @@ describe('a drawn Settings dialog', () => {
       railName: 'Secciones de ajustes',
       rail: RAIL_ES,
     })
-    expect(within(pane(dialog)).getByRole('heading', { level: 3 }).textContent).toBe('Apariencia')
-    expect(within(pane(dialog)).getByText('El aspecto de esta ventana.')).toBeTruthy()
+    expect(within(pane(dialog)).getByRole('heading', { level: 3 }).textContent).toBe('General')
+    expect(within(pane(dialog)).getByText(GENERAL_HINT_ES)).toBeTruthy()
     expect(within(dialog).getByRole('button', { name: 'Cerrar' })).toBeTruthy()
 
     setLanguage('en')

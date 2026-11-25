@@ -2579,6 +2579,87 @@ p {
   border-bottom-color: var(--accent);
 }
 
+/* General (0.9.0 general S2; the approved artboard `08-general.html`, sheets G1
+   and G2): the environment check's rows. One block per tool, set off by the same
+   hairline the facts groups use (R1), with the first one carrying no rule above it
+   - the pane's hint already separates it from the heading. Every colour is a
+   token, so the six themes paint these rows without a line of their own. */
+.settings-pane .tool {
+  width: 100%;
+  padding: 16px 0 14px;
+}
+
+.settings-pane .tool + .tool {
+  border-top: 1px solid var(--border);
+}
+
+.settings-pane .tool:first-of-type {
+  padding-top: 2px;
+  border-top: 0;
+}
+
+/* The name and the state on one line: the name takes what it needs and the tag
+   keeps its own column, so a long name never pushes the state away. */
+.settings-pane .thead {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 0 12px;
+}
+
+/* The tool's own name, mono like every other identifier the dialog draws, and the
+   version it printed underneath in the faint ink (G1). */
+.settings-pane .tname {
+  font-size: 13px;
+  font-weight: 600;
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+}
+
+.settings-pane .tver {
+  color: var(--faint);
+  font-size: 12px;
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+}
+
+/* The fix hint, drawn ONLY where there is something to fix (S2): quiet, and with
+   the exact command inside it in `<code>`, so the command and the sentence never
+   read as the same kind of text. */
+.settings-pane .twhy {
+  width: 100%;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+
+.settings-pane .twhy code {
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  font-size: 12px;
+  background: var(--surface2);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+/* The last check and its one button close the pane (S4): the same hairline, the
+   sentence mono like the ages the card already draws, and the button pushed to the
+   far end of the row. */
+.settings-pane .tcheck {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 12px;
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+}
+
+.settings-pane .tcheck .btn {
+  margin-left: auto;
+}
+
 /* The dialog's buttons keep the house button look with the same quiet
    transition as the rail: border and fill, never a jump. */
 .dlg.settings .btn {

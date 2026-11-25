@@ -57,6 +57,7 @@
   import HomeSetting from '../sidebar/HomeSetting.svelte'
   import AccountPane from './AccountPane.svelte'
   import AboutPane from './AboutPane.svelte'
+  import GeneralPane from './GeneralPane.svelte'
   import LanguagePane from './LanguagePane.svelte'
   import NotificationsPane from './NotificationsPane.svelte'
   import ThemeCards from './ThemeCards.svelte'
@@ -285,6 +286,7 @@
                 <!-- The live push's home decides which command each action runs
                      (updates-by-home S4), so the pane draws it under every button. -->
                 <UpdatesPane updates={updatesView} {openChats} home={shell?.choice ?? null} refreshing={rechecking} onRefresh={again} />
+              {:else if selected === 'general'}<GeneralPane general={read.snapshot?.general ?? null} refreshing={rechecking} onRefresh={again} />
               {:else if selected === 'account'}
                 <AccountPane auth={authView} onRefresh={again} />
               {:else if selected === 'usage'}

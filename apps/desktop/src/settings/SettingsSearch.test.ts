@@ -27,8 +27,10 @@ const FIND_ES = 'Buscar un ajuste'
 const NONE = 'No settings match.'
 const NONE_ES = 'Ningún ajuste coincide.'
 
-/** The eight entries in the order the dialog draws them, per language. */
+/** The nine entries in the order the dialog draws them, per language. General
+ * opens the rail (0.9.0 general S1) and its G4 word is the same in both. */
 const RAIL_EN = [
+  'General',
   'Appearance',
   'Shell home',
   'Updates',
@@ -39,6 +41,7 @@ const RAIL_EN = [
   'About',
 ]
 const RAIL_ES = [
+  'General',
   'Apariencia',
   'Home del shell',
   'Actualizaciones',
@@ -139,10 +142,11 @@ describe('the Settings search field', () => {
     setLanguage('es')
     await tick()
 
-    // 'máquina', typed without its accent: the Home hint names the machine and
-    // the Updates hint says what runs on it, so both are answers.
+    // 'máquina', typed without its accent: the General hint names it too, and the
+    // Home hint names the machine and the Updates hint says what runs on it, so
+    // all three are answers, in rail order.
     await search(dialog, 'MAQUINA')
-    expect(names(dialog)).toEqual(['Home del shell', 'Actualizaciones'])
+    expect(names(dialog)).toEqual(['General', 'Home del shell', 'Actualizaciones'])
     expect(within(dialog).getByRole('searchbox').getAttribute('aria-label')).toBe(FIND_ES)
   })
 
@@ -232,9 +236,10 @@ describe('the Settings search field', () => {
   it('walks the entries the field leaves, and wraps at the ends of that list', async () => {
     const dialog = await openSettings()
 
-    // Two entries hold the word "version": Updates and About, in rail order.
+    // Three entries hold the word "version": General, Updates and About, in rail
+    // order (General's keywords carry it; S1's entry is new).
     await search(dialog, 'version')
-    expect(names(dialog)).toEqual(['Updates', 'About'])
+    expect(names(dialog)).toEqual(['General', 'Updates', 'About'])
 
     await fireEvent.keyDown(within(dialog).getByRole('tab', { name: 'Updates' }), {
       key: 'ArrowDown',
@@ -243,11 +248,11 @@ describe('the Settings search field', () => {
       'true',
     )
 
-    // The rail wraps inside the two it is drawing, not across the eight.
+    // The rail wraps inside the three it is drawing, not across the nine.
     await fireEvent.keyDown(within(dialog).getByRole('tab', { name: 'About' }), {
       key: 'ArrowDown',
     })
-    expect(within(dialog).getByRole('tab', { name: 'Updates' }).getAttribute('aria-selected')).toBe(
+    expect(within(dialog).getByRole('tab', { name: 'General' }).getAttribute('aria-selected')).toBe(
       'true',
     )
   })

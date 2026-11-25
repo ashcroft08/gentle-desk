@@ -19,6 +19,9 @@ const NAMES: IconName[] = [
   'bell',
   // The sidebar toggle (0.9.0): Lucide's `panel-left`, in place of `menu`.
   'panel-left',
+  // The General rail entry (0.9.0 general S1): Lucide's `activity`, the path the
+  // approved artboard `08-general.html` draws first in the rail.
+  'activity',
 ]
 
 describe('Icon', () => {
@@ -51,8 +54,18 @@ describe('Icon', () => {
     expect(Object.keys(ICON_SHAPES)).not.toContain('menu')
   })
 
-  it('draws the plus of the design artboard exactly', () => {
-    const { container } = render(Icon, { props: { name: 'plus' } })
+  it('draws the General rail entry as the artboard\'s activity line', () => {
+    // 0.9.0 general S1: the rail's first entry is the house's `activity` glyph,
+    // one polyline copied verbatim from the approved artboard.
+    const { container } = render(Icon, { props: { name: 'activity' } })
+    const paths = [...container.querySelectorAll('path')].map((path) => path.getAttribute('d'))
+
+    expect(paths).toEqual(['M22 12h-4l-3 9L9 3l-3 9H2'])
+    expect(container.querySelector('circle')).toBeNull()
+    expect(container.querySelector('rect')).toBeNull()
+  })
+
+  it('draws the plus of the design artboard exactly', () => {    const { container } = render(Icon, { props: { name: 'plus' } })
     const paths = [...container.querySelectorAll('path')].map((path) => path.getAttribute('d'))
     expect(paths).toEqual(['M5 12h14', 'M12 5v14'])
   })
