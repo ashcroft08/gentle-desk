@@ -35,6 +35,26 @@ Part of 0.9.0. The idea came from the maintainer's question (L1): the terminal s
   `crates/backend/src/chat_host/desktop.rs` + `DesktopClient` (crates/gentle-core/rpc/desktop.rs),
   the same path profile.rs and stop.rs use, with `supports(method)` on the cached capabilities.
 
+- S6 HONEST "CHECKED" (a defect found by the maintainer, 0.9.0): the shell reports a package as
+  `update_available` ONLY after its own check ran (`refresh: true`); with no prior refresh in that
+  child every checkable package is `unknown`. The app asked `refresh: false` and read only
+  `available`, so an extension that was behind read as "Las extensiones están al día" - a false claim.
+  Now: "up to date" requires every checkable item to be `no_update_reported` (or `skipped`);
+  ANY item still `unknown` means "not checked yet", which is its own state with its own words
+  (never "al día", never "no se pudo revisar" either - nothing failed, it just has not run).
+- S7 AN EXPLICIT CHECK: a new command `check_packages` runs pi's own check once (`get_update_status`
+  with `refresh: true`) with its own longer deadline (the shell's refresh has a 15 s bound; the
+  channel's 5 s default is for plain reads), on a thread of its own and OFF the snapshot load (it must
+  never hold Settings open), and the result is HELD by the app and carried in the pushed updates
+  slice (`ViewState.updates.packages`) so the gear's dot and the pane light WITHOUT opening Settings.
+  It runs (a) once per app run, in the background, when the first chat's child is ready (the only
+  moment the channel exists - still never at launch and never starting a child), and (b) when the user
+  presses "Comprobar de nuevo" in Updates. No timer, no watcher. No chat open: nothing runs, the
+  pane keeps today's honest sentence.
+- S8 THE RAIL DOT: when something is waiting (the same rule as the gear's dot, `updateWaiting`, with
+  the dialog's live updates), the "Actualizaciones" entry in the Settings rail shows a small dot, so a
+  user who opened Settings on General knows where to go. It follows the skip rule like the gear.
+
 ## Tasks
 
 - T1 (S1, S2, S4, S5) Rust: a bounded packages read through the desktop channel for one open chat
@@ -48,6 +68,10 @@ Part of 0.9.0. The idea came from the maintainer's question (L1): the terminal s
 - T3 The gear dot: the packages slice joins `update/dot.ts`'s waiting rule (behind packages light
   it like pi/shell do). Route: worker, with T2.
 
+- T4 (S6, S7) Rust: the derivation fix (an `unchecked` state in `PackagesView`), the `check_packages` command with its longer deadline, the held result in the pushed updates slice, the once-per-app-run trigger on the first chat ready. Route: worker.
+- T5 (S8) Web: the rail dot. Route: worker, in parallel with T4 (disjoint files).
+- T6 (S6, S7) Web: the "not checked yet" state in the Extensions block, "Comprobar de nuevo" also asking `check_packages`, the gear dot reading the pushed packages. Route: worker, after T4.
+
 ## Log
 
 - L1 (2026-11-21, the maintainer): "cuando abro gentle-shell en la terminal y tengo que actualizar
@@ -56,3 +80,4 @@ Part of 0.9.0. The idea came from the maintainer's question (L1): the terminal s
   --extension. ese mensaje que sale no podriamos usarlo para avisarle al usuario en la app que debe
   actualizar una extension?" - answered yes with the explorer's facts above; the maintainer chose
   to add it to 0.9.0 ("si agregala ahi") right after merging v0.8.2.
+- L2 (2026-11-24, the maintainer, with everything else working): "cuando hay una actualizacion de gentle-shell por ejemplo aparece un circulo rojo en el icono de la tuerca de configuracion pero al abrir configuracion deberia tambien aparecer algo en la seccion de actualiacion para que el usuario sepa que hay es donde debe ir, otra cosa en las extensiones no hay forma de notificar cuando hay que actualizar aunque aparezca este mensaje si uso en terminal: Package Updates Available / Package updates are available. Run pi update --extensions / Packages: - @estebanforge/pi-antigravity-bridge". Verified in the code: S6 (the false "al día") and S7 (the dot could never light without opening Settings).
