@@ -71,6 +71,13 @@ pub(crate) fn helper_stopped(mut state: AppState, chat: &ChatId, helper_id: &str
 /// with the Restart that brings it back (S3). Nothing here is fatal for the
 /// window: every other chat keeps its child.
 pub(crate) fn closed(mut state: AppState, chat: &ChatId, expected: bool) -> (AppState, Effects) {
+    // A chat this run closed is gone for good: the child that goes away is the one
+    // its close was stopping, so it says nothing and it is certainly not a
+    // Restart to offer (packages-status S7: the entry this would make is the count
+    // the Updates gate reads).
+    if state.chats.is_closed(chat) {
+        return (state, Effects::default());
+    }
     // A working chat whose child goes away frees the slot it held, whatever
     // stopped the child: both an expected stop and a death free it.
     let freed = state.chats.stop_working(chat);

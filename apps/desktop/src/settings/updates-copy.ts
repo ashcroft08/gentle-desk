@@ -16,6 +16,17 @@
 // clause and never as the client's message, the "not checked yet" line is gone
 // because the last-checked line says `never`, and the extensions note is the one
 // sentence that explains why that button has no state.
+//
+// packages-status (T2, S1, S3) adds four lines to the extensions block: the
+// plural-safe count of what pi's own check reports as behind, the "up to date"
+// line only an answered listing earns, the short clause of a read that ran and
+// could not answer, and the condition that makes the read possible when no chat
+// is open. The approved sentence about this Gentle Shell not knowing stays, in
+// that last state.
+//
+// packages-status T6 (S6) adds the fifth line: the listing exists but pi's own check
+// has not run for it, so "al día" would be a claim nobody made. It says exactly
+// that, and it is drawn UNDER the behind list when only some packages are known.
 import type { LanguageView, UpdateReasonView } from '../contract/bindings'
 
 /** Which piece a row is, for the one sentence that names it. */
@@ -55,8 +66,34 @@ export interface UpdatesCopy {
   updateInTerminal: string
   /** Why the extensions button has no state to wait for (D14). */
   extensionsNote: string
+  /**
+   * The Extensions block's states (packages-status T2, S1, S3): how many
+   * extensions pi's own check reports as behind - the count is spoken with the
+   * plural the line needs - and the three exceptions, each said in the pane's
+   * own short words and never as the client's message.
+   */
+  packagesBehind: (count: number) => string
+  /** The read answered and none is behind: the only honest "up to date". */
+  packagesUpToDate: string
+  /**
+   * The listing exists and pi's own check has not run in that child (T6, S6):
+   * "not checked yet" is its own sentence - never "up to date" (the claim this
+   * line exists to stop) and never the failed read's clause either, because
+   * nothing failed.
+   */
+  packagesUnchecked: string
+  /** The read ran and could not produce a listing: never "up to date" (S1). */
+  packagesUnreadable: string
+  /** No chat is open, or this shell cannot ask: what would make it possible (S3, S5). */
+  packagesNeedsSession: string
   /** The app's own release is not a terminal's job: the banner installs it. */
   appUpdatesItself: string
+  /**
+   * What the line under "Update Gentle Shell" says when Mi pi has no measured
+   * stable version to install (updates-by-home S4): the honest clause, never a
+   * guessed `@latest` and never the other home's upgrade.
+   */
+  noStableLatest: string
   /**
    * When the rows were last read (S8, D11): the house's own age (`hace 3m`) or the
    * one word it answers for something just read, and `never` before any check.
@@ -68,6 +105,13 @@ export interface UpdatesCopy {
    * that blocks them, and the way out.
    */
   gateHint: (openChats: number) => string
+  /** The gate's own button: it closes every chat that is not running a turn (close-chats S1). */
+  closeChats: string
+  /**
+   * Why some chats stay open after that button (close-chats S3): a chat running a
+   * turn is never closed by it, so the pane says how many and what to do.
+   */
+  chatsWorking: (working: number) => string
 }
 
 /** The one sentence a failed read is worded as, in English (S8, D12). */
@@ -111,6 +155,17 @@ const ENGLISH: UpdatesCopy = {
   extensionsNote:
     'There is no way to tell which ones are behind with this Gentle Shell. Update extensions updates all of them, so this button is always offered and safe to use any time.',
   appUpdatesItself: 'This app updates itself: use the update banner at the top.',
+  noStableLatest: 'Without a measured stable version, nothing is installed.',
+  packagesBehind: (count) =>
+    count === 1
+      ? '1 extension has an update available'
+      : `${count} extensions have an update available`,
+  packagesUpToDate: 'The extensions are up to date.',
+  packagesUnchecked: 'It has not been checked yet whether any extension has an update.',
+  // The packages read carries no reason of its own, so the failure is the short
+  // generic clause: pi's own check is what does not answer.
+  packagesUnreadable: 'Could not check the extensions: pi did not answer.',
+  packagesNeedsSession: 'You can check it by opening a session.',
   checkedAt: (age, justNow) => (justNow ? 'Last checked: just now' : `Last checked: ${age} ago`),
   checkedNever: 'Last checked: never',
   gateHint: (openChats) => {
@@ -118,6 +173,11 @@ const ENGLISH: UpdatesCopy = {
     const their = openChats === 1 ? 'its' : 'their'
     return `Updates need every chat closed. ${chats} open - Close chat in ${their} row menu, and the update buttons come alive.`
   },
+  closeChats: 'Close the chats',
+  chatsWorking: (working) =>
+    working === 1
+      ? 'One chat is still working: the button does not close it; stop it and try again.'
+      : `${working} chats are still working: the button does not close them; stop them and try again.`,
 }
 
 /** Neutral Spanish: no voseo, no regionalisms, nothing left in English. */
@@ -160,6 +220,15 @@ const SPANISH: typeof ENGLISH = {
   extensionsNote:
     'No se puede saber cuáles están desactualizadas con este Gentle Shell. Actualizar extensiones las actualiza todas, así que este botón se ofrece siempre y es seguro usarlo en cualquier momento.',
   appUpdatesItself: 'Esta app se actualiza sola: usa el aviso de actualización de la parte superior.',
+  noStableLatest: 'Sin una versión estable medida, no se instala nada.',
+  packagesBehind: (count) =>
+    count === 1
+      ? '1 extensión con actualización disponible'
+      : `${count} extensiones con actualización disponible`,
+  packagesUpToDate: 'Las extensiones están al día.',
+  packagesUnchecked: 'Todavía no se comprobó si hay extensiones por actualizar.',
+  packagesUnreadable: 'No se pudo revisar las extensiones: pi no respondió.',
+  packagesNeedsSession: 'Se puede revisar al abrir una sesión.',
   checkedAt: (age, justNow) =>
     justNow ? 'Última comprobación: ahora mismo' : `Última comprobación: hace ${age}`,
   checkedNever: 'Última comprobación: nunca',
@@ -168,6 +237,11 @@ const SPANISH: typeof ENGLISH = {
     const open = openChats === 1 ? 'abierto' : 'abiertos'
     return `Las actualizaciones necesitan todos los chats cerrados. ${chats} ${open} - Cerrar chat en el menú de su fila y los botones de actualización se activan.`
   },
+  closeChats: 'Cerrar los chats',
+  chatsWorking: (working) =>
+    working === 1
+      ? 'Un chat sigue trabajando: el botón no lo cierra; detenlo y vuelve a intentarlo.'
+      : `${working} chats siguen trabajando: el botón no los cierra; detenlos y vuelve a intentarlo.`,
 }
 
 /** The pane's own words in `language`, the whole dictionary at once (D4). */

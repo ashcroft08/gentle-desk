@@ -15,7 +15,7 @@ use std::sync::mpsc;
 use std::sync::{Arc, Mutex, Weak};
 use std::time::Duration;
 
-use gentle_app::{ChatId, Input, Intent};
+use gentle_app::{ChatCommand, ChatId, Input, Intent};
 use gentle_core::chat::SESSION_FILE_MAX_BYTES;
 use gentle_core::i18n::Language;
 use gentle_core::rpc::{decode_line, Decoded};
@@ -242,6 +242,48 @@ fn a_read_of_a_chat_that_closed_and_reopened_is_dropped() {
     let drawn = holder
         .note_transcript(&new.read())
         .expect("the new read is the one this chat draws");
+    assert!(drawn.transcript_provisional);
+    assert_eq!(drawn.items.len(), 2);
+}
+
+/// The same rule for a chat closed in BULK (close-chats T1, S2): the button
+/// closes what `CloseChat` closes, so the bookkeeping is the same one - the
+/// reopened chat is a NEW incarnation that reads its session file again, and the
+/// read that was in flight when it closed is dropped instead of installed.
+#[test]
+fn a_chat_closed_in_bulk_reopens_as_a_new_incarnation_that_reads_its_file() {
+    let (holder, _asked) = opened_with(Ok(Some(file())));
+    let old = holder
+        .claim_transcript()
+        .expect("the first incarnation's read");
+
+    let (closed, commands) = holder.dispatch_commands(UiIntent::CloseAllChats);
+    assert_eq!(
+        closed.open_chats, 0,
+        "the bulk close took the chat off the open set"
+    );
+    assert_eq!(
+        commands,
+        vec![ChatCommand::CloseProcess { chat: stored() }],
+        "and asked for that chat's child to stop"
+    );
+
+    holder.fold_input(Input::Intent(Intent::OpenChat(stored())));
+    let new = holder
+        .claim_transcript()
+        .expect("the new incarnation of the chat reads its file again");
+    assert_ne!(
+        old.started_in, new.started_in,
+        "the two incarnations are told apart"
+    );
+    assert_eq!(
+        holder.note_transcript(&old.read()),
+        None,
+        "the read of the closed incarnation is dropped"
+    );
+    let drawn = holder
+        .note_transcript(&new.read())
+        .expect("the reopened chat draws its file's rows");
     assert!(drawn.transcript_provisional);
     assert_eq!(drawn.items.len(), 2);
 }

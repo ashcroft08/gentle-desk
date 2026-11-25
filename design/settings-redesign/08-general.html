@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="es" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=1400">
+<title>General — el chequeo del entorno, la primera página de Ajustes</title>
+<style>
+/* ── TOKENS. Copia literal de apps/desktop/src/theme.css (los seis bloques), que
+   es la única fuente de color de esta hoja: ninguna regla de más abajo escribe
+   un hex. ─────────────────────────────────────────────────────────────────── */
+:root,[data-theme='dark']{--bg:#0e1116;--surface:#151a21;--surface2:#1c222b;--border:#2b333d;--text:#e4e8ee;--muted:#9aa4b2;--faint:#7d8593;--accent:#7aa2f7;--tint:rgba(122,162,247,.14);--success:#7edc9a;--warning:#e7b455;--danger:#ff8585;--shadow:0 8px 24px rgba(0,0,0,.45);--row-h:34px}
+[data-theme='light']{--bg:#f2f4f7;--surface:#ffffff;--surface2:#e9edf2;--border:#cfd5dd;--text:#17202a;--muted:#576272;--faint:#6b7686;--accent:#2e5bd7;--tint:rgba(46,91,215,.1);--success:#166e38;--warning:#8a5800;--danger:#c22f37;--shadow:0 8px 24px rgba(23,32,42,.18);--row-h:34px}
+[data-theme='Gentle']{--bg:#06080f;--surface:#06080f;--surface2:#0d0f14;--border:#313342;--text:#f3f6f9;--muted:#8394a3;--faint:#96a2b0;--accent:#7fb4ca;--tint:#161d2e;--success:#b7cc85;--warning:#deba87;--danger:#cb7c94;--shadow:0 8px 24px rgba(0,0,0,.6);--row-h:34px}
+[data-theme='Gentleman-Cute']{--bg:#060407;--surface:#100a0f;--surface2:#100a0f;--border:#563040;--text:#f6eff3;--muted:#a78e9b;--faint:#d7a0b8;--accent:#f095c8;--tint:#2a1523;--success:#b4e7c7;--warning:#f2b86d;--danger:#ff718f;--shadow:0 8px 24px rgba(0,0,0,.6);--row-h:34px}
+[data-theme='Gentleman-Sexy']{--bg:#060407;--surface:#100a0f;--surface2:#100a0f;--border:#563040;--text:#f6eff3;--muted:#a78e9b;--faint:#d7a0b8;--accent:#f43888;--tint:#2e0f1f;--success:#d2cbd0;--warning:#f2b86d;--danger:#ff718f;--shadow:0 8px 24px rgba(0,0,0,.6);--row-h:34px}
+@media (prefers-color-scheme:light){[data-theme='system']{--bg:#f2f4f7;--surface:#ffffff;--surface2:#e9edf2;--border:#cfd5dd;--text:#17202a;--muted:#576272;--faint:#6b7686;--accent:#2e5bd7;--tint:rgba(46,91,215,.1);--success:#166e38;--warning:#8a5800;--danger:#c22f37;--shadow:0 8px 24px rgba(23,32,42,.18);--row-h:34px}}
+[data-theme='dark'],[data-theme='Gentle'],[data-theme='Gentleman-Cute'],[data-theme='Gentleman-Sexy']{color-scheme:dark}
+[data-theme='light']{color-scheme:light}
+
+/* ── la hoja ──────────────────────────────────────────────────────────────── */
+*{box-sizing:border-box}
+h1,h2,h3,h4,h5,p,ul,li,dl,dd,dt{margin:0}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.page{width:1400px;padding:30px 0 64px}
+.head{width:1280px;margin:0 auto 26px}
+.kicker{margin:0 0 10px;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--faint)}
+h1{margin:0 0 12px;font-size:23px;font-weight:600;line-height:1.25}
+.lede{margin:0 0 12px;max-width:880px;color:var(--muted);font-size:13.5px;line-height:1.65}
+.lede b{color:var(--text);font-weight:600}
+.tradeoff{margin:0 0 22px;max-width:920px;padding-left:14px;border-left:2px solid var(--accent);color:var(--text);font-size:13px;line-height:1.6}
+.tradeoff b{color:var(--accent);font-weight:600}
+h1 code,p code,li code,dd code,td code{font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:12px;background:var(--surface2);border-radius:4px;padding:1px 5px}
+.wrap{display:flex;justify-content:center}
+.sheet{margin:0 0 30px}
+.sheet>.cap{width:1280px;margin:0 auto 10px;color:var(--faint);font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase}
+.sheet>.cap b{color:var(--muted)}
+.figcap{width:1280px;margin:12px auto 0;color:var(--muted);font-size:12.5px;line-height:1.6}
+.figcap b{color:var(--text);font-weight:600}
+
+/* ── la ventana de la app, a tamaño real ──────────────────────────────────── */
+.frame{position:relative;width:1280px;height:800px;background:var(--bg);border:1px solid var(--border);border-radius:12px;overflow:hidden;box-shadow:var(--shadow)}
+.app{display:grid;grid-template-columns:280px minmax(0,1fr);height:100%}
+.side{display:flex;flex-direction:column;gap:10px;padding:12px 10px 8px;background:var(--surface);border-right:1px solid var(--border)}
+.wm{padding:2px 6px 12px;font-size:12px;font-weight:600;letter-spacing:.22em;color:var(--accent)}
+.neww{display:flex;align-items:center;justify-content:center;height:38px;border:1px solid var(--border);border-radius:10px;background:var(--surface2);font-size:13px;font-weight:600}
+.gh{padding:10px 10px 2px;color:var(--muted);font-size:12px;font-weight:600;letter-spacing:.02em}
+.row{display:flex;align-items:center;gap:8px;height:var(--row-h);padding:0 10px;border-radius:8px;font-size:13px}
+.row.chat{padding-left:42px;color:var(--muted)}
+.row span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.foot{display:flex;align-items:center;gap:8px;margin-top:auto;padding-top:8px;border-top:1px solid var(--border);color:var(--faint);font-size:12px}
+.main{display:flex;flex-direction:column;min-height:0;background:var(--bg)}
+.mh{display:flex;align-items:center;gap:8px;height:52px;padding:0 20px;border-bottom:1px solid var(--border)}
+.mh h2{margin:0;font-size:15px;font-weight:600}
+
+/* ── el diálogo COMO ESTÁ HOY (S7/T3, con el borde derecho real de 12px):
+   860 de tarjeta, riel de 184, cuerpo de clamp(380px,60vh,560px), entradas de 36 ── */
+.dlg{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;gap:16px;width:860px;padding:20px 24px;background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow)}
+.dt{margin:0 0 6px;font-size:15px;font-weight:600}
+.body{display:flex;gap:20px;height:480px}
+.side2{flex:none;width:184px;display:flex;flex-direction:column;gap:14px;padding:2px 14px 0 0;border-right:1px solid var(--border)}
+.find{display:flex;align-items:center;gap:8px;height:28px;padding:0 9px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--faint)}
+.find svg{flex:none;width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.find input{flex:1;min-width:0;padding:0;border:0;background:transparent;color:var(--text);font:inherit;font-size:12.5px;outline:none}
+.find input::placeholder{color:var(--faint)}
+.rail{display:flex;flex-direction:column;gap:2px}
+.rail [role='tab']{display:flex;align-items:center;gap:8px;height:36px;padding:0 12px;border:0;border-radius:8px;background:transparent;color:var(--muted);font:inherit;font-size:13px;text-align:left;cursor:pointer;transition:background-color 120ms ease,color 120ms ease}
+.rail [role='tab'] svg{flex:none;width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.rail [role='tab']:hover{background:var(--surface2);color:var(--text)}
+.rail [role='tab'][aria-selected='true']{background:var(--tint);color:var(--accent)}
+/* el pane, con las reglas de la hoja 07: aire abajo + velo, y el borde derecho
+   REAL de 12px que el 0.8.2 fijó (la barra flotante colapsa el gutter a cero) */
+.pane{flex:1;min-width:0;min-height:0;overflow-y:auto;display:flex;flex-direction:column;align-items:flex-start;padding:4px 12px 24px 4px;mask-image:linear-gradient(to bottom,var(--text) calc(100% - 24px),transparent 100%)}
+.pbody{display:flex;flex-direction:column;align-items:flex-start;width:100%}
+.pane h3{margin:0 0 6px;font-size:15px;font-weight:600}
+.hint{margin:0 0 18px;color:var(--muted);font-size:12px;line-height:1.5}
+.quiet{margin:0 0 8px;color:var(--muted);font-size:12.5px;line-height:1.5}
+.btn{border:1px solid var(--border);background:var(--surface2);color:var(--text);border-radius:8px;padding:6px 14px;font-size:13px;white-space:nowrap;cursor:pointer;transition:border-color 120ms ease,background-color 120ms ease}
+.btn:hover{border-color:var(--accent)}
+.tag{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border:1px solid var(--border);border-radius:999px;color:var(--muted);font-size:11.5px;font-weight:600}
+.tag.ok{color:var(--success);border-color:color-mix(in srgb,var(--success) 45%,transparent)}
+.tag.warn{color:var(--warning);border-color:color-mix(in srgb,var(--warning) 45%,transparent)}
+.tag.bad{color:var(--danger);border-color:color-mix(in srgb,var(--danger) 45%,transparent)}
+.foot-row{display:flex;justify-content:flex-end;gap:8px}
+*::-webkit-scrollbar{width:10px;height:10px}
+*::-webkit-scrollbar-track{background:transparent}
+*::-webkit-scrollbar-thumb{background:var(--border);border-radius:999px;border:2px solid transparent;background-clip:content-box}
+
+/* ── General: las filas del entorno (lo nuevo de esta hoja) ───────────────── */
+.tool{width:100%;padding:16px 0 14px}
+.tool + .tool{border-top:1px solid var(--border)}
+.tool:first-of-type{padding-top:2px;border-top:0}
+.thead{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:baseline;gap:0 12px}
+.tname{font-size:13px;font-weight:600;font-family:ui-monospace,'Cascadia Code',Consolas,monospace}
+.tver{color:var(--faint);font-size:12px;font-family:ui-monospace,'Cascadia Code',Consolas,monospace}
+.twhy{width:100%;margin-top:8px;color:var(--muted);font-size:12.5px;line-height:1.55}
+.twhy code{font-family:ui-monospace,'Cascadia Code',Consolas,monospace;font-size:12px;background:var(--surface2);border-radius:4px;padding:1px 5px}
+.tcheck{display:flex;align-items:center;gap:10px;width:100%;margin-top:18px;padding-top:14px;border-top:1px solid var(--border);color:var(--muted);font-size:12px;font-family:ui-monospace,'Cascadia Code',Consolas,monospace}
+.tcheck .btn{margin-left:auto}
+/* la ventana mínima */
+.frame.small{width:800px;height:560px}
+.dlg.sm{width:752px}
+.dlg.sm .body{height:380px}
+/* el tablero de estados: tarjetas a tamaño real, apiladas */
+.board{display:flex;flex-direction:column;align-items:center;gap:18px}
+</style></head>
+<body><div class="page">
+<div class="head">
+<p class="kicker">Ajustes · 0.9.0 · General (T1, una propuesta)</p>
+<h1>General — el chequeo del entorno, primera en el riel</h1>
+<p class="lede">La página que dice <b>qué tiene la máquina</b> antes de preguntar por qué algo no anda: una fila por herramienta (Gentle Shell, pi, node, git), su estado (<b>Instalado / Falta / No se pudo leer</b>), su versión, y la pista de arreglo <b>solo</b> cuando falta o no se pudo leer. Todo sale de lecturas que la app ya sabe correr: la de versiones que Actualizaciones ya tiene, y <code>node --version</code> / <code>git --version</code> como sondas acotadas sin consola. Nada pide a la red (S3).</p>
+<p class="tradeoff"><b>Una sola propuesta.</b> El ritmo es el de Acerca de (R1: secciones + hairline; R4: subtítulos callados) y las reglas del borde son las de la hoja 07 (aire de 24 + velo, borde derecho real de 12). Costo honesto: un panel de lista es menos denso que un tablero; si algún día entran más herramientas, la lista crece hacia abajo y ya está.</p>
+</div>
+
+<div class="sheet"><p class="cap">G1 · <b>Todo instalado</b> — 1280×800, General seleccionada y primera en el riel</p>
+<div class="wrap"><div class="frame"><div class="app">
+<div class="side">
+<div class="wm">Gentle Shell</div>
+<div class="neww">+ Nueva sesión</div>
+<div class="gh">Espacio de trabajo</div>
+<div class="row"><span>gentle-desk</span></div>
+<div class="row chat"><span>hola, que modelo eres</span></div>
+<div class="row chat"><span>HOLA QUE MODELO ERES</span></div>
+<div class="row"><span>Curriculum</span></div>
+<div class="row"><span>Kallari_Pagina_web</span></div>
+<div class="foot">Vista previa ⚙</div>
+</div>
+<div class="main">
+<div class="mh"><h2>Inicio</h2></div>
+<div class="dlg">
+<div class="dt">Ajustes</div>
+<div class="body">
+<div class="side2">
+<div class="find"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input placeholder="Buscar un ajuste..." readonly></div>
+<div class="rail" role="tablist" aria-label="Secciones">
+<div role="tab" aria-selected="true"><svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>General</div>
+<div role="tab"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18"/></svg>Apariencia</div>
+<div role="tab"><svg viewBox="0 0 24 24"><path d="M3 10h18M5 6h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2Z"/></svg>Home del shell</div>
+<div role="tab"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>Actualizaciones</div>
+<div role="tab"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg>Cuenta</div>
+<div role="tab"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="m7 14 4-4 3 3 5-6"/></svg>Uso</div>
+<div role="tab"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m7 9 4 3-4 3"/></svg>Idioma</div>
+<div role="tab"><svg viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>Notificaciones</div>
+<div role="tab"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/></svg>Acerca de</div>
+</div>
+</div>
+<div class="pane"><div class="pbody">
+<h3>General</h3>
+<p class="hint">Lo que esta app necesita en la máquina, y cómo se arregla lo que falta.</p>
+
+<div class="tool">
+<div class="thead"><span class="tname">Gentle Shell</span><span class="tag ok">Instalado</span></div>
+<p class="tver">4.9.0</p>
+</div>
+<div class="tool">
+<div class="thead"><span class="tname">pi</span><span class="tag ok">Instalado</span></div>
+<p class="tver">1.6.0</p>
+</div>
+<div class="tool">
+<div class="thead"><span class="tname">node</span><span class="tag ok">Instalado</span></div>
+<p class="tver">v24.11.1</p>
+</div>
+<div class="tool">
+<div class="thead"><span class="tname">git</span><span class="tag ok">Instalado</span></div>
+<p class="tver">2.51.0</p>
+</div>
+
+<div class="tcheck"><span>Última comprobación: hace 3m</span><button class="btn" type="button">Comprobar de nuevo</button></div>
+</div></div>
+</div>
+<div class="foot-row"><button class="btn" type="button">Cerrar</button></div>
+</div>
+</div></div></div>
+<figcaption class="figcap"><b>El estado bueno es callado:</b> nombre mono, etiqueta verde, versión mono. Sin pista: la pista solo aparece cuando falta o no se pudo leer (S2/S5). El riel estrena «General» <b>primero</b> (S1), con el ícono <code>activity</code> de la casa; Configuración abre ahí.</figcaption>
+</div>
+
+<div class="sheet"><p class="cap">G2 · <b>El tablero de estados</b> — tres tarjetas a tamaño real (860 de tarjeta)</p>
+<div class="board">
+<div class="dlg card-only" style="position:relative;left:auto;top:auto;transform:none">
+<div class="dt">Ajustes · General (recortado)</div>
+<div class="tool">
+<div class="thead"><span class="tname">node</span><span class="tag warn">Falta</span></div>
+<p class="twhy">Instálalo con <code>winget install OpenJS.NodeJS.LTS</code> y vuelve a comprobar. La app lo usa para el script de uso.</p>
+</div>
+<div class="tool">
+<div class="thead"><span class="tname">git</span><span class="tag bad">No se pudo leer</span></div>
+<p class="twhy">No se pudo leer la versión de <code>git</code>. Instálalo con <code>winget install Git.Git</code>. Sin git la app anda: solo faltan los chips de rama.</p>
+</div>
+<div class="tcheck"><span>Última comprobación: hace 3m</span><button class="btn" type="button">Comprobar de nuevo</button></div>
+</div>
+<div class="dlg card-only" style="position:relative;left:auto;top:auto;transform:none">
+<div class="dt">Ajustes · General (recortado)</div>
+<div class="tool">
+<div class="thead"><span class="tname">Gentle Shell</span><span class="tag warn">Comprobando...</span></div>
+<p class="tver">—</p>
+</div>
+<div class="tcheck"><span>Última comprobación: nunca</span><button class="btn" type="button" disabled>Comprobar de nuevo</button></div>
+</div>
+</div>
+<figcaption class="figcap"><b>Los dos estados que se confunden menos de lo que parece:</b> «Falta» (la sonda corrió y el ejecutable no está) y «No se pudo leer» (corrió y no contestó) son <b>palabras distintas</b> (S5), cada una con su pista. Git, además, lleva la frase de S6: sin git la app anda. Mientras comprueba, la etiqueta dice «Comprobando...», la versión queda «—» y «Comprobar de nuevo» se apaga. El panel corto (G1 con todo instalado) muestra aire abajo: es el costo del cuerpo alto, y es el mismo aire que ya se aprobó.</figcaption>
+</div>
+
+<div class="sheet"><p class="cap">G3 · <b>La ventana mínima</b> — 800×560: tarjeta 752, cuerpo 380, las mismas cuatro filas sin cortes</p>
+<div class="wrap"><div class="frame small"><div class="dlg sm">
+<div class="dt">Ajustes</div>
+<div class="body">
+<div class="side2">
+<div class="find"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input placeholder="Buscar un ajuste..." readonly></div>
+<div class="rail" role="tablist">
+<div role="tab" aria-selected="true"><svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>General</div>
+<div role="tab"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18"/></svg>Apariencia</div>
+<div role="tab"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>Actualizaciones</div>
+<div role="tab"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg>Cuenta</div>
+</div>
+</div>
+<div class="pane"><div class="pbody">
+<h3>General</h3>
+<p class="hint">Lo que esta app necesita en la máquina, y cómo se arregla lo que falta.</p>
+<div class="tool"><div class="thead"><span class="tname">Gentle Shell</span><span class="tag ok">Instalado</span></div><p class="tver">4.9.0</p></div>
+<div class="tool"><div class="thead"><span class="tname">pi</span><span class="tag ok">Instalado</span></div><p class="tver">1.6.0</p></div>
+<div class="tool"><div class="thead"><span class="tname">node</span><span class="tag ok">Instalado</span></div><p class="tver">v24.11.1</p></div>
+<div class="tool"><div class="thead"><span class="tname">git</span><span class="tag bad">No se pudo leer</span></div><p class="twhy">No se pudo leer la versión de <code>git</code>. Instálalo con <code>winget install Git.Git</code>. Sin git la app anda: solo faltan los chips de rama.</p></div>
+<div class="tcheck"><span>Última comprobación: hace 3m</span><button class="btn" type="button">Comprobar de nuevo</button></div>
+</div></div>
+</div>
+<div class="foot-row"><button class="btn" type="button">Cerrar</button></div>
+</div></div></div>
+<figcaption class="figcap"><b>En 752 de tarjeta las cuatro filas entran</b> y la pista de git lee completa; el velo de 24 cae sobre el aire y nunca sobre la última fila.</figcaption>
+</div>
+
+<div class="sheet"><p class="cap">G4 · <b>Las palabras, en los dos idiomas</b> (la implementación las copia verbatim)</p>
+<table class="metrics" style="width:1280px;margin:0 auto">
+<tr><th>ES</th><th>EN</th></tr>
+<tr><td>General</td><td>General</td></tr>
+<tr><td>Lo que esta app necesita en la máquina, y cómo se arregla lo que falta.</td><td>What this app needs on the machine, and how to fix what is missing.</td></tr>
+<tr><td>Instalado</td><td>Installed</td></tr>
+<tr><td>Falta</td><td>Missing</td></tr>
+<tr><td>No se pudo leer</td><td>Could not read</td></tr>
+<tr><td>Comprobando...</td><td>Checking...</td></tr>
+<tr><td>Instálalo con <code>…</code> y vuelve a comprobar.</td><td>Install it with <code>…</code> and check again.</td></tr>
+<tr><td>La app lo usa para el script de uso.</td><td>The app uses it for the usage script.</td></tr>
+<tr><td>No se pudo leer la versión de <code>git</code>.</td><td>The version of <code>git</code> could not be read.</td></tr>
+<tr><td>Sin git la app anda: solo faltan los chips de rama.</td><td>Without git the app still works: only the branch chips are missing.</td></tr>
+<tr><td>Última comprobación: hace 3m / nunca</td><td>Last checked: 3m ago / never</td></tr>
+<tr><td>Comprobar de nuevo</td><td>Check again</td></tr>
+</table>
+<figcaption class="figcap"><b>Las pistas nombran el comando exacto de cada pieza:</b> <code>npm install -g gentle-pi</code> (shell y, para pi, <code>pi update</code> o el npm de su fuente), <code>winget install OpenJS.NodeJS.LTS</code> (node), <code>winget install Git.Git</code> (git). Ninguna otra cosa se inventa (S3). <b>Clases nuevas (5):</b> <code>.tool</code>, <code>.thead</code>, <code>.tname</code>, <code>.tver</code>, <code>.twhy</code> + <code>.tcheck</code>. Todo lo demás es la casa: <code>.tag.ok/.warn/.bad</code>, <code>.btn</code>, <code>.quiet</code>, las hairlines de R1 y el riel del diálogo.</figcaption>
+</div>
+
+<div class="sheet"><p class="cap">Notas para el cableado (T2/T3)</p>
+<div class="head" style="margin-bottom:0">
+<p class="lede">1 · <b>El ícono:</b> la fila de General dibuja el <code>activity</code> que Uso ya usa; si prefieren un ícono propio, Lucide <code>settings2</code> es el candidato (una sola entrada más en <code>icons/shapes.ts</code>). 2 · <b>Abrir en General</b> (S1): la prueba de teclado del diálogo fija hoy «abre en Idioma» — el pin cambia a General. 3 · <b>Las búsquedas:</b> keywords ES/EN para el buscador (entorno, entorno/…: general, entorno, herramientas, tools, node, git, versión, version). 4 · <b>La sonda de node/git</b> corre en el mismo hilo bloqueante del snapshot, sin consola (el arreglo de las terminales), con el presupuesto de 8 s que <code>settings.rs::run</code> ya tiene; una sonda que falla es «No se pudo leer», nunca un panel roto. 5 · <b>git sin bloquear</b> (S6): su fila existe aunque la sonda falle; la app no toma caminos distintos por git. 6 · <b>Una lectura por apertura</b> (S4): «Comprobar de nuevo» re-corre las sondas una vez, igual que Actualizaciones.</p>
+</div>
+</div>
+
+</div></body></html>

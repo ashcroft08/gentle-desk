@@ -54,6 +54,23 @@ impl ChatId {
         (!path.is_empty()).then_some(path)
     }
 
+    /// The chat an id TEXT names, read through the scheme and nowhere else: the
+    /// round trip of an id this layer gave the UI (`foreground_chat`).
+    ///
+    /// A fresh chat ([`ChatId::fresh`]'s `new-N` form) answers ITSELF, so a chat
+    /// with no session file yet stays the very chat the shell opened - which is
+    /// what lets a command reach the host key that chat's child was started
+    /// under, instead of a session path that does not exist yet. The two live
+    /// stored forms ([`ChatId::of_session`]'s own text and the bare session path a
+    /// sidebar row sends) both answer the stored chat of that file. An id that
+    /// names nothing at all answers `None`, never a guess.
+    pub fn of_text(id: &str) -> Option<Self> {
+        if is_fresh(id) {
+            return Some(Self(id.to_owned()));
+        }
+        Self::session_path_of(id).map(Self::of_session)
+    }
+
     /// The id as text, the way the UI holds it.
     pub fn as_str(&self) -> &str {
         &self.0

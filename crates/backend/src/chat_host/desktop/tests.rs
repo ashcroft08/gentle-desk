@@ -97,6 +97,35 @@ fn ask_in_background(
 }
 
 #[test]
+fn a_request_that_names_its_own_deadline_is_bounded_by_it() {
+    // packages-status T4, S7: pi's `refresh: true` is bounded at 15 s by the
+    // shell, so the explicit check names its own bound instead of failing inside
+    // the channel's 5 s default. The named deadline is the one that is used, on a
+    // channel whose own default is untouched.
+    let (spawner, host) = live(true);
+    let child = spawner.child(&chat());
+    let channel = host.desktop_channel(chat());
+    let deadline = Duration::from_millis(50);
+
+    let asked = Instant::now();
+    let reply = DesktopChannel::exchange_within(&channel, &get_config(), deadline);
+    let bounded_for = asked.elapsed();
+
+    assert_eq!(reply, ChannelReply::Timeout);
+    assert!(
+        bounded_for < Duration::from_secs(1),
+        "the ask must be bounded by the deadline it NAMED, took {bounded_for:?}"
+    );
+    // The prompt was still written: the bound cuts the WAIT, never the request.
+    wait_for_commands(&child, 1);
+    assert_eq!(child.commands(), vec![get_config().command()]);
+    assert!(
+        lock(&host.desktop.waits).is_empty(),
+        "a timed-out exchange must leave no waiter behind"
+    );
+}
+
+#[test]
 fn the_prompt_reaches_the_child_and_its_widget_answers_it() {
     let (spawner, host) = live(true);
     let request = get_config();

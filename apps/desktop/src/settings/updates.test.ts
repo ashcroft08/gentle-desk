@@ -5,8 +5,11 @@
 // shell's being its own `upgrade` (S7). The pane's drawing is
 // UpdatesPane.test.ts's and the rows' is UpdateRows.test.ts's.
 import { describe, expect, it } from 'vitest'
-import type { UpdatesView_Serialize as UpdatesView } from '../contract/bindings'
-import { cardOf } from './updates'
+import type {
+  PackagesView_Serialize as PackagesView,
+  UpdatesView_Serialize as UpdatesView,
+} from '../contract/bindings'
+import { cardOf, packagesOf, updatesDrawn } from './updates'
 import { updatesCopy } from './updates-copy'
 
 /** The card's labels in English, read through the dictionary (0.2.0, D4). */
@@ -20,9 +23,16 @@ function updates(over: Partial<UpdatesView> = {}): UpdatesView {
     desk: { current: '0.1.12', latest: '0.1.12', update_available: false },
     pi: { current: '1.5.2', latest: '2.0.5', update_available: true },
     shell: { current: '4.8.0', latest: '4.9.2', update_available: true },
+
+    packages: { available: false, behind: [], unknown: false, truncated: false, unchecked: false, checked: null },
     checked_ms: 1_700_000_000_000,
     ...over,
   }
+}
+
+/** The Extensions block's slice: unasked unless a test says otherwise. */
+function packages(over: Partial<PackagesView> = {}): PackagesView {
+  return { available: false, behind: [], unknown: false, truncated: false, unchecked: false, checked: null, ...over }
 }
 
 /** The one row a test asks about, by the key the pane draws it under. */
@@ -183,6 +193,140 @@ describe('the Updates card', () => {
   it('carries when the rows were last read (S8, D11)', () => {
     expect(drawn(updates()).checkedMs).toBe(1_700_000_000_000)
     expect(drawn(updates({ checked_ms: undefined })).checkedMs).toBeNull()
+  })
+
+  it("dates the one line with the newest read, the rows or pi's own check", () => {
+    // packages-status T2: the packages slice carries pi's own check instant. When
+    // it is NEWER than the rows' read (the RPC read just ran) the one line says
+    // so; when it is older it adds nothing and the rows' instant still dates it.
+    const newer = 1_700_000_120_000
+    const older = 1_699_999_000_000
+    const rowsNewer = drawn(updates({ packages: packages({ available: true, checked: newer }) }))
+    const rowsOlder = drawn(updates({ packages: packages({ available: true, checked: older }) }))
+
+    expect(rowsNewer.checkedMs).toBe(newer)
+    expect(rowsOlder.checkedMs).toBe(1_700_000_000_000)
+    // A rows read that never landed leaves pi's instant as the only one there is.
+    const onlyPackages = drawn(updates({ checked_ms: undefined, packages: packages({ checked: newer }) }))
+    expect(onlyPackages.checkedMs).toBe(newer)
+    // Neither read has an instant: the line still says never, once.
+    expect(drawn(updates({ checked_ms: undefined })).checkedMs).toBeNull()
+  })
+
+  describe('the Extensions block (packages-status S1, S3)', () => {
+    it('names and counts every extension pi reports as behind', () => {
+      // Only `update_available` reads as behind in Rust, so whatever reaches this
+      // list is behind: the block counts it and draws each name (S1).
+      expect(
+        packagesOf(
+          packages({
+            available: true,
+            behind: [{ name: 'pi-hud', current: '0.3.1' }, { name: 'pi-tools' }],
+          }),
+        ),
+      ).toEqual({
+        state: 'behind',
+        count: 2,
+        rows: [
+          { name: 'pi-hud', version: '0.3.1' },
+          { name: 'pi-tools', version: null },
+        ],
+        unchecked: false,
+      })
+    })
+
+    it('says the extensions are up to date only when pi has checked every one', () => {
+      expect(packagesOf(packages({ available: true, unchecked: false }))).toEqual({
+        state: 'upToDate',
+      })
+    })
+
+    it('never reads a listing pi has not checked as up to date (S6, T6)', () => {
+      // `available: true` with nothing behind and one item still `unknown`: pi's
+      // own check never ran in that child, so an extension that IS behind would
+      // read as "al día" - the false claim this state exists to stop.
+      expect(packagesOf(packages({ available: true, unchecked: true }))).toEqual({
+        state: 'unchecked',
+      })
+    })
+
+    it('draws the behind list AND says it is not checked yet when both hold', () => {
+      // Some packages are known behind and another is still `unknown`: the list is
+      // drawn, and the line under it keeps the list from reading as complete.
+      expect(
+        packagesOf(
+          packages({
+            available: true,
+            unchecked: true,
+            behind: [{ name: 'pi-hud', current: '0.3.1' }],
+          }),
+        ),
+      ).toEqual({
+        state: 'behind',
+        count: 1,
+        rows: [{ name: 'pi-hud', version: '0.3.1' }],
+        unchecked: true,
+      })
+    })
+
+    it('never reads a read that could not run as up to date', () => {
+      // S1: a listing that did not answer says the read could not run.
+      expect(packagesOf(packages({ unknown: true }))).toEqual({ state: 'unreadable' })
+      // A listing that does not answer and is not marked unknown is unasked too:
+      // the block never guesses which of the two it is.
+      expect(packagesOf(packages())).toEqual({ state: 'unasked' })
+    })
+
+    it('is unasked when nothing asked: no chat open, or a shell without the read', () => {
+      // S3, S5: the honest state, never an empty "nothing is behind".
+      expect(packagesOf(null)).toEqual({ state: 'unasked' })
+    })
+  })
+
+  // packages-status T6 (S6, S7): the check the user asks for answers by PUSH, and
+  // the dialog's one load answered before it. The block draws the pushed slice
+  // only when that one is a FINISHED check and the snapshot's is not, so a check
+  // that finishes while Settings is open shows up without reopening - and a push
+  // pi has not checked never overwrites what the load already knows.
+  describe('the packages slice the dialog draws (S7)', () => {
+    const checked = (over: Partial<PackagesView> = {}) =>
+      packages({ available: true, unchecked: false, checked: 1_700_000_120_000, ...over })
+    const unchecked = () => packages({ available: true, unchecked: true })
+
+    it('keeps the snapshot when the push has nothing better', () => {
+      const snapshot = updates({ packages: checked() })
+      const pushed = updates({ packages: checked({ behind: [{ name: 'pi-hud' }] }) })
+
+      // Both are finished checks: the snapshot is the dialog's own answer.
+      expect(updatesDrawn(pushed, snapshot)).toBe(snapshot)
+    })
+
+    it("takes the push's packages when they are a finished check and the snapshot's are not", () => {
+      const snapshot = updates({ packages: unchecked() })
+      const pushed = updates({ packages: checked({ behind: [{ name: 'pi-hud', current: '0.3.1' }] }) })
+      const drawn = updatesDrawn(pushed, snapshot)
+
+      expect(drawn?.packages).toEqual(pushed.packages)
+      // Only the packages move: the rows are still the snapshot's.
+      expect(drawn?.pi).toEqual(snapshot.pi)
+      expect(drawn?.checked_ms).toBe(snapshot.checked_ms)
+    })
+
+    it('never takes a pushed slice pi has not checked', () => {
+      const snapshot = updates({ packages: unchecked() })
+      const pushed = updates({ packages: unchecked() })
+
+      expect(updatesDrawn(pushed, snapshot)).toBe(snapshot)
+      const bothUnchecked = updates({ packages: packages({ available: true, unchecked: true, behind: [{ name: 'pi-hud' }] }) })
+      expect(updatesDrawn(bothUnchecked, snapshot)?.packages).toEqual(snapshot.packages)
+    })
+
+    it('falls back to whichever slice there is, before the load answers', () => {
+      const pushed = updates({ packages: unchecked() })
+      expect(updatesDrawn(pushed, null)).toBe(pushed)
+      expect(updatesDrawn(null, pushed)).toBe(pushed)
+      expect(updatesDrawn(null, null)).toBeNull()
+    })
   })
 
   describe('the one skip (D9)', () => {

@@ -34,7 +34,10 @@ function bottomPadding(): number {
   const shorthand = /padding:\s*([^;]+);/.exec(declarations('.settings-pane'))
   expect(shorthand, 'the pane declares its padding as one shorthand').not.toBeNull()
   const parts = shorthand![1].trim().split(/\s+/)
-  // `4px 0 24px 4px`: four values are top / right / bottom / left.
+  // `4px 12px 24px 4px`: four values are top / right / bottom / left. The RIGHT
+  // edge is real: Windows 11's overlay scrollbar collapses the
+  // `scrollbar-gutter` to zero, so without it the content ran under the floating
+  // bar (the maintainer's 0.8.2 test: the plan glued to the edge).
   expect(parts, 'the pane names all four edges').toHaveLength(4)
   const bottom = /^(\d+)px$/.exec(parts[2])
   expect(bottom, 'the bottom edge is a px length').not.toBeNull()
@@ -56,7 +59,10 @@ describe('the end of a scrolling Settings pane', () => {
     expect(bottomPadding()).toBe(24)
     // PRESERVE: the two edges the rail does not already give are unchanged.
     const shorthand = /padding:\s*([^;]+);/.exec(declarations('.settings-pane'))!
-    expect(shorthand[1].trim()).toBe('4px 0 24px 4px')
+    expect(shorthand[1].trim()).toBe('4px 12px 24px 4px')
+    // The right edge is a px length the test can read, not a gutter it cannot:
+    // an overlay scrollbar makes `scrollbar-gutter` reserve nothing.
+    expect(/^12px$/.test(shorthand[1].trim().split(/\s+/)[1] ?? ''), 'the right edge is real air').toBe(true)
   })
 
   it('fades the last 24px, with the prefixed property WebView2 older than 120 needs', () => {

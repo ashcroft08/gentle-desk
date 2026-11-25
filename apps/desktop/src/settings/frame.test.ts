@@ -78,7 +78,7 @@ describe('the Settings frame the maintainer approved', () => {
     expect(declarations('.settings-side')).toMatch(/gap:\s*14px\s*;/)
 
     const pane = declarations('.settings-pane')
-    expect(pane).toMatch(/padding:\s*4px\s+0\s+24px\s+4px\s*;/)
+    expect(pane).toMatch(/padding:\s*4px\s+12px\s+24px\s+4px\s*;/)
     expect(pane).toMatch(/scrollbar-gutter:\s*stable\s*;/)
   })
 

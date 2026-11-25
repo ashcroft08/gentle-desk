@@ -25,6 +25,7 @@ pub(crate) fn apply(state: &mut AppState, intent: &Intent) -> Option<Effects> {
         Intent::EnsureStarted(chat) => Some(for_chat(ensure_started(state, chat))),
         Intent::RestartChat(chat) => Some(for_chat(open(state, chat.clone()))),
         Intent::CloseChat(chat) => Some(for_chat(close_chat(state, chat))),
+        Intent::CloseAllChats => Some(for_chat(close_all_chats(state))),
         Intent::SendPrompt(text) => send_prompt(state, text).map(for_chat),
         Intent::Abort => {
             // The Abort of a chat that only waits for a slot cancels its own
@@ -216,19 +217,64 @@ fn ensure_started(state: &mut AppState, chat: &ChatId) -> Vec<ChatCommand> {
 /// words ([`close_working`], the same sentence `chat_delete` refuses with): its
 /// child is mid-turn, and stopping it is the user's (S4), so the row menu asks
 /// for that first rather than pulling the child out from under the turn.
-///
-/// A chat this run never opened has no child to stop and no place to leave, so
-/// nothing at all happens - no command and no notice.
 fn close_chat(state: &mut AppState, chat: &ChatId) -> Vec<ChatCommand> {
+    match close_if_idle(state, chat) {
+        Some(commands) => commands,
+        None => {
+            let refusal = close_working(state.language());
+            push_notice(state, NoticeLevel::Warning, refusal);
+            Vec::new()
+        }
+    }
+}
+
+/// Closes EVERY open chat at once (close-chats T1, S2, S3), each one through the
+/// very close `CloseChat` takes ([`close_if_idle`]: the stop command, the removal
+/// from the open set, the closed set that keeps it closed and the foreground
+/// fallback), and with the same guard: a chat that is working is SKIPPED,
+/// silently. That is deliberate - the turn in flight is the user's to stop, and
+/// this action only closes what is not running - so a skipped chat answers no
+/// command, no notice and no change at all, and the caller reads the count the
+/// open set still holds (close-chats S3's sentence).
+///
+/// The order is the open set's own id order with the FOREGROUND chat LAST: closing
+/// a chat clears the foreground mark, so closing the one in front first would
+/// leave the view with no chat to draw while the others go. Last, the user keeps
+/// a chat in front for every step and the slice ends where a single close ends,
+/// with no foreground chat at all.
+fn close_all_chats(state: &mut AppState) -> Vec<ChatCommand> {
+    let mut commands = Vec::new();
+    for chat in closing_order(state) {
+        if let Some(close) = close_if_idle(state, &chat) {
+            commands.extend(close);
+        }
+    }
+    commands
+}
+
+/// The open chats of `state` in the order a bulk close takes them: a stable id
+/// order with the foreground chat last (see [`close_all_chats`]).
+fn closing_order(state: &AppState) -> Vec<ChatId> {
+    let foreground = state.chats.foreground().cloned();
+    let mut chats: Vec<ChatId> = state.chats.ids().into_iter().cloned().collect();
+    // `false` sorts first, so only the foreground entry moves to the end.
+    chats.sort_by_key(|chat| foreground.as_ref() == Some(chat));
+    chats
+}
+
+/// The close of one chat with its guard already answered: `None` when the chat
+/// is working, because which words say so - or nothing at all - is the caller's
+/// rule, and never a second copy of the close itself.
+fn close_if_idle(state: &mut AppState, chat: &ChatId) -> Option<Vec<ChatCommand>> {
     if state.chats.is_working(chat) {
-        let refusal = close_working(state.language());
-        push_notice(state, NoticeLevel::Warning, refusal);
-        return Vec::new();
+        return None;
     }
+    // A chat this run never opened has no child to stop and no place to leave,
+    // so it answers no command.
     if !state.chats.close(chat) {
-        return Vec::new();
+        return Some(Vec::new());
     }
-    vec![ChatCommand::CloseProcess { chat: chat.clone() }]
+    Some(vec![ChatCommand::CloseProcess { chat: chat.clone() }])
 }
 
 /// Sends a command to the foreground chat. `None` with none, so the single-chat

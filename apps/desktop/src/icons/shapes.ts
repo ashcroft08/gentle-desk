@@ -72,10 +72,15 @@ export type IconName =
   // The notifications pane's rail entry (notifications T4): Lucide's `bell`, the
   // dome and its clapper, exactly the shape the approved artboard draws.
   | 'bell'
+  // The General rail entry (0.9.0 general S1): Lucide's `activity`, the one
+  // polyline the approved artboard `08-general.html` draws first in the rail.
+  | 'activity'
   // The model chip's two dropdowns (0.1.11): Lucide's `chevron-down`.
   | 'chevronDown'
-  // The sidebar collapse toggle (responsive-sidebar S1): Lucide's `menu`.
-  | 'menu'
+  // The sidebar collapse toggle (responsive-sidebar S1): Lucide's `panel-left`
+  // since 0.9.0 - the window with its side column, which says what the button
+  // folds; the three lines of `menu` read as a menu, not as a panel.
+  | 'panel-left'
   // The composer dock's three (design/composer-dock): Lucide's `clock` for the
   // context rail, the approved artboard's four-point spark for the model select
   // and its ascending bars for the effort select.
@@ -108,8 +113,13 @@ export const ICON_SHAPES: Record<IconName, IconShape[]> = {
   x: [path('M18 6 6 18'), path('m6 6 12 12')],
   // The model chip's two dropdowns (0.1.11): Lucide's `chevron-down`.
   chevronDown: [path('m6 9 6 6 6-6')],
-  // The sidebar collapse toggle (responsive-sidebar S1): Lucide's `menu`.
-  menu: [path('M3 6h18'), path('M3 12h18'), path('M3 18h18')],
+  // The sidebar collapse toggle (responsive-sidebar S1): Lucide's `panel-left`,
+  // the rounded window as one outline path (the `rect` kind is the FILLED one) and
+  // the line that marks the column.
+  'panel-left': [
+    path('M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z'),
+    path('M9 3v18'),
+  ],
   // The helper thread's Back, 01b's `i-back` symbol.
   back: [path('m12 19-7-7 7-7'), path('M19 12H5')],
   // The footer theme control, 01a's `i-theme` symbol: a half-filled circle.
@@ -149,6 +159,9 @@ export const ICON_SHAPES: Record<IconName, IconShape[]> = {
     path('M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326'),
     path('M10.268 21a2 2 0 0 0 3.464 0'),
   ],
+  // The rail's General entry (0.9.0 general S1): Lucide's `activity`, the heartbeat
+  // line the approved artboard draws - one path, no circle.
+  activity: [path('M22 12h-4l-3 9L9 3l-3 9H2')],
   // The context rail's clock (design/composer-dock): Lucide's `clock`, the ring
   // and its two hands.
   clock: [circle(12, 12, 9), path('M12 7.5V12l3 2')],

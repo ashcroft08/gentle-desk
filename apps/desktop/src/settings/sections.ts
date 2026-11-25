@@ -25,9 +25,15 @@
 // where a term is one word - the matcher folds case and accents on both sides,
 // so the accents stay here for the reader.
 import type { IconName } from '../icons/shapes'
+import type { UpdatesView_Serialize as UpdatesView } from '../contract/bindings'
+import { updateWaiting } from '../update/dot'
 
-/** The eight sections, as the dialog names them. */
+/** The nine sections, as the dialog names them. */
 export type Section =
+  // The environment check (0.9.0 general S1): FIRST in the rail, and the section
+  // the dialog opens on. It asks what the machine has before anything else is
+  // asked, which is why it goes above the pane that changes what it reports.
+  | 'general'
   | 'appearance'
   | 'home'
   | 'updates'
@@ -46,8 +52,20 @@ export interface SectionEntry {
   keywords: readonly string[]
 }
 
-/** The rail, in the order the dialog draws it: Appearance comes first. */
+/** The rail, in the order the dialog draws it: General comes first (S1). */
 export const SECTIONS: SectionEntry[] = [
+  // The environment check (0.9.0 general S1, S2): the four tools the app and the
+  // shell depend on. Its glyph is Lucide's `activity`, the line the approved
+  // artboard draws first in the rail; the keywords are the words the page does
+  // not draw - the other language's, and the two tools' own names.
+  {
+    id: 'general',
+    icon: 'activity',
+    keywords: [
+      'general', 'environment', 'tools', 'node', 'git', 'pi', 'version', 'check',
+      'entorno', 'herramientas', 'versión', 'comprobación',
+    ],
+  },
   {
     id: 'appearance',
     icon: 'theme',
@@ -128,6 +146,7 @@ export const DEFAULT_SECTION: Section = SECTIONS[0].id
 
 /** The id of each rail entry, so the pane can name it with `aria-labelledby`. */
 export const TAB_IDS: Record<Section, string> = {
+  general: 'settings-tab-general',
   appearance: 'settings-tab-appearance',
   home: 'settings-tab-home',
   updates: 'settings-tab-updates',
@@ -175,4 +194,35 @@ export function sectionAfter(
     default:
       return null
   }
+}
+
+/**
+ * The id of the hidden line that says the rail's update in words (packages-status
+ * S8, T5): the one "Actualizaciones" entry DESCRIBES itself with it
+ * (`aria-describedby`) while something waits, so the news has a text channel that
+ * adds no word to the entry's own name - the name a user and a test look it up
+ * by, and the reason the phrase is not a span inside the entry.
+ */
+export const RAIL_NOTE_ID = 'settings-rail-note'
+
+/**
+ * The note a rail entry carries while something waits (packages-status S8, T5):
+ * the phrase the hidden line carries and the same answer that draws the dot
+ * beside the entry's word - one condition, so the mark and its description can
+ * never disagree.
+ *
+ * Only `updates` has anything to say. `updates` is the dialog's LIVE slice - the
+ * very expression the Updates pane draws - and the rule is `updateWaiting`
+ * (update/dot.ts), asked here rather than restated: the skip rule, the two rows
+ * and the packages slice stay that module's, so the rail and the gear promise
+ * exactly the same thing. Every other entry - and every state that is not a
+ * promise: unasked, unknown, up to date - answers `null`, which is no note and no
+ * dot.
+ */
+export function railNote(
+  id: Section,
+  updates: UpdatesView | null,
+  words: { updateWaiting: string },
+): string | null {
+  return id === 'updates' && updateWaiting(updates) ? words.updateWaiting : null
 }

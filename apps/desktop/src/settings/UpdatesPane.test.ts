@@ -9,7 +9,12 @@
 import '../test-support/dom-env'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, within } from '@testing-library/svelte'
-import type { UpdatesView_Serialize as UpdatesView } from '../contract/bindings'
+import { tick } from 'svelte'
+import type {
+  HomeChoiceView,
+  PackagesView_Serialize as PackagesView,
+  UpdatesView_Serialize as UpdatesView,
+} from '../contract/bindings'
 import { handlerArgs, resetTauriMock, setHandler } from '../test-support/tauri-mock'
 import UpdatesPane from './UpdatesPane.svelte'
 import { updatesCopy } from './updates-copy'
@@ -45,6 +50,8 @@ function updates(over: Partial<UpdatesView> = {}): UpdatesView {
     desk: { current: '0.1.12', latest: '0.1.12', update_available: false },
     pi: { current: '1.5.2', latest: '2.0.5', update_available: true },
     shell: { current: '4.8.0', latest: '4.9.2', update_available: true },
+
+    packages: { available: false, behind: [], unknown: false, truncated: false, unchecked: false, checked: null },
     checked_ms: CHECKED_MS,
     ...over,
   }
@@ -55,7 +62,21 @@ function current(): UpdatesView {
   return updates({
     pi: { current: '2.0.5', latest: '2.0.5', update_available: false },
     shell: { current: '4.9.2', latest: '4.9.2', update_available: false },
+
+    packages: { available: false, behind: [], unknown: false, truncated: false, unchecked: false, checked: null },
   })
+}
+
+/** The Extensions block's slice: unasked unless a test says otherwise. */
+function packages(over: Partial<PackagesView> = {}): PackagesView {
+  return { available: false, behind: [], unknown: false, truncated: false, unchecked: false, checked: null, ...over }
+}
+
+/** The Extensions block, the second group of the pane (D14). */
+function ext(pane: HTMLElement): HTMLElement {
+  const found = pane.querySelector('.card.ext')
+  if (!(found instanceof HTMLElement)) throw new Error('the pane drew no extensions block')
+  return found
 }
 
 /** One ask for the dialog's load, as the pane sends it. */
@@ -64,15 +85,23 @@ function ask(): () => void {
 }
 
 function draw(
-  view: UpdatesView = updates(),
+  view: UpdatesView | null = updates(),
   openChats = 0,
   refreshing = false,
   onRefresh: () => void = ask(),
+  home: HomeChoiceView | null = null,
 ): HTMLElement {
   const { container } = render(UpdatesPane, {
-    props: { updates: view, openChats, refreshing, onRefresh },
+    props: { updates: view, openChats, refreshing, onRefresh, home },
   })
   return container as HTMLElement
+}
+
+/** The command lines the pane draws, in the order they appear (updates-by-home S4). */
+function commands(pane: HTMLElement): string[] {
+  return [...pane.querySelectorAll('[data-command]')].map(
+    (line) => line.textContent?.trim() ?? '',
+  )
 }
 
 /** One row's element, by the key it is drawn under. */
@@ -260,6 +289,96 @@ describe('the Updates pane', () => {
     expect(handlerArgs('open_terminal')).toEqual([])
   })
 
+  // packages-status T6 (S6, S7): one press asks both - the dialog's one coalesced
+  // load AND pi's own explicit check, whose answer arrives by push. Nothing here
+  // waits for that answer: the pane keeps drawing what it has.
+  describe('the explicit extensions check (S7)', () => {
+    it('asks it on the same press, and says it in the Extensions block only', async () => {
+      // The command answers the slice as it stands; the result comes by push.
+      setHandler('check_packages', () => ({}))
+      const again = ask()
+      const { container, rerender } = render(UpdatesPane, {
+        props: { updates: updates(), openChats: 1, refreshing: false, onRefresh: again, home: null },
+      })
+      const pane = container as HTMLElement
+
+      await fireEvent.click(within(pane).getByRole('button', { name: copy.checkAgain }))
+
+      // Both asks: the one load, and pi's check. Neither waits on the other.
+      expect(again).toHaveBeenCalledTimes(1)
+      expect(handlerArgs('check_packages')).toHaveLength(1)
+      // The block says it is checking; the card of the three rows is untouched.
+      expect(ext(pane).textContent).toContain(copy.checking)
+      expect(pane.querySelectorAll(`.versions`)).toHaveLength(1)
+      expect(within(pane).getByText(copy.updateAvailable)).toBeTruthy()
+
+      // The answer arrives as the push: the block stops saying it is checking and
+      // draws the extension pi found.
+      await rerender({
+        updates: updates({
+          packages: packages({
+            available: true,
+            behind: [{ name: 'pi-hud', current: '0.3.1' }],
+          }),
+        }),
+        openChats: 1,
+        refreshing: false,
+        onRefresh: again,
+        home: null,
+      })
+      await tick()
+
+      expect(ext(pane).textContent).not.toContain(copy.checking)
+      expect(ext(pane).textContent).toContain(copy.packagesBehind(1))
+      expect(ext(pane).textContent).toContain('pi-hud')
+    })
+
+    it('claims no check while no chat is open, where nothing could answer', async () => {
+      setHandler('check_packages', () => ({}))
+      const again = ask()
+      const pane = draw(updates(), 0, false, again)
+
+      await fireEvent.click(within(pane).getByRole('button', { name: copy.checkAgain }))
+      await tick()
+
+      // The ask still leaves (the shell answers `Unasked` and touches nothing),
+      // and the block keeps its honest sentence rather than a promise of an answer.
+      expect(again).toHaveBeenCalledTimes(1)
+      expect(handlerArgs('check_packages')).toHaveLength(1)
+      expect(ext(pane).textContent).not.toContain(copy.checking)
+      expect(ext(pane).textContent).toContain(copy.extensionsNote)
+    })
+
+    it('stops saying it is checking when the ask was refused: nothing will arrive', async () => {
+      setHandler('check_packages', () => {
+        throw 'the shell is closing'
+      })
+      const again = ask()
+      const pane = draw(updates(), 1, false, again)
+
+      await fireEvent.click(within(pane).getByRole('button', { name: copy.checkAgain }))
+      await vi.waitFor(() => {
+        expect(ext(pane).textContent).not.toContain(copy.checking)
+      })
+      // A refused check says nothing of its own: the block draws what it already had.
+      expect(ext(pane).textContent).toContain(copy.extensionsNote)
+    })
+
+    it('draws the fifth state: a listing pi has not checked yet (S6)', () => {
+      const pane = draw(
+        updates({ packages: packages({ available: true, unchecked: true }) }),
+        1,
+      )
+
+      expect(within(ext(pane)).getByText(copy.packagesUnchecked)).toBeTruthy()
+      expect(ext(pane).textContent).not.toContain(copy.packagesUpToDate)
+      // The one action is untouched by the state of the read.
+      expect(
+        within(ext(pane)).getByRole('button', { name: copy.updateExtensions }),
+      ).toBeTruthy()
+    })
+  })
+
   it('offers Skip this version on the row whose version is the newest (D9)', async () => {
     const again = ask()
     const pane = draw(updates(), 0, false, again)
@@ -303,11 +422,231 @@ describe('the Updates pane', () => {
     expect(within(pane).queryByRole('button', { name: copy.skipVersion })).toBeNull()
     const stop = within(row(pane, 'shell')).getByRole('button', { name: copy.stopSkipping })
     expect(stop.classList.contains('accent')).toBe(false)
-    expect(row(pane, 'shell').querySelector('.reason')?.textContent).toBe(
+    // The shell's row also names the command its button runs (updates-by-home S4).
+    expect(row(pane, 'shell').querySelector('.reason:not([data-command])')?.textContent).toBe(
       copy.skippedNote('4.9.2'),
     )
     await fireEvent.click(stop)
     expect(handlerArgs('dispatch_intent')).toEqual([{ intent: { type: 'UnskipUpdate' } }])
     expect(again).toHaveBeenCalledTimes(1)
+  })
+
+  it('names and counts the extensions pi reports as behind, each on its own line', () => {
+    // packages-status S1: the count, and every name pi's own check reported - a
+    // quiet row each, with the version it runs when pi knows it.
+    const pane = draw(
+      updates({
+        packages: packages({
+          available: true,
+          behind: [{ name: 'pi-hud', current: '0.3.1' }, { name: 'pi-tools' }],
+        }),
+      }),
+    )
+    const block = ext(pane)
+    const rows = [...block.querySelectorAll('.urow')]
+
+    expect(within(block).getByText(copy.packagesBehind(2))).toBeTruthy()
+    expect(rows.map((each) => each.querySelector('.headline')?.textContent)).toEqual([
+      'pi-hud',
+      'pi-tools',
+    ])
+    expect(rows.map((each) => each.querySelector('.mono')?.textContent ?? null)).toEqual([
+      '0.3.1',
+      null,
+    ])
+    // Quiet rows of the block: no button of their own, and never the sentence
+    // that says this Gentle Shell cannot tell.
+    expect(block.querySelectorAll('.urow button')).toHaveLength(0)
+    expect(block.textContent).not.toContain(copy.extensionsNote)
+    // The block's one action is untouched by any of it.
+    expect(within(block).getByRole('button', { name: copy.updateExtensions })).toBeTruthy()
+  })
+
+  it('says the extensions are up to date only when the read could name them all', () => {
+    const upToDate = draw(updates({ packages: packages({ available: true }) }))
+    expect(within(ext(upToDate)).getByText(copy.packagesUpToDate)).toBeTruthy()
+    expect(ext(upToDate).textContent).not.toContain(copy.extensionsNote)
+
+    // S1: a read that ran and could not answer is never "up to date", and it
+    // names no extension.
+    const unreadable = draw(updates({ packages: packages({ unknown: true }) }))
+    expect(within(ext(unreadable)).getByText(copy.packagesUnreadable)).toBeTruthy()
+    expect(ext(unreadable).textContent).not.toContain(copy.packagesUpToDate)
+    expect(ext(unreadable).querySelectorAll('.urow')).toHaveLength(0)
+
+    // And neither is one that never ran (S3, S5).
+    const unasked = draw(updates())
+    expect(ext(unasked).textContent).not.toContain(copy.packagesUpToDate)
+    expect(ext(unasked).textContent).not.toContain(copy.packagesUnreadable)
+  })
+
+  it('keeps the honest sentence and names its condition when nothing asked', () => {
+    // S3: no chat open, and S5: a shell that does not advertise the read. Both
+    // arrive as the unasked value, and the block says what would make it possible.
+    for (const view of [updates(), null]) {
+      const block = ext(draw(view))
+      expect(block.textContent).toContain(copy.extensionsNote)
+      expect(within(block).getByText(copy.packagesNeedsSession)).toBeTruthy()
+      // Nothing is named, and no count is claimed.
+      expect(block.querySelectorAll('.urow')).toHaveLength(0)
+    }
+  })
+
+  it('says the read could not run, with the short clause and no interior', () => {
+    const block = ext(draw(updates({ packages: packages({ unknown: true }) })))
+
+    expect(block.textContent).toContain(copy.packagesUnreadable)
+    // The client's own message names addresses: nothing of it reaches the block.
+    expect(block.textContent).not.toMatch(/https?:|npmjs|\b[45]\d\d\b/)
+  })
+
+  it('dates its one last-checked line with the newest read, and never draws two', () => {
+    // packages-status T2: pi's own check just ran after the rows were read, so the
+    // one line says so.
+    const pane = draw(updates({ packages: packages({ available: true, checked: NOW_MS }) }))
+    expect(pane.querySelectorAll('.versions')).toHaveLength(1)
+    expect(pane.querySelector('.versions')?.textContent).toBe('Last checked: just now')
+
+    // An older packages instant adds nothing: the rows' read is the newest.
+    const older = draw(
+      updates({ packages: packages({ available: true, checked: CHECKED_MS - 60_000 }) }),
+    )
+    expect(older.querySelectorAll('.versions')).toHaveLength(1)
+    expect(older.querySelector('.versions')?.textContent).toBe('Last checked: 3m ago')
+  })
+
+  it('draws the exact command each action runs on the home the push chose', () => {
+    // updates-by-home S4: one quiet line under each button, for THIS home, so the
+    // home choice is never a surprise. The literals are Rust's table's (and its
+    // tests'), in the pane's own order: pi, Gentle Shell, then the extensions.
+    expect(commands(draw(updates(), 0, false, ask(), 'isolated'))).toEqual([
+      'gentle-shell update',
+      'gentle-shell upgrade',
+      'gentle-shell update --extensions',
+    ])
+    expect(commands(draw(updates(), 0, false, ask(), 'link'))).toEqual([
+      'pi update',
+      'pi install npm:gentle-pi@4.9.2',
+      'pi update --extensions',
+    ])
+    // A run that never chose reads as Separado, the way Rust unwraps it.
+    expect(commands(draw(updates(), 0, false, ask(), null))).toEqual([
+      'gentle-shell update',
+      'gentle-shell upgrade',
+      'gentle-shell update --extensions',
+    ])
+  })
+
+  it('never draws a guessed install: with no measured stable version it says so (S4)', () => {
+    const pane = draw(
+      updates({
+        shell: { current: '4.8.0', latest: '4.9.0-main.abc123', update_available: true },
+      }),
+      0,
+      false,
+      ask(),
+      'link',
+    )
+
+    expect(commands(pane)).toEqual(['pi update', copy.noStableLatest, 'pi update --extensions'])
+    // Neither `@latest` nor the other home's command stands in for it.
+    expect(pane.textContent).not.toContain('pi install')
+    expect(pane.textContent).not.toContain('gentle-shell upgrade')
+  })
+
+  it('draws each command as one quiet mono line, under its own action', () => {
+    const pane = draw(updates(), 0, false, ask(), 'link')
+    const lines = [...pane.querySelectorAll('[data-command]')]
+
+    expect(lines).toHaveLength(3)
+    for (const line of lines) {
+      // The pane's own quiet mono (`.reason mono`): no new look for this line.
+      expect(line.tagName).toBe('P')
+      expect(line.classList.contains('mono')).toBe(true)
+    }
+    expect(row(pane, 'pi').querySelector('[data-command]')?.textContent).toBe('pi update')
+    expect(row(pane, 'shell').querySelector('[data-command]')?.textContent).toBe(
+      'pi install npm:gentle-pi@4.9.2',
+    )
+    expect(ext(pane).querySelector('[data-command]')?.textContent).toBe('pi update --extensions')
+  })
+
+  it("draws the terminal's refusal as one quiet line under the action, and clears it", async () => {
+    const refusal = 'No stable version of gentle-pi was measured, so nothing was installed.'
+    setHandler('open_terminal', () => {
+      throw refusal
+    })
+    const pane = draw(
+      updates({
+        shell: { current: '4.8.0', latest: '4.9.0-main.abc123', update_available: true },
+      }),
+      0,
+      false,
+      ask(),
+      'link',
+    )
+
+    await fireEvent.click(within(pane).getByRole('button', { name: copy.updateShell }))
+    const line = within(pane).getByRole('status')
+    expect(line.textContent).toBe(refusal)
+    expect(line.classList.contains('quiet')).toBe(true)
+    // Under the rows whose buttons run those commands, in that card.
+    expect(pane.querySelector('.card.updates')?.contains(line)).toBe(true)
+
+    // The next press clears it, and an extensions refusal lands under its button.
+    setHandler('open_terminal', () => {
+      throw 'the extensions window could not open'
+    })
+    await fireEvent.click(within(pane).getByRole('button', { name: copy.updateExtensions }))
+    const moved = within(pane).getByRole('status')
+    expect(moved.textContent).toBe('the extensions window could not open')
+    expect(ext(pane).contains(moved)).toBe(true)
+    expect(pane.querySelector('.card.updates')?.contains(moved)).toBe(false)
+  })
+})
+
+// The gate's button (close-chats S1, S3, S4): the pane draws it while a chat is
+// open and not otherwise, with the working line only when some chat is mid-turn.
+describe('the Updates pane gate', () => {
+  /** The pane with `open` chats, `working` of them mid-turn. */
+  function gate(open: number, working: number): HTMLElement {
+    const { container } = render(UpdatesPane, {
+      props: { updates: updates(), openChats: open, workingChats: working },
+    })
+    return container as HTMLElement
+  }
+
+  it('offers the Close the chats button next to the sentence while a chat is open', () => {
+    const pane = gate(1, 0)
+
+    expect(within(pane).getByRole('button', { name: 'Close the chats' })).toBeTruthy()
+    expect(pane.querySelector('.gate')?.textContent).toBe(copy.gateHint(1))
+  })
+
+  it('draws neither the sentence nor the button once every chat is closed', () => {
+    const pane = gate(0, 0)
+
+    expect(within(pane).queryByRole('button', { name: 'Close the chats' })).toBeNull()
+    expect(pane.querySelector('.gate')).toBeNull()
+  })
+
+  it('says how many chats the button leaves open because they are mid-turn', () => {
+    const pane = gate(3, 2)
+
+    expect(pane.textContent).toContain(copy.chatsWorking(2))
+    expect(within(pane).getByRole('button', { name: 'Close the chats' })).toBeTruthy()
+  })
+
+  it('keeps the update buttons dead while any chat is open, and alive after', async () => {
+    const pane = gate(2, 0)
+    const update = within(pane).queryAllByRole('button').filter((button) => /update/i.test(button.textContent ?? ''))
+
+    // PRESERVE: the gate's own rule is untouched by the new button.
+    expect(update.length).toBeGreaterThan(0)
+    for (const button of update) expect((button as HTMLButtonElement).disabled).toBe(true)
+
+    const open = gate(0, 0)
+    const alive = within(open).queryAllByRole('button').filter((button) => /^update/i.test((button.textContent ?? '').trim()))
+    for (const button of alive) expect((button as HTMLButtonElement).disabled).toBe(false)
   })
 })

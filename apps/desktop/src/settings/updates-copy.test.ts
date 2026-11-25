@@ -33,7 +33,12 @@ const ENGLISH = {
   extensionsNote:
     'There is no way to tell which ones are behind with this Gentle Shell. Update extensions updates all of them, so this button is always offered and safe to use any time.',
   appUpdatesItself: 'This app updates itself: use the update banner at the top.',
+  noStableLatest: 'Without a measured stable version, nothing is installed.',
   checkedNever: 'Last checked: never',
+  packagesUpToDate: 'The extensions are up to date.',
+  packagesUnchecked: 'It has not been checked yet whether any extension has an update.',
+  packagesUnreadable: 'Could not check the extensions: pi did not answer.',
+  packagesNeedsSession: 'You can check it by opening a session.',
 }
 
 /** The Spanish words: neutral Spanish, accents allowed. */
@@ -57,7 +62,12 @@ const SPANISH = {
   extensionsNote:
     'No se puede saber cuáles están desactualizadas con este Gentle Shell. Actualizar extensiones las actualiza todas, así que este botón se ofrece siempre y es seguro usarlo en cualquier momento.',
   appUpdatesItself: 'Esta app se actualiza sola: usa el aviso de actualización de la parte superior.',
+  noStableLatest: 'Sin una versión estable medida, no se instala nada.',
   checkedNever: 'Última comprobación: nunca',
+  packagesUpToDate: 'Las extensiones están al día.',
+  packagesUnchecked: 'Todavía no se comprobó si hay extensiones por actualizar.',
+  packagesUnreadable: 'No se pudo revisar las extensiones: pi no respondió.',
+  packagesNeedsSession: 'Se puede revisar al abrir una sesión.',
 }
 
 const WORDS = Object.keys(ENGLISH) as (keyof typeof ENGLISH)[]
@@ -181,5 +191,71 @@ describe('the updates copy', () => {
       'Las actualizaciones necesitan todos los chats cerrados. 1 chat está abierto - Cerrar chat en el menú de su fila y los botones de actualización se activan.',
     )
     expect(spanish.gateHint(3)).toContain('3 chats están abiertos')
+  })
+
+  it('words the gate button and why it leaves some chats open (close-chats S1, S3)', () => {
+    const english = updatesCopy('en')
+    const spanish = updatesCopy('es')
+
+    expect(english.closeChats).toBe('Close the chats')
+    expect(spanish.closeChats).toBe('Cerrar los chats')
+    expect(english.chatsWorking(1)).toBe(
+      'One chat is still working: the button does not close it; stop it and try again.',
+    )
+    expect(english.chatsWorking(2)).toBe(
+      '2 chats are still working: the button does not close them; stop them and try again.',
+    )
+    expect(spanish.chatsWorking(1)).toBe(
+      'Un chat sigue trabajando: el botón no lo cierra; detenlo y vuelve a intentarlo.',
+    )
+    expect(spanish.chatsWorking(3)).toBe(
+      '3 chats siguen trabajando: el botón no los cierra; detenlos y vuelve a intentarlo.',
+    )
+  })
+  it('counts the extensions that are behind, one or many (packages-status S1)', () => {
+    const english = updatesCopy('en')
+    const spanish = updatesCopy('es')
+
+    // The plural-safe line: the number is the count, and both languages carry
+    // the singular of it.
+    expect(english.packagesBehind(1)).toBe('1 extension has an update available')
+    expect(english.packagesBehind(4)).toBe('4 extensions have an update available')
+    expect(spanish.packagesBehind(1)).toBe('1 extensión con actualización disponible')
+    expect(spanish.packagesBehind(4)).toBe('4 extensiones con actualización disponible')
+  })
+
+  it('never claims a read that did not run: the clause is the app\'s own', () => {
+    // The packages read carries no reason of its own, so the block says the short
+    // generic clause - never the client's message, never an address (S1, S4).
+    for (const language of ['en', 'es'] as const) {
+      const sentence = updatesCopy(language).packagesUnreadable
+      expect(sentence).not.toMatch(/https?:|\d{3}/)
+      expect(sentence.endsWith('.')).toBe(true)
+    }
+  })
+
+  // packages-status T6 (S6): the listing exists but pi's own check has not run for
+  // it, so the block says exactly that - never "al día", and never the failed
+  // read's clause either (nothing failed).
+  it('says the extensions have not been checked yet, in both languages', () => {
+    const english = updatesCopy('en')
+    const spanish = updatesCopy('es')
+
+    expect(english.packagesUnchecked).toBe(
+      'It has not been checked yet whether any extension has an update.',
+    )
+    expect(spanish.packagesUnchecked).toBe(
+      'Todavía no se comprobó si hay extensiones por actualizar.',
+    )
+    // Not the two claims it replaces: a machine nobody checked is neither up to
+    // date nor a read that could not run.
+    for (const language of ['en', 'es'] as const) {
+      expect(updatesCopy(language).packagesUnchecked).not.toBe(
+        updatesCopy(language).packagesUpToDate,
+      )
+      expect(updatesCopy(language).packagesUnchecked).not.toBe(
+        updatesCopy(language).packagesUnreadable,
+      )
+    }
   })
 })

@@ -15,7 +15,12 @@
 //!   home, running version, the open-chat gate and what became of the config
 //!   file), which costs no read at all;
 //! - the Account pane's auth view, the Usage pane's usage view and the Updates
-//!   pane's update view, each of which IS a read.
+//!   pane's update view, each of which IS a read;
+//! - the General pane's environment check (0.9.0 general T2, S2-S6): one row per
+//!   tool the app and the shell depend on. The shell's and pi's rows are the
+//!   versions read the Updates slice already made - the same one
+//!   `gentle-shell --version` run, never a second one - and node and git are the
+//!   load's only two extra bounded probes.
 //!
 //! What it deliberately does not carry: a chat's profiles, session mode or
 //! images. Those are per chat, they are read through that chat's own child, and
@@ -29,16 +34,19 @@
 //! reasons, exactly as `settings::auth_view` builds it.
 
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
 use gentle_core::i18n::Language;
+use gentle_runtime::chat_runtime::PackagesRead;
 
 use crate::contract::{
-    AuthView, LanguageView, NotificationsMode, ShellView, ThemeView, UpdatesView, UsageView,
+    AuthView, GeneralView, LanguageView, NotificationsMode, ShellView, ThemeView, UpdatesView,
+    UsageView,
 };
-use crate::settings::{self, FileRead, NodeProbe, ProviderProbe, VersionProbe, WebGet};
+use crate::settings::{self, FileRead, NodeProbe, ProviderProbe, ToolProbe, VersionProbe, WebGet};
 
 /// The half of the snapshot this run already holds in memory: the things the
 /// dialog draws that cost no read, taken from the slice the last push carried.
@@ -92,6 +100,17 @@ pub struct Reads {
     pub web: WebGet,
     /// One run of the usage sources' own script.
     pub node: NodeProbe,
+    /// One bounded `node --version` / `git --version` run each: the General
+    /// page's environment check (0.9.0 general T2, S3). One ask per tool per
+    /// load, never on the window's thread, because the whole gather is on a
+    /// blocking worker. The shell's and pi's rows are NOT asked here: they are the
+    /// versions read the Updates rows already made from the same load.
+    pub tools: ToolProbe,
+    /// The extensions read over ONE open chat's child (packages-status T1, S1-S5):
+    /// `Unasked` when no chat is open, so a load with nothing to ask touches no
+    /// host and starts no child. Called exactly once per load, which is the one
+    /// read the dialog open (and its "Check again") makes (S2).
+    pub packages: Arc<dyn Fn() -> PackagesRead + Send + Sync>,
     /// The version this run runs as, which the desk's row is compared against.
     pub desk_version: Option<String>,
     /// The desk's release manifest, named once at startup by the update check.
@@ -142,6 +161,16 @@ pub struct SettingsSnapshot {
     /// The subscription usage the shell's own sources report, or the reason they
     /// could not be read. Nothing here touches a chat.
     pub usage: UsageView,
+    /// The General page's environment check (0.9.0 general T2, S2-S6): one row per
+    /// tool the app and the shell depend on, state and version only, and the
+    /// instant this load read them.
+    ///
+    /// Additive and optional on the wire, like the Extensions block: a payload
+    /// written before this page existed reads as [`GeneralView::default`] - no
+    /// rows and no instant, "nothing was read yet" - which is never "nothing is
+    /// installed". This build always carries it as a VALUE.
+    #[serde(default)]
+    pub general: GeneralView,
 }
 
 /// Gathers one snapshot: the three reads, in the order the panes used to ask for
@@ -155,6 +184,40 @@ pub struct SettingsSnapshot {
 /// whole.
 pub fn gather(config: SettingsConfig, reads: &Reads) -> SettingsSnapshot {
     let skipped = config.skipped_update;
+    // The ONE instant this load is worded from (S4): the Updates rows' last-checked
+    // line and the environment check's own are the same reading of the clock, so
+    // the two pages can never disagree about when they last read the machine.
+    let now_ms = gentle_runtime::clock::now_ms();
+    // Whether this machine has the shell at all, which the environment check takes
+    // from the shell view instead of resolving the launcher a second time (S3).
+    let launcher_found = config.shell.launcher_found;
+    // The one chat's extensions, read ONCE here (S2): the ask blocks on the
+    // channel's own deadline, which is why the caller gathers off the window's
+    // thread, and `Unasked` costs nothing at all.
+    let packages = (reads.packages)();
+    // The Updates rows first: their two version rows ARE the environment check's
+    // shell and pi, from the one `gentle-shell --version` run of this load.
+    let updates = settings::updates_view(
+        reads.desk_version.as_deref(),
+        reads.desk_manifest.as_deref(),
+        &reads.web,
+        &reads.versions,
+        reads.language,
+        skipped.as_deref(),
+        // The dialog's own load IS a check, so its rows were read just now.
+        now_ms,
+        &packages,
+    );
+    // The environment check, from the versions read just above plus one bounded
+    // probe per tool that prints its own (S3). git's row exists whatever its
+    // probe answers (S6).
+    let general = settings::general_view(
+        &updates,
+        launcher_found,
+        &reads.tools,
+        reads.language,
+        now_ms,
+    );
     SettingsSnapshot {
         theme: config.theme,
         language: config.language,
@@ -169,22 +232,14 @@ pub fn gather(config: SettingsConfig, reads: &Reads) -> SettingsSnapshot {
             &reads.probe,
             reads.language,
         ),
-        updates: settings::updates_view(
-            reads.desk_version.as_deref(),
-            reads.desk_manifest.as_deref(),
-            &reads.web,
-            &reads.versions,
-            reads.language,
-            skipped.as_deref(),
-            // The dialog's own load IS a check, so its rows were read just now.
-            gentle_runtime::clock::now_ms(),
-        ),
+        updates,
         usage: settings::usage_view(
             &reads.files,
             reads.agent.as_deref(),
             &reads.node,
-            gentle_runtime::clock::now_ms(),
+            now_ms,
             reads.language,
         ),
+        general,
     }
 }

@@ -158,6 +158,18 @@ export const commands = {
 	 */
 	settingsSnapshot: () => typedError<SettingsSnapshot_Serialize, string>(__TAURI_INVOKE("settings_snapshot")),
 	/**
+	 *  The explicit extensions check (packages-status T4, S7): pi's own update check,
+	 *  run once over the chat in front's own child.
+	 * 
+	 *  It takes no argument: the bridge knows which chat is in front and which child
+	 *  to ask. It returns the slice as it stands and does NOT wait for the check - the
+	 *  ask names the check's own long deadline (the shell bounds its refresh at 15 s)
+	 *  and runs on a thread of its own, so the button that asked is answered at once
+	 *  and the result arrives as the `state-changed` push that carries it. With no
+	 *  chat open nothing runs at all, and the pane keeps its honest sentence.
+	 */
+	checkPackages: () => typedError<ViewState_Serialize, string>(__TAURI_INVOKE("check_packages")),
+	/**
 	 *  Opens a visible terminal window on `action`: the shell's profiles screen, its
 	 *  login or logout, or its own update.
 	 * 
@@ -1247,6 +1259,92 @@ export type FolderView = {
 };
 
 /**
+ *  The General page's slice (0.9.0 general S2-S6): the environment check's rows,
+ *  state only.
+ * 
+ *  One row per tool, in [`ToolKind`]'s own order, always all of them: git's row
+ *  exists whether or not git does (S6), so a failed probe is that row's state
+ *  and nothing else in the app takes a different path.
+ * 
+ *  The members are FACTS, never the tool's words: no path, no command line and
+ *  no raw stderr travels (S5). The web words the row and its fix hint from
+ *  [`ToolRow::state`] in both languages.
+ * 
+ *  [`Self::default`] - no rows, no instant - is what a payload from a build
+ *  without this page reads as: nothing was read yet, never "nothing is
+ *  installed".
+ */
+export type GeneralView = GeneralView_Serialize | GeneralView_Deserialize;
+
+/**
+ *  The General page's slice (0.9.0 general S2-S6): the environment check's rows,
+ *  state only.
+ * 
+ *  One row per tool, in [`ToolKind`]'s own order, always all of them: git's row
+ *  exists whether or not git does (S6), so a failed probe is that row's state
+ *  and nothing else in the app takes a different path.
+ * 
+ *  The members are FACTS, never the tool's words: no path, no command line and
+ *  no raw stderr travels (S5). The web words the row and its fix hint from
+ *  [`ToolRow::state`] in both languages.
+ * 
+ *  [`Self::default`] - no rows, no instant - is what a payload from a build
+ *  without this page reads as: nothing was read yet, never "nothing is
+ *  installed".
+ */
+export type GeneralView_Deserialize = {
+	/**  The environment check's rows, in [`ToolKind`]'s order. */
+	tools: ToolRow_Deserialize[],
+	/**
+	 *  When the load read the machine, in epoch milliseconds (S4): the dialog's
+	 *  ONE read per open is this check, and "Check again" on the page re-runs it
+	 *  once, so the page words its last-checked line from this and never from a
+	 *  clock of its own. It is the same instant the Updates rows carry, read
+	 *  from the same clock.
+	 * 
+	 *  `None` is a run that read nothing at all - the value of a payload written
+	 *  before this page existed. An `f64` for the same reason
+	 *  [`UpdatesView::checked_ms`] is: the generated bindings refuse a 64-bit
+	 *  integer on the wire, and a real millisecond count is exact in a double.
+	 */
+	checked_ms?: number | null,
+};
+
+/**
+ *  The General page's slice (0.9.0 general S2-S6): the environment check's rows,
+ *  state only.
+ * 
+ *  One row per tool, in [`ToolKind`]'s own order, always all of them: git's row
+ *  exists whether or not git does (S6), so a failed probe is that row's state
+ *  and nothing else in the app takes a different path.
+ * 
+ *  The members are FACTS, never the tool's words: no path, no command line and
+ *  no raw stderr travels (S5). The web words the row and its fix hint from
+ *  [`ToolRow::state`] in both languages.
+ * 
+ *  [`Self::default`] - no rows, no instant - is what a payload from a build
+ *  without this page reads as: nothing was read yet, never "nothing is
+ *  installed".
+ */
+export type GeneralView_Serialize = {
+	/**  The environment check's rows, in [`ToolKind`]'s order. */
+	tools: ToolRow_Serialize[],
+	/**
+	 *  When the load read the machine, in epoch milliseconds (S4): the dialog's
+	 *  ONE read per open is this check, and "Check again" on the page re-runs it
+	 *  once, so the page words its last-checked line from this and never from a
+	 *  clock of its own. It is the same instant the Updates rows carry, read
+	 *  from the same clock.
+	 * 
+	 *  `None` is a run that read nothing at all - the value of a payload written
+	 *  before this page existed. An `f64` for the same reason
+	 *  [`UpdatesView::checked_ms`] is: the generated bindings refuse a 64-bit
+	 *  integer on the wire, and a real millisecond count is exact in a double.
+	 */
+	checked_ms?: number | null,
+};
+
+/**
  *  One card of the helpers panel, flattened for display: what the iced panel
  *  draws for a task (`crates/ui/src/view/helpers.rs`) and nothing more. The
  *  helper's thread is NOT here - the said/thought/ran view is T7b-2 - so the
@@ -1722,6 +1820,198 @@ export type OrchestratorModeView =
  */
 "organic" | "full-delegation";
 
+/**
+ *  One extension pi's own update check says is behind (packages-status T1, S1):
+ *  the shell's own display name and the version it runs. Never a raw source, a
+ *  path or a scope (S4), and never `latest`, which is always null today.
+ */
+export type PackagesBehindView = PackagesBehindView_Serialize | PackagesBehindView_Deserialize;
+
+/**
+ *  One extension pi's own update check says is behind (packages-status T1, S1):
+ *  the shell's own display name and the version it runs. Never a raw source, a
+ *  path or a scope (S4), and never `latest`, which is always null today.
+ */
+export type PackagesBehindView_Deserialize = {
+	name: string,
+	/**  The version installed, when pi's check reports one. */
+	current?: string | null,
+};
+
+/**
+ *  One extension pi's own update check says is behind (packages-status T1, S1):
+ *  the shell's own display name and the version it runs. Never a raw source, a
+ *  path or a scope (S4), and never `latest`, which is always null today.
+ */
+export type PackagesBehindView_Serialize = {
+	name: string,
+	/**  The version installed, when pi's check reports one. */
+	current?: string,
+};
+
+/**
+ *  The Updates pane's Extensions block (packages-status T1, S1-S5): which
+ *  extensions pi's own check reports as behind, and what this app could learn.
+ * 
+ *  The members are DERIVED, never the child's own words: only
+ *  `update_available` reads as behind ([`Self::behind`]), while
+ *  `no_update_reported`, `skipped`, `unknown` and any state this build has not
+ *  learned never do.
+ * 
+ *  `unknown` is a read that ran and could not produce a listing - the child said
+ *  `available: false`, its answer carried no packages slice, or no answer came
+ *  at all - so the block says the read could not run and never "up to date"
+ *  (S1).
+ * 
+ *  `unchecked` is the OTHER fact, and the one 0.9.0 had to add (S6): the child
+ *  produced a listing, but pi's own check has not run for every extension in it.
+ *  The shell reports a package as `update_available` only after its own check
+ *  ran and reports every checkable package as `unknown` until it does, so
+ *  `available: true` with nothing behind is a machine nobody has checked - not a
+ *  machine that is up to date. "Up to date" is only ever `available: true`,
+ *  `unchecked: false` and an empty `behind`; a machine with one package behind
+ *  AND one pi has not checked carries both, and `skipped` items alone leave the
+ *  listing checked (they are not checkable).
+ * 
+ *  [`Self::default`] is [`Self::unasked`], the value a block draws as its honest
+ *  sentence (S3) and what an older shell that does not advertise the method
+ *  degrades to (S5). It travels as a VALUE, never as an absence that could be
+ *  read as "nothing is behind".
+ */
+export type PackagesView = PackagesView_Serialize | PackagesView_Deserialize;
+
+/**
+ *  The Updates pane's Extensions block (packages-status T1, S1-S5): which
+ *  extensions pi's own check reports as behind, and what this app could learn.
+ * 
+ *  The members are DERIVED, never the child's own words: only
+ *  `update_available` reads as behind ([`Self::behind`]), while
+ *  `no_update_reported`, `skipped`, `unknown` and any state this build has not
+ *  learned never do.
+ * 
+ *  `unknown` is a read that ran and could not produce a listing - the child said
+ *  `available: false`, its answer carried no packages slice, or no answer came
+ *  at all - so the block says the read could not run and never "up to date"
+ *  (S1).
+ * 
+ *  `unchecked` is the OTHER fact, and the one 0.9.0 had to add (S6): the child
+ *  produced a listing, but pi's own check has not run for every extension in it.
+ *  The shell reports a package as `update_available` only after its own check
+ *  ran and reports every checkable package as `unknown` until it does, so
+ *  `available: true` with nothing behind is a machine nobody has checked - not a
+ *  machine that is up to date. "Up to date" is only ever `available: true`,
+ *  `unchecked: false` and an empty `behind`; a machine with one package behind
+ *  AND one pi has not checked carries both, and `skipped` items alone leave the
+ *  listing checked (they are not checkable).
+ * 
+ *  [`Self::default`] is [`Self::unasked`], the value a block draws as its honest
+ *  sentence (S3) and what an older shell that does not advertise the method
+ *  degrades to (S5). It travels as a VALUE, never as an absence that could be
+ *  read as "nothing is behind".
+ */
+export type PackagesView_Deserialize = {
+	/**
+	 *  Whether pi's check produced a listing at all: the child's own
+	 *  `available`, and `false` for every read that did not answer.
+	 */
+	available: boolean,
+	/**
+	 *  The extensions pi reports as behind, in its own order, each with its own
+	 *  display name (the block counts them, S1).
+	 */
+	behind: PackagesBehindView_Deserialize[],
+	/**
+	 *  A read that ran and could not produce a listing: the block says the read
+	 *  could not run, never "up to date" (S1).
+	 */
+	unknown: boolean,
+	/**
+	 *  Whether pi's own check has NOT run for the whole listing (packages-status
+	 *  T4, S6): `available` and at least one item still `unknown`. It is its own
+	 *  state with its own words - "not checked yet" - never "up to date" (the
+	 *  claim this field exists to stop) and never "the read could not run"
+	 *  either: nothing failed, the check simply has not run.
+	 */
+	unchecked: boolean,
+	/**
+	 *  Whether the listing is cut by the contract's own bound, so the block can
+	 *  say there are more than it draws.
+	 */
+	truncated: boolean,
+	/**
+	 *  When pi's check last read the machine, in epoch milliseconds, when the
+	 *  child reports one. `None` is a child that does not report it, never a
+	 *  clock of this app's.
+	 */
+	checked?: number | null,
+};
+
+/**
+ *  The Updates pane's Extensions block (packages-status T1, S1-S5): which
+ *  extensions pi's own check reports as behind, and what this app could learn.
+ * 
+ *  The members are DERIVED, never the child's own words: only
+ *  `update_available` reads as behind ([`Self::behind`]), while
+ *  `no_update_reported`, `skipped`, `unknown` and any state this build has not
+ *  learned never do.
+ * 
+ *  `unknown` is a read that ran and could not produce a listing - the child said
+ *  `available: false`, its answer carried no packages slice, or no answer came
+ *  at all - so the block says the read could not run and never "up to date"
+ *  (S1).
+ * 
+ *  `unchecked` is the OTHER fact, and the one 0.9.0 had to add (S6): the child
+ *  produced a listing, but pi's own check has not run for every extension in it.
+ *  The shell reports a package as `update_available` only after its own check
+ *  ran and reports every checkable package as `unknown` until it does, so
+ *  `available: true` with nothing behind is a machine nobody has checked - not a
+ *  machine that is up to date. "Up to date" is only ever `available: true`,
+ *  `unchecked: false` and an empty `behind`; a machine with one package behind
+ *  AND one pi has not checked carries both, and `skipped` items alone leave the
+ *  listing checked (they are not checkable).
+ * 
+ *  [`Self::default`] is [`Self::unasked`], the value a block draws as its honest
+ *  sentence (S3) and what an older shell that does not advertise the method
+ *  degrades to (S5). It travels as a VALUE, never as an absence that could be
+ *  read as "nothing is behind".
+ */
+export type PackagesView_Serialize = {
+	/**
+	 *  Whether pi's check produced a listing at all: the child's own
+	 *  `available`, and `false` for every read that did not answer.
+	 */
+	available: boolean,
+	/**
+	 *  The extensions pi reports as behind, in its own order, each with its own
+	 *  display name (the block counts them, S1).
+	 */
+	behind: PackagesBehindView_Serialize[],
+	/**
+	 *  A read that ran and could not produce a listing: the block says the read
+	 *  could not run, never "up to date" (S1).
+	 */
+	unknown: boolean,
+	/**
+	 *  Whether pi's own check has NOT run for the whole listing (packages-status
+	 *  T4, S6): `available` and at least one item still `unknown`. It is its own
+	 *  state with its own words - "not checked yet" - never "up to date" (the
+	 *  claim this field exists to stop) and never "the read could not run"
+	 *  either: nothing failed, the check simply has not run.
+	 */
+	unchecked: boolean,
+	/**
+	 *  Whether the listing is cut by the contract's own bound, so the block can
+	 *  say there are more than it draws.
+	 */
+	truncated: boolean,
+	/**
+	 *  When pi's check last read the machine, in epoch milliseconds, when the
+	 *  child reports one. `None` is a child that does not report it, never a
+	 *  clock of this app's.
+	 */
+	checked?: number | null,
+};
+
 /**  How one provider's `auth check` stands: the four states the shell reports. */
 export type ProviderStatusView = "Ready" | "NotReady" | 
 /**
@@ -2030,6 +2320,17 @@ export type SettingsSnapshot_Deserialize = {
 	 *  could not be read. Nothing here touches a chat.
 	 */
 	usage: UsageView_Deserialize,
+	/**
+	 *  The General page's environment check (0.9.0 general T2, S2-S6): one row per
+	 *  tool the app and the shell depend on, state and version only, and the
+	 *  instant this load read them.
+	 * 
+	 *  Additive and optional on the wire, like the Extensions block: a payload
+	 *  written before this page existed reads as [`GeneralView::default`] - no
+	 *  rows and no instant, "nothing was read yet" - which is never "nothing is
+	 *  installed". This build always carries it as a VALUE.
+	 */
+	general?: GeneralView_Deserialize,
 };
 
 /**
@@ -2093,6 +2394,17 @@ export type SettingsSnapshot_Serialize = {
 	 *  could not be read. Nothing here touches a chat.
 	 */
 	usage: UsageView_Serialize,
+	/**
+	 *  The General page's environment check (0.9.0 general T2, S2-S6): one row per
+	 *  tool the app and the shell depend on, state and version only, and the
+	 *  instant this load read them.
+	 * 
+	 *  Additive and optional on the wire, like the Extensions block: a payload
+	 *  written before this page existed reads as [`GeneralView::default`] - no
+	 *  rows and no instant, "nothing was read yet" - which is never "nothing is
+	 *  installed". This build always carries it as a VALUE.
+	 */
+	general: GeneralView_Serialize,
 };
 
 /**
@@ -2429,6 +2741,94 @@ export type ToolCallItemView_Serialize = {
 };
 
 /**
+ *  One tool the app and the shell depend on, as the General page's environment
+ *  check draws it (0.9.0 general S2).
+ * 
+ *  The order of the members IS the order of the rows: the shell first, the pi it
+ *  runs second, then the two tools the shell's own work needs. The web draws the
+ *  name, the words and the fix hint (S5); nothing of that is on the wire.
+ */
+export type ToolKind = 
+/**  `gentle-shell`, resolved through the launcher. */
+"GentleShell" | 
+/**  The `pi` the shell runs, named by the same `--version` run. */
+"Pi" | 
+/**  `node`, which the usage sources' script needs. */
+"Node" | 
+/**  `git`, which the folder chips read branch names with (S6). */
+"Git";
+
+/**
+ *  One row of the environment check (0.9.0 general S2): the tool, how it
+ *  stands, and the version it printed when it printed one.
+ * 
+ *  Never a command line, never a path and never a tool's raw output (S5): the
+ *  version is the token the tool itself printed (`v24.11.1`, `2.51.0`), and the
+ *  fix hint the row draws is the web's own words for the state, not a message of
+ *  this app's machine.
+ */
+export type ToolRow = ToolRow_Serialize | ToolRow_Deserialize;
+
+/**
+ *  One row of the environment check (0.9.0 general S2): the tool, how it
+ *  stands, and the version it printed when it printed one.
+ * 
+ *  Never a command line, never a path and never a tool's raw output (S5): the
+ *  version is the token the tool itself printed (`v24.11.1`, `2.51.0`), and the
+ *  fix hint the row draws is the web's own words for the state, not a message of
+ *  this app's machine.
+ */
+export type ToolRow_Deserialize = {
+	tool: ToolKind,
+	state: ToolState,
+	/**
+	 *  The version the tool printed, when it printed one: `None` for every row
+	 *  that is not [`ToolState::Installed`], and never an empty string.
+	 */
+	version?: string | null,
+};
+
+/**
+ *  One row of the environment check (0.9.0 general S2): the tool, how it
+ *  stands, and the version it printed when it printed one.
+ * 
+ *  Never a command line, never a path and never a tool's raw output (S5): the
+ *  version is the token the tool itself printed (`v24.11.1`, `2.51.0`), and the
+ *  fix hint the row draws is the web's own words for the state, not a message of
+ *  this app's machine.
+ */
+export type ToolRow_Serialize = {
+	tool: ToolKind,
+	state: ToolState,
+	/**
+	 *  The version the tool printed, when it printed one: `None` for every row
+	 *  that is not [`ToolState::Installed`], and never an empty string.
+	 */
+	version?: string,
+};
+
+/**
+ *  How one tool of the environment check stands (0.9.0 general S2, S5).
+ * 
+ *  `Missing` and `Unreadable` are two different facts and two different words:
+ *  the tool is not on this machine at all, or it is there and did not answer
+ *  with a version. The web never sees one drawn as the other.
+ */
+export type ToolState = 
+/**  The tool answered with a version. */
+"Installed" | 
+/**
+ *  The tool is not there: nothing resolved the launcher, or the program was
+ *  not found when it was started.
+ */
+"Missing" | 
+/**
+ *  The tool ran and printed nothing this app can read as a version (a
+ *  non-zero exit, no answer inside its budget, or words that are not one).
+ */
+"Unreadable";
+
+/**
  *  How one tool call of a helper's thread stands. The two booleans the helper
  *  state carries are folded into these three by
  *  [`gentle_runtime::helper_text::format::tool_status`]; the WORD each state is
@@ -2559,6 +2959,16 @@ export type UiIntent_Deserialize = { type: "SendPrompt"; data: {
 { type: "CloseChat"; data: {
 	chat_id: string,
 } } | 
+/**
+ *  Close EVERY open chat at once (close-chats S2, S3): each chat is closed
+ *  through exactly what [`UiIntent::CloseChat`] does for it - its child is
+ *  stopped and it leaves the open set the Updates pane's gate counts, while
+ *  nothing on disk changes and the session list keeps its rows. A chat that
+ *  is working is SKIPPED silently: closing it is refused by the same rule
+ *  `CloseChat` refuses with (stopping a turn is the user's), so the count
+ *  only reaches zero once nothing is running any more.
+ */
+{ type: "CloseAllChats" } | 
 /**
  *  Copy one message's raw markdown: the message is named by the id the
  *  thread was given ([`MessageView::id`]), and the copy itself is the
@@ -2916,6 +3326,16 @@ export type UiIntent_Serialize = { type: "SendPrompt"; data: {
 	chat_id: string,
 } } | 
 /**
+ *  Close EVERY open chat at once (close-chats S2, S3): each chat is closed
+ *  through exactly what [`UiIntent::CloseChat`] does for it - its child is
+ *  stopped and it leaves the open set the Updates pane's gate counts, while
+ *  nothing on disk changes and the session list keeps its rows. A chat that
+ *  is working is SKIPPED silently: closing it is refused by the same rule
+ *  `CloseChat` refuses with (stopping a turn is the user's), so the count
+ *  only reaches zero once nothing is running any more.
+ */
+{ type: "CloseAllChats" } | 
+/**
  *  Copy one message's raw markdown: the message is named by the id the
  *  thread was given ([`MessageView::id`]), and the copy itself is the
  *  shell's side effect, never the view's.
@@ -3255,6 +3675,16 @@ export type UpdatesView_Deserialize = {
 	 *  one.
 	 */
 	shell: VersionRowView_Deserialize,
+	/**
+	 *  The extensions pi's own update check reports (packages-status T1, S1-S5):
+	 *  which are behind, and what this app could learn.
+	 * 
+	 *  Additive and optional on the wire: a payload without it reads as
+	 *  [`PackagesView::unasked`], which is exactly the block today's builds
+	 *  draw. This build always carries it as a VALUE, so an unanswered read is
+	 *  never an absence that could look like "nothing is behind".
+	 */
+	packages?: PackagesView_Deserialize,
 };
 
 /**
@@ -3308,6 +3738,16 @@ export type UpdatesView_Serialize = {
 	 *  one.
 	 */
 	shell: VersionRowView_Serialize,
+	/**
+	 *  The extensions pi's own update check reports (packages-status T1, S1-S5):
+	 *  which are behind, and what this app could learn.
+	 * 
+	 *  Additive and optional on the wire: a payload without it reads as
+	 *  [`PackagesView::unasked`], which is exactly the block today's builds
+	 *  draw. This build always carries it as a VALUE, so an unanswered read is
+	 *  never an absence that could look like "nothing is behind".
+	 */
+	packages: PackagesView_Serialize,
 };
 
 /**

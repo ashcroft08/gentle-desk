@@ -20,6 +20,9 @@ const ENGLISH = {
   searchLabel: 'Find a setting',
   searchPlaceholder: 'Find a setting…',
   noMatches: 'No settings match.',
+  // The rail's update dot said in words (packages-status S8): the entry's own
+  // description, since the entry's NAME must stay the word it has always been.
+  updateWaiting: 'An update is available',
   themeGroup: 'Theme',
   homeExplain:
     'My pi uses the pi installation already on the machine: sign-ins, local models and chats appear in the terminal. Separate creates a clean space at ~/.gentle-shell/agent and touches nothing else.',
@@ -39,6 +42,7 @@ const SPANISH = {
   searchLabel: 'Buscar un ajuste',
   searchPlaceholder: 'Buscar un ajuste…',
   noMatches: 'Ningún ajuste coincide.',
+  updateWaiting: 'Hay una actualización disponible',
   themeGroup: 'Tema',
   homeExplain:
     'Mi pi usa la instalación de pi que ya está en la máquina: los inicios de sesión, los modelos locales y los chats aparecen en la terminal. Separado crea un espacio limpio en ~/.gentle-shell/agent y no toca nada más.',
@@ -51,6 +55,8 @@ const SPANISH = {
 
 /** Each section's word in the rail and its one-line hint, per language. */
 const ENGLISH_TITLES: Record<Section, string> = {
+  // General opens the rail in 0.9.0 (general S1): the environment check.
+  general: 'General',
   appearance: 'Appearance',
   home: 'Shell home',
   updates: 'Updates',
@@ -62,6 +68,7 @@ const ENGLISH_TITLES: Record<Section, string> = {
 }
 
 const SPANISH_TITLES: Record<Section, string> = {
+  general: 'General',
   appearance: 'Apariencia',
   home: 'Home del shell',
   updates: 'Actualizaciones',
@@ -73,6 +80,8 @@ const SPANISH_TITLES: Record<Section, string> = {
 }
 
 const ENGLISH_HINTS: Record<Section, string> = {
+  // Verbatim from the approved artboard's G4 table (0.9.0 general S2).
+  general: 'What this app needs on the machine, and how to fix what is missing.',
   appearance: 'The look of this window.',
   home: 'Which pi this shell runs on.',
   updates: 'What this machine runs, and whether something newer is out.',
@@ -84,6 +93,7 @@ const ENGLISH_HINTS: Record<Section, string> = {
 }
 
 const SPANISH_HINTS: Record<Section, string> = {
+  general: 'Lo que esta app necesita en la máquina, y cómo se arregla lo que falta.',
   appearance: 'El aspecto de esta ventana.',
   home: 'En qué pi corre este shell.',
   updates: 'Lo que corre en esta máquina y si hay algo más nuevo.',
@@ -99,6 +109,13 @@ const WORDS = Object.keys(ENGLISH) as (keyof typeof ENGLISH)[]
 
 /** The app's own NAME is the same in both languages: a name is never translated. */
 const SAME_IN_BOTH = new Set<keyof typeof ENGLISH>(['appName'])
+
+/**
+ * A section whose WORD is the same in both languages. General is one: the G4
+ * table spells it `General` in the two columns (0.9.0 general S1), and a rail
+ * entry the two languages agree on is a name, not a translation that was missed.
+ */
+const SAME_TITLE = new Set<Section>(['general'])
 
 /** The words of one language, as a template reads them. */
 function words(language: 'en' | 'es'): Record<string, string> {
@@ -138,7 +155,11 @@ describe('the settings copy', () => {
       expect(spanish[word], word).not.toBe(english[word])
     }
     for (const section of Object.keys(english.titles) as Section[]) {
-      expect(spanish.titles[section], `the title of ${section}`).not.toBe(english.titles[section])
+      if (SAME_TITLE.has(section)) {
+        expect(spanish.titles[section], `the title of ${section}`).toBe(english.titles[section])
+      } else {
+        expect(spanish.titles[section], `the title of ${section}`).not.toBe(english.titles[section])
+      }
       expect(spanish.hints[section], `the hint of ${section}`).not.toBe(english.hints[section])
     }
   })

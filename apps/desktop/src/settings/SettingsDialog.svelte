@@ -57,21 +57,18 @@
   import HomeSetting from '../sidebar/HomeSetting.svelte'
   import AccountPane from './AccountPane.svelte'
   import AboutPane from './AboutPane.svelte'
+  import GeneralPane from './GeneralPane.svelte'
   import LanguagePane from './LanguagePane.svelte'
   import NotificationsPane from './NotificationsPane.svelte'
+  import RailDot from './RailDot.svelte'
   import ThemeCards from './ThemeCards.svelte'
   import UpdatesPane from './UpdatesPane.svelte'
   import UsagePane from './UsagePane.svelte'
   import { settingsCopy } from './copy'
   import { visibleSections } from './search'
   import { createSettingsRead } from './snapshot.svelte'
-  import {
-    DEFAULT_SECTION,
-    PANEL_ID,
-    TAB_IDS,
-    sectionAfter,
-    type Section,
-  } from './sections'
+  import { updatesDrawn } from './updates'
+  import { DEFAULT_SECTION, PANEL_ID, RAIL_NOTE_ID, TAB_IDS, railNote, sectionAfter, type Section } from './sections'
 
   let {
     open = $bindable(false),
@@ -82,7 +79,7 @@
     auth = null,
     updates = null,
     usage = null,
-    openChats = 0,
+    openChats = 0, workingChats = 0,
   }: {
     /** Whether the dialog is open. */
     open?: boolean
@@ -104,8 +101,8 @@
     updates?: UpdatesView | null
     /** The Usage slice, until the one read of this open answers. */
     usage?: UsageView | null
-    /** How many chats are open: the Updates pane's gate (S4). */
-    openChats?: number
+    /** How many chats are open (the Updates gate, S4) and how many are mid-turn (close-chats S3). */
+    openChats?: number; workingChats?: number
   } = $props()
 
   /** The section the pane draws: Appearance on open (L4). */
@@ -143,7 +140,14 @@
    * keep following the live slice (the snapshot carries them for the record).
    */
   const authView = $derived(read.snapshot?.auth ?? auth)
-  const updatesView = $derived(read.snapshot?.updates ?? updates)
+  /**
+   * The Updates slice the section and the rail's dot both draw: the push until
+   * the one read answers, and that answer afterwards - EXCEPT the packages slice,
+   * which the pushed explicit check may finish later (packages-status T6, S7, the
+   * rule in `updatesDrawn`). One expression, so the rail and the pane can never
+   * say different things.
+   */
+  const updatesView = $derived(updatesDrawn(updates, read.snapshot?.updates ?? null))
   const usageView = $derived(read.snapshot?.usage ?? usage)
 
   /**
@@ -241,21 +245,25 @@
               aria-orientation="vertical"
             >
               {#each drawn as entry (entry.id)}
+                {@const note = railNote(entry.id, updatesView, copy)}
                 <button
                   type="button"
                   role="tab"
                   id={TAB_IDS[entry.id]}
                   aria-controls={PANEL_ID}
                   aria-selected={selected === entry.id}
+                  aria-describedby={note === null ? undefined : RAIL_NOTE_ID}
                   tabindex={entry.id === tabStop ? 0 : -1}
                   onclick={() => (selected = entry.id)}
                   onkeydown={(event) => keyed(event, entry.id)}
                 >
                   <Icon name={entry.icon} size={16} />
                   <span>{copy.titles[entry.id]}</span>
+                  {#if note !== null}<RailDot />{/if}
                 </button>
               {/each}
             </div>
+            <span class="settings-rail-note" id={RAIL_NOTE_ID}>{copy.updateWaiting}</span>
           {:else}
             <!-- One quiet line instead of an empty rail: the pane keeps the
                  section the user opened, and searching never moves it. -->
@@ -282,7 +290,10 @@
                   <HomeSetting {shell} />
                 {/if}
               {:else if selected === 'updates'}
-                <UpdatesPane updates={updatesView} {openChats} refreshing={rechecking} onRefresh={again} />
+                <!-- The live push's home decides which command each action runs
+                     (updates-by-home S4), so the pane draws it under every button. -->
+                <UpdatesPane updates={updatesView} {openChats} {workingChats} home={shell?.choice ?? null} refreshing={rechecking} onRefresh={again} />
+              {:else if selected === 'general'}<GeneralPane general={read.snapshot?.general ?? null} refreshing={rechecking} onRefresh={again} />
               {:else if selected === 'account'}
                 <AccountPane auth={authView} onRefresh={again} />
               {:else if selected === 'usage'}

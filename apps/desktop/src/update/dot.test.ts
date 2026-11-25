@@ -4,8 +4,17 @@
 // its more urgent banner already sits at the top of the window.
 
 import { describe, expect, it } from 'vitest'
-import type { UpdatesView_Serialize as UpdatesView, VersionRowView_Serialize as VersionRow } from '../contract/bindings'
+import type {
+  PackagesView_Serialize as PackagesView,
+  UpdatesView_Serialize as UpdatesView,
+  VersionRowView_Serialize as VersionRow,
+} from '../contract/bindings'
 import { updateWaiting } from './dot'
+
+/** The Extensions block's slice: unasked unless a test says otherwise. */
+function packages(over: Partial<PackagesView> = {}): PackagesView {
+  return { available: false, behind: [], unknown: false, truncated: false, unchecked: false, checked: null, ...over }
+}
 
 /** One row of the check, behind (`true`), level (`false`) or unknown (`null`). */
 function row(update_available: boolean | null): VersionRow {
@@ -21,6 +30,7 @@ function updates(
   rows: { desk?: VersionRow; pi?: VersionRow; shell?: VersionRow },
   status: UpdatesView['status'] = 'Ready',
   skipped: string | undefined = undefined,
+  packagesView: PackagesView = packages(),
 ): UpdatesView {
   return {
     status,
@@ -28,6 +38,7 @@ function updates(
     desk: rows.desk ?? row(false),
     pi: rows.pi ?? row(false),
     shell: rows.shell ?? row(false),
+    packages: packagesView,
   }
 }
 
@@ -80,5 +91,61 @@ describe('The gear dot', () => {
     expect(updateWaiting(updates({ pi: row(true) }, 'Ready', 'latest'))).toBe(true)
     // Nothing skipped at all: the field is absent from the push.
     expect(updateWaiting(updates({ pi: row(true) }))).toBe(true)
+  })
+
+  it('lights up when pi reports an extension as behind (packages-status T3)', () => {
+    // A behind package is a promise exactly like a behind pi or shell row: the
+    // terminal is where it is updated from.
+    expect(
+      updateWaiting(
+        updates({}, 'Ready', undefined, packages({ available: true, behind: [{ name: 'pi-hud' }] })),
+      ),
+    ).toBe(true)
+  })
+
+  it('stays dark for a packages read that never ran or could not run', () => {
+    // Unasked (no chat open, or a shell that does not advertise it) and unknown
+    // (a read that could not answer) are never a promise.
+    expect(updateWaiting(updates({}, 'Ready', undefined, packages()))).toBe(false)
+    expect(
+      updateWaiting(updates({}, 'Ready', undefined, packages({ unknown: true }))),
+    ).toBe(false)
+    // An answered listing with nothing behind promises nothing either.
+    expect(updateWaiting(updates({}, 'Ready', undefined, packages({ available: true })))).toBe(
+      false,
+    )
+  })
+
+  it('stays dark for a listing pi has not checked yet (packages-status T6, S6)', () => {
+    // The listing exists and every checkable item is still `unknown`: pi's own
+    // check never ran in that child, so the app knows of nothing waiting - and the
+    // dot is a promise, not a maybe.
+    expect(
+      updateWaiting(
+        updates({}, 'Ready', undefined, packages({ available: true, unchecked: true })),
+      ),
+    ).toBe(false)
+    // A listing with one package behind lights it whatever the rest is: that much
+    // the check did learn.
+    expect(
+      updateWaiting(
+        updates(
+          {},
+          'Ready',
+          undefined,
+          packages({ available: true, unchecked: true, behind: [{ name: 'pi-hud' }] }),
+        ),
+      ),
+    ).toBe(true)
+  })
+
+  it('never lets the skip darken a package: a package name is not a version', () => {
+    // The skip is a version rule for the rows (S2). A package the user never
+    // skipped still lights the dot, whatever version number sits beside it.
+    const behind = packages({
+      available: true,
+      behind: [{ name: 'pi-hud', current: '2.0.5' }],
+    })
+    expect(updateWaiting(updates({}, 'Ready', '2.0.5', behind))).toBe(true)
   })
 })

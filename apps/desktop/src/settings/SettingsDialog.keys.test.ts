@@ -13,6 +13,7 @@ vi.mock('@tauri-apps/api/core', () => import('../test-support/tauri-mock').then(
 vi.mock('@tauri-apps/api/event', () => import('../test-support/tauri-mock').then((m) => m.eventModule()))
 
 /** The words this file keys on, quoted so a change of copy is a change here. */
+const GENERAL = 'General'
 const APPEARANCE = 'Appearance'
 const HOME = 'Shell home'
 const ABOUT = 'About'
@@ -32,7 +33,7 @@ describe('the Settings dialog keys', () => {
     const dialog = await openSettings()
 
     // Only the selected entry takes the tab: the rest are reached by key.
-    // Eight entries since notifications T4 put Notifications after Language.
+    // Nine entries since 0.9.0's General opens the rail (general S1).
     expect(rail(dialog).map((entry) => entry.getAttribute('tabindex'))).toEqual([
       '0',
       '-1',
@@ -42,7 +43,17 @@ describe('the Settings dialog keys', () => {
       '-1',
       '-1',
       '-1',
+      '-1',
     ])
+
+    // The dialog opens on General (S1), and the arrows walk from there.
+    await fireEvent.keyDown(within(dialog).getByRole('tab', { name: GENERAL }), {
+      key: 'ArrowDown',
+    })
+    expect(within(dialog).getByRole('tab', { name: APPEARANCE }).getAttribute('aria-selected')).toBe(
+      'true',
+    )
+    expect(document.activeElement).toBe(within(dialog).getByRole('tab', { name: APPEARANCE }))
 
     await fireEvent.keyDown(within(dialog).getByRole('tab', { name: APPEARANCE }), {
       key: 'ArrowDown',
@@ -59,12 +70,12 @@ describe('the Settings dialog keys', () => {
     )
 
     await fireEvent.keyDown(within(dialog).getByRole('tab', { name: ABOUT }), { key: 'Home' })
-    expect(
-      within(dialog).getByRole('tab', { name: APPEARANCE }).getAttribute('aria-selected'),
-    ).toBe('true')
+    expect(within(dialog).getByRole('tab', { name: GENERAL }).getAttribute('aria-selected')).toBe(
+      'true',
+    )
 
     // The rail wraps at both ends, as the chat header's tablist does.
-    await fireEvent.keyDown(within(dialog).getByRole('tab', { name: APPEARANCE }), {
+    await fireEvent.keyDown(within(dialog).getByRole('tab', { name: GENERAL }), {
       key: 'ArrowUp',
     })
     expect(within(dialog).getByRole('tab', { name: ABOUT }).getAttribute('aria-selected')).toBe(
@@ -115,7 +126,8 @@ describe('the Settings dialog keys', () => {
 
   it('starts the focus on the selected rail entry and keeps it in the dialog', async () => {
     const dialog = await openSettings()
-    const entry = within(dialog).getByRole('tab', { name: APPEARANCE })
+    // The card opens on General (0.9.0 general S1), so that entry holds the focus.
+    const entry = within(dialog).getByRole('tab', { name: GENERAL })
     await vi.waitFor(() => expect(document.activeElement).toBe(entry))
 
     const close = within(dialog).getByRole('button', { name: 'Close' })

@@ -89,6 +89,43 @@ pub type ChatCommandSink = Arc<dyn Fn(Vec<gentle_app::ChatCommand>) + Send + Syn
 /// answer is still cached, and the next fold pushes it.
 pub type BranchPush = Arc<dyn Fn() + Send + Sync>;
 
+/// Installed once at startup: what runs the explicit extensions check when a
+/// chat's child proves it is alive (packages-status T4, S7, T7). It starts its
+/// own thread and returns: it is called while a child event is being folded, so it
+/// must never block, and nothing runs while no chat has a child (which is the
+/// whole reason the trigger is a child's own event and never a launch step).
+///
+/// The holder decides WHETHER it runs ([`AppStateHolder::note_child_ready`]): the
+/// run's attempts last until one check ANSWERED, so the trigger may be called
+/// more than once per app run.
+pub type PackagesTrigger = Arc<dyn Fn() + Send + Sync>;
+
+/// How many automatic extensions checks one app run may start (packages-status
+/// T7). A check is retried while it answers nothing (`Unasked`, `Deadline`), and
+/// each try can cost the check's own long bound - twenty seconds - so the run's
+/// cost has to stop somewhere: five is enough for a fresh chat whose child is
+/// still starting and for a chat or two that decline, and small enough that a
+/// shell which never answers is not asked forever.
+pub const MAX_PACKAGES_ATTEMPTS: u32 = 5;
+
+/// The automatic extensions check of this app run, as the holder keeps it
+/// (packages-status T7): the retry rule is "until one check ANSWERED".
+///
+/// Consuming the run's one attempt on the ATTEMPT - the 0.9.0 rule - spent it on
+/// a check whose answer never came, which is how a fresh chat's decline or a
+/// connect that timed out meant the gear's dot never lit for the whole run.
+#[derive(Default)]
+struct PackagesAttempts {
+    /// How many checks this run has started.
+    attempts: u32,
+    /// Whether one is running right now: never two at once.
+    in_flight: bool,
+    /// Whether the shell has SPOKEN - one listing read or one refusal of its
+    /// own. Both stop the run's retries: asking again would ask the same child
+    /// the same question.
+    answered: bool,
+}
+
 /// The app state the Tauri shell owns. Created at startup, managed by Tauri;
 /// nothing else anywhere holds an `AppState`.
 #[derive(Default)]
@@ -204,6 +241,21 @@ pub struct AppStateHolder {
     auth: Mutex<AuthView>,
     /// The Updates pane's slice (0.1.12, S2, S7): the last check's answer.
     updates: Mutex<UpdatesView>,
+    /// The Extensions block the explicit check HELD (packages-status T4, S7): what
+    /// `check_packages` made pi answer, kept so the pushed slice
+    /// (`ViewState.updates.packages`) and the gear's dot carry it without Settings
+    /// being open, and so the dialog's own load shows the checked answer instead
+    /// of re-deriving a "not checked yet" from a plain read. `None` until the
+    /// first check answers.
+    packages: Mutex<Option<crate::contract::PackagesView>>,
+    /// Installed once at startup: what starts the run's extensions check when a
+    /// chat's child is ready ([`Self::note_child_ready`]).
+    packages_trigger: Mutex<Option<PackagesTrigger>>,
+    /// The run's automatic extensions check: how many attempts it has started,
+    /// whether one is running, and whether the shell has answered (packages-status
+    /// T7). Read and written only by [`Self::note_child_ready`] and
+    /// [`Self::note_packages_attempt`].
+    packages_check: Mutex<PackagesAttempts>,
     /// The Usage pane's slice: the subscription usage the shell's own sources
     /// reported when the pane last asked, and whether that read is running.
     usage: Mutex<UsageView>,
@@ -258,6 +310,44 @@ impl AppStateHolder {
     /// `git` process; this is how what it found reaches the window.
     pub fn arm_branch_push(&self, push: BranchPush) {
         *lock(&self.branch_push) = Some(push);
+    }
+
+    /// Installs what runs the run's automatic extensions check (packages-status
+    /// T4, S7, T7). Armed with the window's emit step: a run with no window would
+    /// start a check nothing can show.
+    pub fn arm_packages_trigger(&self, trigger: PackagesTrigger) {
+        *lock(&self.packages_trigger) = Some(trigger);
+    }
+
+    /// A chat's child is ready: a chat's own decoded event arrived, which is the
+    /// app's proof that some child is alive and answerable.
+    ///
+    /// The trigger runs while the run's check has not ANSWERED yet (packages-status
+    /// T7): a check that asked nothing (`Unasked`) or timed out did not spend the
+    /// run's question, so the next chat's first event may try again - on a chat
+    /// whose child is now ready, or on the chat this one's gate could not name.
+    /// A check already running blocks a second one, and the attempts of one run
+    /// are capped at [`MAX_PACKAGES_ATTEMPTS`]. Nothing here ever runs at launch
+    /// and nothing starts a child: this is only reached from an event a child
+    /// already sent.
+    pub fn note_child_ready(&self) {
+        let trigger = lock(&self.packages_trigger).clone();
+        let Some(trigger) = trigger else {
+            return;
+        };
+        // The decision is made and the attempt recorded under one lock, which is
+        // then released: the trigger is called with NO lock held (it starts a
+        // thread, and a test's trigger reports its answer straight back).
+        {
+            let mut attempts = lock(&self.packages_check);
+            if attempts.answered || attempts.in_flight || attempts.attempts >= MAX_PACKAGES_ATTEMPTS
+            {
+                return;
+            }
+            attempts.attempts += 1;
+            attempts.in_flight = true;
+        }
+        trigger();
     }
 
     /// The branch cache, for a caller outside a fold: the tests seed it so an
@@ -731,9 +821,19 @@ impl AppStateHolder {
         // (R3-001 of `chat-transcript.md`). It is acted on after the fold, not
         // before it, because a close the reducer REFUSES - a chat mid-turn - keeps
         // the chat open and keeps its rows.
+        //
+        // One close and a BULK close answer the same way (close-chats T1, S2): the
+        // idle chats a bulk close takes off the open set are as gone as one the row
+        // menu closed, so they forget their rows too. The ids are the ones open
+        // BEFORE the fold, and the `is_open` test below is what says which of them
+        // the fold really closed - the working ones it skips are still open, so
+        // they keep exactly what they drew.
         let closing = match &input {
-            gentle_app::Input::Intent(gentle_app::Intent::CloseChat(chat)) => Some(chat.clone()),
-            _ => None,
+            gentle_app::Input::Intent(gentle_app::Intent::CloseChat(chat)) => vec![chat.clone()],
+            gentle_app::Input::Intent(gentle_app::Intent::CloseAllChats) => {
+                lock(&self.app).chats.ids().into_iter().cloned().collect()
+            }
+            _ => Vec::new(),
         };
         // A chat that closes takes the Profile tab's view with it (profiles-editor
         // T2b-2, L11-4): the view is that chat's, and a read still in flight for
@@ -769,8 +869,10 @@ impl AppStateHolder {
             (view, effects.chat_commands, effects.commands)
         };
         self.run_shared(commands);
-        if let Some(chat) = closing.filter(|chat| !self.is_open(chat)) {
-            self.forget_transcript(&chat);
+        for chat in &closing {
+            if !self.is_open(chat) {
+                self.forget_transcript(chat);
+            }
         }
         (view, chat_commands)
     }

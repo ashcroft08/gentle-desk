@@ -10,45 +10,75 @@
   // The rules that pick a shape live in `./updates`; the rows are drawn by
   // `UpdateRows.svelte`.
   //
-  // The second card is "Update extensions", and it is a card of its own because it
-  // is the one action NO data drives (D14): the shell's updater with pi's
-  // `--extensions` flag only touches the packages the shell has installed, nothing
-  // can tell which of them are behind, so there is no state to wait for and the
-  // sentence says exactly that. It is drawn in every state and obeys the same
-  // chats-closed gate.
+  // The second group is "Update extensions" (D14; packages-status T2, S1, S3; T6,
+  // S6, S7), drawn by `ExtensionsBlock.svelte`: the shell's updater with pi's
+  // `--extensions` flag only touches the packages the shell has installed, so that
+  // button is always offered - but WHICH of them are behind is knowable while a
+  // chat is open, through pi's own check. So the block counts and names them, says
+  // they are up to date only when pi's own check ran for the whole listing, says
+  // nobody has checked yet when it did not, says the read could not run when it
+  // could not, and keeps the approved honest sentence plus its condition when
+  // nothing asked. Same chats-closed gate.
   //
   // The terminal actions are the shell's own - `update` on pi's row and `upgrade`
   // on the shell's (S7) - and both are DEAD while any chat is open (S4), with the
   // reason written under the rows: a chat whose child is mid-turn must not have its
   // pi change underneath. "Check again" only ever asks for a check; no update is
   // installed from here, and it is never held back by the gate because reading
-  // changes nothing.
+  // changes nothing. One press asks TWO things (packages-status T6, S7): the
+  // dialog's one coalesced load, and pi's own explicit check, whose answer arrives
+  // as a pushed packages slice.
+  //
+  // WHICH command an action runs is the home's (updates-by-home S4): under each
+  // button is one quiet mono line with the exact line Rust will start -
+  // `gentle-shell ...` on Separado, `pi ...` on Mi pi - read from the one table in
+  // `./update-commands`, and never a guess when Mi pi has no measured stable
+  // version to install. A terminal that refuses answers with its own line, drawn
+  // here as it always was, under the button that asked and cleared by the next one.
   //
   // "Skip this version" (S1, S2, D9) is the quiet one: a plain secondary `.btn` on
   // the row whose version is the newest on offer, and "Stop skipping" once that row
   // publishes the version the user skipped. Both are intents the bridge answers,
   // and the pane asks for the dialog's one read again after them, so the card shows
   // the skip it just made.
-  import { dispatchIntent, openTerminal } from '../bridge'
-  import type { UpdatesView_Serialize as UpdatesView } from '../contract/bindings'
+  import { checkPackages, dispatchIntent, openTerminal } from '../bridge'
+  import type {
+    HomeChoiceView,
+    PackagesView_Serialize as PackagesView,
+    TerminalActionView,
+    UpdatesView_Serialize as UpdatesView,
+  } from '../contract/bindings'
   import { ago, isJustNow } from '../home/ago'
   import { language } from '../i18n/language.svelte'
+  import ExtensionsBlock from './ExtensionsBlock.svelte'
+  import ChatsGate from './ChatsGate.svelte'
   import UpdateRows from './UpdateRows.svelte'
+  import { commandAction, commandLine, drawnLine } from './update-commands'
   import { cardOf, type RowAction } from './updates'
   import { updatesCopy } from './updates-copy'
 
   let {
     updates,
     openChats = 0,
+    workingChats = 0,
     refreshing = false,
+    home = null,
     onRefresh = () => {},
   }: {
     /** The check as the dialog's one load answered, or null before any read. */
     updates: UpdatesView | null
     /** How many chats are open: the Update gate (S4). */
     openChats?: number
+    /** How many of them are mid-turn: the close button leaves those open (close-chats S3). */
+    workingChats?: number
     /** Whether a load the user asked for is in flight: the checking line. */
     refreshing?: boolean
+    /**
+     * The home the live push carries (`shell.choice`), which decides WHICH command
+     * every terminal action runs (updates-by-home S4): it is drawn under each
+     * button, so the choice is never a surprise.
+     */
+    home?: HomeChoiceView | null
     /** Asks the dialog for one more load: the pane's only read path. */
     onRefresh?: () => void
   } = $props()
@@ -56,8 +86,26 @@
   /** The pane's own words in the language the app holds (0.2.0, D4). */
   const copy = $derived(updatesCopy(language.current))
 
-  /** What the terminal said when it could not open, or `null`. */
-  let terminalError = $state<string | null>(null)
+  /**
+   * What the terminal answered when it could not open, and the action that asked
+   * (updates-by-home S4): ONE quiet line, drawn under the button it belongs to.
+   */
+  let terminalError = $state<{ action: TerminalActionView; line: string } | null>(null)
+
+  /**
+   * The refusal under the card's two actions, and the one under the extensions
+   * button: the same state, so the next press clears whatever was said before.
+   */
+  const rowsError = $derived(
+    terminalError !== null && terminalError.action !== 'UpdateExtensions'
+      ? terminalError.line
+      : null,
+  )
+  const extensionsError = $derived(
+    terminalError !== null && terminalError.action === 'UpdateExtensions'
+      ? terminalError.line
+      : null,
+  )
 
   const card = $derived(cardOf(updates, copy))
   /** Whether a check is on its way: the pushed one, or the one the user asked for. */
@@ -65,6 +113,59 @@
   const blocked = $derived(openChats > 0)
   const hint = $derived(copy.gateHint(openChats))
   const hintId = 'updates-gate'
+
+  /**
+   * The measured Gentle Shell version the Mi pi install names (the same
+   * `updates.shell.latest` the row is drawn from), and the extensions line - which
+   * needs no version, so a dialog that has not checked yet still says it.
+   */
+  const shellLatest = $derived(updates?.shell.latest ?? null)
+  const extensionsLine = $derived(
+    drawnLine(commandLine('UpdateExtensions', home, shellLatest), copy.noStableLatest),
+  )
+
+  /** The packages slice the dialog's one read answered, or null when it read none. */
+  const packages = $derived(updates?.packages ?? null)
+
+  /**
+   * What the pushed packages slice says, as one comparable value (T6, S7): the
+   * explicit check's result arrives as a PUSH, so this is how "the push changed"
+   * is read - and it changes only when the slice does, never on a push that
+   * carried something else.
+   */
+  function packagesTag(slice: PackagesView | null): string {
+    if (slice === null) return ''
+    const { available, unknown, unchecked, truncated, checked, behind } = slice
+    return JSON.stringify({ available, unknown, unchecked, truncated, checked, behind })
+  }
+
+  /**
+   * The tag the pushed slice had when the user pressed, and null when no check of
+   * theirs is out: the block's quiet "Comprobando..." is derived from it, so
+   * nothing polls and the line lasts exactly until the pushed slice changes.
+   */
+  let pressedPackages = $state<string | null>(null)
+  const checkingPackages = $derived(
+    pressedPackages !== null && packagesTag(packages) === pressedPackages,
+  )
+
+  /**
+   * "Check again" (packages-status T6, S7): ONE press asks both - the dialog's one
+   * coalesced snapshot load, and pi's own explicit check, which answers at once and
+   * delivers its result as the pushed packages slice. The card's readiness never
+   * waits for that check.
+   *
+   * That is also why the line is cleared by the PUSH and not by the call: a call
+   * that resolves at once would take "Comprobando..." away before pi had even run.
+   * With no chat open nothing can answer, so nothing is claimed; and a refused
+   * command answers nothing, so the line stops rather than wait for a push that
+   * will never come.
+   */
+  async function check(): Promise<void> {
+    onRefresh()
+    if (openChats > 0) pressedPackages = packagesTag(packages)
+    if ((await checkPackages()) === null) pressedPackages = null
+  }
 
   /** The card's one tag: something newer, nothing newer, or a row nobody read. */
   const tag = $derived(
@@ -89,13 +190,16 @@
 
   async function open(action: RowAction): Promise<void> {
     if (blocked) return
-    terminalError = await openTerminal(action === 'upgrade' ? 'UpgradeShell' : 'Update')
+    const target = commandAction(action)
+    const line = await openTerminal(target)
+    terminalError = line === null ? null : { action: target, line }
   }
 
   /** The same terminal path, with pi's `--extensions` flag passed through. */
   async function extensions(): Promise<void> {
     if (blocked) return
-    terminalError = await openTerminal('UpdateExtensions')
+    const line = await openTerminal('UpdateExtensions')
+    terminalError = line === null ? null : { action: 'UpdateExtensions', line }
   }
 
   /**
@@ -126,18 +230,25 @@
       {copy}
       {blocked}
       {hintId}
+      {home}
+      {shellLatest}
       onAction={(action) => void open(action)}
       onSkip={(version) => void skip(version)}
       onUnskip={() => void unskip()}
     />
+    {#if rowsError !== null}
+      <!-- The terminal's own answer when the row's button could not run (S4): ONE
+           quiet line, under the actions that run those commands. -->
+      <p class="quiet" role="status">{rowsError}</p>
+    {/if}
     {#if blocked}
-      <p class="gate" id={hintId} role="status">{hint}</p>
+      <ChatsGate {hint} {hintId} {copy} {workingChats} />
     {:else if card.terminal}
       <p class="note">{copy.updateInTerminal}</p>
     {/if}
     <p class="versions">{checkedLine}</p>
     <div class="acts">
-      <button class="btn" type="button" onclick={onRefresh}>{copy.checkAgain}</button>
+      <button class="btn" type="button" onclick={() => void check()}>{copy.checkAgain}</button>
     </div>
   </div>
 {:else}
@@ -149,26 +260,23 @@
   {/if}
   <p class="versions">{checkedLine}</p>
   <div class="acts">
-    <button class="btn" type="button" onclick={onRefresh}>{copy.checkAgain}</button>
+    <button class="btn" type="button" onclick={() => void check()}>{copy.checkAgain}</button>
   </div>
   {#if blocked}
-    <p class="gate" id={hintId} role="status">{hint}</p>
+    <ChatsGate {hint} {hintId} {copy} {workingChats} />
   {/if}
 {/if}
-{#if terminalError !== null}
-  <p class="quiet" role="status">{terminalError}</p>
-{/if}
 
-<!-- The one action no data drives, in a card of its own that says so (D14). -->
-<div class="card ext">
-  <p class="quiet">{copy.extensionsNote}</p>
-  <div class="acts">
-    <button
-      class="btn"
-      type="button"
-      disabled={blocked}
-      aria-describedby={blocked ? hintId : undefined}
-      onclick={() => void extensions()}>{copy.updateExtensions}</button
-    >
-  </div>
-</div>
+<!-- The extensions block: pi's own check when it could ask (packages-status T2),
+     the "not checked yet" state (T6, S6), and the approved honest sentence plus
+     its condition when it could not (S3). -->
+<ExtensionsBlock
+  {packages}
+  checking={checkingPackages}
+  {blocked}
+  {hintId}
+  line={extensionsLine}
+  error={extensionsError}
+  onExtensions={() => void extensions()}
+  {copy}
+/>

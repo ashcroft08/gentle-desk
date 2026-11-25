@@ -19,10 +19,21 @@
 // the row that publishes the skipped one, which is what offers the way back. The
 // contract stores ONE version, so D9 puts the skip on the row whose `latest` is the
 // greatest version - the newest thing on offer - and each row is compared with it.
+// one stored version can only name one of them.
+//
+// packages-status T2 (S1, S3) adds one function beside the card, `packagesOf`,
+// with the Extensions block's honest states, and lets the one last-checked
+// line take the newest instant either read reported.
 // The check itself always reports the real state, so a skipped version is still
 // drawn as published here: hiding it is the startup check's business.
+//
+// packages-status T6 (S6, S7) adds two things to that: a FIFTH state, `unchecked`
+// - the listing exists and pi's own check has not run in that child, so "al día"
+// would be a claim nobody made - and `updatesDrawn`, which is which packages
+// slice the dialog draws when the load's answer and the pushed check disagree.
 
 import type {
+  PackagesView_Serialize as PackagesView,
   UpdatesView_Serialize as UpdatesView,
   VersionRowView_Serialize as VersionRow,
 } from '../contract/bindings'
@@ -76,6 +87,28 @@ export type UpdatesCard = {
   checkedMs: number | null
 }
 
+/** One extension pi's own check reports as behind, as the block draws it. */
+export type PackageRow = {
+  /** pi's own display name for it: never a source, a path or a scope (S4). */
+  name: string
+  /** The version it runs when pi reports one, or `null` to draw no version. */
+  version: string | null
+}
+
+/**
+ * The Extensions block's one honest state (packages-status T2, S1, S3; T6, S6):
+ * the listing that named the behind ones, the listing pi has not checked yet, the
+ * answer that named none, the read that could not run, and the one nothing asked -
+ * never a sixth, and never a guess. A `behind` block whose `unchecked` is set keeps
+ * drawing its line under the names: the list is not the whole story then.
+ */
+export type PackagesCard =
+  | { state: 'behind'; count: number; rows: PackageRow[]; unchecked: boolean }
+  | { state: 'unchecked' }
+  | { state: 'upToDate' }
+  | { state: 'unreadable' }
+  | { state: 'unasked' }
+
 /** The three rows of the check, with the action each one offers. */
 function rowsOf(updates: UpdatesView): { key: ReasonRow; row: VersionRow; action: RowAction | null }[] {
   return [
@@ -117,6 +150,67 @@ function skipRow(
   return best?.key ?? null
 }
 
+/** The newer of the two instants the card knows, or the one it has. */
+function newest(rows: number | null, packages: number | null): number | null {
+  if (rows === null) return packages
+  if (packages === null) return rows
+  return Math.max(rows, packages)
+}
+
+/**
+ * Whether pi's own check names the extensions that are behind (packages-status
+ * T2, S1, S3; T6, S6): only a listing that answered can be `behind`,
+ * `unchecked` or `upToDate`, a read that ran and could not answer is `unreadable`,
+ * and no answer at all - no chat open, or an older shell that does not advertise
+ * the read (S5) - is `unasked`.
+ *
+ * "Up to date" is only ever the answered listing pi's own check ran for and that
+ * has nothing behind it: a listing with an item still `unknown` is `unchecked`,
+ * and one with names behind AND items unknown carries both, because a behind list
+ * nobody finished checking must never read as complete.
+ */
+export function packagesOf(packages: PackagesView | null): PackagesCard {
+  if (packages === null) return { state: 'unasked' }
+  if (!packages.available) return { state: packages.unknown ? 'unreadable' : 'unasked' }
+  // A listing pi's own check cut short is drawn as the names it carried: the count
+  // is those, and the block names no extension it did not read.
+  const rows: PackageRow[] = packages.behind.map((each) => ({
+    name: each.name,
+    version: each.current ?? null,
+  }))
+  if (rows.length > 0) {
+    return { state: 'behind', count: rows.length, rows, unchecked: packages.unchecked }
+  }
+  return packages.unchecked ? { state: 'unchecked' } : { state: 'upToDate' }
+}
+
+/** Whether pi's own check has finished for the whole listing (S6). */
+function checkFinished(packages: PackagesView | null): packages is PackagesView {
+  return packages !== null && packages.available && !packages.unchecked
+}
+
+/**
+ * The updates the dialog draws (packages-status T6, S7): the push until the one
+ * load answers, and the load's answer afterwards - the expression the rail and the
+ * pane already shared - EXCEPT for the packages slice.
+ *
+ * The explicit check's result arrives by PUSH, so a check that finishes while
+ * Settings is open lives only in the live slice: the pushed packages are drawn
+ * when they are a FINISHED check (`available` and nothing left `unknown`) and the
+ * load's are not. A pushed slice pi has not checked never replaces one that was,
+ * and neither does anything a push carries about the three rows: only the
+ * packages move.
+ */
+export function updatesDrawn(
+  pushed: UpdatesView | null,
+  snapshot: UpdatesView | null,
+): UpdatesView | null {
+  const base = snapshot ?? pushed
+  const packages = pushed?.packages ?? null
+  const better = checkFinished(packages) && !checkFinished(snapshot?.packages ?? null)
+  return base === null || !better ? base : { ...base, packages }
+}
+
 /**
  * The whole card, from the check Rust pushed, named in the language the pane is
  * drawn in (0.2.0, D4): the labels and the reason sentences are the app's own
@@ -137,7 +231,11 @@ export function cardOf(updates: UpdatesView | null, copy: UpdatesCopy): UpdatesC
   if (updates === null) return empty
 
   // The last read is a datum of its own: a check on its way does not erase it.
-  const checkedMs = updates.checked_ms ?? null
+  // packages-status T2: the packages slice carries pi's own check instant, so the
+  // one line takes the NEWEST of the two - pi's read when it just ran, the rows'
+  // own read when that is the newer one. An older instant adds nothing, and the
+  // card never draws a second check line.
+  const checkedMs = newest(updates.checked_ms ?? null, updates.packages.checked ?? null)
   if (updates.status === 'Checking') return { ...empty, checking: true, checkedMs }
   if (updates.status === 'Unknown') return { ...empty, checkedMs }
 

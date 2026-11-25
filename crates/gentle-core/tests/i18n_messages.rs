@@ -405,6 +405,16 @@ fn every_terminal_refusal_carries_what_it_names() {
         &messages::terminal_open_failed(Language::Es, "boom"),
         "No se pudo abrir la terminal: boom",
     );
+    // The one that names no parameter: it is the answer of an action that runs
+    // NOTHING, because the Gentle Shell row has no stable version to install
+    // (updates-by-home S2).
+    pair(
+        "terminal_no_stable_latest",
+        messages::terminal_no_stable_latest(Language::En),
+        "No stable version of gentle-pi was measured, so nothing was installed.",
+        messages::terminal_no_stable_latest(Language::Es),
+        "No se midió una versión estable de gentle-pi, así que no se instaló nada.",
+    );
 }
 
 /// The three refusals of making a folder, each carrying the disk's own reason.

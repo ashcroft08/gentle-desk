@@ -51,18 +51,23 @@ const IDLE: Duration = Duration::from_millis(100);
 /// a test.
 pub type Push = Box<dyn Fn(ViewState) + Send + 'static>;
 
-/// The translated stream and the runtime that translated it.
-struct Tagged {
-    runtime: Arc<ChatRuntime>,
-    events: Receiver<TaggedEvent>,
-}
-
 /// The one place the event threads start, and the reason they start once.
 #[derive(Default)]
 pub struct EventPump {
     holder: Arc<AppStateHolder>,
     push: Mutex<Option<Push>>,
-    tagged: Mutex<Option<Tagged>>,
+    /// The stream of every child's tagged events: taken OUT by the translator's
+    /// thread when it starts, because that stream has one consumer and the pump
+    /// is it.
+    events: Mutex<Option<Receiver<TaggedEvent>>>,
+    /// The runtime that reads the stream, kept for the WHOLE life of the run and
+    /// never taken. A caller that only wants to ASK a child - the Settings load's
+    /// packages read and the run's own explicit check (packages-status T1, S2,
+    /// S7) - reads it through [`EventPump::runtime`], and the answer must stay
+    /// there after the threads took the stream: taking it with the stream is what
+    /// made every one of those reads answer "no host" on the one machine where a
+    /// real child was running.
+    runtime: Mutex<Option<Arc<ChatRuntime>>>,
     started: Mutex<bool>,
     /// Set by the close: the translating thread ends at its next look, and the
     /// pump behind it ends when that thread's sender drops.
@@ -91,8 +96,21 @@ impl EventPump {
     /// The stream of every child's tagged events and the runtime that reads it,
     /// handed over once, when the executor builds its host.
     pub fn feed(&self, runtime: Arc<ChatRuntime>, events: Receiver<TaggedEvent>) {
-        *lock(&self.tagged) = Some(Tagged { runtime, events });
+        // The runtime is kept here AND handed to the translator: the stream has
+        // one consumer, but every asker of a child needs the runtime for as long
+        // as the run lasts.
+        *lock(&self.runtime) = Some(Arc::clone(&runtime));
+        *lock(&self.events) = Some(events);
         self.start_once();
+    }
+
+    /// The runtime the pump was fed, `None` until a host exists.
+    ///
+    /// Read-only on purpose: it never builds a host, starts a child or reads the
+    /// machine, so a caller that only WANTS to ask a child - the Settings load's
+    /// packages read (packages-status T1, S2) - can never start one by asking.
+    pub fn runtime(&self) -> Option<Arc<ChatRuntime>> {
+        lock(&self.runtime).clone()
     }
 
     /// Starts the translating thread and the pump behind it when both halves are
@@ -105,15 +123,19 @@ impl EventPump {
         }
         // Check BOTH halves are there before taking either: taking one while the
         // other is missing would throw it away and the pump could never start.
-        if lock(&self.push).is_none() || lock(&self.tagged).is_none() {
+        if lock(&self.push).is_none() || lock(&self.events).is_none() {
             return;
         }
-        let (Some(push), Some(tagged)) = (push_of(&self.push), tagged_of(&self.tagged)) else {
+        let (Some(push), Some(runtime), Some(events)) = (
+            push_of(&self.push),
+            lock(&self.runtime).clone(),
+            events_of(&self.events),
+        ) else {
             return;
         };
         *started = true;
         let (into, from) = channel();
-        let translator = spawn_translator(tagged, into, Arc::clone(&self.stop));
+        let translator = spawn_translator(runtime, events, into, Arc::clone(&self.stop));
         let pump = spawn_pump(from, Arc::clone(&self.holder), push);
         let mut threads = lock(&self.threads);
         threads.extend(translator);
@@ -168,9 +190,9 @@ fn push_of(push: &Mutex<Option<Push>>) -> Option<Push> {
     lock(push).take()
 }
 
-/// The tagged stream and its runtime, taken out for the translator's thread.
-fn tagged_of(tagged: &Mutex<Option<Tagged>>) -> Option<Tagged> {
-    lock(tagged).take()
+/// The tagged stream, taken out for the translator's thread.
+fn events_of(events: &Mutex<Option<Receiver<TaggedEvent>>>) -> Option<Receiver<TaggedEvent>> {
+    lock(events).take()
 }
 
 /// The translating thread: waits for the tagged stream, converts each event and
@@ -181,14 +203,14 @@ fn tagged_of(tagged: &Mutex<Option<Tagged>>) -> Option<Tagged> {
 /// channel at that moment, so the close need not fold the children's last
 /// `Closed`: that fold only clears marks of a window that is going away.
 fn spawn_translator(
-    tagged: Tagged,
+    runtime: Arc<ChatRuntime>,
+    events: Receiver<TaggedEvent>,
     into: Sender<Converted>,
     stop: Arc<AtomicBool>,
 ) -> Option<JoinHandle<()>> {
     let spawned = std::thread::Builder::new()
         .name("chat-events-translate".to_owned())
         .spawn(move || {
-            let Tagged { runtime, events } = tagged;
             while !stop.load(Ordering::SeqCst) {
                 let event = match events.recv_timeout(IDLE) {
                     Ok(event) => event,
@@ -233,10 +255,32 @@ pub fn spawn_pump(
 /// other chat's events, never waits on a child's pipe (S3).
 pub fn pump(source: Receiver<Converted>, holder: &AppStateHolder, push: Push) {
     for converted in source {
+        // Read before the fold takes it: a chat's own decoded event is the app's
+        // proof that some child is alive and answerable (packages-status T4, S7).
+        let alive = child_alive(&converted);
         let (view, chat_commands) = holder.fold_event(input_of(converted));
         push(view);
+        // The slice is shown first, then the run's automatic extensions check
+        // starts on a thread of its own (until one check answers, T7): this thread
+        // keeps delivering every chat's events and never waits on a child.
+        if alive {
+            holder.note_child_ready();
+        }
         holder.deliver_chat_commands(chat_commands);
     }
+}
+
+/// Whether one translated value is a chat's own DECODED event - the proof its
+/// child is up and talking, which is the only moment the desktop channel exists
+/// to be asked (packages-status T4, S7).
+///
+/// A stderr line and a close are not: one is a line before any answer, the other
+/// is the child going away.
+fn child_alive(converted: &Converted) -> bool {
+    matches!(
+        converted,
+        Converted::Input(Input::ChatEvent { .. } | Input::ChatEventAt { .. })
+    )
 }
 
 /// The reducer input one translated event folds as, named the way the iced

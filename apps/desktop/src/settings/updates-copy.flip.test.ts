@@ -11,7 +11,11 @@ import '../test-support/dom-env'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, within } from '@testing-library/svelte'
 import { tick } from 'svelte'
-import type { UpdatesView_Serialize as UpdatesView } from '../contract/bindings'
+import type {
+  HomeChoiceView,
+  PackagesView_Serialize as PackagesView,
+  UpdatesView_Serialize as UpdatesView,
+} from '../contract/bindings'
 import { resetTauriMock, setHandler } from '../test-support/tauri-mock'
 import { setLanguage } from '../i18n/language.svelte'
 import UpdatesPane from './UpdatesPane.svelte'
@@ -44,14 +48,32 @@ function updates(over: Partial<UpdatesView> = {}): UpdatesView {
     desk: { current: '0.1.11', latest: '0.1.12', update_available: true },
     pi: { current: '1.5.2', latest: '2.0.5', update_available: true },
     shell: { current: '4.8.0', latest: '4.9.2', update_available: true },
+
+    packages: { available: false, behind: [], unknown: false, truncated: false, unchecked: false, checked: null },
     checked_ms: CHECKED_MS,
     ...over,
   }
 }
 
-function draw(view: UpdatesView | null = updates(), openChats = 0): HTMLElement {
-  const { container } = render(UpdatesPane, { props: { updates: view, openChats } })
+function draw(
+  view: UpdatesView | null = updates(),
+  openChats = 0,
+  home: HomeChoiceView | null = null,
+): HTMLElement {
+  const { container } = render(UpdatesPane, { props: { updates: view, openChats, home } })
   return container as HTMLElement
+}
+
+/** The Extensions block's slice: unasked unless a test says otherwise. */
+function packages(over: Partial<PackagesView> = {}): PackagesView {
+  return { available: false, behind: [], unknown: false, truncated: false, unchecked: false, checked: null, ...over }
+}
+
+/** The pane's extensions block, the group no version drives (D14). */
+function ext(pane: HTMLElement): HTMLElement {
+  const found = pane.querySelector('.card.ext')
+  if (!(found instanceof HTMLElement)) throw new Error('the pane drew no extensions block')
+  return found
 }
 
 describe('a drawn Updates pane', () => {
@@ -105,7 +127,10 @@ describe('a drawn Updates pane', () => {
     )
     expect(pane.querySelector('.tag')?.textContent?.trim()).toBe('Everything is up to date')
     // Nothing is behind, so no row carries a sentence and the terminal note is gone.
-    expect(pane.querySelectorAll('.reason')).toHaveLength(0)
+    // The extensions block still names the command its button runs (updates-by-home
+    // S4), which is the pane's one `.reason` line here.
+    expect(pane.querySelectorAll('.urow .reason:not([data-command])')).toHaveLength(0)
+    expect(pane.querySelectorAll('.reason')).toHaveLength(1)
     expect(pane.querySelector('.note')).toBeNull()
     expect(pane.textContent).toContain('There is no way to tell which ones are behind')
 
@@ -202,6 +227,98 @@ describe('a drawn Updates pane', () => {
     expect(within(checking).getByText('Comprobando...')).toBeTruthy()
     expect(checking.textContent).toContain('Última comprobación: hace 3m')
     expect(never.textContent).toContain('Última comprobación: nunca')
+
+    setLanguage('en')
+  })
+
+  it('flips every extension block state, and never a name or a version pi reported', async () => {
+    setLanguage('en')
+    const behind = draw(
+      updates({
+        packages: packages({
+          available: true,
+          behind: [{ name: 'pi-hud', current: '0.3.1' }, { name: 'pi-tools' }],
+        }),
+      }),
+    )
+    const upToDate = draw(updates({ packages: packages({ available: true }) }))
+    const unreadable = draw(updates({ packages: packages({ unknown: true }) }))
+    const unasked = draw(updates())
+    // S6, T6: the listing exists and pi's own check has not run in that child.
+    const unchecked = draw(updates({ packages: packages({ available: true, unchecked: true }) }))
+    const behindUnchecked = draw(
+      updates({
+        packages: packages({
+          available: true,
+          unchecked: true,
+          behind: [{ name: 'pi-hud', current: '0.3.1' }],
+        }),
+      }),
+    )
+
+    expect(ext(behind).textContent).toContain('2 extensions have an update available')
+    expect(ext(behind).textContent).toContain('pi-hud')
+    expect(ext(upToDate).textContent).toContain('The extensions are up to date.')
+    expect(ext(unchecked).textContent).toContain(
+      'It has not been checked yet whether any extension has an update.',
+    )
+    // The behind list is drawn, and the line under it keeps it from reading as
+    // the whole story.
+    expect(ext(behindUnchecked).textContent).toContain('pi-hud')
+    expect(ext(behindUnchecked).textContent).toContain(
+      'It has not been checked yet whether any extension has an update.',
+    )
+    expect(ext(unreadable).textContent).toContain(
+      'Could not check the extensions: pi did not answer.',
+    )
+    expect(ext(unasked).textContent).toContain('There is no way to tell which ones are behind')
+    expect(ext(unasked).textContent).toContain('You can check it by opening a session.')
+
+    setLanguage('es')
+    await tick()
+
+    expect(ext(behind).textContent).toContain('2 extensiones con actualización disponible')
+    // D7: the names and the versions are pi's own, so they read the same in both.
+    expect(ext(behind).textContent).toContain('pi-hud')
+    expect(ext(behind).textContent).toContain('0.3.1')
+    expect(ext(upToDate).textContent).toContain('Las extensiones están al día.')
+    expect(ext(unchecked).textContent).toContain(
+      'Todavía no se comprobó si hay extensiones por actualizar.',
+    )
+    expect(ext(behindUnchecked).textContent).toContain('pi-hud')
+    expect(ext(behindUnchecked).textContent).toContain(
+      'Todavía no se comprobó si hay extensiones por actualizar.',
+    )
+    expect(ext(unreadable).textContent).toContain(
+      'No se pudo revisar las extensiones: pi no respondió.',
+    )
+    expect(ext(unasked).textContent).toContain('No se puede saber cuáles están desactualizadas')
+    expect(ext(unasked).textContent).toContain('Se puede revisar al abrir una sesión.')
+
+    setLanguage('en')
+  })
+  it('flips the line that says no stable version was measured, and never a command', async () => {
+    // updates-by-home S4: Mi pi's "Update Gentle Shell" installs the version the
+    // pane measured. With no stable one measured the pane says so in the app's own
+    // words - and the commands it does name are the same bytes in both languages.
+    setLanguage('en')
+    const pane = draw(
+      updates({
+        shell: { current: '4.8.0', latest: '4.9.0-main.abc123', update_available: true },
+      }),
+      0,
+      'link',
+    )
+    expect(pane.textContent).toContain('Without a measured stable version, nothing is installed.')
+    expect(pane.textContent).toContain('pi update')
+    expect(pane.textContent).not.toContain('pi install')
+
+    setLanguage('es')
+    await tick()
+
+    expect(pane.textContent).toContain('Sin una versión estable medida, no se instala nada.')
+    expect(pane.textContent).toContain('pi update')
+    expect(pane.textContent).not.toContain('pi install')
 
     setLanguage('en')
   })

@@ -72,6 +72,10 @@ export function snapshotOf(view: ViewState): SettingsSnapshot {
     auth: view.auth,
     updates: view.updates,
     usage: view.usage,
+    // The environment check has not run in a pushed slice (0.9.0 general T2):
+    // the dialog's own load is what reads it, so a test that only wants the push
+    // drawn sets this when it cares.
+    general: { tools: [], checked_ms: null },
   }
 }
 

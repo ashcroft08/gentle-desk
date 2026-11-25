@@ -21,6 +21,7 @@
 
 use std::collections::BTreeSet;
 use std::fmt;
+use std::time::Duration;
 
 use serde_json::{json, Map, Value};
 
@@ -327,6 +328,20 @@ pub enum ChannelReply {
 /// as a [`ChannelReply`] so the caller decides what to do.
 pub trait DesktopChannel: Send + Sync {
     fn exchange(&self, request: &DesktopRequest) -> ChannelReply;
+
+    /// [`DesktopChannel::exchange`] under a deadline THIS ask names.
+    ///
+    /// The channel's own bound is one default for every method; a method whose
+    /// bound is longer (pi's `get_update_status` with `refresh: true` is bounded
+    /// at 15 s, while the desktop channel's default is 5 s) names its own here.
+    /// The default ignores the deadline and is `exchange`, so a channel with one
+    /// fixed bound - a test's fake - keeps working and keeps its own timeout;
+    /// the real channel overrides it, and an ask that overruns answers
+    /// [`ChannelReply::Timeout`] exactly like a plain one.
+    fn exchange_within(&self, request: &DesktopRequest, deadline: Duration) -> ChannelReply {
+        let _ = deadline;
+        self.exchange(request)
+    }
 }
 
 /// A shared channel is a channel, so a test (or a caller that shares one) can
@@ -334,6 +349,12 @@ pub trait DesktopChannel: Send + Sync {
 impl<T: DesktopChannel + ?Sized> DesktopChannel for std::sync::Arc<T> {
     fn exchange(&self, request: &DesktopRequest) -> ChannelReply {
         (**self).exchange(request)
+    }
+
+    /// Forwarded, so a shared channel keeps the deadline an ask names instead of
+    /// silently falling back to its default.
+    fn exchange_within(&self, request: &DesktopRequest, deadline: Duration) -> ChannelReply {
+        (**self).exchange_within(request, deadline)
     }
 }
 
@@ -412,7 +433,26 @@ impl<C: DesktopChannel> DesktopClient<C> {
     /// "clients must not infer support"). A failed call leaves the client
     /// unconnected, exactly as it was.
     pub fn connect(&mut self) -> DesktopOutcome {
-        let outcome = self.send(CAPABILITIES, json!({}));
+        self.resolve(None)
+    }
+
+    /// Asks `capabilities` under the deadline named for THIS ask, for a caller
+    /// whose child may still be starting.
+    ///
+    /// A freshly spawned child answers no desktop request until it is ready, and
+    /// every request sent before that is answered at once when it becomes ready -
+    /// so a plain 5 s connect fails on a child that is a few seconds away, and a
+    /// caller with its own longer bound (the explicit packages check) names it
+    /// here. Everything else is [`DesktopClient::connect`]'s: the same cache, the
+    /// same leave-it-unconnected failure.
+    pub fn connect_within(&mut self, deadline: Duration) -> DesktopOutcome {
+        self.resolve(Some(deadline))
+    }
+
+    /// The one `capabilities` exchange both [`DesktopClient::connect`] and
+    /// [`DesktopClient::connect_within`] make.
+    fn resolve(&mut self, deadline: Option<Duration>) -> DesktopOutcome {
+        let outcome = self.send(CAPABILITIES, json!({}), deadline);
         self.capabilities = match &outcome {
             DesktopOutcome::Data { data, .. } => DesktopCapabilities::from_data(data),
             _ => None,
@@ -426,10 +466,26 @@ impl<C: DesktopChannel> DesktopClient<C> {
     /// limit, when `capabilities` was never resolved, or when the cached
     /// contract does not list the method. Everything else is one round trip.
     pub fn ask(&mut self, method: &str, params: Value) -> DesktopOutcome {
-        self.send(method, params)
+        self.send(method, params, None)
     }
 
-    fn send(&mut self, method: &str, params: Value) -> DesktopOutcome {
+    /// Asks one method with `params` under the deadline named for THIS ask, for a
+    /// method whose own bound is longer than the channel's default.
+    ///
+    /// Everything else is [`DesktopClient::ask`]'s: the same contract limits, the
+    /// same cached capabilities, one round trip - and an overrun is the same
+    /// [`NoAnswer::TimedOut`], so a caller that words its own deadline reads it
+    /// without learning a second failure shape.
+    pub fn ask_within(
+        &mut self,
+        method: &str,
+        params: Value,
+        deadline: Duration,
+    ) -> DesktopOutcome {
+        self.send(method, params, Some(deadline))
+    }
+
+    fn send(&mut self, method: &str, params: Value, deadline: Option<Duration>) -> DesktopOutcome {
         let request =
             match DesktopRequest::new(format!("desktop-{}", self.asked + 1), method, params) {
                 Ok(request) => request,
@@ -447,7 +503,11 @@ impl<C: DesktopChannel> DesktopClient<C> {
             }
         }
         self.asked += 1;
-        interpret(&request, self.channel.exchange(&request))
+        let reply = match deadline {
+            Some(deadline) => self.channel.exchange_within(&request, deadline),
+            None => self.channel.exchange(&request),
+        };
+        interpret(&request, reply)
     }
 }
 

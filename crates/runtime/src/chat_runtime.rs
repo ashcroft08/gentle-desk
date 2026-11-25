@@ -23,6 +23,7 @@ mod events;
 mod execute;
 mod host;
 mod open;
+mod packages;
 mod profile;
 mod rekey;
 mod stop;
@@ -30,6 +31,10 @@ mod stop;
 pub use events::Converted;
 pub use execute::Outcome;
 pub use open::request_after_open;
+pub use packages::{
+    check_packages, packages_status, PackagesItem, PackagesRead, PackagesState, PackagesStatus,
+    GET_UPDATE_STATUS, MAX_ITEMS, REFRESH_DEADLINE,
+};
 pub use profile::{
     ChainWriteResult, ChatChainWrite, ChatConfigRead, ChatModeWrite, ChatPinWrite,
     ChatProfileApply, ModeWriteResult, PinLayerState, PinSlot, PinWriteResult, PinsRead, StoreRead,

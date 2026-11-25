@@ -33,6 +33,13 @@ export interface SettingsCopy {
   searchPlaceholder: string
   /** The one quiet line when the query leaves no entry in the rail. */
   noMatches: string
+  /**
+   * The rail's update dot in words (packages-status S8, T5): the
+   * "Actualizaciones" entry's DESCRIPTION while something waits, so the promise
+   * is never the colour alone. The entry's own name is not touched - it stays
+   * the word it has always been, which is what a user and a test look it up by.
+   */
+  updateWaiting: string
   /** The name of the theme card grid in the Appearance section. */
   themeGroup: string
   /** Each section's word, for the rail entry and the pane's heading. */
@@ -77,8 +84,10 @@ const ENGLISH: SettingsCopy = {
   searchLabel: 'Find a setting',
   searchPlaceholder: 'Find a setting…',
   noMatches: 'No settings match.',
+  updateWaiting: 'An update is available',
   themeGroup: 'Theme',
   titles: {
+    general: 'General',
     appearance: 'Appearance',
     home: 'Shell home',
     updates: 'Updates',
@@ -89,6 +98,8 @@ const ENGLISH: SettingsCopy = {
     about: 'About',
   },
   hints: {
+    // Verbatim from the approved artboard's G4 table (0.9.0 general S2).
+    general: 'What this app needs on the machine, and how to fix what is missing.',
     appearance: 'The look of this window.',
     home: 'Which pi this shell runs on.',
     updates: 'What this machine runs, and whether something newer is out.',
@@ -117,8 +128,10 @@ const SPANISH: typeof ENGLISH = {
   searchLabel: 'Buscar un ajuste',
   searchPlaceholder: 'Buscar un ajuste…',
   noMatches: 'Ningún ajuste coincide.',
+  updateWaiting: 'Hay una actualización disponible',
   themeGroup: 'Tema',
   titles: {
+    general: 'General',
     appearance: 'Apariencia',
     home: 'Home del shell',
     updates: 'Actualizaciones',
@@ -129,6 +142,7 @@ const SPANISH: typeof ENGLISH = {
     about: 'Acerca de',
   },
   hints: {
+    general: 'Lo que esta app necesita en la máquina, y cómo se arregla lo que falta.',
     appearance: 'El aspecto de esta ventana.',
     home: 'En qué pi corre este shell.',
     updates: 'Lo que corre en esta máquina y si hay algo más nuevo.',

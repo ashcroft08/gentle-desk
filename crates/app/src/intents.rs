@@ -145,7 +145,8 @@ fn single_chat(mut state: AppState, intent: Intent) -> (AppState, Vec<Command>) 
         | Intent::OpenNewChat
         | Intent::EnsureStarted(_)
         | Intent::RestartChat(_)
-        | Intent::CloseChat(_) => (state, Vec::new()),
+        | Intent::CloseChat(_)
+        | Intent::CloseAllChats => (state, Vec::new()),
     }
 }
 

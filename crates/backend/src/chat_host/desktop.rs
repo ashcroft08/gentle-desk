@@ -184,6 +184,15 @@ impl HostDesktopChannel {
 
 impl DesktopChannel for HostDesktopChannel {
     fn exchange(&self, request: &DesktopRequest) -> ChannelReply {
+        self.exchange_within(request, self.deadline)
+    }
+
+    /// The same exchange under a deadline THIS ask names (the plain reads keep
+    /// [`DEFAULT_DESKTOP_DEADLINE`]; pi's `refresh` is bounded at 15 s, so the
+    /// explicit check names its own bound instead of failing inside this one).
+    /// The bound covers the write as well as the answer, exactly as the default
+    /// does.
+    fn exchange_within(&self, request: &DesktopRequest, deadline: Duration) -> ChannelReply {
         // The channel only exists for an interactive RPC host; everywhere else
         // it is inactive and nothing is written.
         if !self.host.interactive() {
@@ -212,7 +221,7 @@ impl DesktopChannel for HostDesktopChannel {
         // Detached: the abandoned writer is not joined, so a parked write can
         // never hold the caller.
         drop(writer);
-        match finished.recv_timeout(self.deadline) {
+        match finished.recv_timeout(deadline) {
             Ok(true) => {}
             Ok(false) => return ChannelReply::Closed,
             Err(RecvTimeoutError::Timeout) => return ChannelReply::Timeout,
@@ -220,7 +229,7 @@ impl DesktopChannel for HostDesktopChannel {
             Err(RecvTimeoutError::Disconnected) => return ChannelReply::Closed,
         }
         // Whatever the write left of the deadline is what the answer gets.
-        match wait.recv_timeout(self.deadline.saturating_sub(started.elapsed())) {
+        match wait.recv_timeout(deadline.saturating_sub(started.elapsed())) {
             Ok(reply) => reply,
             Err(RecvTimeoutError::Timeout) => ChannelReply::Timeout,
             Err(RecvTimeoutError::Disconnected) => ChannelReply::Closed,

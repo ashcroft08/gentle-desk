@@ -316,8 +316,11 @@ describe('the pane’s geometry', () => {
     expect(centred).toContain('overflow-y: auto')
   })
 
-  it('caps the composer’s column at 560 px', () => {
-    expect(rule('.chat-pane.is-fresh .composer-dock')).toContain('width: min(560px, 100%)')
+  it('caps the composer’s column at --fresh-max, 720 px, so its row is not cut', () => {
+    expect(rule('.chat-pane.is-fresh .composer-dock')).toContain('width: min(var(--fresh-max), 100%)')
+    // The hero over it takes the same column, so the two stay one block.
+    expect(rule('.new-session')).toContain('width: min(var(--fresh-max), 100%)')
+    expect(APP_CSS).toMatch(/--fresh-max:\s*720px\s*;/)
   })
 
   it('takes the thread’s place while the chat has no rows, keeping it mounted', () => {
@@ -338,12 +341,12 @@ describe('the pane’s geometry', () => {
 
   it('keeps the composer’s dock inside the pane at any size', () => {
     // The dock is the pane's own child now: it spans the column, and the box
-    // inside it decides its own width (560 px here, the thread's 880 px after).
+    // inside it decides its own width (720 px here, the thread's 880 px after).
     expect(rule('.chat-pane-dock')).toContain('width: 100%')
   })
 
   it('leaves the dock’s own width alone once the chat has rows', () => {
-    // PRESERVE: the 560 px column is view B's. With rows the box keeps the rule it
+    // PRESERVE: the narrower column is view B's. With rows the box keeps the rule it
     // always had, so it still lines up with the thread's messages.
     expect(rule('.composer-dock')).toContain('width: min(var(--chat-max), calc(100% - 48px))')
   })
