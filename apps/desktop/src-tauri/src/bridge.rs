@@ -89,13 +89,42 @@ pub type ChatCommandSink = Arc<dyn Fn(Vec<gentle_app::ChatCommand>) + Send + Syn
 /// answer is still cached, and the next fold pushes it.
 pub type BranchPush = Arc<dyn Fn() + Send + Sync>;
 
-/// Installed once at startup: what runs the explicit extensions check once per
-/// app run (packages-status T4, S7), when the FIRST chat's child is ready
-/// ([`AppStateHolder::note_child_ready`]). It starts its own thread and returns:
-/// it is called while a child event is being folded, so it must never block, and
-/// nothing runs while no chat has a child (which is the whole reason the trigger
-/// is a child's own event and never a launch step).
+/// Installed once at startup: what runs the explicit extensions check when a
+/// chat's child proves it is alive (packages-status T4, S7, T7). It starts its
+/// own thread and returns: it is called while a child event is being folded, so it
+/// must never block, and nothing runs while no chat has a child (which is the
+/// whole reason the trigger is a child's own event and never a launch step).
+///
+/// The holder decides WHETHER it runs ([`AppStateHolder::note_child_ready`]): the
+/// run's attempts last until one check ANSWERED, so the trigger may be called
+/// more than once per app run.
 pub type PackagesTrigger = Arc<dyn Fn() + Send + Sync>;
+
+/// How many automatic extensions checks one app run may start (packages-status
+/// T7). A check is retried while it answers nothing (`Unasked`, `Deadline`), and
+/// each try can cost the check's own long bound - twenty seconds - so the run's
+/// cost has to stop somewhere: five is enough for a fresh chat whose child is
+/// still starting and for a chat or two that decline, and small enough that a
+/// shell which never answers is not asked forever.
+pub const MAX_PACKAGES_ATTEMPTS: u32 = 5;
+
+/// The automatic extensions check of this app run, as the holder keeps it
+/// (packages-status T7): the retry rule is "until one check ANSWERED".
+///
+/// Consuming the run's one attempt on the ATTEMPT - the 0.9.0 rule - spent it on
+/// a check whose answer never came, which is how a fresh chat's decline or a
+/// connect that timed out meant the gear's dot never lit for the whole run.
+#[derive(Default)]
+struct PackagesAttempts {
+    /// How many checks this run has started.
+    attempts: u32,
+    /// Whether one is running right now: never two at once.
+    in_flight: bool,
+    /// Whether the shell has SPOKEN - one listing read or one refusal of its
+    /// own. Both stop the run's retries: asking again would ask the same child
+    /// the same question.
+    answered: bool,
+}
 
 /// The app state the Tauri shell owns. Created at startup, managed by Tauri;
 /// nothing else anywhere holds an `AppState`.
@@ -219,14 +248,14 @@ pub struct AppStateHolder {
     /// of re-deriving a "not checked yet" from a plain read. `None` until the
     /// first check answers.
     packages: Mutex<Option<crate::contract::PackagesView>>,
-    /// Installed once at startup: what starts the once-per-run extensions check
-    /// when the first chat's child is ready ([`Self::note_child_ready`]).
+    /// Installed once at startup: what starts the run's extensions check when a
+    /// chat's child is ready ([`Self::note_child_ready`]).
     packages_trigger: Mutex<Option<PackagesTrigger>>,
-    /// Set the first time a child's own event proves a chat is alive, so the
-    /// explicit check runs once per app run and no later event starts it again.
-    /// A check that failed or timed out does NOT retry on its own: the user's
-    /// "Comprobar de nuevo" is what runs it again (S7).
-    packages_check_started: std::sync::atomic::AtomicBool,
+    /// The run's automatic extensions check: how many attempts it has started,
+    /// whether one is running, and whether the shell has answered (packages-status
+    /// T7). Read and written only by [`Self::note_child_ready`] and
+    /// [`Self::note_packages_attempt`].
+    packages_check: Mutex<PackagesAttempts>,
     /// The Usage pane's slice: the subscription usage the shell's own sources
     /// reported when the pane last asked, and whether that read is running.
     usage: Mutex<UsageView>,
@@ -283,31 +312,40 @@ impl AppStateHolder {
         *lock(&self.branch_push) = Some(push);
     }
 
-    /// Installs what runs the once-per-run extensions check (packages-status T4,
-    /// S7). Armed with the window's emit step: a run with no window would start a
-    /// check nothing can show.
+    /// Installs what runs the run's automatic extensions check (packages-status
+    /// T4, S7, T7). Armed with the window's emit step: a run with no window would
+    /// start a check nothing can show.
     pub fn arm_packages_trigger(&self, trigger: PackagesTrigger) {
         *lock(&self.packages_trigger) = Some(trigger);
     }
 
-    /// The first chat's child is ready: a chat's own decoded event arrived, which
-    /// is the app's proof that some child is alive and answerable.
+    /// A chat's child is ready: a chat's own decoded event arrived, which is the
+    /// app's proof that some child is alive and answerable.
     ///
-    /// The trigger runs ONCE per app run (the flag is taken before it is called),
-    /// so a second chat, a second event or a re-opened chat never asks again. It
-    /// never runs at launch and never starts a child: this is only ever reached
-    /// from an event that child already sent. A failed check is not retried here -
-    /// only the user's own "Comprobar de nuevo" asks again (S7).
+    /// The trigger runs while the run's check has not ANSWERED yet (packages-status
+    /// T7): a check that asked nothing (`Unasked`) or timed out did not spend the
+    /// run's question, so the next chat's first event may try again - on a chat
+    /// whose child is now ready, or on the chat this one's gate could not name.
+    /// A check already running blocks a second one, and the attempts of one run
+    /// are capped at [`MAX_PACKAGES_ATTEMPTS`]. Nothing here ever runs at launch
+    /// and nothing starts a child: this is only reached from an event a child
+    /// already sent.
     pub fn note_child_ready(&self) {
-        if self.packages_check_started.load(Ordering::SeqCst) {
-            return;
-        }
         let trigger = lock(&self.packages_trigger).clone();
         let Some(trigger) = trigger else {
             return;
         };
-        if self.packages_check_started.swap(true, Ordering::SeqCst) {
-            return;
+        // The decision is made and the attempt recorded under one lock, which is
+        // then released: the trigger is called with NO lock held (it starts a
+        // thread, and a test's trigger reports its answer straight back).
+        {
+            let mut attempts = lock(&self.packages_check);
+            if attempts.answered || attempts.in_flight || attempts.attempts >= MAX_PACKAGES_ATTEMPTS
+            {
+                return;
+            }
+            attempts.attempts += 1;
+            attempts.in_flight = true;
         }
         trigger();
     }

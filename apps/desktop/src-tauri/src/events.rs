@@ -249,9 +249,9 @@ pub fn pump(source: Receiver<Converted>, holder: &AppStateHolder, push: Push) {
         let alive = child_alive(&converted);
         let (view, chat_commands) = holder.fold_event(input_of(converted));
         push(view);
-        // The slice is shown first, then the once-per-run extensions check starts
-        // on a thread of its own: this thread keeps delivering every chat's
-        // events and never waits on a child.
+        // The slice is shown first, then the run's automatic extensions check
+        // starts on a thread of its own (until one check answers, T7): this thread
+        // keeps delivering every chat's events and never waits on a child.
         if alive {
             holder.note_child_ready();
         }

@@ -1,20 +1,23 @@
 //! Reading which extensions are behind over one chat's own child (packages-status
 //! T1, S1, S2, S4, S5).
 //!
-//! Nothing here starts a child: the channel is a fake that answers what the test
-//! says and records every request it was asked, so the wire itself - one
-//! `get_update_status` ask, its params, and the typed answer it became - is what
-//! these tests assert.
+//! The wire itself is asserted here against a channel that answers what the test
+//! says and records every request it was asked; the gate and the retry rule live
+//! one layer up (`commands.rs`) and are proved there. The two scripted-child tests
+//! at the end are the exception: they open a REAL fake child through the host, so
+//! the key a FRESH `new-N` chat is asked over (T7) is the runtime's own.
 
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use gentle_app::{ChatCommand, ChatId};
 use gentle_core::rpc::{ChannelReply, DesktopChannel, DesktopClient, DesktopRequest, SCHEMA};
 use serde_json::{json, Value};
 
-use super::runtime;
+use super::fake::{Reply, Script};
+use super::{open, runtime};
 use crate::chat_runtime::{
-    check_packages, packages_status, PackagesRead, MAX_ITEMS, REFRESH_DEADLINE,
+    check_packages, packages_status, Outcome, PackagesRead, MAX_ITEMS, REFRESH_DEADLINE,
 };
 
 /// What a scripted child answers the one method this module asks.
@@ -489,10 +492,13 @@ fn a_plain_read_still_uses_the_channels_default_deadline() {
 }
 
 #[test]
-fn the_check_resolves_the_contract_first_when_the_client_has_none() {
+fn the_check_resolves_the_contract_first_on_its_own_long_deadline() {
     // The check is what makes the answer exist, so it asks for the contract when
-    // the chat's client never resolved one (its own 5 s default), then the
-    // refresh on the long bound.
+    // the chat's client never resolved one - and it asks for it on the LONG
+    // deadline too (packages-status T7). A freshly spawned child answers NO
+    // desktop request until it is ready (measured: ~14 s after spawn), so a
+    // connect on the channel's 5 s default fails on a child that is a few seconds
+    // from speaking and the check would never run.
     let channel = FakeChannel::new(ADVERTISED, Answer::Data(listing_of(&[])));
 
     let _ = check_packages(&mut DesktopClient::new(Arc::clone(&channel)));
@@ -500,9 +506,10 @@ fn the_check_resolves_the_contract_first_when_the_client_has_none() {
     assert_eq!(
         channel.deadlines(),
         vec![
-            ("capabilities".to_owned(), None),
+            ("capabilities".to_owned(), Some(REFRESH_DEADLINE)),
             ("get_update_status".to_owned(), Some(REFRESH_DEADLINE)),
-        ]
+        ],
+        "a child still starting is connected on the check's own long bound"
     );
 }
 
@@ -615,4 +622,135 @@ fn the_check_time_reads_the_shells_iso_instant_and_a_plain_number() {
         };
         assert_eq!(status.checked_ms, expected, "checkedAt = {checked_at}");
     }
+}
+
+/// packages-status T7, S7: a FRESH chat is askable over its own child.
+///
+/// The runtime keys a `new-N` chat by the key it registered when the chat was
+/// opened, so the check reaches the child that chat really started. This is what
+/// the gate had stopped naming - it re-derived a session path from the id text,
+/// and a chat with no session file yet has none - and the wire proves it: the
+/// refresh leaves for THAT child, on the same key, with the check's own params.
+#[test]
+fn a_fresh_chats_check_reaches_its_own_child() {
+    let script: Script = Arc::new(|method: &str, params: &Value| match method {
+        "capabilities" => Reply::Data(json!({
+            "schema": SCHEMA,
+            "command": "gentle:desktop",
+            "widget": "gentle-desktop-rpc",
+            "methods": ["capabilities", "get_update_status"],
+            "events": [],
+        })),
+        "get_update_status" => {
+            assert_eq!(
+                params,
+                &json!({"refresh": true}),
+                "the explicit check asks pi to run its own checks"
+            );
+            Reply::Data(listing(json!({
+                "available": true,
+                "truncated": false,
+                "items": [{
+                    "name": "gentle-pi",
+                    "current": "4.9.0",
+                    "state": "update_available",
+                }],
+            })))
+        }
+        _ => Reply::Refused {
+            code: "unsupported_method",
+        },
+    });
+    let (runtime, spawner, _events) = super::profile::answering(script);
+    let chat = ChatId::fresh();
+
+    let opened = runtime.execute(open(&chat));
+    assert!(
+        matches!(opened, Outcome::Opened { .. }),
+        "the fake child started: {opened:?}"
+    );
+
+    let read = runtime.check_packages(&chat);
+
+    let PackagesRead::Read(status) = read else {
+        panic!("a fresh chat's own child answered its listing: {read:?}");
+    };
+    assert_eq!(
+        status
+            .behind()
+            .map(|item| item.name.as_str())
+            .collect::<Vec<_>>(),
+        vec!["gentle-pi"],
+        "the listing is the one that child produced"
+    );
+    let key = spawner
+        .started()
+        .first()
+        .cloned()
+        .expect("the child started");
+    let written = spawner.written_to(&key);
+    assert!(
+        written
+            .iter()
+            .filter_map(|command| command.prompt_text())
+            .any(|prompt| prompt.contains(r#""method":"get_update_status""#)
+                && prompt.contains(r#""refresh":true"#)),
+        "the ask left for that chat's own child, on its own key"
+    );
+}
+
+/// packages-status T7: the chat in front is the one asked whenever the host has
+/// it; when it does not, another open chat that HAS a child is asked instead of
+/// nothing.
+#[test]
+fn the_chat_in_front_wins_and_another_live_chat_is_the_fallback() {
+    let (runtime, spawner) = runtime();
+    let other = ChatId::fresh();
+    runtime.execute(open(&other));
+    assert_eq!(spawner.started().len(), 1, "one child, for the open chat");
+
+    assert_eq!(
+        runtime.packages_chat(Some(&other)),
+        Some(other.clone()),
+        "the chat in front is asked, exactly as before"
+    );
+    assert_eq!(
+        runtime.packages_chat(None),
+        Some(other.clone()),
+        "no chat in front still names an open chat that can answer"
+    );
+    let stranger = ChatId::of_text("new-424242").expect("the fresh form");
+    assert_eq!(
+        runtime.packages_chat(Some(&stranger)),
+        Some(other),
+        "a chat this run never opened cannot answer, so another open one is asked"
+    );
+}
+
+/// packages-status T7: with no chat open at all, no chat is named - the zero-chat
+/// rule the pane's honest sentence rests on.
+#[test]
+fn no_open_chat_names_no_chat() {
+    let (runtime, spawner) = runtime();
+
+    assert_eq!(runtime.packages_chat(None), None);
+    assert_eq!(runtime.packages_chat(Some(&ChatId::fresh())), None);
+    assert!(spawner.started().is_empty(), "naming a chat starts nothing");
+}
+
+/// packages-status T7: a FRESH chat the runtime opened is asked by the command
+/// layer too - `ChatCommand` is what the app runs, and the id it holds is the
+/// text the gate reads back.
+#[test]
+fn opening_a_fresh_chat_registers_the_id_the_gate_reads_back() {
+    let (runtime, _spawner) = runtime();
+    let chat = ChatId::fresh();
+    runtime.execute(ChatCommand::OpenProcess { chat: chat.clone() });
+
+    assert_eq!(
+        ChatId::of_text(chat.as_str()),
+        Some(chat.clone()),
+        "the id text the UI holds is the fresh chat itself"
+    );
+    assert_eq!(runtime.packages_chat(Some(&chat)), Some(chat));
 }

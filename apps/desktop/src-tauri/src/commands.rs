@@ -376,9 +376,9 @@ impl Bridge {
             }
         }));
         self.pump.arm(push_via(emit.clone()));
-        // The once-per-run extensions check (packages-status T4, S7) is armed in
-        // this same step, before the pump starts delivering: a chat's own first
-        // event is what proves its child is alive (`EventPump::pump` calls
+        // The run's automatic extensions check (packages-status T4, S7, T7) is
+        // armed in this same step, before the pump starts delivering: a chat's own
+        // first event is what proves its child is alive (`EventPump::pump` calls
         // `note_child_ready`), and the check then runs on a thread of its own, so
         // neither the frame nor the dialog ever waits for it. Weak handles, like
         // the sinks above - the holder owns this trigger.
@@ -390,7 +390,7 @@ impl Bridge {
             else {
                 return;
             };
-            start_packages_check(&holder, &pump, &packages_emit);
+            start_automatic_packages_check(&holder, &pump, &packages_emit);
         }));
         // The folder dialog is owned by the window, so it is modal to the app
         // instead of to the desktop. The window exists only from this step, and
@@ -866,11 +866,11 @@ impl Bridge {
     }
 
     /// The explicit extensions check of this run (packages-status T4, S7): pi's
-    /// own update check over the chat in front's own child, run once, on a thread
-    /// of its own.
+    /// own update check over the chat the gate names, run once, on a thread of its
+    /// own.
     ///
-    /// It is what the Updates pane's "Comprobar de nuevo" asks, and what the
-    /// bridge runs by itself once per app run when the first chat's child is ready
+    /// It is what the Updates pane's "Comprobar de nuevo" asks, and the same check
+    /// the bridge runs by itself while no check has answered yet
     /// ([`AppStateHolder::note_child_ready`]). It never runs on the window's
     /// thread, never inside the Settings load, and never with no chat: the gate
     /// ([`asking_chat`]) then asks nothing and starts nothing.
@@ -992,14 +992,15 @@ impl Bridge {
 /// is in front when the dialog opens.
 ///
 /// It answers [`PackagesRead::Unasked`] - and touches NO host - while no chat is
-/// open (`open_chats` is the reducer's own gate and the pane's), while no chat is
-/// in front, and while this run never built a host at all: [`EventPump::runtime`]
-/// hands back the runtime it was fed and never builds one, so a Settings open can
-/// never start a child, arm the event thread or read the machine at launch (S2).
+/// open (`open_chats` is the reducer's own gate and the pane's) and while this run
+/// never built a host at all: [`EventPump::runtime`] hands back the runtime it was
+/// fed and never builds one, so a Settings open can never start a child, arm the
+/// event thread or read the machine at launch (S2).
 ///
-/// The id the slice carries is a chat's own text (`foreground_chat`, the
-/// `of_session` form); a fresh chat this run cannot name again is `Unasked`,
-/// never a guess at another chat's child.
+/// The id the slice carries is a chat's own text (`foreground_chat`), and the gate
+/// reads it through the app's own scheme, so a fresh `new-N` chat is asked like any
+/// other (T7); with a chat the runtime cannot name, another open chat is asked
+/// instead of nothing.
 fn packages_probe(
     pump: Arc<EventPump>,
     open_chats: u32,
@@ -1012,12 +1013,15 @@ fn packages_probe(
 }
 
 /// The chat this run may ask about its extensions, and the runtime to ask it
-/// through: `None` while no chat is open, while no chat is in front, while the
-/// id is not one a chat can be named by, and while this run never built a host.
+/// through: `None` while no chat is open and while this run never built a host.
 ///
 /// This is the ONE gate the plain read, the dialog's load and the explicit check
-/// share (packages-status T1, T4): all three answer [`PackagesRead::Unasked`] -
-/// touching no host and starting no child - when it declines.
+/// share (packages-status T1, T4, T7). It reads the id text through the app's own
+/// scheme ([`ChatId::of_text`]) - a fresh `new-N` chat included - and hands it to
+/// the runtime, which names the chat the way its own child was started
+/// ([`ChatRuntime::packages_chat`]): the chat in front when the host has that
+/// chat, else another open chat that can answer. `None` is nothing asked,
+/// nothing started and nothing touched.
 fn asking_chat(
     pump: &EventPump,
     open_chats: u32,
@@ -1026,25 +1030,56 @@ fn asking_chat(
     if open_chats == 0 {
         return None;
     }
-    let path = chat.as_deref().and_then(ChatId::session_path_of)?;
     let runtime = pump.runtime()?;
-    Some((runtime, ChatId::of_session(path)))
+    let preferred = chat.as_deref().and_then(ChatId::of_text);
+    let chat = runtime.packages_chat(preferred.as_ref())?;
+    Some((runtime, chat))
 }
 
 /// The explicit extensions check (packages-status T4, S7): pi's own check, run
-/// once, over the chat in front's own child, and the held block it becomes.
+/// once, over the chat the gate names, and the held block it becomes.
 ///
 /// It runs on a thread of its own - the ask names the check's long deadline - and
 /// never on the window's and never inside the Settings load's blocking worker, so
 /// neither the frame nor an open dialog waits for it. It runs nothing when the
-/// gate declines (no chat, no chat in front, no host): nothing is asked, nothing
-/// is started, nothing is touched, and the pane keeps its honest sentence.
+/// gate declines (no chat, no host): nothing is asked, nothing is started, nothing
+/// is touched, and the pane keeps its honest sentence.
+///
+/// This is the USER's ask ("Comprobar de nuevo"), so it touches nothing of the
+/// run's automatic rule: asking again is always allowed.
 pub fn start_packages_check(holder: &Arc<AppStateHolder>, pump: &Arc<EventPump>, emit: &Emit) {
+    let _ = spawn_packages_check(holder, pump, emit, false);
+}
+
+/// The app's own attempt (packages-status T7), started by a chat's own first
+/// event: the same check, plus the one thing the user's ask does not need - its
+/// outcome settles the run's retry rule
+/// ([`AppStateHolder::note_packages_attempt`]).
+pub fn start_automatic_packages_check(
+    holder: &Arc<AppStateHolder>,
+    pump: &Arc<EventPump>,
+    emit: &Emit,
+) {
+    if spawn_packages_check(holder, pump, emit, true).is_err() {
+        // No thread to run it on: nothing was asked, so this attempt must not keep
+        // the run's question (an `Unasked` never answers it).
+        holder.note_packages_attempt(&PackagesRead::Unasked);
+    }
+}
+
+/// The check itself, on a thread of its own, for either caller. `automatic` is
+/// whether what it comes to settles the run's retry rule.
+fn spawn_packages_check(
+    holder: &Arc<AppStateHolder>,
+    pump: &Arc<EventPump>,
+    emit: &Emit,
+    automatic: bool,
+) -> std::io::Result<()> {
     let view = holder.view();
     let pump = Arc::clone(pump);
     let holder = Arc::downgrade(holder);
     let emit = Arc::clone(emit);
-    let _ = std::thread::Builder::new()
+    std::thread::Builder::new()
         .name("packages-check".to_owned())
         .spawn(move || {
             let read = match asking_chat(&pump, view.open_chats, view.foreground_chat) {
@@ -1054,8 +1089,12 @@ pub fn start_packages_check(holder: &Arc<AppStateHolder>, pump: &Arc<EventPump>,
             let Some(holder) = holder.upgrade() else {
                 return;
             };
+            if automatic {
+                holder.note_packages_attempt(&read);
+            }
             note_packages(&holder, &read, &emit);
-        });
+        })
+        .map(|_thread| ())
 }
 
 /// What a finished explicit check does: the block it becomes is HELD as this
@@ -1606,17 +1645,23 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::{Arc, Mutex};
 
-    use gentle_app::{ChatId, Input, Intent};
+    use gentle_app::{ChatCommand, ChatId, Input, Intent};
     use gentle_backend::chat_host::{ChatHost, ChatKey, Child, Limits, ManualClock, Spawner};
     use gentle_core::i18n::Language;
     use gentle_core::rpc::config_store::{self, StoreId, StoreValue};
-    use gentle_runtime::chat_runtime::{ChatConfigRead, ChatRuntime, PackagesRead, StoreRead};
+    use gentle_runtime::chat_runtime::{
+        ChatConfigRead, ChatRuntime, Outcome, PackagesRead, StoreRead,
+    };
 
     use super::{fold_and_push, note_packages, packages_probe, Emit, Ran};
-    use crate::bridge::AppStateHolder;
+    use crate::bridge::{AppStateHolder, MAX_PACKAGES_ATTEMPTS};
     use crate::contract::{PackagesBehindView, PackagesView, ViewState};
     use crate::events::EventPump;
     use crate::settings_snapshot::{self, Reads, SettingsConfig};
+
+    /// The cap is what bounds one app run's cost, because a single try can take
+    /// the check's own long deadline.
+    const _: () = assert!(MAX_PACKAGES_ATTEMPTS <= 5);
 
     /// A spawner that starts nothing and counts every ask: the no-launch rule is
     /// asserted by this counter staying at zero.
@@ -1635,12 +1680,9 @@ mod tests {
         }
     }
 
-    /// packages-status T1, S2 and S3: a Settings load with no chat open asks NO
-    /// host - even a host that exists - and carries the honest block as a VALUE.
-    #[test]
-    fn a_load_with_no_chat_open_touches_no_host_and_carries_the_honest_block() {
-        // The host IS built and its runtime IS in the pump, so it is the chat gate
-        // that declines - not the absence of a runtime.
+    /// A pump that holds a host whose spawner starts nothing, plus that host's
+    /// counter: a test proves the gate touched nothing by leaving it at zero.
+    fn hosted() -> (Arc<EventPump>, Arc<ChatRuntime>, Arc<AtomicUsize>) {
         let spawns = Arc::new(AtomicUsize::new(0));
         let host = ChatHost::with_parts(
             Limits::default(),
@@ -1650,8 +1692,96 @@ mod tests {
             Arc::new(ManualClock::new()) as Arc<dyn gentle_backend::chat_host::Clock>,
         );
         let (runtime, events) = ChatRuntime::new(host);
+        let runtime = Arc::new(runtime);
         let pump = Arc::new(EventPump::new(Arc::new(AppStateHolder::default())));
-        pump.feed(Arc::new(runtime), events);
+        pump.feed(Arc::clone(&runtime), events);
+        (pump, runtime, spawns)
+    }
+
+    /// packages-status T7, S7: the chat the runtime really opened is the chat the
+    /// gate names - a FRESH `new-N` chat included, which has no session file yet.
+    ///
+    /// This is the maintainer's 0.9.0 build: several new chats open, and the gear's
+    /// dot and the block never lit because the gate read the id text as a session
+    /// path only, so a chat with no file was declined and nothing was ever asked.
+    #[test]
+    fn a_fresh_chat_in_front_is_the_chat_its_id_text_names() {
+        let (pump, runtime, spawns) = hosted();
+        let fresh = ChatId::fresh();
+        let opened = runtime.execute(ChatCommand::OpenProcess {
+            chat: fresh.clone(),
+        });
+        assert!(
+            matches!(opened, Outcome::OpenFailed { .. }),
+            "this spawner starts no child: {opened:?}"
+        );
+
+        assert_eq!(
+            super::asking_chat(&pump, 1, Some(fresh.as_str().to_owned())).map(|(_, chat)| chat),
+            Some(fresh),
+            "a new chat's own id text reaches the host key the runtime gave it"
+        );
+        assert_eq!(spawns.load(Ordering::SeqCst), 1, "only the test's own open");
+    }
+
+    /// packages-status T7: the stored form keeps asking exactly the chat it always
+    /// did, so the fix costs nothing to a session that has a file.
+    #[test]
+    fn a_stored_chat_in_front_is_still_asked() {
+        let (pump, _runtime, _spawns) = hosted();
+        let stored = ChatId::of_session("/sessions/a.jsonl");
+
+        assert_eq!(
+            super::asking_chat(&pump, 1, Some(stored.as_str().to_owned())).map(|(_, chat)| chat),
+            Some(stored)
+        );
+    }
+
+    /// packages-status T7: the chat in front is preferred, but one the host has no
+    /// key for cannot answer - the store or the runtime declined it. The gate then
+    /// names ANOTHER open chat the registry can reach instead of asking nothing at
+    /// all, which is what makes the check work with several chats open.
+    #[test]
+    fn a_front_chat_the_host_does_not_know_falls_back_to_another_open_chat() {
+        let (pump, runtime, spawns) = hosted();
+        let open = ChatId::fresh();
+        runtime.execute(ChatCommand::OpenProcess { chat: open.clone() });
+        // A first desktop request of that chat: its client is now in the
+        // registry, which is what "another open chat we can ask" means.
+        assert_eq!(runtime.read_packages(&open), PackagesRead::Unasked);
+
+        assert_eq!(
+            super::asking_chat(&pump, 2, Some("new-9999".to_owned())).map(|(_, chat)| chat),
+            Some(open),
+            "the front chat declined, so another open chat is the one asked"
+        );
+        assert_eq!(
+            spawns.load(Ordering::SeqCst),
+            1,
+            "the fallback starts no child of its own"
+        );
+    }
+
+    /// packages-status T7: a run with no host at all asks nothing, whatever the
+    /// view says about open chats.
+    #[test]
+    fn a_run_with_no_host_asks_nothing() {
+        let pump = Arc::new(EventPump::new(Arc::new(AppStateHolder::default())));
+
+        assert_eq!(
+            super::asking_chat(&pump, 1, Some("session:/sessions/a.jsonl".to_owned()))
+                .map(|(_, chat)| chat),
+            None
+        );
+    }
+
+    /// packages-status T1, S2 and S3: a Settings load with no chat open asks NO
+    /// host - even a host that exists - and carries the honest block as a VALUE.
+    #[test]
+    fn a_load_with_no_chat_open_touches_no_host_and_carries_the_honest_block() {
+        // The host IS built and its runtime IS in the pump, so it is the chat gate
+        // that declines - not the absence of a runtime.
+        let (pump, _runtime, spawns) = hosted();
 
         let probe = packages_probe(
             Arc::clone(&pump),
@@ -1818,26 +1948,160 @@ mod tests {
         assert_eq!(spawns.load(Ordering::SeqCst), 0, "nothing was started");
     }
 
-    /// packages-status T4, S7: the once-per-app-run trigger. A chat's own event is
-    /// what starts the check, the FIRST one only, and a run that never armed a
-    /// trigger starts nothing at all.
+    /// packages-status T4, S7: a run that never armed a trigger starts nothing at
+    /// all, and a child coming alive asks nothing.
     #[test]
-    fn the_first_ready_child_starts_the_check_once_and_only_once() {
+    fn nothing_armed_starts_nothing() {
         let holder = Arc::new(AppStateHolder::default());
-        // Nothing armed: a child coming alive starts nothing (a run with no
-        // window has nothing to show).
+
         holder.note_child_ready();
 
+        assert!(
+            holder.held_packages().is_none(),
+            "no trigger, no check, nothing held"
+        );
+    }
+
+    /// packages-status T7, S7: the automatic check runs until ONE check ANSWERED.
+    ///
+    /// The 0.9.0 rule took the run's only attempt before it knew the outcome, so
+    /// a decline - a fresh chat the gate could not name, or a connect that timed
+    /// out on a child still starting - meant no check ever ran in that app run.
+    /// Now a decline frees the next chat's first event to try again.
+    #[test]
+    fn a_declined_automatic_check_is_retried_by_a_later_chats_event() {
+        let holder = Arc::new(AppStateHolder::default());
+        let runs = Arc::new(AtomicUsize::new(0));
+        let counted = Arc::clone(&runs);
+        let reporting = Arc::clone(&holder);
+        holder.arm_packages_trigger(Arc::new(move || {
+            let attempt = counted.fetch_add(1, Ordering::SeqCst);
+            // The first chat asked nothing; the second one answered.
+            let read = if attempt == 0 {
+                PackagesRead::Unasked
+            } else {
+                checked_behind(&["gentle-pi"], false)
+            };
+            reporting.note_packages_attempt(&read);
+        }));
+
+        holder.note_child_ready();
+        holder.note_child_ready();
+        assert_eq!(
+            runs.load(Ordering::SeqCst),
+            2,
+            "a decline does not spend the run's check"
+        );
+        holder.note_child_ready();
+        assert_eq!(
+            runs.load(Ordering::SeqCst),
+            2,
+            "once a check ANSWERED, no later event asks again"
+        );
+    }
+
+    /// packages-status T7: a deadline is retried (the child was not ready); a
+    /// refusal is not (the shell said no, and asking again would say so again).
+    #[test]
+    fn a_deadline_is_retried_and_a_refusal_stops_the_run() {
+        for (answer, expected) in [
+            (PackagesRead::Deadline, 2),
+            (PackagesRead::Refused("unsupported_method".to_owned()), 1),
+        ] {
+            let holder = Arc::new(AppStateHolder::default());
+            let runs = Arc::new(AtomicUsize::new(0));
+            let counted = Arc::clone(&runs);
+            let reporting = Arc::clone(&holder);
+            let answered = answer.clone();
+            holder.arm_packages_trigger(Arc::new(move || {
+                counted.fetch_add(1, Ordering::SeqCst);
+                reporting.note_packages_attempt(&answered);
+            }));
+
+            holder.note_child_ready();
+            holder.note_child_ready();
+
+            assert_eq!(runs.load(Ordering::SeqCst), expected, "{answer:?}");
+        }
+    }
+
+    /// packages-status T7: the attempts of one app run are bounded, so a shell
+    /// that never answers costs a handful of long waits and no more.
+    #[test]
+    fn the_automatic_check_stops_at_its_attempt_cap() {
+        let holder = Arc::new(AppStateHolder::default());
+        let runs = Arc::new(AtomicUsize::new(0));
+        let counted = Arc::clone(&runs);
+        let reporting = Arc::clone(&holder);
+        holder.arm_packages_trigger(Arc::new(move || {
+            counted.fetch_add(1, Ordering::SeqCst);
+            reporting.note_packages_attempt(&PackagesRead::Deadline);
+        }));
+
+        for _ in 0..(MAX_PACKAGES_ATTEMPTS + 4) {
+            holder.note_child_ready();
+        }
+
+        assert_eq!(
+            runs.load(Ordering::SeqCst),
+            MAX_PACKAGES_ATTEMPTS as usize,
+            "the cap is what bounds a shell that never answers"
+        );
+    }
+
+    /// packages-status T7: never two automatic checks at once. A check is in
+    /// flight until it answers, and the events of the chats already open keep
+    /// arriving while it runs.
+    #[test]
+    fn no_second_automatic_check_starts_while_one_is_in_flight() {
+        let holder = Arc::new(AppStateHolder::default());
         let runs = Arc::new(AtomicUsize::new(0));
         let counted = Arc::clone(&runs);
         holder.arm_packages_trigger(Arc::new(move || {
             counted.fetch_add(1, Ordering::SeqCst);
         }));
+
         holder.note_child_ready();
         holder.note_child_ready();
-        // The FIRST chat's child is what asks, and a second chat's - or a reopened
-        // one - never asks again in the same app run.
+        holder.note_child_ready();
+        assert_eq!(runs.load(Ordering::SeqCst), 1, "one check at a time");
+
+        // The running check answers "not yet": the guard is released, and the
+        // next chat's first event may try again.
+        holder.note_packages_attempt(&PackagesRead::Deadline);
+        holder.note_child_ready();
+
+        assert_eq!(runs.load(Ordering::SeqCst), 2);
+    }
+
+    /// packages-status T7, S7: with no chat open the automatic check asks nothing
+    /// and starts no child, exactly as the explicit one does.
+    #[test]
+    fn the_automatic_check_with_no_chat_open_asks_nothing() {
+        let (pump, _runtime, spawns) = hosted();
+        let holder = Arc::new(AppStateHolder::default());
+        let runs = Arc::new(AtomicUsize::new(0));
+        let counted = Arc::clone(&runs);
+        let gate = Arc::clone(&pump);
+        let reporting = Arc::clone(&holder);
+        holder.arm_packages_trigger(Arc::new(move || {
+            counted.fetch_add(1, Ordering::SeqCst);
+            // The gate `start_packages_check` asks first.
+            assert!(
+                super::asking_chat(&gate, 0, None).is_none(),
+                "no chat open is nothing to ask"
+            );
+            reporting.note_packages_attempt(&PackagesRead::Unasked);
+        }));
+
+        holder.note_child_ready();
+
         assert_eq!(runs.load(Ordering::SeqCst), 1);
+        assert_eq!(spawns.load(Ordering::SeqCst), 0, "nothing was started");
+        assert!(
+            holder.held_packages().is_none(),
+            "nothing was asked, so nothing is held"
+        );
     }
 
     /// One chat's profile read, as the channel's own parser answers it: the

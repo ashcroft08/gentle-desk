@@ -226,9 +226,16 @@ pub fn packages_status<C: DesktopChannel>(client: &mut DesktopClient<C>) -> Pack
 /// desktop request follows: the check is what makes the answer exist, so it is
 /// worth the one extra bounded exchange, and a failed connection is retried on
 /// the next check instead of poisoning the chat.
+///
+/// That connection is asked on [`REFRESH_DEADLINE`] too (packages-status T7): a
+/// freshly spawned child answers NO desktop request until it is ready - measured
+/// at ~14 s after spawn, with everything sent earlier answered at once at that
+/// moment - so a connect on the channel's 5 s default fails on a child that was
+/// only a few seconds away, and the run's one automatic check would be spent on
+/// that failure.
 pub fn check_packages<C: DesktopChannel>(client: &mut DesktopClient<C>) -> PackagesRead {
     if client.capabilities().is_none() {
-        client.connect();
+        client.connect_within(REFRESH_DEADLINE);
     }
     let outcome = client.ask_within(GET_UPDATE_STATUS, refresh(), REFRESH_DEADLINE);
     read_of(outcome)
@@ -328,6 +335,49 @@ impl ChatRuntime {
         // same sequence as that chat's other desktop requests.
         let mut client = super::lock(&client);
         check_packages(&mut client)
+    }
+
+    /// The chat a packages read or check must ask, named the way the RUNTIME
+    /// names chats (packages-status T7), or `None` when no open chat can answer.
+    ///
+    /// `preferred` - the chat in front - wins whenever the host has a key for
+    /// it: a stored chat answers the session path the host knows, and a FRESH
+    /// `new-N` chat answers the key registered when it was opened, so a chat with
+    /// no session file yet is askable from its first second. Re-deriving a
+    /// session path from an id is exactly what made a new chat unaskable, so
+    /// nothing here reads the id text.
+    ///
+    /// When the host has no key for the chat in front (never opened, or this run
+    /// cannot name it), another open chat is the answer instead of nothing: one
+    /// the host has a live child for, else one the registry already holds a
+    /// desktop client for. `None` only when there is no such chat, which is what
+    /// keeps the zero-chat rule.
+    pub fn packages_chat(&self, preferred: Option<&ChatId>) -> Option<ChatId> {
+        {
+            let keys = self.keys();
+            if let Some(chat) = preferred {
+                if keys.key_of(chat).is_some() {
+                    return Some(chat.clone());
+                }
+            }
+        }
+        // Read the registry lock last and drop it before the clients lock is
+        // taken: no lock here is ever held across another.
+        let live = {
+            let keys = self.keys();
+            let live = self.host.live_keys();
+            live.iter()
+                .filter_map(|key| keys.id_of(key))
+                .find(|chat| Some(chat) != preferred)
+        };
+        if let Some(live) = live {
+            return Some(live);
+        }
+        let clients = super::lock(&self.clients);
+        clients
+            .keys()
+            .find(|chat| Some(*chat) != preferred)
+            .cloned()
     }
 }
 /// The check time as the shell reports it: `isoTime`'s ISO instant, or a plain

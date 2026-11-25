@@ -433,7 +433,26 @@ impl<C: DesktopChannel> DesktopClient<C> {
     /// "clients must not infer support"). A failed call leaves the client
     /// unconnected, exactly as it was.
     pub fn connect(&mut self) -> DesktopOutcome {
-        let outcome = self.send(CAPABILITIES, json!({}), None);
+        self.resolve(None)
+    }
+
+    /// Asks `capabilities` under the deadline named for THIS ask, for a caller
+    /// whose child may still be starting.
+    ///
+    /// A freshly spawned child answers no desktop request until it is ready, and
+    /// every request sent before that is answered at once when it becomes ready -
+    /// so a plain 5 s connect fails on a child that is a few seconds away, and a
+    /// caller with its own longer bound (the explicit packages check) names it
+    /// here. Everything else is [`DesktopClient::connect`]'s: the same cache, the
+    /// same leave-it-unconnected failure.
+    pub fn connect_within(&mut self, deadline: Duration) -> DesktopOutcome {
+        self.resolve(Some(deadline))
+    }
+
+    /// The one `capabilities` exchange both [`DesktopClient::connect`] and
+    /// [`DesktopClient::connect_within`] make.
+    fn resolve(&mut self, deadline: Option<Duration>) -> DesktopOutcome {
+        let outcome = self.send(CAPABILITIES, json!({}), deadline);
         self.capabilities = match &outcome {
             DesktopOutcome::Data { data, .. } => DesktopCapabilities::from_data(data),
             _ => None,

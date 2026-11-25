@@ -49,6 +49,24 @@ impl AppStateHolder {
         lock(&self.packages).clone()
     }
 
+    /// One AUTOMATIC attempt of the run's extensions check came to `read`
+    /// (packages-status T7).
+    ///
+    /// It settles the run's retry rule and nothing else: the block itself is held
+    /// and pushed by [`Self::note_packages`], the same step the user's own check
+    /// takes. A check that asked nothing (`Unasked`) or timed out (`Deadline`) did
+    /// NOT spend the run's question, so the next chat's first event may try again:
+    /// on a chat whose child was ready then, or on the one this gate could not
+    /// name. A listing read, or the shell's own refusal, stops the retries - asking
+    /// that child again would ask the same question.
+    pub fn note_packages_attempt(&self, read: &PackagesRead) {
+        let mut attempts = lock(&self.packages_check);
+        attempts.in_flight = false;
+        if matches!(read, PackagesRead::Read(_) | PackagesRead::Refused(_)) {
+            attempts.answered = true;
+        }
+    }
+
     /// The block the Settings dialog draws (T4, S7): the checked answer this run
     /// holds when it carries a listing, else the plain read's own derivation.
     ///
