@@ -278,18 +278,21 @@ p {
 }
 
 /* The composer is the protagonist in view B, so it is narrower than the column it
-   lines up with once there are rows. */
+   lines up with once there are rows - but wide enough for its own row: the model,
+   the effort, the folder's name and the branch fit without being cut to `...`
+   (the maintainer, 0.9.0: at 560 the folder read `Kallari_Pagina_...` and the
+   branch `mas...`). */
 .chat-pane.is-fresh .composer-dock {
-  width: min(560px, 100%);
+  width: min(var(--fresh-max), 100%);
 }
 
 /* The hero itself: the rose, the title and the one line that names the folder,
-   over the same 560 px column the box under it takes (sheet B). */
+   over the same column the box under it takes (sheet B, `--fresh-max`). */
 .new-session {
   display: flex;
   flex-direction: column;
   align-items: center;
-  width: min(560px, 100%);
+  width: min(var(--fresh-max), 100%);
   text-align: center;
 }
 
@@ -327,6 +330,10 @@ p {
    way back, and the empty sides on a big screen cost less than that. */
 :root {
   --chat-max: 880px;
+  /* View B's column (the new-session hero and the box under it): between the
+     old 560, which cut the folder and the branch, and the thread's 880, so the
+     box is still the protagonist and not a copy of the conversation. */
+  --fresh-max: 720px;
 }
 
 /* The thread and its messages: the artboard's rules for `.thread`, `.thread-in`

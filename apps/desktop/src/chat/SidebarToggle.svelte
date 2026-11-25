@@ -29,5 +29,5 @@
   aria-expanded={!collapsed}
   onclick={onToggle}
 >
-  <Icon name="menu" size={18} />
+  <Icon name="panel-left" size={18} />
 </button>

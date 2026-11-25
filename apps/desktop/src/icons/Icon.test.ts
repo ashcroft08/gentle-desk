@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { render } from '@testing-library/svelte'
 import Icon from './Icon.svelte'
-import { MARK_LABELS, markLabelsCopy, type IconName, type MarkKind } from './shapes'
+import { ICON_SHAPES, MARK_LABELS, markLabelsCopy, type IconName, type MarkKind } from './shapes'
 
 const NAMES: IconName[] = [
   'plus',
@@ -17,6 +17,8 @@ const NAMES: IconName[] = [
   'info',
   // The Notifications rail entry (notifications T4): Lucide's `bell`.
   'bell',
+  // The sidebar toggle (0.9.0): Lucide's `panel-left`, in place of `menu`.
+  'panel-left',
 ]
 
 describe('Icon', () => {
@@ -34,6 +36,19 @@ describe('Icon', () => {
       expect(container.querySelectorAll('path, circle').length).toBeGreaterThan(0)
       unmount()
     }
+  })
+
+  // The maintainer's 0.9.0 note: the sidebar toggle reads as a PANEL (the window
+  // and the line that marks its side column), not as a menu's three lines. The
+  // old `menu` name is gone, so nothing can draw the three lines by accident.
+  it('draws the sidebar toggle as a window with its side column', () => {
+    const { container } = render(Icon, { props: { name: 'panel-left' } })
+    const paths = [...container.querySelectorAll('path')].map((path) => path.getAttribute('d'))
+    expect(paths).toEqual([
+      'M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z',
+      'M9 3v18',
+    ])
+    expect(Object.keys(ICON_SHAPES)).not.toContain('menu')
   })
 
   it('draws the plus of the design artboard exactly', () => {
