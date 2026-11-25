@@ -7,12 +7,15 @@
 //! these tests assert.
 
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use gentle_core::rpc::{ChannelReply, DesktopChannel, DesktopClient, DesktopRequest, SCHEMA};
 use serde_json::{json, Value};
 
 use super::runtime;
-use crate::chat_runtime::{packages_status, PackagesRead, MAX_ITEMS};
+use crate::chat_runtime::{
+    check_packages, packages_status, PackagesRead, MAX_ITEMS, REFRESH_DEADLINE,
+};
 
 /// What a scripted child answers the one method this module asks.
 #[derive(Debug, Clone)]
@@ -25,12 +28,21 @@ enum Answer {
     Silence,
 }
 
+/// One request the fake was handed: the method, its params, and the deadline
+/// the caller named for THAT ask (`None` for the channel's own default).
+#[derive(Debug, Clone, PartialEq)]
+struct Asked {
+    method: String,
+    params: Value,
+    within: Option<Duration>,
+}
+
 /// A channel that records every request and answers `capabilities` with
 /// `methods`, and every later request with `answer`.
 struct FakeChannel {
     methods: &'static [&'static str],
     answer: Answer,
-    asked: Mutex<Vec<(String, Value)>>,
+    asked: Mutex<Vec<Asked>>,
 }
 
 impl FakeChannel {
@@ -44,16 +56,33 @@ impl FakeChannel {
 
     /// The methods this channel was asked, in order, with their params.
     fn asked(&self) -> Vec<(String, Value)> {
+        self.recorded()
+            .into_iter()
+            .map(|asked| (asked.method, asked.params))
+            .collect()
+    }
+
+    /// Every request with the deadline the caller named for it, so a test can
+    /// tell an ask that took its own deadline from one on the channel's default.
+    fn deadlines(&self) -> Vec<(String, Option<Duration>)> {
+        self.recorded()
+            .into_iter()
+            .map(|asked| (asked.method, asked.within))
+            .collect()
+    }
+
+    fn recorded(&self) -> Vec<Asked> {
         self.asked.lock().unwrap().clone()
     }
-}
 
-impl DesktopChannel for FakeChannel {
-    fn exchange(&self, request: &DesktopRequest) -> ChannelReply {
-        self.asked
-            .lock()
-            .unwrap()
-            .push((request.method().to_owned(), request.params().clone()));
+    /// Records `request` and answers it, the one behaviour both the plain
+    /// exchange and the one with its own deadline share.
+    fn answer(&self, request: &DesktopRequest, within: Option<Duration>) -> ChannelReply {
+        self.asked.lock().unwrap().push(Asked {
+            method: request.method().to_owned(),
+            params: request.params().clone(),
+            within,
+        });
         let id = request.request_id();
         if request.method() == "capabilities" {
             return reply_ok(id, json!({"methods": self.methods, "events": []}));
@@ -63,6 +92,18 @@ impl DesktopChannel for FakeChannel {
             Answer::Refused(code) => reply_refused(id, code),
             Answer::Silence => ChannelReply::Timeout,
         }
+    }
+}
+
+impl DesktopChannel for FakeChannel {
+    fn exchange(&self, request: &DesktopRequest) -> ChannelReply {
+        self.answer(request, None)
+    }
+
+    /// The seam an ask with its own deadline takes: recorded, so the test can
+    /// assert which bound the caller named.
+    fn exchange_within(&self, request: &DesktopRequest, deadline: Duration) -> ChannelReply {
+        self.answer(request, Some(deadline))
     }
 }
 
@@ -275,6 +316,226 @@ fn a_chat_with_no_child_is_unasked_and_touches_nothing() {
     assert!(
         spawner.started().is_empty(),
         "a read from Settings never starts a child"
+    );
+}
+
+/// The listing `states` names, one item each, as an `available` listing.
+fn listing_of(states: &[&str]) -> Value {
+    let items = states
+        .iter()
+        .enumerate()
+        .map(|(at, state)| json!({"name": format!("package-{at}"), "state": state}))
+        .collect::<Vec<_>>();
+    listing(json!({"available": true, "truncated": false, "items": items}))
+}
+
+/// The one `get_update_status` answer of a channel scripted with `answer`, read
+/// as a listing.
+fn status_of(answer: Value) -> crate::chat_runtime::PackagesStatus {
+    let channel = FakeChannel::new(ADVERTISED, Answer::Data(answer));
+    let PackagesRead::Read(status) = packages_status(&mut connected(&channel)) else {
+        panic!("the child answered its listing");
+    };
+    status
+}
+
+#[test]
+fn a_listing_pi_reported_on_for_every_item_is_checked_and_up_to_date() {
+    // S6: pi's own check ran for every extension and nothing is behind. THIS is
+    // the only shape that may be drawn as "up to date".
+    let status = status_of(listing_of(&["no_update_reported", "no_update_reported"]));
+
+    assert!(status.available);
+    assert!(!status.unknown(), "the listing was read");
+    assert!(
+        !status.unchecked(),
+        "every checkable item carries pi's own answer, so the listing IS checked"
+    );
+    assert_eq!(status.behind().count(), 0);
+    assert!(status.up_to_date());
+}
+
+#[test]
+fn one_unknown_item_is_unchecked_and_never_up_to_date() {
+    // S6's defect: with no refresh in that child pi reports every checkable
+    // package as `unknown`, so `available: true` with nothing behind is NOT
+    // "up to date" - nothing has been checked yet.
+    let status = status_of(listing_of(&["no_update_reported", "unknown"]));
+
+    assert!(status.available, "pi produced a listing");
+    assert!(!status.unknown(), "and it was read, so nothing failed");
+    assert!(
+        status.unchecked(),
+        "one item pi has not checked makes the listing not yet checked"
+    );
+    assert_eq!(status.behind().count(), 0);
+    assert!(
+        !status.up_to_date(),
+        "a listing nobody checked is never 'up to date'"
+    );
+}
+
+#[test]
+fn a_state_from_the_future_is_unchecked_too() {
+    // A state this build has not learned is not pi's answer that the item is
+    // current either: it reads as `unknown`, so it is not checked.
+    assert!(status_of(listing_of(&["reinstalling"])).unchecked());
+}
+
+#[test]
+fn behind_and_unchecked_together_are_two_separate_facts() {
+    // S6: a machine with one package behind AND one pi has not checked reads
+    // both ways at once - the count is drawn AND the listing is not yet complete.
+    let status = status_of(listing_of(&["update_available", "unknown"]));
+
+    assert_eq!(
+        status
+            .behind()
+            .map(|item| item.name.as_str())
+            .collect::<Vec<_>>(),
+        vec!["package-0"]
+    );
+    assert!(status.unchecked());
+    assert!(!status.up_to_date());
+}
+
+#[test]
+fn skipped_items_alone_are_not_checkable_so_nothing_is_unchecked() {
+    // S6: a skipped item is not one pi has to check, so `skipped` alone leaves
+    // the listing checked - and, with nothing behind it, up to date.
+    let status = status_of(listing_of(&["skipped", "no_update_reported"]));
+
+    assert!(!status.unchecked());
+    assert!(status.up_to_date());
+}
+
+#[test]
+fn a_listing_the_child_could_not_produce_is_unknown_and_never_unchecked() {
+    // S6 keeps the two facts apart: a read that did not produce a listing is
+    // `unknown` (the read could not run), never `unchecked` (nothing has run).
+    let status = status_of(listing(json!(
+        {"available": false, "items": [], "truncated": false}
+    )));
+
+    assert!(status.unknown());
+    assert!(!status.unchecked());
+    assert!(!status.up_to_date());
+}
+
+#[test]
+fn an_empty_checked_listing_is_up_to_date() {
+    // No extensions installed at all is pi's checked answer too, not a guess.
+    let status = status_of(listing_of(&[]));
+
+    assert!(status.available);
+    assert!(!status.unchecked());
+    assert!(status.up_to_date());
+}
+
+#[test]
+fn the_explicit_check_asks_for_a_refresh_on_its_own_longer_deadline() {
+    // S7: the ONE ask that runs pi's own check names `refresh: true` and takes a
+    // deadline of its own - the shell bounds its refresh at 15 s, so the
+    // channel's 5 s default is not it.
+    assert!(
+        REFRESH_DEADLINE > Duration::from_secs(5),
+        "the refresh is bounded longer than a plain read's 5 s: {REFRESH_DEADLINE:?}"
+    );
+    assert!(
+        REFRESH_DEADLINE >= Duration::from_secs(15),
+        "the shell's own bound is 15 s, so the ask must tolerate it"
+    );
+    let channel = FakeChannel::new(ADVERTISED, Answer::Data(listing_of(&[])));
+
+    let read = check_packages(&mut connected(&channel));
+
+    assert_eq!(
+        channel.asked(),
+        vec![
+            ("capabilities".to_owned(), json!({})),
+            ("get_update_status".to_owned(), json!({"refresh": true})),
+        ],
+        "the contract, then one ask - and the ask is the refresh"
+    );
+    assert_eq!(
+        channel.deadlines(),
+        vec![
+            ("capabilities".to_owned(), None),
+            ("get_update_status".to_owned(), Some(REFRESH_DEADLINE)),
+        ],
+        "the check's own deadline is what the channel was told"
+    );
+    let PackagesRead::Read(status) = read else {
+        panic!("the child answered its listing: {read:?}");
+    };
+    assert!(status.up_to_date());
+}
+
+#[test]
+fn a_plain_read_still_uses_the_channels_default_deadline() {
+    // S7 leaves the plain read exactly as it was: no deadline of its own.
+    let channel = FakeChannel::new(ADVERTISED, Answer::Data(listing_of(&[])));
+
+    let _ = packages_status(&mut connected(&channel));
+
+    assert_eq!(
+        channel.deadlines(),
+        vec![
+            ("capabilities".to_owned(), None),
+            ("get_update_status".to_owned(), None),
+        ],
+        "a plain read asks with the channel's default bound"
+    );
+}
+
+#[test]
+fn the_check_resolves_the_contract_first_when_the_client_has_none() {
+    // The check is what makes the answer exist, so it asks for the contract when
+    // the chat's client never resolved one (its own 5 s default), then the
+    // refresh on the long bound.
+    let channel = FakeChannel::new(ADVERTISED, Answer::Data(listing_of(&[])));
+
+    let _ = check_packages(&mut DesktopClient::new(Arc::clone(&channel)));
+
+    assert_eq!(
+        channel.deadlines(),
+        vec![
+            ("capabilities".to_owned(), None),
+            ("get_update_status".to_owned(), Some(REFRESH_DEADLINE)),
+        ]
+    );
+}
+
+#[test]
+fn a_check_the_child_never_answers_is_the_deadline() {
+    let channel = FakeChannel::new(ADVERTISED, Answer::Silence);
+
+    assert_eq!(
+        check_packages(&mut connected(&channel)),
+        PackagesRead::Deadline,
+        "a refresh that never answers is bounded, never a hang"
+    );
+}
+
+#[test]
+fn a_refused_check_is_the_owners_own_code() {
+    let channel = FakeChannel::new(ADVERTISED, Answer::Refused("unsupported_method"));
+
+    assert_eq!(
+        check_packages(&mut connected(&channel)),
+        PackagesRead::Refused("unsupported_method".to_owned())
+    );
+}
+
+#[test]
+fn a_check_of_a_chat_with_no_child_is_unasked_and_touches_nothing() {
+    let (runtime, spawner) = runtime();
+    let chat = gentle_app::ChatId::of_session("/sessions/never-opened.jsonl");
+
+    assert_eq!(runtime.check_packages(&chat), PackagesRead::Unasked);
+    assert!(
+        spawner.started().is_empty(),
+        "the explicit check never starts a child either"
     );
 }
 #[test]

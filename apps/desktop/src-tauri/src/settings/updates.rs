@@ -20,9 +20,10 @@
 //! The Extensions block is the fourth piece and it is NOT a probe of this module
 //! (packages-status T1): it is one open chat's own child answering pi's own
 //! `get_update_status` (`gentle_runtime::chat_runtime::packages`), and this module
-//! only derives the block's slice from that typed read ([`packages_view`]):
-//! `update_available` is behind, everything else is not, and a listing the child
-//! could not produce is "the read could not run" rather than "up to date".
+//! only derives the block's slice from that typed read ([`PackagesView::of`]):
+//! `update_available` is behind, everything else is not, a listing the child
+//! could not produce is "the read could not run", and one pi has not checked is
+//! "not checked yet" - never "up to date" (S6).
 //!
 //! Every read that fails is carried as a SHORT clause on its own row (S8, D12):
 //! the client's message names addresses and lives in English, so it is turned
@@ -63,7 +64,7 @@ pub const SHELL_REGISTRY: &str = "https://registry.npmjs.org/gentle-pi/latest";
 /// `now_ms` is the instant the check finished (S8): the pane words its last-checked
 /// line from it and never from a clock of its own.
 ///
-/// `packages` is the one open chat's extensions read (packages-status T1, S1-S5),
+/// `packages` is the one open chat's extensions read (packages-status T1, S1-S7),
 /// carried beside the rows as [`PackagesView`] and never instead of them: a chat
 /// that could not answer leaves the three version rows exactly as they are.
 ///
@@ -110,46 +111,82 @@ pub fn view(
             rule::stable_row(shell_installed.as_deref(), shell.version.as_deref()),
             shell.reason,
         ),
-        packages: packages_view(packages),
+        packages: PackagesView::of(packages),
     }
 }
 
 /// The Extensions block's slice, from what the one chat's child answered
-/// (packages-status T1, S1-S5).
+/// (packages-status T1, T4, S1-S7), and how the checked answer this run holds is
+/// reconciled with a plain read.
 ///
 /// The members are DERIVED and nothing is the child's own wording: only
 /// `update_available` is behind ([`PackagesStatus::behind`]), a listing the child
 /// could not produce (or a read that did not answer at all) is `unknown` - the
-/// block says the read could not run, never "up to date" (S1) - and a block with
-/// nothing asked is [`PackagesView::unasked`], today's honest sentence (S3) and
-/// the state an older shell degrades to (S5).
-fn packages_view(read: &PackagesRead) -> PackagesView {
-    match read {
-        PackagesRead::Read(status) => PackagesView {
-            available: status.available,
-            behind: status
-                .behind()
-                .map(|item| PackagesBehindView {
-                    name: item.name.clone(),
-                    current: item.current.clone(),
-                })
-                .collect(),
-            unknown: status.unknown(),
-            truncated: status.truncated,
-            checked: status.checked_ms,
-        },
-        // The read ran and did not answer, or the owner refused it: the block says
-        // the read could not run. Never "up to date".
-        PackagesRead::Deadline | PackagesRead::Refused(_) => PackagesView {
-            available: false,
-            behind: Vec::new(),
-            unknown: true,
-            truncated: false,
-            checked: None,
-        },
-        // Nothing was asked: no chat has a child to ask, or the shell does not
-        // advertise the method. The honest value, never an absence (S3, S5).
-        PackagesRead::Unasked => PackagesView::unasked(),
+/// block says the read could not run, never "up to date" (S1) - an item pi has
+/// not checked makes the listing `unchecked` (S6, its own words), and a block
+/// with nothing asked is [`PackagesView::unasked`], today's honest sentence (S3)
+/// and the state an older shell degrades to (S5).
+impl PackagesView {
+    /// The block one read becomes: the ONE derivation, shared by the dialog's
+    /// plain read, the explicit check the app runs (S7) and the answer Settings
+    /// prefers over a re-derivation.
+    pub(crate) fn of(read: &PackagesRead) -> Self {
+        match read {
+            PackagesRead::Read(status) => PackagesView {
+                available: status.available,
+                behind: status
+                    .behind()
+                    .map(|item| PackagesBehindView {
+                        name: item.name.clone(),
+                        current: item.current.clone(),
+                    })
+                    .collect(),
+                unknown: status.unknown(),
+                unchecked: status.unchecked(),
+                truncated: status.truncated,
+                checked: status.checked_ms,
+            },
+            // The read ran and did not answer, or the owner refused it: the block
+            // says the read could not run. Never "up to date" - and never
+            // `unchecked` either, because a read that failed is not a check that
+            // has not run.
+            PackagesRead::Deadline | PackagesRead::Refused(_) => PackagesView {
+                available: false,
+                behind: Vec::new(),
+                unknown: true,
+                unchecked: false,
+                truncated: false,
+                checked: None,
+            },
+            // Nothing was asked: no chat has a child to ask, or the shell does not
+            // advertise the method. The honest value, never an absence (S3, S5).
+            PackagesRead::Unasked => PackagesView::unasked(),
+        }
+    }
+
+    /// The block the Settings dialog draws: the checked answer this run HOLDS
+    /// when it carries a listing, else the plain read's own derivation (T4, S7).
+    ///
+    /// The two are reconciled by ONE rule and neither can hide the other's facts:
+    /// the plain read can only ever report what pi knew at that instant, so a
+    /// listing the explicit check produced is the better answer - it is the one
+    /// that ran, and it is what turns "not checked yet" into a real count. It
+    /// loses in exactly two cases: when it carries NO listing (a check that timed
+    /// out or was refused, where the plain read may still have answered), and when
+    /// pi's own `checked` instant on the plain read is LATER than the held one (the
+    /// shell refreshed in that same child after we did). Reading this is one lock
+    /// and a clone: the dialog never waits on the long check.
+    pub(crate) fn checked_over(held: Option<&Self>, plain: Self) -> Self {
+        let Some(held) = held else {
+            return plain;
+        };
+        if !held.available {
+            return plain;
+        }
+        match (held.checked, plain.checked) {
+            (Some(held_checked), Some(plain_checked)) if plain_checked > held_checked => plain,
+            _ => held.clone(),
+        }
     }
 }
 
@@ -367,7 +404,7 @@ mod tests {
             ],
         );
 
-        let view = packages_view(&read);
+        let view = PackagesView::of(&read);
 
         assert!(view.available);
         assert!(!view.unknown, "the listing was read");
@@ -385,7 +422,7 @@ mod tests {
 
     #[test]
     fn a_listing_the_child_could_not_read_is_unknown_and_never_up_to_date() {
-        let view = packages_view(&listing(false, Vec::new()));
+        let view = PackagesView::of(&listing(false, Vec::new()));
 
         assert!(!view.available);
         assert!(
@@ -401,10 +438,14 @@ mod tests {
             PackagesRead::Deadline,
             PackagesRead::Refused("not_found".to_owned()),
         ] {
-            let view = packages_view(&read);
+            let view = PackagesView::of(&read);
 
             assert!(!view.available, "{read:?}");
             assert!(view.unknown, "{read:?}");
+            assert!(
+                !view.unchecked,
+                "a read that failed is not a check that has not run: {read:?}"
+            );
             assert!(view.behind.is_empty(), "{read:?}");
             assert_eq!(view.checked, None, "{read:?}");
         }
@@ -412,7 +453,7 @@ mod tests {
 
     #[test]
     fn nothing_asked_is_the_blocks_honest_value_and_not_up_to_date() {
-        let view = packages_view(&nothing_asked());
+        let view = PackagesView::of(&nothing_asked());
 
         assert_eq!(view, PackagesView::unasked());
         assert!(!view.available, "nothing was read, so nothing is claimed");
@@ -420,7 +461,111 @@ mod tests {
             !view.unknown,
             "the block draws its own sentence here (S3), not a failed read"
         );
+        assert!(
+            !view.unchecked,
+            "nothing was asked, which is not a check that has not run either"
+        );
         assert!(view.behind.is_empty());
+    }
+
+    /// packages-status T4, S6: one item pi has not checked makes the listing
+    /// `unchecked` - its own state, and never "up to date".
+    #[test]
+    fn one_item_pi_has_not_checked_makes_the_listing_unchecked() {
+        let view = PackagesView::of(&listing(
+            true,
+            vec![
+                extension(
+                    "pi-usage-sources",
+                    Some("0.2.0"),
+                    PackagesState::NoUpdateReported,
+                ),
+                extension("a-bridge", None, PackagesState::Unknown),
+            ],
+        ));
+
+        assert!(view.available, "pi did produce a listing");
+        assert!(!view.unknown, "and it was read, so nothing failed");
+        assert!(
+            view.unchecked,
+            "S6: the shell reports every checkable package as unknown until it checks"
+        );
+        assert!(view.behind.is_empty(), "and nothing is behind yet");
+    }
+
+    /// packages-status T4, S6: every item answered by pi's own check - skipped ones
+    /// included, they are not checkable - leaves the listing checked.
+    #[test]
+    fn every_item_answered_leaves_the_listing_checked() {
+        let view = PackagesView::of(&listing(
+            true,
+            vec![
+                extension(
+                    "pi-usage-sources",
+                    Some("0.2.0"),
+                    PackagesState::NoUpdateReported,
+                ),
+                extension("skipped-one", None, PackagesState::Skipped),
+            ],
+        ));
+
+        assert!(!view.unchecked);
+        assert!(view.behind.is_empty());
+    }
+
+    /// packages-status T4, S6, S7: the dialog draws the block this run's explicit
+    /// check HELD when it carries a listing, because a plain read can only ever say
+    /// "not checked yet" - and the held block that failed loses to a plain read
+    /// that answered.
+    #[test]
+    fn the_checked_block_this_run_holds_wins_over_a_plain_derivation() {
+        let held = PackagesView::of(&listing(
+            true,
+            vec![extension(
+                "gentle-pi",
+                Some("4.9.0"),
+                PackagesState::UpdateAvailable,
+            )],
+        ));
+        let plain = PackagesView::of(&listing(
+            true,
+            vec![extension("gentle-pi", None, PackagesState::Unknown)],
+        ));
+        assert!(plain.unchecked, "the plain read is the S6 false 'al día'");
+
+        assert_eq!(
+            PackagesView::checked_over(Some(&held), plain.clone()),
+            held,
+            "the check's own answer is the one the pane draws"
+        );
+        // A held check that produced no listing is not an answer at all: the plain
+        // read may still have one.
+        let failed = PackagesView::of(&PackagesRead::Deadline);
+        assert_eq!(
+            PackagesView::checked_over(Some(&failed), plain.clone()),
+            plain
+        );
+        assert_eq!(
+            PackagesView::checked_over(None, plain.clone()),
+            plain,
+            "a run that never checked keeps the plain read"
+        );
+    }
+
+    /// packages-status T4, S7: pi's own check time decides between the two when
+    /// the shell refreshed in that same child AFTER our check answered.
+    #[test]
+    fn a_plain_read_pi_checked_later_is_the_fresher_one() {
+        let mut held = PackagesView::of(&listing(true, Vec::new()));
+        held.checked = Some(1_700_000_000_000.0);
+        let mut plain = PackagesView::of(&listing(true, Vec::new()));
+        plain.checked = Some(1_700_000_060_000.0);
+
+        assert_eq!(
+            PackagesView::checked_over(Some(&held), plain.clone()),
+            plain,
+            "a check time later than the held one is the fresher answer"
+        );
     }
 
     #[test]

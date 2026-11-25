@@ -8,13 +8,15 @@
 //! client a helper stop and the profile read use, which is what gives one chat ONE
 //! `requestId` counter - and never over a client of its own.
 //!
-//! ONE exchange, ONE deadline. The method is asked exactly once with
-//! `{refresh: false}`, a plain read of what pi already knows, under the channel's
-//! own deadline. `refresh: true` is deliberately never sent: the channel defines it
-//! as RUNNING the checks once, with a 15 s deadline of its own - longer than this
-//! channel's bound - and this app is a reader of pi's check, never the thing that
-//! starts it (S2, S4). A plain read that cannot answer packages leaves the honest
-//! state [`PackagesStatus::unknown`], never a forced check and never "up to date".
+//! ONE exchange, ONE deadline. A plain read asks the method exactly once with
+//! `{refresh: false}`, a memory-only read of what pi already knows, under the
+//! channel's own deadline (5 s). The EXPLICIT check (S7,
+//! [`check_packages`]) asks it once with `{refresh: true}`, which the channel
+//! defines as RUNNING pi's checks once under a 15 s bound of its own, so that one
+//! ask names its own longer deadline ([`REFRESH_DEADLINE`]) instead of failing
+//! inside a plain read's bound. A read that cannot answer packages leaves the
+//! honest state [`PackagesStatus::unknown`], never a forced check and never "up
+//! to date".
 //!
 //! Every outcome is typed and nothing is an error string on the wire: the chat has
 //! no child to ask ([`PackagesRead::Unasked`], which is also what a shell that does
@@ -30,6 +32,8 @@
 //! [`PackagesStatus::unknown`]. `latest` is not carried at all (it is always null
 //! today), and neither is a raw source, a `kind` or a `scope` (S4).
 
+use std::time::Duration;
+
 use serde_json::Value;
 
 use super::ChatRuntime;
@@ -38,6 +42,15 @@ use gentle_core::rpc::{DesktopChannel, DesktopClient, DesktopOutcome, NoAnswer};
 
 /// The method that reports pi's own update check, packages included.
 pub const GET_UPDATE_STATUS: &str = "get_update_status";
+
+/// How long the EXPLICIT check (packages-status T4, S7) waits for its answer.
+///
+/// The one ask that names `refresh: true` makes the shell run pi's own checks,
+/// which the contract bounds at 15 s; the channel's 5 s default is a plain read's
+/// bound and would cut the refresh short on a slow machine. Twenty seconds is
+/// that bound plus the answer's own trip, and it is still a bound: a child that
+/// never answers costs this one wait and nothing more.
+pub const REFRESH_DEADLINE: Duration = Duration::from_secs(20);
 
 /// The contract's own bound on one packages listing. The child reports
 /// `truncated` for what IT cut; this app never draws more than the same hundred,
@@ -137,6 +150,34 @@ impl PackagesStatus {
     pub fn unknown(&self) -> bool {
         !self.available
     }
+
+    /// Whether pi's own check has NOT run for the whole listing (S6): the child
+    /// produced a listing, but at least one extension it names is still
+    /// [`PackagesState::Unknown`].
+    ///
+    /// The shell reports a package as `update_available` only after its own check
+    /// ran, and reports every checkable package as `unknown` until it does - so a
+    /// listing with one `unknown` item is a listing nobody has checked, not a
+    /// machine that is up to date. An item whose state this build has not learned
+    /// reads as `unknown` too, and is not a claim that the item is current. A
+    /// listing that could not be read at all is [`Self::unknown`], never this: a
+    /// read that failed is not a check that has not run.
+    pub fn unchecked(&self) -> bool {
+        self.available
+            && self
+                .items
+                .iter()
+                .any(|item| item.state == PackagesState::Unknown)
+    }
+
+    /// Whether the listing says this machine is UP TO DATE (S6): the child
+    /// produced a listing, nothing is behind, and pi's own check ran for every
+    /// item. Anything else is not this claim - one `unknown` item is "not checked
+    /// yet", a `skipped` item is simply not checkable, and a listing that could
+    /// not be read is "the read could not run".
+    pub fn up_to_date(&self) -> bool {
+        self.available && !self.unchecked() && self.behind().next().is_none()
+    }
 }
 
 /// One extension pi's check reports, reduced to its display name, the version it
@@ -170,7 +211,33 @@ pub enum PackagesState {
 /// `get_update_status` ask with the plain-read params, under the channel's
 /// deadline.
 pub fn packages_status<C: DesktopChannel>(client: &mut DesktopClient<C>) -> PackagesRead {
-    match client.ask(GET_UPDATE_STATUS, plain_read()) {
+    let outcome = client.ask(GET_UPDATE_STATUS, plain_read());
+    read_of(outcome)
+}
+
+/// Runs pi's own update check over `client` and answers its listing (S7): the
+/// ONE ask that names `refresh: true`, on its own [`REFRESH_DEADLINE`].
+///
+/// This is the explicit check the user asks for ("Comprobar de nuevo") and the
+/// one the app runs once when the first chat's child is ready. It is still only a
+/// READ of pi's check: nothing here installs anything (S4).
+///
+/// Asks `capabilities` first when the client has none, the rule every other
+/// desktop request follows: the check is what makes the answer exist, so it is
+/// worth the one extra bounded exchange, and a failed connection is retried on
+/// the next check instead of poisoning the chat.
+pub fn check_packages<C: DesktopChannel>(client: &mut DesktopClient<C>) -> PackagesRead {
+    if client.capabilities().is_none() {
+        client.connect();
+    }
+    let outcome = client.ask_within(GET_UPDATE_STATUS, refresh(), REFRESH_DEADLINE);
+    read_of(outcome)
+}
+
+/// What one `get_update_status` answer became: the one mapping both the plain
+/// read and the explicit check share.
+fn read_of(outcome: DesktopOutcome) -> PackagesRead {
+    match outcome {
         DesktopOutcome::Data { data, .. } => PackagesRead::Read(PackagesStatus::of(&data)),
         DesktopOutcome::Rejected { error, .. } => PackagesRead::Refused(error.code),
         // Nothing was asked: no contract was resolved, or the child does not
@@ -178,6 +245,8 @@ pub fn packages_status<C: DesktopChannel>(client: &mut DesktopClient<C>) -> Pack
         DesktopOutcome::NoAnswer(NoAnswer::NotConnected) | DesktopOutcome::Unsupported { .. } => {
             PackagesRead::Unasked
         }
+        // A timeout, an inactive host, a closed child, a payload that is not this
+        // contract's: one bounded failure, never a state.
         DesktopOutcome::NoAnswer(_) => PackagesRead::Deadline,
         // The request broke a limit before it left, which the contract's own code
         // for that is: nothing was asked, so nothing is behind.
@@ -186,9 +255,17 @@ pub fn packages_status<C: DesktopChannel>(client: &mut DesktopClient<C>) -> Pack
 }
 
 /// The one params this app ever sends: a plain read, which the channel documents
-/// as memory-only. See the module's own note on why `refresh: true` is never sent.
+/// as memory-only. See the module's own note on why `refresh: true` is never sent
+/// on a plain read.
 fn plain_read() -> Value {
     serde_json::json!({ "refresh": false })
+}
+
+/// The explicit check's params: pi runs its own checks once for this answer
+/// (S7), bounded by the shell at 15 s - which is what [`REFRESH_DEADLINE`]
+/// tolerates.
+fn refresh() -> Value {
+    serde_json::json!({ "refresh": true })
 }
 
 /// One entry of the child's `items[]`, or `None` for one this app cannot draw
@@ -234,6 +311,23 @@ impl ChatRuntime {
         // meaningful; another chat's read runs in parallel.
         let mut client = super::lock(&client);
         packages_status(&mut client)
+    }
+
+    /// Runs pi's own update check over `chat`'s OWN child (packages-status T4,
+    /// S7) and answers the listing it produced.
+    ///
+    /// Blocking, and for longer than a plain read: the ask names
+    /// [`REFRESH_DEADLINE`], so the caller runs it on a thread of its own and
+    /// never on the window's, and never inside a snapshot load. A chat the host
+    /// has no key for answers [`PackagesRead::Unasked`] and touches nothing.
+    pub fn check_packages(&self, chat: &ChatId) -> PackagesRead {
+        let Some(client) = self.desktop_client(chat) else {
+            return PackagesRead::Unasked;
+        };
+        // One exchange per chat at a time: the check numbers its request on the
+        // same sequence as that chat's other desktop requests.
+        let mut client = super::lock(&client);
+        check_packages(&mut client)
     }
 }
 /// The check time as the shell reports it: `isoTime`'s ISO instant, or a plain

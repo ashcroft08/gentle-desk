@@ -158,6 +158,18 @@ export const commands = {
 	 */
 	settingsSnapshot: () => typedError<SettingsSnapshot_Serialize, string>(__TAURI_INVOKE("settings_snapshot")),
 	/**
+	 *  The explicit extensions check (packages-status T4, S7): pi's own update check,
+	 *  run once over the chat in front's own child.
+	 * 
+	 *  It takes no argument: the bridge knows which chat is in front and which child
+	 *  to ask. It returns the slice as it stands and does NOT wait for the check - the
+	 *  ask names the check's own long deadline (the shell bounds its refresh at 15 s)
+	 *  and runs on a thread of its own, so the button that asked is answered at once
+	 *  and the result arrives as the `state-changed` push that carries it. With no
+	 *  chat open nothing runs at all, and the pane keeps its honest sentence.
+	 */
+	checkPackages: () => typedError<ViewState_Serialize, string>(__TAURI_INVOKE("check_packages")),
+	/**
 	 *  Opens a visible terminal window on `action`: the shell's profiles screen, its
 	 *  login or logout, or its own update.
 	 * 
@@ -1849,7 +1861,17 @@ export type PackagesBehindView_Serialize = {
  *  `unknown` is a read that ran and could not produce a listing - the child said
  *  `available: false`, its answer carried no packages slice, or no answer came
  *  at all - so the block says the read could not run and never "up to date"
- *  (S1). "Up to date" is only ever `available: true` with an empty `behind`.
+ *  (S1).
+ * 
+ *  `unchecked` is the OTHER fact, and the one 0.9.0 had to add (S6): the child
+ *  produced a listing, but pi's own check has not run for every extension in it.
+ *  The shell reports a package as `update_available` only after its own check
+ *  ran and reports every checkable package as `unknown` until it does, so
+ *  `available: true` with nothing behind is a machine nobody has checked - not a
+ *  machine that is up to date. "Up to date" is only ever `available: true`,
+ *  `unchecked: false` and an empty `behind`; a machine with one package behind
+ *  AND one pi has not checked carries both, and `skipped` items alone leave the
+ *  listing checked (they are not checkable).
  * 
  *  [`Self::default`] is [`Self::unasked`], the value a block draws as its honest
  *  sentence (S3) and what an older shell that does not advertise the method
@@ -1870,7 +1892,17 @@ export type PackagesView = PackagesView_Serialize | PackagesView_Deserialize;
  *  `unknown` is a read that ran and could not produce a listing - the child said
  *  `available: false`, its answer carried no packages slice, or no answer came
  *  at all - so the block says the read could not run and never "up to date"
- *  (S1). "Up to date" is only ever `available: true` with an empty `behind`.
+ *  (S1).
+ * 
+ *  `unchecked` is the OTHER fact, and the one 0.9.0 had to add (S6): the child
+ *  produced a listing, but pi's own check has not run for every extension in it.
+ *  The shell reports a package as `update_available` only after its own check
+ *  ran and reports every checkable package as `unknown` until it does, so
+ *  `available: true` with nothing behind is a machine nobody has checked - not a
+ *  machine that is up to date. "Up to date" is only ever `available: true`,
+ *  `unchecked: false` and an empty `behind`; a machine with one package behind
+ *  AND one pi has not checked carries both, and `skipped` items alone leave the
+ *  listing checked (they are not checkable).
  * 
  *  [`Self::default`] is [`Self::unasked`], the value a block draws as its honest
  *  sentence (S3) and what an older shell that does not advertise the method
@@ -1893,6 +1925,14 @@ export type PackagesView_Deserialize = {
 	 *  could not run, never "up to date" (S1).
 	 */
 	unknown: boolean,
+	/**
+	 *  Whether pi's own check has NOT run for the whole listing (packages-status
+	 *  T4, S6): `available` and at least one item still `unknown`. It is its own
+	 *  state with its own words - "not checked yet" - never "up to date" (the
+	 *  claim this field exists to stop) and never "the read could not run"
+	 *  either: nothing failed, the check simply has not run.
+	 */
+	unchecked: boolean,
 	/**
 	 *  Whether the listing is cut by the contract's own bound, so the block can
 	 *  say there are more than it draws.
@@ -1918,7 +1958,17 @@ export type PackagesView_Deserialize = {
  *  `unknown` is a read that ran and could not produce a listing - the child said
  *  `available: false`, its answer carried no packages slice, or no answer came
  *  at all - so the block says the read could not run and never "up to date"
- *  (S1). "Up to date" is only ever `available: true` with an empty `behind`.
+ *  (S1).
+ * 
+ *  `unchecked` is the OTHER fact, and the one 0.9.0 had to add (S6): the child
+ *  produced a listing, but pi's own check has not run for every extension in it.
+ *  The shell reports a package as `update_available` only after its own check
+ *  ran and reports every checkable package as `unknown` until it does, so
+ *  `available: true` with nothing behind is a machine nobody has checked - not a
+ *  machine that is up to date. "Up to date" is only ever `available: true`,
+ *  `unchecked: false` and an empty `behind`; a machine with one package behind
+ *  AND one pi has not checked carries both, and `skipped` items alone leave the
+ *  listing checked (they are not checkable).
  * 
  *  [`Self::default`] is [`Self::unasked`], the value a block draws as its honest
  *  sentence (S3) and what an older shell that does not advertise the method
@@ -1941,6 +1991,14 @@ export type PackagesView_Serialize = {
 	 *  could not run, never "up to date" (S1).
 	 */
 	unknown: boolean,
+	/**
+	 *  Whether pi's own check has NOT run for the whole listing (packages-status
+	 *  T4, S6): `available` and at least one item still `unknown`. It is its own
+	 *  state with its own words - "not checked yet" - never "up to date" (the
+	 *  claim this field exists to stop) and never "the read could not run"
+	 *  either: nothing failed, the check simply has not run.
+	 */
+	unchecked: boolean,
 	/**
 	 *  Whether the listing is cut by the contract's own bound, so the block can
 	 *  say there are more than it draws.

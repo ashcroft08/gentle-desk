@@ -89,6 +89,14 @@ pub type ChatCommandSink = Arc<dyn Fn(Vec<gentle_app::ChatCommand>) + Send + Syn
 /// answer is still cached, and the next fold pushes it.
 pub type BranchPush = Arc<dyn Fn() + Send + Sync>;
 
+/// Installed once at startup: what runs the explicit extensions check once per
+/// app run (packages-status T4, S7), when the FIRST chat's child is ready
+/// ([`AppStateHolder::note_child_ready`]). It starts its own thread and returns:
+/// it is called while a child event is being folded, so it must never block, and
+/// nothing runs while no chat has a child (which is the whole reason the trigger
+/// is a child's own event and never a launch step).
+pub type PackagesTrigger = Arc<dyn Fn() + Send + Sync>;
+
 /// The app state the Tauri shell owns. Created at startup, managed by Tauri;
 /// nothing else anywhere holds an `AppState`.
 #[derive(Default)]
@@ -204,6 +212,21 @@ pub struct AppStateHolder {
     auth: Mutex<AuthView>,
     /// The Updates pane's slice (0.1.12, S2, S7): the last check's answer.
     updates: Mutex<UpdatesView>,
+    /// The Extensions block the explicit check HELD (packages-status T4, S7): what
+    /// `check_packages` made pi answer, kept so the pushed slice
+    /// (`ViewState.updates.packages`) and the gear's dot carry it without Settings
+    /// being open, and so the dialog's own load shows the checked answer instead
+    /// of re-deriving a "not checked yet" from a plain read. `None` until the
+    /// first check answers.
+    packages: Mutex<Option<crate::contract::PackagesView>>,
+    /// Installed once at startup: what starts the once-per-run extensions check
+    /// when the first chat's child is ready ([`Self::note_child_ready`]).
+    packages_trigger: Mutex<Option<PackagesTrigger>>,
+    /// Set the first time a child's own event proves a chat is alive, so the
+    /// explicit check runs once per app run and no later event starts it again.
+    /// A check that failed or timed out does NOT retry on its own: the user's
+    /// "Comprobar de nuevo" is what runs it again (S7).
+    packages_check_started: std::sync::atomic::AtomicBool,
     /// The Usage pane's slice: the subscription usage the shell's own sources
     /// reported when the pane last asked, and whether that read is running.
     usage: Mutex<UsageView>,
@@ -258,6 +281,35 @@ impl AppStateHolder {
     /// `git` process; this is how what it found reaches the window.
     pub fn arm_branch_push(&self, push: BranchPush) {
         *lock(&self.branch_push) = Some(push);
+    }
+
+    /// Installs what runs the once-per-run extensions check (packages-status T4,
+    /// S7). Armed with the window's emit step: a run with no window would start a
+    /// check nothing can show.
+    pub fn arm_packages_trigger(&self, trigger: PackagesTrigger) {
+        *lock(&self.packages_trigger) = Some(trigger);
+    }
+
+    /// The first chat's child is ready: a chat's own decoded event arrived, which
+    /// is the app's proof that some child is alive and answerable.
+    ///
+    /// The trigger runs ONCE per app run (the flag is taken before it is called),
+    /// so a second chat, a second event or a re-opened chat never asks again. It
+    /// never runs at launch and never starts a child: this is only ever reached
+    /// from an event that child already sent. A failed check is not retried here -
+    /// only the user's own "Comprobar de nuevo" asks again (S7).
+    pub fn note_child_ready(&self) {
+        if self.packages_check_started.load(Ordering::SeqCst) {
+            return;
+        }
+        let trigger = lock(&self.packages_trigger).clone();
+        let Some(trigger) = trigger else {
+            return;
+        };
+        if self.packages_check_started.swap(true, Ordering::SeqCst) {
+            return;
+        }
+        trigger();
     }
 
     /// The branch cache, for a caller outside a fold: the tests seed it so an

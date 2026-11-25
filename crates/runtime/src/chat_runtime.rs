@@ -32,8 +32,8 @@ pub use events::Converted;
 pub use execute::Outcome;
 pub use open::request_after_open;
 pub use packages::{
-    packages_status, PackagesItem, PackagesRead, PackagesState, PackagesStatus, GET_UPDATE_STATUS,
-    MAX_ITEMS,
+    check_packages, packages_status, PackagesItem, PackagesRead, PackagesState, PackagesStatus,
+    GET_UPDATE_STATUS, MAX_ITEMS, REFRESH_DEADLINE,
 };
 pub use profile::{
     ChainWriteResult, ChatChainWrite, ChatConfigRead, ChatModeWrite, ChatPinWrite,

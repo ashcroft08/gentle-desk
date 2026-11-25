@@ -49,7 +49,7 @@ function updates(over: Partial<UpdatesView> = {}): UpdatesView {
     pi: { current: '1.5.2', latest: '2.0.5', update_available: true },
     shell: { current: '4.8.0', latest: '4.9.2', update_available: true },
 
-    packages: { available: false, behind: [], unknown: false, truncated: false, checked: null },
+    packages: { available: false, behind: [], unknown: false, truncated: false, unchecked: false, checked: null },
     checked_ms: CHECKED_MS,
     ...over,
   }
@@ -66,7 +66,7 @@ function draw(
 
 /** The Extensions block's slice: unasked unless a test says otherwise. */
 function packages(over: Partial<PackagesView> = {}): PackagesView {
-  return { available: false, behind: [], unknown: false, truncated: false, checked: null, ...over }
+  return { available: false, behind: [], unknown: false, truncated: false, unchecked: false, checked: null, ...over }
 }
 
 /** The pane's extensions block, the group no version drives (D14). */

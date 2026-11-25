@@ -32,8 +32,8 @@ use crate::clipboard::{self, Clipboard, SystemClipboard};
 use crate::close::{self, BridgeSteps, CloseFlow};
 use crate::config::{ConfigSnapshot, ConfigWriter};
 use crate::contract::{
-    AttachmentView, HomeChoiceView, SettingsFilesChanged, SettingsFilesChangedView, StateChanged,
-    TerminalActionView, UiIntent, UpdatesView, ViewState, WhatsNewRead,
+    AttachmentView, HomeChoiceView, PackagesView, SettingsFilesChanged, SettingsFilesChangedView,
+    StateChanged, TerminalActionView, UiIntent, UpdatesView, ViewState, WhatsNewRead,
 };
 use crate::effects::{self, Ran, RuntimeExecutor};
 use crate::events::{EventPump, Push};
@@ -376,6 +376,22 @@ impl Bridge {
             }
         }));
         self.pump.arm(push_via(emit.clone()));
+        // The once-per-run extensions check (packages-status T4, S7) is armed in
+        // this same step, before the pump starts delivering: a chat's own first
+        // event is what proves its child is alive (`EventPump::pump` calls
+        // `note_child_ready`), and the check then runs on a thread of its own, so
+        // neither the frame nor the dialog ever waits for it. Weak handles, like
+        // the sinks above - the holder owns this trigger.
+        let packages_holder = Arc::downgrade(&self.holder);
+        let packages_pump = Arc::downgrade(&self.pump);
+        let packages_emit = Arc::clone(&emit);
+        self.holder.arm_packages_trigger(Arc::new(move || {
+            let (Some(holder), Some(pump)) = (packages_holder.upgrade(), packages_pump.upgrade())
+            else {
+                return;
+            };
+            start_packages_check(&holder, &pump, &packages_emit);
+        }));
         // The folder dialog is owned by the window, so it is modal to the app
         // instead of to the desktop. The window exists only from this step, and
         // it is the same step that arms the pump, for the same reason.
@@ -849,6 +865,19 @@ impl Bridge {
         self.run_update_check(self.emitter());
     }
 
+    /// The explicit extensions check of this run (packages-status T4, S7): pi's
+    /// own update check over the chat in front's own child, run once, on a thread
+    /// of its own.
+    ///
+    /// It is what the Updates pane's "Comprobar de nuevo" asks, and what the
+    /// bridge runs by itself once per app run when the first chat's child is ready
+    /// ([`AppStateHolder::note_child_ready`]). It never runs on the window's
+    /// thread, never inside the Settings load, and never with no chat: the gate
+    /// ([`asking_chat`]) then asks nothing and starts nothing.
+    pub fn check_packages(&self) {
+        start_packages_check(&self.holder, &self.pump, &self.emitter());
+    }
+
     /// The Settings dialog's one read (settings-snapshot): every page's data
     /// in one object, gathered once per open and never on the window's thread.
     ///
@@ -901,6 +930,17 @@ impl Bridge {
         };
         tauri::async_runtime::spawn_blocking(move || settings_snapshot::gather(config, &reads))
             .await
+            .map(|mut snapshot| {
+                // The checked answer this run holds wins over the plain read the
+                // load just made (packages-status T4, S6, S7): a plain read can
+                // only ever say "not checked yet", so the dialog draws the count
+                // the explicit check found. Reading it is one lock and a clone -
+                // the load never waits on the long check.
+                let held = self.holder.held_packages();
+                snapshot.updates.packages =
+                    PackagesView::checked_over(held.as_ref(), snapshot.updates.packages);
+                snapshot
+            })
             .map_err(|error| format!("the settings snapshot could not run: {error}"))
     }
 
@@ -965,18 +1005,68 @@ fn packages_probe(
     open_chats: u32,
     chat: Option<String>,
 ) -> Arc<dyn Fn() -> PackagesRead + Send + Sync> {
-    Arc::new(move || {
-        if open_chats == 0 {
-            return PackagesRead::Unasked;
-        }
-        let Some(path) = chat.as_deref().and_then(ChatId::session_path_of) else {
-            return PackagesRead::Unasked;
-        };
-        let Some(runtime) = pump.runtime() else {
-            return PackagesRead::Unasked;
-        };
-        runtime.read_packages(&ChatId::of_session(path))
+    Arc::new(move || match asking_chat(&pump, open_chats, chat.clone()) {
+        Some((runtime, chat)) => runtime.read_packages(&chat),
+        None => PackagesRead::Unasked,
     })
+}
+
+/// The chat this run may ask about its extensions, and the runtime to ask it
+/// through: `None` while no chat is open, while no chat is in front, while the
+/// id is not one a chat can be named by, and while this run never built a host.
+///
+/// This is the ONE gate the plain read, the dialog's load and the explicit check
+/// share (packages-status T1, T4): all three answer [`PackagesRead::Unasked`] -
+/// touching no host and starting no child - when it declines.
+fn asking_chat(
+    pump: &EventPump,
+    open_chats: u32,
+    chat: Option<String>,
+) -> Option<(Arc<gentle_runtime::chat_runtime::ChatRuntime>, ChatId)> {
+    if open_chats == 0 {
+        return None;
+    }
+    let path = chat.as_deref().and_then(ChatId::session_path_of)?;
+    let runtime = pump.runtime()?;
+    Some((runtime, ChatId::of_session(path)))
+}
+
+/// The explicit extensions check (packages-status T4, S7): pi's own check, run
+/// once, over the chat in front's own child, and the held block it becomes.
+///
+/// It runs on a thread of its own - the ask names the check's long deadline - and
+/// never on the window's and never inside the Settings load's blocking worker, so
+/// neither the frame nor an open dialog waits for it. It runs nothing when the
+/// gate declines (no chat, no chat in front, no host): nothing is asked, nothing
+/// is started, nothing is touched, and the pane keeps its honest sentence.
+pub fn start_packages_check(holder: &Arc<AppStateHolder>, pump: &Arc<EventPump>, emit: &Emit) {
+    let view = holder.view();
+    let pump = Arc::clone(pump);
+    let holder = Arc::downgrade(holder);
+    let emit = Arc::clone(emit);
+    let _ = std::thread::Builder::new()
+        .name("packages-check".to_owned())
+        .spawn(move || {
+            let read = match asking_chat(&pump, view.open_chats, view.foreground_chat) {
+                Some((runtime, chat)) => runtime.check_packages(&chat),
+                None => PackagesRead::Unasked,
+            };
+            let Some(holder) = holder.upgrade() else {
+                return;
+            };
+            note_packages(&holder, &read, &emit);
+        });
+}
+
+/// What a finished explicit check does: the block it becomes is HELD as this
+/// run's answer and pushed, so `ViewState.updates.packages` carries it to the
+/// pane and the gear's dot without Settings being open (S7).
+///
+/// One push either way, including one a chat could not answer: the block then says
+/// the read could not run, which is what the pane draws.
+fn note_packages(holder: &AppStateHolder, read: &PackagesRead, emit: &Emit) {
+    let view = holder.note_packages(read);
+    push(emit, view);
 }
 
 /// What a finished check pushes: `None` is a startup pass with nothing to say
@@ -1492,6 +1582,24 @@ pub async fn settings_snapshot(
     bridge.inner().settings_snapshot().await
 }
 
+/// The explicit extensions check (packages-status T4, S7): pi's own update check,
+/// run once over the chat in front's own child.
+///
+/// It takes no argument: the bridge knows which chat is in front and which child
+/// to ask. It returns the slice as it stands and does NOT wait for the check - the
+/// ask names the check's own long deadline (the shell bounds its refresh at 15 s)
+/// and runs on a thread of its own, so the button that asked is answered at once
+/// and the result arrives as the `state-changed` push that carries it. With no
+/// chat open nothing runs at all, and the pane keeps its honest sentence.
+#[tauri::command]
+#[specta::specta]
+pub async fn check_packages(bridge: tauri::State<'_, Bridge>) -> Result<ViewState, String> {
+    let bridge = bridge.inner();
+    bridge.accepting_work()?;
+    bridge.check_packages();
+    Ok(bridge.holder.view())
+}
+
 #[cfg(test)]
 mod tests {
     use std::path::Path;
@@ -1504,9 +1612,9 @@ mod tests {
     use gentle_core::rpc::config_store::{self, StoreId, StoreValue};
     use gentle_runtime::chat_runtime::{ChatConfigRead, ChatRuntime, PackagesRead, StoreRead};
 
-    use super::{fold_and_push, packages_probe, Emit, Ran};
+    use super::{fold_and_push, note_packages, packages_probe, Emit, Ran};
     use crate::bridge::AppStateHolder;
-    use crate::contract::{PackagesView, ViewState};
+    use crate::contract::{PackagesBehindView, PackagesView, ViewState};
     use crate::events::EventPump;
     use crate::settings_snapshot::{self, Reads, SettingsConfig};
 
@@ -1615,6 +1723,121 @@ mod tests {
             pump.runtime().is_some(),
             "the host exists, so the gate is what declined"
         );
+    }
+
+    /// One chat's explicit check answered with `behind` extensions and `unchecked`
+    /// items, as the channel's typed read carries it.
+    fn checked_behind(behind: &[&str], unchecked: bool) -> PackagesRead {
+        use gentle_runtime::chat_runtime::{PackagesItem, PackagesState, PackagesStatus};
+        let mut items = behind
+            .iter()
+            .map(|name| PackagesItem {
+                name: (*name).to_owned(),
+                current: Some("4.9.0".to_owned()),
+                state: PackagesState::UpdateAvailable,
+            })
+            .collect::<Vec<_>>();
+        if unchecked {
+            items.push(PackagesItem {
+                name: "a-bridge".to_owned(),
+                current: None,
+                state: PackagesState::Unknown,
+            });
+        }
+        PackagesRead::Read(PackagesStatus {
+            available: true,
+            items,
+            truncated: false,
+            checked_ms: Some(1_730_000_000_000.0),
+        })
+    }
+
+    /// packages-status T4, S7: what the explicit check answered is HELD and
+    /// pushed, so the pane's block AND the gear's dot read it from the slice - not
+    /// only while Settings is open.
+    #[test]
+    fn a_finished_check_is_held_and_pushed_for_the_pane_and_the_dot() {
+        let holder = Arc::new(AppStateHolder::default());
+        assert_eq!(
+            holder.held_packages(),
+            None,
+            "nothing was checked before the first check answers"
+        );
+        let (emit, pushed) = recorder();
+
+        note_packages(&holder, &checked_behind(&["gentle-pi"], true), &emit);
+
+        let slices = pushed.lock().expect("pushed mutex").clone();
+        assert_eq!(slices.len(), 1, "one answer, one push");
+        let block = slices[0].updates.packages.clone();
+        assert!(block.available);
+        assert!(!block.unknown, "the listing was read");
+        assert!(block.unchecked, "S6: one item pi has not checked");
+        assert_eq!(
+            block.behind,
+            vec![PackagesBehindView {
+                name: "gentle-pi".to_owned(),
+                current: Some("4.9.0".to_owned()),
+            }],
+            "the count the pane draws is the check's own"
+        );
+        assert_eq!(block.checked, Some(1_730_000_000_000.0));
+        // Every LATER slice carries it too: this is the slice the gear's dot and
+        // the rail read, whether or not the dialog was ever opened.
+        assert_eq!(holder.view().updates.packages, block);
+    }
+
+    /// packages-status T4, S7: with no chat to ask, the check touches no host and
+    /// starts no child - and holds nothing, so the pane keeps its honest sentence.
+    #[test]
+    fn a_check_with_no_chat_asks_no_host_and_starts_no_child() {
+        let spawns = Arc::new(AtomicUsize::new(0));
+        let host = ChatHost::with_parts(
+            Limits::default(),
+            Arc::new(CountingSpawner {
+                spawns: Arc::clone(&spawns),
+            }) as Arc<dyn Spawner>,
+            Arc::new(ManualClock::new()) as Arc<dyn gentle_backend::chat_host::Clock>,
+        );
+        let (runtime, events) = ChatRuntime::new(host);
+        let pump = Arc::new(EventPump::new(Arc::new(AppStateHolder::default())));
+        pump.feed(Arc::new(runtime), events);
+        // The gate the check shares with the plain read declines on all three: no
+        // chat open, no chat in front, and a fresh chat this run cannot name a
+        // session file for.
+        for (open_chats, chat) in [
+            (0u32, Some("session:/sessions/a.jsonl".to_owned())),
+            (1, None),
+            (1, Some("new-1".to_owned())),
+        ] {
+            assert!(
+                super::asking_chat(&pump, open_chats, chat.clone()).is_none(),
+                "{open_chats} open, chat {chat:?}"
+            );
+        }
+        assert_eq!(spawns.load(Ordering::SeqCst), 0, "nothing was started");
+    }
+
+    /// packages-status T4, S7: the once-per-app-run trigger. A chat's own event is
+    /// what starts the check, the FIRST one only, and a run that never armed a
+    /// trigger starts nothing at all.
+    #[test]
+    fn the_first_ready_child_starts_the_check_once_and_only_once() {
+        let holder = Arc::new(AppStateHolder::default());
+        // Nothing armed: a child coming alive starts nothing (a run with no
+        // window has nothing to show).
+        holder.note_child_ready();
+
+        let runs = Arc::new(AtomicUsize::new(0));
+        let counted = Arc::clone(&runs);
+        holder.arm_packages_trigger(Arc::new(move || {
+            counted.fetch_add(1, Ordering::SeqCst);
+        }));
+        holder.note_child_ready();
+        holder.note_child_ready();
+        // The FIRST chat's child is what asks, and a second chat's - or a reopened
+        // one - never asks again in the same app run.
+        assert_eq!(runs.load(Ordering::SeqCst), 1);
     }
 
     /// One chat's profile read, as the channel's own parser answers it: the

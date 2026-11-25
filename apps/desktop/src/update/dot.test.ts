@@ -13,7 +13,7 @@ import { updateWaiting } from './dot'
 
 /** The Extensions block's slice: unasked unless a test says otherwise. */
 function packages(over: Partial<PackagesView> = {}): PackagesView {
-  return { available: false, behind: [], unknown: false, truncated: false, checked: null, ...over }
+  return { available: false, behind: [], unknown: false, truncated: false, unchecked: false, checked: null, ...over }
 }
 
 /** One row of the check, behind (`true`), level (`false`) or unknown (`null`). */

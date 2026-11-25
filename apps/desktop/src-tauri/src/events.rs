@@ -244,10 +244,32 @@ pub fn spawn_pump(
 /// other chat's events, never waits on a child's pipe (S3).
 pub fn pump(source: Receiver<Converted>, holder: &AppStateHolder, push: Push) {
     for converted in source {
+        // Read before the fold takes it: a chat's own decoded event is the app's
+        // proof that some child is alive and answerable (packages-status T4, S7).
+        let alive = child_alive(&converted);
         let (view, chat_commands) = holder.fold_event(input_of(converted));
         push(view);
+        // The slice is shown first, then the once-per-run extensions check starts
+        // on a thread of its own: this thread keeps delivering every chat's
+        // events and never waits on a child.
+        if alive {
+            holder.note_child_ready();
+        }
         holder.deliver_chat_commands(chat_commands);
     }
+}
+
+/// Whether one translated value is a chat's own DECODED event - the proof its
+/// child is up and talking, which is the only moment the desktop channel exists
+/// to be asked (packages-status T4, S7).
+///
+/// A stderr line and a close are not: one is a line before any answer, the other
+/// is the child going away.
+fn child_alive(converted: &Converted) -> bool {
+    matches!(
+        converted,
+        Converted::Input(Input::ChatEvent { .. } | Input::ChatEventAt { .. })
+    )
 }
 
 /// The reducer input one translated event folds as, named the way the iced

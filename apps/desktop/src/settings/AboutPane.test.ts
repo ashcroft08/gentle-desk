@@ -43,7 +43,7 @@ function read(over: Partial<UpdatesView> = {}): UpdatesView {
     pi: { current: '4.8.0', latest: '4.8.0', update_available: false },
     shell: { current: '4.8.0', latest: '4.8.0', update_available: false },
 
-    packages: { available: false, behind: [], unknown: false, truncated: false, checked: null },
+    packages: { available: false, behind: [], unknown: false, truncated: false, unchecked: false, checked: null },
     checked_ms: Date.now() - 3 * 60_000,
     ...over,
   }

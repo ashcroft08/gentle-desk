@@ -26,7 +26,7 @@ function updates(over: Partial<UpdatesView> = {}): UpdatesView {
     pi: { current: '1.5.2', latest: '2.0.5', update_available: true },
     shell: { current: '4.8.0', latest: '4.9.2', update_available: true },
 
-    packages: { available: false, behind: [], unknown: false, truncated: false, checked: null },
+    packages: { available: false, behind: [], unknown: false, truncated: false, unchecked: false, checked: null },
     ...over,
   }
 }

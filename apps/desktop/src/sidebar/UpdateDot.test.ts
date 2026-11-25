@@ -22,7 +22,7 @@ const WAITING = 'Settings - an update is available'
 
 /** The Extensions block's slice: unasked unless a test says otherwise. */
 function packages(over: Partial<PackagesView> = {}): PackagesView {
-  return { available: false, behind: [], unknown: false, truncated: false, checked: null, ...over }
+  return { available: false, behind: [], unknown: false, truncated: false, unchecked: false, checked: null, ...over }
 }
 
 /** The pushed check, with pi behind or level. */

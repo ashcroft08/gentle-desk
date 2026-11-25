@@ -80,7 +80,7 @@ export function viewState(overrides: Partial<ViewState_Serialize> = {}): ViewSta
       pi: { current: null, latest: null, update_available: null },
       shell: { current: null, latest: null, update_available: null },
 
-      packages: { available: false, behind: [], unknown: false, truncated: false, checked: null },
+      packages: { available: false, behind: [], unknown: false, truncated: false, unchecked: false, checked: null },
     },
     // Nothing asked the shell's usage sources anything yet: the pane says it is
     // reading and asks for its one read when the section is opened.

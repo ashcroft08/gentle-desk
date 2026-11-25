@@ -77,6 +77,7 @@ pub fn contract_builder() -> Builder<tauri::Wry> {
             commands::store_last_run_version,
             commands::show_whats_new,
             commands::settings_snapshot,
+            commands::check_packages,
             terminal_commands::open_terminal,
         ])
         .events(tauri_specta::collect_events![
