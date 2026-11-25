@@ -23,10 +23,8 @@
   import { settingsCopy } from '../settings/copy'
   import { updateWaiting } from '../update/dot'
   import { language } from '../i18n/language.svelte'
-  import {
-    EMPTY_WHY_ID,
-    sidebarCopy,
-  } from './copy'
+  import { EMPTY_WHY_ID, sidebarCopy } from './copy'
+  import { workingChats } from '../settings/working'
   import { newSessionTarget } from './new-session'
   import { chatTitles, REMOVAL_HOST, removeWorkspace } from './removal'
 
@@ -259,6 +257,7 @@
     updates={model.view?.updates ?? null}
     usage={model.view?.usage ?? null}
     openChats={model.view?.open_chats ?? 0}
+    workingChats={workingChats(model.view?.activity)}
   />
   <!-- The footer keeps exactly two things (S1): the run's Preview chip and the
        gear that opens Settings. -->

@@ -105,6 +105,13 @@ export interface UpdatesCopy {
    * that blocks them, and the way out.
    */
   gateHint: (openChats: number) => string
+  /** The gate's own button: it closes every chat that is not running a turn (close-chats S1). */
+  closeChats: string
+  /**
+   * Why some chats stay open after that button (close-chats S3): a chat running a
+   * turn is never closed by it, so the pane says how many and what to do.
+   */
+  chatsWorking: (working: number) => string
 }
 
 /** The one sentence a failed read is worded as, in English (S8, D12). */
@@ -166,6 +173,11 @@ const ENGLISH: UpdatesCopy = {
     const their = openChats === 1 ? 'its' : 'their'
     return `Updates need every chat closed. ${chats} open - Close chat in ${their} row menu, and the update buttons come alive.`
   },
+  closeChats: 'Close the chats',
+  chatsWorking: (working) =>
+    working === 1
+      ? 'One chat is still working: the button does not close it; stop it and try again.'
+      : `${working} chats are still working: the button does not close them; stop them and try again.`,
 }
 
 /** Neutral Spanish: no voseo, no regionalisms, nothing left in English. */
@@ -225,6 +237,11 @@ const SPANISH: typeof ENGLISH = {
     const open = openChats === 1 ? 'abierto' : 'abiertos'
     return `Las actualizaciones necesitan todos los chats cerrados. ${chats} ${open} - Cerrar chat en el menú de su fila y los botones de actualización se activan.`
   },
+  closeChats: 'Cerrar los chats',
+  chatsWorking: (working) =>
+    working === 1
+      ? 'Un chat sigue trabajando: el botón no lo cierra; detenlo y vuelve a intentarlo.'
+      : `${working} chats siguen trabajando: el botón no los cierra; detenlos y vuelve a intentarlo.`,
 }
 
 /** The pane's own words in `language`, the whole dictionary at once (D4). */

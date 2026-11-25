@@ -193,6 +193,25 @@ describe('the updates copy', () => {
     expect(spanish.gateHint(3)).toContain('3 chats están abiertos')
   })
 
+  it('words the gate button and why it leaves some chats open (close-chats S1, S3)', () => {
+    const english = updatesCopy('en')
+    const spanish = updatesCopy('es')
+
+    expect(english.closeChats).toBe('Close the chats')
+    expect(spanish.closeChats).toBe('Cerrar los chats')
+    expect(english.chatsWorking(1)).toBe(
+      'One chat is still working: the button does not close it; stop it and try again.',
+    )
+    expect(english.chatsWorking(2)).toBe(
+      '2 chats are still working: the button does not close them; stop them and try again.',
+    )
+    expect(spanish.chatsWorking(1)).toBe(
+      'Un chat sigue trabajando: el botón no lo cierra; detenlo y vuelve a intentarlo.',
+    )
+    expect(spanish.chatsWorking(3)).toBe(
+      '3 chats siguen trabajando: el botón no los cierra; detenlos y vuelve a intentarlo.',
+    )
+  })
   it('counts the extensions that are behind, one or many (packages-status S1)', () => {
     const english = updatesCopy('en')
     const spanish = updatesCopy('es')

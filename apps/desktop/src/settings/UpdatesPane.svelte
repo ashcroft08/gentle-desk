@@ -51,6 +51,7 @@
   import { ago, isJustNow } from '../home/ago'
   import { language } from '../i18n/language.svelte'
   import ExtensionsBlock from './ExtensionsBlock.svelte'
+  import ChatsGate from './ChatsGate.svelte'
   import UpdateRows from './UpdateRows.svelte'
   import { commandAction, commandLine, drawnLine } from './update-commands'
   import { cardOf, type RowAction } from './updates'
@@ -59,6 +60,7 @@
   let {
     updates,
     openChats = 0,
+    workingChats = 0,
     refreshing = false,
     home = null,
     onRefresh = () => {},
@@ -67,6 +69,8 @@
     updates: UpdatesView | null
     /** How many chats are open: the Update gate (S4). */
     openChats?: number
+    /** How many of them are mid-turn: the close button leaves those open (close-chats S3). */
+    workingChats?: number
     /** Whether a load the user asked for is in flight: the checking line. */
     refreshing?: boolean
     /**
@@ -238,7 +242,7 @@
       <p class="quiet" role="status">{rowsError}</p>
     {/if}
     {#if blocked}
-      <p class="gate" id={hintId} role="status">{hint}</p>
+      <ChatsGate {hint} {hintId} {copy} {workingChats} />
     {:else if card.terminal}
       <p class="note">{copy.updateInTerminal}</p>
     {/if}
@@ -259,7 +263,7 @@
     <button class="btn" type="button" onclick={() => void check()}>{copy.checkAgain}</button>
   </div>
   {#if blocked}
-    <p class="gate" id={hintId} role="status">{hint}</p>
+    <ChatsGate {hint} {hintId} {copy} {workingChats} />
   {/if}
 {/if}
 

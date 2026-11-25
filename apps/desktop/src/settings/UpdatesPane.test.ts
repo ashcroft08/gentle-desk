@@ -604,3 +604,49 @@ describe('the Updates pane', () => {
     expect(pane.querySelector('.card.updates')?.contains(moved)).toBe(false)
   })
 })
+
+// The gate's button (close-chats S1, S3, S4): the pane draws it while a chat is
+// open and not otherwise, with the working line only when some chat is mid-turn.
+describe('the Updates pane gate', () => {
+  /** The pane with `open` chats, `working` of them mid-turn. */
+  function gate(open: number, working: number): HTMLElement {
+    const { container } = render(UpdatesPane, {
+      props: { updates: updates(), openChats: open, workingChats: working },
+    })
+    return container as HTMLElement
+  }
+
+  it('offers the Close the chats button next to the sentence while a chat is open', () => {
+    const pane = gate(1, 0)
+
+    expect(within(pane).getByRole('button', { name: 'Close the chats' })).toBeTruthy()
+    expect(pane.querySelector('.gate')?.textContent).toBe(copy.gateHint(1))
+  })
+
+  it('draws neither the sentence nor the button once every chat is closed', () => {
+    const pane = gate(0, 0)
+
+    expect(within(pane).queryByRole('button', { name: 'Close the chats' })).toBeNull()
+    expect(pane.querySelector('.gate')).toBeNull()
+  })
+
+  it('says how many chats the button leaves open because they are mid-turn', () => {
+    const pane = gate(3, 2)
+
+    expect(pane.textContent).toContain(copy.chatsWorking(2))
+    expect(within(pane).getByRole('button', { name: 'Close the chats' })).toBeTruthy()
+  })
+
+  it('keeps the update buttons dead while any chat is open, and alive after', async () => {
+    const pane = gate(2, 0)
+    const update = within(pane).queryAllByRole('button').filter((button) => /update/i.test(button.textContent ?? ''))
+
+    // PRESERVE: the gate's own rule is untouched by the new button.
+    expect(update.length).toBeGreaterThan(0)
+    for (const button of update) expect((button as HTMLButtonElement).disabled).toBe(true)
+
+    const open = gate(0, 0)
+    const alive = within(open).queryAllByRole('button').filter((button) => /^update/i.test((button.textContent ?? '').trim()))
+    for (const button of alive) expect((button as HTMLButtonElement).disabled).toBe(false)
+  })
+})

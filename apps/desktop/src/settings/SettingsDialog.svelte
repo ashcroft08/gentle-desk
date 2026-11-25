@@ -79,7 +79,7 @@
     auth = null,
     updates = null,
     usage = null,
-    openChats = 0,
+    openChats = 0, workingChats = 0,
   }: {
     /** Whether the dialog is open. */
     open?: boolean
@@ -101,8 +101,8 @@
     updates?: UpdatesView | null
     /** The Usage slice, until the one read of this open answers. */
     usage?: UsageView | null
-    /** How many chats are open: the Updates pane's gate (S4). */
-    openChats?: number
+    /** How many chats are open (the Updates gate, S4) and how many are mid-turn (close-chats S3). */
+    openChats?: number; workingChats?: number
   } = $props()
 
   /** The section the pane draws: Appearance on open (L4). */
@@ -292,7 +292,7 @@
               {:else if selected === 'updates'}
                 <!-- The live push's home decides which command each action runs
                      (updates-by-home S4), so the pane draws it under every button. -->
-                <UpdatesPane updates={updatesView} {openChats} home={shell?.choice ?? null} refreshing={rechecking} onRefresh={again} />
+                <UpdatesPane updates={updatesView} {openChats} {workingChats} home={shell?.choice ?? null} refreshing={rechecking} onRefresh={again} />
               {:else if selected === 'general'}<GeneralPane general={read.snapshot?.general ?? null} refreshing={rechecking} onRefresh={again} />
               {:else if selected === 'account'}
                 <AccountPane auth={authView} onRefresh={again} />
