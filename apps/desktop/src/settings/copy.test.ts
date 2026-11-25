@@ -20,6 +20,9 @@ const ENGLISH = {
   searchLabel: 'Find a setting',
   searchPlaceholder: 'Find a setting…',
   noMatches: 'No settings match.',
+  // The rail's update dot said in words (packages-status S8): the entry's own
+  // description, since the entry's NAME must stay the word it has always been.
+  updateWaiting: 'An update is available',
   themeGroup: 'Theme',
   homeExplain:
     'My pi uses the pi installation already on the machine: sign-ins, local models and chats appear in the terminal. Separate creates a clean space at ~/.gentle-shell/agent and touches nothing else.',
@@ -39,6 +42,7 @@ const SPANISH = {
   searchLabel: 'Buscar un ajuste',
   searchPlaceholder: 'Buscar un ajuste…',
   noMatches: 'Ningún ajuste coincide.',
+  updateWaiting: 'Hay una actualización disponible',
   themeGroup: 'Tema',
   homeExplain:
     'Mi pi usa la instalación de pi que ya está en la máquina: los inicios de sesión, los modelos locales y los chats aparecen en la terminal. Separado crea un espacio limpio en ~/.gentle-shell/agent y no toca nada más.',

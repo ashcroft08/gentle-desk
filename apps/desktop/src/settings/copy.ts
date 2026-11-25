@@ -33,6 +33,13 @@ export interface SettingsCopy {
   searchPlaceholder: string
   /** The one quiet line when the query leaves no entry in the rail. */
   noMatches: string
+  /**
+   * The rail's update dot in words (packages-status S8, T5): the
+   * "Actualizaciones" entry's DESCRIPTION while something waits, so the promise
+   * is never the colour alone. The entry's own name is not touched - it stays
+   * the word it has always been, which is what a user and a test look it up by.
+   */
+  updateWaiting: string
   /** The name of the theme card grid in the Appearance section. */
   themeGroup: string
   /** Each section's word, for the rail entry and the pane's heading. */
@@ -77,6 +84,7 @@ const ENGLISH: SettingsCopy = {
   searchLabel: 'Find a setting',
   searchPlaceholder: 'Find a setting…',
   noMatches: 'No settings match.',
+  updateWaiting: 'An update is available',
   themeGroup: 'Theme',
   titles: {
     general: 'General',
@@ -120,6 +128,7 @@ const SPANISH: typeof ENGLISH = {
   searchLabel: 'Buscar un ajuste',
   searchPlaceholder: 'Buscar un ajuste…',
   noMatches: 'Ningún ajuste coincide.',
+  updateWaiting: 'Hay una actualización disponible',
   themeGroup: 'Tema',
   titles: {
     general: 'General',

@@ -13,6 +13,8 @@ import { tick } from 'svelte'
 import { openSettings, pane, pick, rail } from '../test-support/settings'
 import { resetTauriMock } from '../test-support/tauri-mock'
 import { setLanguage } from '../i18n/language.svelte'
+import type { UpdatesView_Serialize as UpdatesView } from '../contract/bindings'
+import { RAIL_NOTE_ID } from './sections'
 
 vi.mock('@tauri-apps/api/core', () => import('../test-support/tauri-mock').then((m) => m.coreModule()))
 vi.mock('@tauri-apps/api/event', () => import('../test-support/tauri-mock').then((m) => m.eventModule()))
@@ -51,6 +53,28 @@ const EXPLAIN_EN =
   'My pi uses the pi installation already on the machine: sign-ins, local models and chats appear in the terminal. Separate creates a clean space at ~/.gentle-shell/agent and touches nothing else.'
 const EXPLAIN_ES =
   'Mi pi usa la instalación de pi que ya está en la máquina: los inicios de sesión, los modelos locales y los chats aparecen en la terminal. Separado crea un espacio limpio en ~/.gentle-shell/agent y no toca nada más.'
+
+/**
+ * The rail's update dot, in words (packages-status S8): the "Actualizaciones"
+ * entry's DESCRIPTION, one phrase per language, while Gentle Shell is behind.
+ * The entry's own NAME is not part of this: it stays its word (pinned above).
+ */
+const WAITING_EN = 'An update is available'
+const WAITING_ES = 'Hay una actualización disponible'
+
+/**
+ * The pushed check with Gentle Shell behind: what the rail's dot reads. The
+ * dialog draws its LIVE updates, so this arrives through the push.
+ */
+function shellBehind(): UpdatesView {
+  return {
+    status: 'Ready',
+    desk: { current: '0.1.12', latest: '0.1.12', update_available: false },
+    pi: { current: '1.5.2', latest: '1.5.2', update_available: false },
+    shell: { current: '4.8.0', latest: '5.0.0', update_available: true },
+    packages: { available: true, behind: [], unknown: false, unchecked: false, truncated: false, checked: null },
+  }
+}
 
 // The testing library only cleans up on its own with vitest globals on.
 afterEach(cleanup)
@@ -148,6 +172,31 @@ describe('a drawn Settings dialog', () => {
 
     await pick(dialog, 'Acerca de')
     expect(within(pane(dialog)).getByText('Versión desconocida')).toBeTruthy()
+
+    setLanguage('en')
+  })
+
+  it('says the rail update in the language of the dialog, never renaming the entry', async () => {
+    setLanguage('en')
+    const dialog = await openSettings({}, '0.1.9', { updates: shellBehind() })
+
+    // The entry is found by its own name in each language (pinned in RAIL_EN and
+    // RAIL_ES above): the promise rides beside it as the description the entry
+    // points at, in a hidden line that adds no word to that name.
+    const english = within(dialog).getByRole('tab', { name: 'Updates' })
+    expect(english.getAttribute('aria-describedby')).toBe(RAIL_NOTE_ID)
+    expect(dialog.querySelector(`#${RAIL_NOTE_ID}`)?.textContent).toBe(WAITING_EN)
+    expect(english.querySelector('.dot')).not.toBeNull()
+
+    setLanguage('es')
+    await tick()
+
+    const spanish = within(dialog).getByRole('tab', { name: 'Actualizaciones' })
+    expect(spanish.getAttribute('aria-describedby')).toBe(RAIL_NOTE_ID)
+    expect(dialog.querySelector(`#${RAIL_NOTE_ID}`)?.textContent).toBe(WAITING_ES)
+    // The mark itself does not blink out with the flip: only its words changed.
+    expect(spanish.querySelector('.dot')).not.toBeNull()
+    expect(spanish.textContent?.trim()).toBe('Actualizaciones')
 
     setLanguage('en')
   })

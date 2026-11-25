@@ -60,19 +60,14 @@
   import GeneralPane from './GeneralPane.svelte'
   import LanguagePane from './LanguagePane.svelte'
   import NotificationsPane from './NotificationsPane.svelte'
+  import RailDot from './RailDot.svelte'
   import ThemeCards from './ThemeCards.svelte'
   import UpdatesPane from './UpdatesPane.svelte'
   import UsagePane from './UsagePane.svelte'
   import { settingsCopy } from './copy'
   import { visibleSections } from './search'
   import { createSettingsRead } from './snapshot.svelte'
-  import {
-    DEFAULT_SECTION,
-    PANEL_ID,
-    TAB_IDS,
-    sectionAfter,
-    type Section,
-  } from './sections'
+  import { DEFAULT_SECTION, PANEL_ID, RAIL_NOTE_ID, TAB_IDS, railNote, sectionAfter, type Section } from './sections'
 
   let {
     open = $bindable(false),
@@ -242,21 +237,25 @@
               aria-orientation="vertical"
             >
               {#each drawn as entry (entry.id)}
+                {@const note = railNote(entry.id, updatesView, copy)}
                 <button
                   type="button"
                   role="tab"
                   id={TAB_IDS[entry.id]}
                   aria-controls={PANEL_ID}
                   aria-selected={selected === entry.id}
+                  aria-describedby={note === null ? undefined : RAIL_NOTE_ID}
                   tabindex={entry.id === tabStop ? 0 : -1}
                   onclick={() => (selected = entry.id)}
                   onkeydown={(event) => keyed(event, entry.id)}
                 >
                   <Icon name={entry.icon} size={16} />
                   <span>{copy.titles[entry.id]}</span>
+                  {#if note !== null}<RailDot />{/if}
                 </button>
               {/each}
             </div>
+            <span class="settings-rail-note" id={RAIL_NOTE_ID}>{copy.updateWaiting}</span>
           {:else}
             <!-- One quiet line instead of an empty rail: the pane keeps the
                  section the user opened, and searching never moves it. -->

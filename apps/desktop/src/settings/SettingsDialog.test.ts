@@ -10,9 +10,14 @@ import '../test-support/dom-env'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, within } from '@testing-library/svelte'
 import { tick } from 'svelte'
-import type { UpdatesView_Serialize as UpdatesView } from '../contract/bindings'
-import { intents, openSettings, pane, pick, rail, shell } from '../test-support/settings'
+import type {
+  PackagesView_Serialize as PackagesView,
+  SettingsSnapshot_Serialize as SettingsSnapshot,
+  UpdatesView_Serialize as UpdatesView,
+} from '../contract/bindings'
+import { intents, openSettings, pane, pick, rail, shell, snapshotOf } from '../test-support/settings'
 import { pushEvent, resetTauriMock, viewState } from '../test-support/tauri-mock'
+import { RAIL_NOTE_ID } from './sections'
 
 vi.mock('@tauri-apps/api/core', () => import('../test-support/tauri-mock').then((m) => m.coreModule()))
 vi.mock('@tauri-apps/api/event', () => import('../test-support/tauri-mock').then((m) => m.eventModule()))
@@ -52,6 +57,50 @@ const VERSION_LINE = 'Version 0.1.9'
 const VERSION_UNKNOWN = 'Version unknown'
 
 /**
+ * The phrase the rail's update dot carries in words (packages-status S8), quoted
+ * here so a change of copy is a change here. It is the entry's DESCRIPTION,
+ * carried by a hidden line the entry points at: the entry's NAME stays the word
+ * it has always been.
+ */
+const RAIL_WAITING = 'An update is available'
+
+/** The hidden line the waiting entry describes itself with, as it reads. */
+function noteOf(dialog: HTMLElement): string | null {
+  return dialog.querySelector(`#${RAIL_NOTE_ID}`)?.textContent ?? null
+}
+
+/** The Extensions block's slice: unasked unless a test says otherwise. */
+function packages(over: Partial<PackagesView> = {}): PackagesView {
+  return {
+    available: false,
+    behind: [],
+    unknown: false,
+    unchecked: false,
+    truncated: false,
+    checked: null,
+    ...over,
+  }
+}
+
+/**
+ * A check with every row level - nothing waits, so the rail's dot has nothing to
+ * say - that a test moves one row (or the packages slice) away from.
+ */
+function level(over: Partial<UpdatesView> = {}): UpdatesView {
+  return {
+    status: 'Ready',
+    desk: { current: '0.1.12', latest: '0.1.12', update_available: false },
+    pi: { current: '1.5.2', latest: '1.5.2', update_available: false },
+    shell: { current: '4.8.0', latest: '4.8.0', update_available: false },
+    packages: packages({ available: true }),
+    ...over,
+  }
+}
+
+/** A row no read answered for: unknown, never "behind". */
+const UNKNOWN_ROW = { current: null, latest: null, update_available: null }
+
+/**
  * The check the Updates section draws with Gentle Shell behind: what the two
  * command lines of updates-by-home S4 are read from.
  */
@@ -61,7 +110,7 @@ function updateCheck(): UpdatesView {
     desk: { current: '0.1.12', latest: '0.1.12', update_available: false },
     pi: { current: '1.5.2', latest: '2.0.5', update_available: true },
     shell: { current: '4.8.0', latest: '5.0.0', update_available: true },
-    packages: { available: false, behind: [], unknown: false, truncated: false, checked: null },
+    packages: { available: false, behind: [], unknown: false, unchecked: false, truncated: false, checked: null },
   }
 }
 
@@ -297,7 +346,7 @@ describe('the Settings dialog', () => {
         pi: { current: '1.5.2', latest: '2.0.5', update_available: true },
         shell: { current: '4.7.0', latest: null, update_available: null },
 
-        packages: { available: false, behind: [], unknown: false, truncated: false, checked: null },
+        packages: { available: false, behind: [], unknown: false, unchecked: false, truncated: false, checked: null },
       },
     })
 
@@ -335,5 +384,120 @@ describe('the Settings dialog', () => {
     expect(pane(dialog).textContent).toContain('gentle-shell upgrade')
     expect(pane(dialog).textContent).toContain('gentle-shell update --extensions')
     expect(pane(dialog).textContent).not.toContain('pi install')
+  })
+})
+
+// packages-status S8, T5 (L2): the gear's dot already promises something, but
+// once Settings is open - and it opens on General - nothing said WHERE to go. So
+// the "Actualizaciones" entry itself wears the same dot while `updateWaiting`
+// (update/dot.ts, read here over the dialog's LIVE updates) says something waits
+// - and only that entry does.
+describe('the rail that points at Updates (packages-status S8)', () => {
+  /** The dot a rail entry draws, or null when it draws none. */
+  function dotOf(entry: HTMLElement): Element | null {
+    return entry.querySelector('.dot')
+  }
+
+  it('lights the Updates entry when Gentle Shell is behind, and no other entry', async () => {
+    const dialog = await openSettings({}, VERSION, {
+      updates: level({ shell: { current: '4.8.0', latest: '5.0.0', update_available: true } }),
+    })
+
+    // The entry is still found by the name it has always had: the dot is a mark,
+    // never a word added to the tab.
+    const updatesTab = within(dialog).getByRole('tab', { name: UPDATES })
+    expect(dotOf(updatesTab)).not.toBeNull()
+    expect(updatesTab.textContent?.trim()).toBe(UPDATES)
+
+    // The state has a second channel, so the promise is never the colour alone:
+    // the entry describes itself with the hidden line, which adds no word to the
+    // name it is looked up by.
+    expect(updatesTab.getAttribute('aria-describedby')).toBe(RAIL_NOTE_ID)
+    expect(noteOf(dialog)).toBe(RAIL_WAITING)
+
+    // And the promise points at ONE entry: every other one stays bare.
+    for (const entry of rail(dialog)) {
+      if (entry === updatesTab) continue
+      expect(dotOf(entry), entry.textContent ?? '').toBeNull()
+      expect(entry.getAttribute('aria-describedby'), entry.textContent ?? '').toBeNull()
+    }
+  })
+
+  it('lights it for a behind pi row too, the same rule the gear reads', async () => {
+    const dialog = await openSettings({}, VERSION, {
+      updates: level({ pi: { current: '1.5.2', latest: '2.0.5', update_available: true } }),
+    })
+
+    expect(dotOf(within(dialog).getByRole('tab', { name: UPDATES }))).not.toBeNull()
+  })
+
+  it('lights it for a package pi reports behind', async () => {
+    const dialog = await openSettings({}, VERSION, {
+      updates: level({
+        packages: packages({ available: true, behind: [{ name: '@estebanforge/pi-antigravity-bridge' }] }),
+      }),
+    })
+
+    expect(dotOf(within(dialog).getByRole('tab', { name: UPDATES }))).not.toBeNull()
+  })
+
+  it('stays bare while everything is current', async () => {
+    const dialog = await openSettings({}, VERSION, { updates: level() })
+
+    const updatesTab = within(dialog).getByRole('tab', { name: UPDATES })
+    expect(dotOf(updatesTab)).toBeNull()
+    expect(updatesTab.getAttribute('aria-describedby')).toBeNull()
+  })
+
+  it('stays bare for the states that are not a promise: unknown and unasked', async () => {
+    // Rows no read answered for, and a packages read that could not run: nothing
+    // is behind, so there is nothing to point at.
+    const dialog = await openSettings({}, VERSION, {
+      updates: level({ pi: UNKNOWN_ROW, shell: UNKNOWN_ROW, packages: packages({ unknown: true }) }),
+    })
+
+    expect(dotOf(within(dialog).getByRole('tab', { name: UPDATES }))).toBeNull()
+  })
+
+  it('stays bare when the only waiting version is the one the user skipped', async () => {
+    // The skip rule is the gear's own (0.8.0 settings-polish S2): the user
+    // already said no to 2.0.5, so the entry promises nothing either.
+    const dialog = await openSettings({}, VERSION, {
+      updates: level({
+        skipped: '2.0.5',
+        pi: { current: '1.5.2', latest: '2.0.5', update_available: true },
+      }),
+    })
+
+    expect(dotOf(within(dialog).getByRole('tab', { name: UPDATES }))).toBeNull()
+  })
+
+  it('reads the same live updates the Updates pane draws: the push until the open lands', async () => {
+    // The dot reads `read.snapshot?.updates ?? updates`, the one expression the
+    // pane draws: the pushed slice until the dialog's one read answers, and that
+    // answer afterwards - so the rail and the pane can never say different things.
+    let settle: (snapshot: SettingsSnapshot) => void = () => {}
+    const held = new Promise<SettingsSnapshot>((resolve) => {
+      settle = resolve
+    })
+    const dialog = await openSettings(
+      {},
+      VERSION,
+      { updates: level({ shell: { current: '4.8.0', latest: '5.0.0', update_available: true } }) },
+      held,
+    )
+
+    expect(dotOf(within(dialog).getByRole('tab', { name: UPDATES }))).not.toBeNull()
+
+    settle(snapshotOf(viewState({ shell: shell(), total_sessions: 1, updates: level() })))
+    await vi.waitFor(() => {
+      expect(dotOf(within(dialog).getByRole('tab', { name: UPDATES }))).toBeNull()
+    })
+
+    // The answer is level, so the promise is gone - the same tick the pane's own
+    // data changed, with no reopen - and so is its description.
+    const updatesTab = within(dialog).getByRole('tab', { name: UPDATES })
+    expect(dotOf(updatesTab)).toBeNull()
+    expect(updatesTab.getAttribute('aria-describedby')).toBeNull()
   })
 })

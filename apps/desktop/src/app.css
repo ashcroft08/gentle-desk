@@ -1996,19 +1996,30 @@ p {
   color: var(--text);
 }
 
-/* The gear's update dot (0.1.14): 6px of accent on the icon's corner when a row
-   a terminal updates is behind. A dot, never a number and never a word on the
-   bar; it is decoration (the gear's own name says it in words) and takes no
-   click of its own. */
-.foot .ic .dot {
-  position: absolute;
-  top: 5px;
-  right: 5px;
+/* The update dot (0.1.14; packages-status S8): 6px of accent where the app says
+   something waits - on the footer gear, and since S8 at the right end of the
+   Settings rail's "Actualizaciones" entry, so a user who opened Settings on
+   General knows where to go. A dot, never a number and never a word; it is
+   decoration (the gear's own name, and the entry's description, say it in words)
+   and takes no click of its own.
+
+   The SHAPE lives here once, for both places: the rail's dot is meant to read as
+   the same promise as the gear's, so it cannot drift into a second size or
+   colour. Each place below only says where its dot sits. */
+.foot .ic .dot,
+.settings-rail [role='tab'] .dot {
   width: 6px;
   height: 6px;
   border-radius: 999px;
   background: var(--accent);
   pointer-events: none;
+}
+
+/* The gear's dot sits on the icon's corner. */
+.foot .ic .dot {
+  position: absolute;
+  top: 5px;
+  right: 5px;
 }
 
 /* The home setting (shell-choice S5), drawn in the Settings dialog's Shell home
@@ -2358,6 +2369,21 @@ p {
   line-height: 1.5;
 }
 
+/* The rail's update dot said in words (packages-status S8): a line for the
+   READER, not for the eye. The "Actualizaciones" entry describes itself with it
+   (`aria-describedby`) while something waits, so the promise has a text channel
+   that never joins the entry's name - the entry's word stays its own, which is
+   what a user reads and a test looks it up by. Clipped to a pixel instead of
+   `display: none`, which assistive tech would skip altogether. */
+.settings-rail-note {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 /* The rail's entries under the field: the column's width and edge are the row's
    above, so this only stacks what the search leaves. */
 .settings-rail {
@@ -2403,6 +2429,16 @@ p {
 .settings-rail [role='tab']:focus-visible {
   outline: 1px solid var(--accent);
   outline-offset: -1px;
+}
+
+/* The entry's update dot (packages-status S8) sits at the row's right end, never
+   over its word: the row is a flex LINE, so `margin-left: auto` parks the dot at
+   the end, `flex: none` keeps its 6px whole, and everything before it - the
+   glyph and the word - stays exactly where it was. Its shape is the shared rule
+   at the footer (the gear's own dot). */
+.settings-rail [role='tab'] .dot {
+  flex: none;
+  margin-left: auto;
 }
 
 /* The pane: breathing room from the rail, then the section's heading, its one
