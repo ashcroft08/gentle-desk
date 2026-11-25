@@ -55,6 +55,10 @@ pub fn to_intent(state: &gentle_app::AppState, intent: &UiIntent) -> Option<gent
         // Close chat names a chat the same way the open does, and the reducer
         // refuses a chat that is running a turn (the delete flow's own rule).
         UiIntent::CloseChat { chat_id } => gentle_app::Intent::CloseChat(chat_for(state, chat_id)),
+        // Closing them all names no chat at all: the reducer closes every chat
+        // that is open and skips the ones that are working, through the same
+        // per-chat path (and the same guard) the single close takes.
+        UiIntent::CloseAllChats => gentle_app::Intent::CloseAllChats,
         // The message id is not a chat: the reducer finds it in the foreground
         // chat's thread and answers the copy command the shell runs.
         UiIntent::CopyMessage { message_id } => gentle_app::Intent::CopyMessage(message_id.clone()),

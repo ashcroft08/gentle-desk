@@ -821,9 +821,19 @@ impl AppStateHolder {
         // (R3-001 of `chat-transcript.md`). It is acted on after the fold, not
         // before it, because a close the reducer REFUSES - a chat mid-turn - keeps
         // the chat open and keeps its rows.
+        //
+        // One close and a BULK close answer the same way (close-chats T1, S2): the
+        // idle chats a bulk close takes off the open set are as gone as one the row
+        // menu closed, so they forget their rows too. The ids are the ones open
+        // BEFORE the fold, and the `is_open` test below is what says which of them
+        // the fold really closed - the working ones it skips are still open, so
+        // they keep exactly what they drew.
         let closing = match &input {
-            gentle_app::Input::Intent(gentle_app::Intent::CloseChat(chat)) => Some(chat.clone()),
-            _ => None,
+            gentle_app::Input::Intent(gentle_app::Intent::CloseChat(chat)) => vec![chat.clone()],
+            gentle_app::Input::Intent(gentle_app::Intent::CloseAllChats) => {
+                lock(&self.app).chats.ids().into_iter().cloned().collect()
+            }
+            _ => Vec::new(),
         };
         // A chat that closes takes the Profile tab's view with it (profiles-editor
         // T2b-2, L11-4): the view is that chat's, and a read still in flight for
@@ -859,8 +869,10 @@ impl AppStateHolder {
             (view, effects.chat_commands, effects.commands)
         };
         self.run_shared(commands);
-        if let Some(chat) = closing.filter(|chat| !self.is_open(chat)) {
-            self.forget_transcript(&chat);
+        for chat in &closing {
+            if !self.is_open(chat) {
+                self.forget_transcript(chat);
+            }
         }
         (view, chat_commands)
     }

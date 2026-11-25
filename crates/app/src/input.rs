@@ -71,6 +71,14 @@ pub enum Intent {
     /// refused with the delete flow's own rule and words: the child is mid-turn
     /// and stopping it is the user's (S4).
     CloseChat(ChatId),
+    /// Close EVERY open chat at once (close-chats T1, S2, S3): each one goes
+    /// through exactly what [`Intent::CloseChat`] does for that chat - the stop
+    /// command, the removal from the open set, the closed set that keeps it
+    /// closed and the foreground fallback. A chat that is working is SKIPPED
+    /// silently: `CloseChat` refuses it (stopping a turn is the user's), and
+    /// this action keeps that guard instead of bypassing it, with no per-chat
+    /// notice. Nothing on disk changes, exactly as for one close.
+    CloseAllChats,
 }
 
 #[derive(Debug, Clone, PartialEq)]

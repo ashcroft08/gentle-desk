@@ -2960,6 +2960,16 @@ export type UiIntent_Deserialize = { type: "SendPrompt"; data: {
 	chat_id: string,
 } } | 
 /**
+ *  Close EVERY open chat at once (close-chats S2, S3): each chat is closed
+ *  through exactly what [`UiIntent::CloseChat`] does for it - its child is
+ *  stopped and it leaves the open set the Updates pane's gate counts, while
+ *  nothing on disk changes and the session list keeps its rows. A chat that
+ *  is working is SKIPPED silently: closing it is refused by the same rule
+ *  `CloseChat` refuses with (stopping a turn is the user's), so the count
+ *  only reaches zero once nothing is running any more.
+ */
+{ type: "CloseAllChats" } | 
+/**
  *  Copy one message's raw markdown: the message is named by the id the
  *  thread was given ([`MessageView::id`]), and the copy itself is the
  *  shell's side effect, never the view's.
@@ -3315,6 +3325,16 @@ export type UiIntent_Serialize = { type: "SendPrompt"; data: {
 { type: "CloseChat"; data: {
 	chat_id: string,
 } } | 
+/**
+ *  Close EVERY open chat at once (close-chats S2, S3): each chat is closed
+ *  through exactly what [`UiIntent::CloseChat`] does for it - its child is
+ *  stopped and it leaves the open set the Updates pane's gate counts, while
+ *  nothing on disk changes and the session list keeps its rows. A chat that
+ *  is working is SKIPPED silently: closing it is refused by the same rule
+ *  `CloseChat` refuses with (stopping a turn is the user's), so the count
+ *  only reaches zero once nothing is running any more.
+ */
+{ type: "CloseAllChats" } | 
 /**
  *  Copy one message's raw markdown: the message is named by the id the
  *  thread was given ([`MessageView::id`]), and the copy itself is the
