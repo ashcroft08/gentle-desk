@@ -14,6 +14,9 @@ impl Chats {
     /// for its child, which starts a fresh one through `--session` (S3). No other
     /// chat changes.
     pub fn open(&mut self, chat: ChatId) -> &mut ChatState {
+        // Opening a chat this run closed takes the id off the closed set: its
+        // next child is a new one, and what it says is news again.
+        self.closed.remove(&chat);
         let previous = self.foreground.replace(chat.clone());
         let left = previous.filter(|previous| previous != &chat);
         if let Some(entry) = left.and_then(|left| self.entries.get_mut(&left)) {
@@ -33,6 +36,7 @@ impl Chats {
     /// [`Input::ChatOpened`](crate::Input::ChatOpened)), its start fails
     /// ([`Input::ChatFailed`](crate::Input::ChatFailed)) or its child goes away.
     pub(crate) fn mark_opening(&mut self, chat: &ChatId) {
+        self.closed.remove(chat);
         let foreground = self.foreground.as_ref() == Some(chat);
         let entry = self.entries.entry(chat.clone()).or_default();
         entry.opening = true;
@@ -45,6 +49,7 @@ impl Chats {
     /// the state has started answers no second ask, whatever it is doing by
     /// then.
     pub(crate) fn mark_started(&mut self, chat: &ChatId) {
+        self.closed.remove(chat);
         let foreground = self.foreground.as_ref() == Some(chat);
         let entry = self.entries.entry(chat.clone()).or_default();
         entry.opening = true;
@@ -79,6 +84,9 @@ impl Chats {
 
     /// Records that `chat`'s child died: it runs nothing until it is restarted.
     /// The chat keeps its thread, its place and its foreground mark.
+    ///
+    /// A chat this run CLOSED never gets here ([`super::closed`] answers first):
+    /// the child that died is the one its close was stopping.
     pub(crate) fn ended_now(&mut self, chat: &ChatId) {
         let foreground = self.foreground.as_ref() == Some(chat);
         let entry = self.entries.entry(chat.clone()).or_default();
@@ -120,6 +128,12 @@ impl Chats {
         // to, so the entry has to be gone after that, never before it.
         queue::drop_of(self, chat);
         let known = self.entries.remove(chat).is_some();
+        if known {
+            // Remembered, so the child this close is stopping cannot put the chat
+            // back on the open set with its last line, its last reply or its own
+            // death: the count is the Updates pane's gate (packages-status S7).
+            self.closed.insert(chat.clone());
+        }
         if self.foreground.as_ref() == Some(chat) {
             self.foreground = None;
         }

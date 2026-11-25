@@ -23,6 +23,15 @@ impl Chats {
         event: &RpcEvent,
         now_ms: Option<u64>,
     ) -> (Vec<Command>, Vec<ChatCommand>) {
+        // A chat this run CLOSED keeps nothing of the child it stopped: a reply
+        // that was already in flight is stale, and folding it would put the chat
+        // back on the open set - the count `open_chats` carries, and the gate the
+        // Updates pane's terminal buttons read (packages-status S7). An id the app
+        // never heard of keeps today's rule, below: its event makes the chat
+        // exist.
+        if self.is_closed(chat) {
+            return (Vec::new(), Vec::new());
+        }
         // The chat's own decoded event is the proof its child is alive: whatever
         // end of the opening phase awaits (`ChatOpened` at once, the 20 s net,
         // the first request's reply), any event of this chat means it already

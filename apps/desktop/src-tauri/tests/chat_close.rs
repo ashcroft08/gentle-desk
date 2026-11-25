@@ -169,3 +169,167 @@ fn closing_a_chat_this_run_never_opened_asks_for_nothing() {
     assert_eq!(view.open_chats, before.open_chats);
     assert_eq!(view.notices, before.notices);
 }
+
+/// The gate the Updates pane's terminal buttons read (`open_chats`) counts the
+/// chats the app has OPEN - not every id something mentioned. A chat that left
+/// the set must never come back from the last things its child said.
+///
+/// This is the maintainer's second report (L3, 0.9.0): one chat opened and
+/// closed, and the terminal buttons stayed disabled with "1 chat is open" for the
+/// rest of the run. The chat was not on screen and had no child: a last input of
+/// the child that had just been stopped (a stderr line, a reply that was already
+/// in flight, the death of the process as it went) recreated the map entry, and
+/// the entry is the count.
+#[test]
+fn a_closed_chats_last_inputs_never_reopen_it() {
+    let scratch = Scratch::new("phantom");
+    let path = scratch.session("a.jsonl");
+    let chat = ChatId::of_session(&path);
+    let holder = open_chat(&path);
+    holder.fold_input(Input::ChatEvent {
+        chat: chat.clone(),
+        event: RpcEvent::AgentSettled,
+    });
+    let (closed, _commands) = holder.dispatch_commands(UiIntent::CloseChat {
+        chat_id: path.clone(),
+    });
+    assert_eq!(closed.open_chats, 0, "the close took it off the open set");
+    assert_eq!(closed.foreground_chat, None);
+
+    // What a stopped child can still leave behind, in the order it can arrive.
+    holder.fold_input(Input::ChatStderr {
+        chat: chat.clone(),
+        line: "gentle-shell: goodbye".to_owned(),
+    });
+    assert_eq!(
+        holder.view().open_chats,
+        0,
+        "a stderr line of a stopped child is not a chat the app has open"
+    );
+
+    holder.fold_input(Input::ChatEvent {
+        chat: chat.clone(),
+        event: RpcEvent::Response(gentle_core::rpc::RpcResponse {
+            id: None,
+            command: "get_session_stats".to_owned(),
+            outcome: Ok(serde_json::json!({"tokens": 10, "contextWindow": 100})),
+        }),
+    });
+    assert_eq!(
+        holder.view().open_chats,
+        0,
+        "a reply that was already in flight does not reopen the chat"
+    );
+
+    holder.fold_input(Input::ChatClosed {
+        chat: chat.clone(),
+        expected: false,
+    });
+    let view = holder.view();
+    assert_eq!(
+        view.open_chats, 0,
+        "the stop of a closed chat's child is not a chat back on the open set"
+    );
+    assert_eq!(view.foreground_chat, None, "nothing took the screen back");
+    assert!(
+        view.notices.is_empty(),
+        "and it is not a Restart offered for a chat that is not open: {:?}",
+        view.notices
+    );
+}
+
+/// The other side of the same memory: a chat opened AGAIN after a close is a live
+/// chat like any other, so what its new child says is folded and kept.
+#[test]
+fn a_chat_opened_again_after_a_close_is_live_again() {
+    let scratch = Scratch::new("reopened");
+    let path = scratch.session("a.jsonl");
+    let chat = ChatId::of_session(&path);
+    let holder = open_chat(&path);
+    let (closed, _commands) = holder.dispatch_commands(UiIntent::CloseChat {
+        chat_id: path.clone(),
+    });
+    assert_eq!(closed.open_chats, 0);
+
+    let (reopened, _commands) = holder.dispatch_commands(UiIntent::OpenChat {
+        chat_id: path.clone(),
+    });
+    assert_eq!(reopened.open_chats, 1, "the row opens it again");
+    holder.fold_input(Input::ChatStderr {
+        chat: chat.clone(),
+        line: "gentle-shell: back".to_owned(),
+    });
+    holder.fold_input(Input::ChatEvent {
+        chat: chat.clone(),
+        event: RpcEvent::AgentStart,
+    });
+    assert_eq!(
+        holder.view().activity.first().map(|mark| mark.activity),
+        Some(gentle_desk_lib::contract::ChatActivityMark::Working),
+        "the new child's own event marks it working"
+    );
+}
+
+/// The other half of the same rule, for the LAZY start (welcome-screen T4): a
+/// fresh chat this run allocated and never started has no child at all, so
+/// closing it asks for no stop, leaves the gate at zero, and nothing of its own
+/// reopens it.
+#[test]
+fn a_fresh_chat_that_never_started_closes_to_zero_chats() {
+    let holder = AppStateHolder::default();
+    let (allocated, _commands) = holder.dispatch_commands(UiIntent::OpenNewChat);
+    let fresh = allocated.foreground_chat.expect("a new chat is in front");
+    assert_eq!(allocated.open_chats, 1, "the click opened one chat");
+
+    let (closed, commands) = holder.dispatch_commands(UiIntent::CloseChat {
+        chat_id: fresh.clone(),
+    });
+
+    assert_eq!(
+        closed.open_chats, 0,
+        "the Updates gate has nothing left to wait for"
+    );
+    assert_eq!(closed.foreground_chat, None);
+    assert!(
+        commands
+            .iter()
+            .all(|command| matches!(command, ChatCommand::CloseProcess { chat } if chat == &ChatId::of_text(&fresh).expect("the fresh form"))),
+        "a chat whose child never started asks for no other chat's process: {commands:?}"
+    );
+    assert!(closed.notices.is_empty(), "and nothing is reported");
+}
+
+/// A fresh chat that WAS started and closed leaves its child's own inputs behind
+/// too: the key the runtime registered for `new-N` is not the app's open set, and
+/// nothing it says brings the chat back.
+#[test]
+fn a_closed_fresh_chat_stays_closed_whatever_its_child_says() {
+    let holder = AppStateHolder::default();
+    let (allocated, _commands) = holder.dispatch_commands(UiIntent::OpenNewChat);
+    let fresh = allocated.foreground_chat.expect("a new chat is in front");
+    let (_started, commands) = holder.dispatch_commands(UiIntent::EnsureStarted {
+        chat_id: fresh.clone(),
+    });
+    assert_eq!(
+        commands,
+        vec![ChatCommand::OpenProcess {
+            chat: ChatId::of_text(&fresh).expect("the fresh form")
+        }],
+        "the composer's ask starts its child"
+    );
+
+    let (closed, _commands) = holder.dispatch_commands(UiIntent::CloseChat {
+        chat_id: fresh.clone(),
+    });
+    assert_eq!(closed.open_chats, 0);
+
+    holder.fold_input(Input::ChatClosed {
+        chat: ChatId::of_text(&fresh).expect("the fresh form"),
+        expected: true,
+    });
+    assert_eq!(
+        holder.view().open_chats,
+        0,
+        "an expected stop of a closed chat's child reopens nothing"
+    );
+}

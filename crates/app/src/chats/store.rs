@@ -6,7 +6,7 @@
 //! it. Opening a chat only moves the foreground mark: no other chat is stopped,
 //! cleared or read, which is what lets a chat keep working in the background.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use gentle_core::chat::ChatState;
 
@@ -24,6 +24,16 @@ pub struct Chats {
     pub(crate) queue: Vec<(ChatId, String)>,
     /// The working cap; `0` means no cap is enforced (S7).
     pub(crate) max_working: usize,
+    /// The chats this run CLOSED (`Close chat`, 0.1.14). They are gone from
+    /// `entries` on purpose, and this is what keeps a leftover of the child that
+    /// was stopped - a stderr line, a reply already in flight, its death - from
+    /// putting the chat back: such a leftover changes nothing, while an id the app
+    /// never heard of keeps today's rule (its event makes the chat exist). The
+    /// distinction matters because the entry count IS `ViewState::open_chats`, the
+    /// gate the Updates pane's terminal buttons read (packages-status S7): a
+    /// resurrected id kept every one of them disabled on a machine with nothing
+    /// open. Opening the chat again takes the id out of here.
+    pub(crate) closed: BTreeSet<ChatId>,
 }
 
 /// One chat: its state, whether a finished turn is still unread, whether its
@@ -102,6 +112,11 @@ impl Chats {
         if line.is_empty() {
             return;
         }
+        // The child of a chat this run CLOSED is the one that was being stopped:
+        // its last lines are not a reason to put the chat back.
+        if self.is_closed(chat) {
+            return;
+        }
         let entry = self.entries.entry(chat.clone()).or_default();
         entry
             .stderr
@@ -114,6 +129,12 @@ impl Chats {
     pub(crate) fn stderr_of(&self, chat: &ChatId) -> &[String] {
         self.entries.get(chat).map_or(&[], |entry| &entry.stderr)
     }
+
+    /// Whether this run closed that chat and has not opened it again: the child
+    /// it stopped leaves nothing behind (see the field's own note).
+    pub fn is_closed(&self, chat: &ChatId) -> bool {
+        self.closed.contains(chat)
+    }
 }
 
 impl Default for Chats {
@@ -123,6 +144,7 @@ impl Default for Chats {
             foreground: None,
             queue: Default::default(),
             max_working: queue::DEFAULT_MAX_WORKING,
+            closed: BTreeSet::new(),
         }
     }
 }
